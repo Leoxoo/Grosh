@@ -44,11 +44,15 @@ _Avoid_: Entry, record, item
 The person a transaction involved, such as who the user ate with or who a Loan was given to. A name, not a contact.
 _Avoid_: Contact, member, payee
 
+**Event**:
+A named occasion a transaction belonged to, such as a trip or a wedding.
+_Avoid_: Trip, tag
+
 **Category**:
 What a transaction was for. Its category type decides whether the amount adds to or subtracts from the wallet.
 
 **Category type**:
-Expense, Income, or Debt/Loan. Expense and Income categories are the user's own; Debt/Loan categories are fixed.
+Expense, Income, or Debt/Loan. Expense and Income categories are the user's own; Debt/Loan categories are fixed. The app also keeps categories of its own, such as Starting balance, that are never offered in a picker.
 
 **Parent category** / **Subcategory**:
 Categories nest at most two levels deep (e.g. Bills & Utilities → Phone Bill). A transaction may be filed under either level.
@@ -57,11 +61,11 @@ Categories nest at most two levels deep (e.g. Bills & Utilities → Phone Bill).
 Moving every transaction from one category (or Card) into another, then removing the first.
 
 **Locked category**:
-A category the app itself depends on (the transfer pair, Other Income, Other Expense, and the four Debt/Loan categories). It can't be deleted or merged.
+A category the app itself depends on (the transfer pair, Other Income, Other Expense, the four Debt/Loan categories, and Starting balance). It can't be deleted or merged.
 
 **Hidden category**:
 A category removed from the picker that keeps its history.
-_Avoid_: Inactive, archived (archived is for wallets)
+_Avoid_: Inactive, archived (archived is for wallets and Cards)
 
 **Loan**:
 Money the user lent to someone else and expects back.
