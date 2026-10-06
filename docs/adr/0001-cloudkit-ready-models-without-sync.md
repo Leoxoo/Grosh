@@ -1,0 +1,3 @@
+# SwiftData models follow CloudKit's rules while sync is off
+
+Grosh stores everything on-device with SwiftData and has no iCloud sync yet, because sync needs a paid Apple Developer account. We still write every model to CloudKit's constraints from day one: every property is optional or has a default, nothing uses `@Attribute(.unique)`, and every relationship is optional with an explicit inverse. That way, turning on sync later is a configuration change rather than a data migration over years of history. The cost is looser models now: uniqueness (e.g. category names) and required-ness are enforced in app logic, not by the store.

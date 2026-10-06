@@ -1,0 +1,3 @@
+# Settling a Debt or Loan never rewrites the original transaction
+
+When a Loan is paid back (or a Debt repaid), the original transaction keeps its amount and date. The repayment is recorded as new transaction(s) on the repayment date, linked to the original: the owed portion under Debt Collection or Repayment (excluded from report), and anything above it as ordinary income or expense. We considered zeroing the original and adding only the difference, which gives the same report numbers, but it moves every opening and ending balance between the two dates and breaks reconciliation against bank statements, which is the main reason the user keeps these records.

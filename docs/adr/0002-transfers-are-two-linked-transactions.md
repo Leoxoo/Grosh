@@ -1,0 +1,3 @@
+# A transfer is two linked transactions, not one record
+
+A transfer between wallets is stored as two ordinary transactions (an Outgoing transfer in the source wallet, an Incoming transfer in the destination) joined by a link, rather than as a single record with "from" and "to" wallets. This matches how the user's MoneyLover history is shaped, lets each half be shown and edited on its own (editing one asks whether to update the other), and allows the halves to differ when a fee was taken. The same link mechanism is reused for Debt/Loan repayments. The trade-off is that the two halves can drift apart if the user picks "only this one", which a single record would make impossible.
