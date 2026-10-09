@@ -11,6 +11,9 @@ nonisolated enum CardKind: String, CaseIterable, Sendable {
 /// The payment card an expense was made with. Only a label: it never changes any balance.
 @Model
 final class Card {
+    /// The SF Symbol every Card is drawn with.
+    static let symbolName = "creditcard.fill"
+
     var name: String = ""
     var kindRaw: String = CardKind.credit.rawValue
     var colorName: String = PaletteColor.blue.rawValue

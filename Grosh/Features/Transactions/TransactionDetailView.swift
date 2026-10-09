@@ -96,7 +96,7 @@ struct TransactionDetailView: View {
         if let card = transaction.card {
             LabeledContent("Card") {
                 HStack(spacing: 6) {
-                    Image(systemName: "creditcard.fill")
+                    Image(systemName: Card.symbolName)
                         .foregroundStyle(card.color.color)
                     Text(card.displayName)
                 }

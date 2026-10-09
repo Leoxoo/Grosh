@@ -30,7 +30,7 @@ struct CardRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            SymbolCircle(symbolName: "creditcard.fill", color: card.color)
+            SymbolCircle(symbolName: Card.symbolName, color: card.color)
             VStack(alignment: .leading, spacing: 2) {
                 Text(card.displayName)
                 Text(summary)

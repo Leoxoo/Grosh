@@ -74,7 +74,7 @@ struct CardEditor: View {
             Form {
                 Section {
                     HStack(spacing: 12) {
-                        SymbolCircle(symbolName: "creditcard.fill", color: draft.color, size: 40)
+                        SymbolCircle(symbolName: Card.symbolName, color: draft.color, size: 40)
                         TextField("Name", text: $draft.name)
                     }
                     Picker("Kind", selection: $draft.kind) {

@@ -47,7 +47,7 @@ struct CardBadge: View {
     let card: Card
 
     var body: some View {
-        Label(card.name, systemImage: "creditcard.fill")
+        Label(card.name, systemImage: Card.symbolName)
             .labelStyle(.titleAndIcon)
             .font(.caption2.weight(.medium))
             .lineLimit(1)

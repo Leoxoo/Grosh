@@ -16,7 +16,7 @@ struct CardPicker: View {
                 Label {
                     Text(card.displayName)
                 } icon: {
-                    Image(systemName: "creditcard.fill")
+                    Image(systemName: Card.symbolName)
                         .foregroundStyle(card.color.color)
                 }
                 .tag(Optional(card))
