@@ -19,5 +19,8 @@ struct GroshApp: App {
             RootView()
         }
         .modelContainer(container)
+        .commands {
+            NewTransactionCommands()
+        }
     }
 }
