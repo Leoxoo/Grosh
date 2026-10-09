@@ -9,6 +9,8 @@ struct TransactionListView: View {
 
     @Query private var transactions: [Transaction]
     @State private var walletSelection = WalletSelection.total
+    /// How long each period in the strip is. Only a month for now; the "…" menu will choose it once it has
+    /// more ranges to offer.
     @State private var timeRange = TimeRange.month
     @State private var period = Period.month(CalendarMonth(.today))
 
@@ -73,11 +75,6 @@ struct TransactionListView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                TransactionsMenu(walletSelection: walletSelection, timeRange: $timeRange)
-            }
-        }
         .addTransactionButton()
     }
 }
