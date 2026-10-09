@@ -44,6 +44,8 @@ struct TransactionDetailView: View {
                 }
             }
 
+            BalanceChangeSection(transaction: transaction)
+
             Section {
                 fields
             }

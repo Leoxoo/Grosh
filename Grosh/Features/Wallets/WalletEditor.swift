@@ -21,6 +21,7 @@ struct WalletEditor: View {
     @State private var startingAmountText = ""
     @State private var startingDay = CalendarDay.today
     @State private var errorMessage: String?
+    @State private var isAdjustingBalance = false
 
     init(mode: EditorMode<Wallet>) {
         self.mode = mode
@@ -61,6 +62,14 @@ struct WalletEditor: View {
                     PaletteColorGrid(selection: $draft.color)
                 }
 
+                if let wallet = mode.editing, !wallet.isArchived {
+                    Section {
+                        Button("Adjust Balance", systemImage: "plusminus") { isAdjustingBalance = true }
+                    } footer: {
+                        Text("Type what the wallet really holds; the difference is recorded as one transaction.")
+                    }
+                }
+
                 if let wallet = mode.editing {
                     Section {
                         if wallet.isArchived {
@@ -89,6 +98,9 @@ struct WalletEditor: View {
                 }
             }
             .errorAlert("Couldn't Save Wallet", message: $errorMessage)
+            .sheet(isPresented: $isAdjustingBalance) {
+                AdjustBalanceEditor(wallet: mode.editing)
+            }
         }
     }
 
