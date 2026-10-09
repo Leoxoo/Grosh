@@ -94,7 +94,7 @@ extension Card {
     @discardableResult
     static func create(_ draft: CardDraft, in context: ModelContext) throws -> Card {
         try draft.validate()
-        let card = Card(name: draft.name, kind: draft.kind, payingWallet: nil, sortOrder: try nextSortOrder(in: context))
+        let card = Card(name: draft.name, kind: draft.kind, payingWallet: nil, sortOrder: try context.nextSortOrder(\Card.sortOrder))
         context.insert(card)
         card.apply(draft)
         return card
@@ -116,13 +116,6 @@ extension Card {
         color = draft.color
         lastFourDigits = draft.storedLastFourDigits
         statementDay = draft.statementDay
-    }
-
-    /// The position after every Card already in the store, archived ones included.
-    private static func nextSortOrder(in context: ModelContext) throws -> Int {
-        var descriptor = FetchDescriptor<Card>(sortBy: [SortDescriptor(\.sortOrder, order: .reverse)])
-        descriptor.fetchLimit = 1
-        return try context.fetch(descriptor).first.map { $0.sortOrder + 1 } ?? 0
     }
 
     /// The order Cards are listed in everywhere: the order they were added.

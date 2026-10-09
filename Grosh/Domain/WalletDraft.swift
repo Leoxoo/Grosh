@@ -52,7 +52,7 @@ extension Wallet {
     ) throws -> Wallet {
         try draft.validate()
         let category = try context.lockedCategory(.startingBalance)
-        let wallet = Wallet(name: draft.trimmedName, sortOrder: try nextSortOrder(in: context))
+        let wallet = Wallet(name: draft.trimmedName, sortOrder: try context.nextSortOrder(\Wallet.sortOrder))
         context.insert(wallet)
         wallet.apply(draft)
 

@@ -21,13 +21,6 @@ extension Wallet {
         }
     }
 
-    /// The position after every wallet already in the store, archived ones included.
-    static func nextSortOrder(in context: ModelContext) throws -> Int {
-        var descriptor = FetchDescriptor<Wallet>(sortBy: [SortDescriptor(\.sortOrder, order: .reverse)])
-        descriptor.fetchLimit = 1
-        return try context.fetch(descriptor).first.map { $0.sortOrder + 1 } ?? 0
-    }
-
     /// Adds a wallet named `name` with its Starting balance, as ``create(_:startingBalance:on:in:)`` does.
     @discardableResult
     static func create(
