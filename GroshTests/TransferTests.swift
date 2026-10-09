@@ -137,12 +137,32 @@ struct TransferTests {
         }
     }
 
+    @Test func eachHalfShowsTheWalletTheMoneyLeftAndTheOneItWentTo() throws {
+        let transfer = try Transfer.create(draft(250_00), in: context)
+
+        for half in [transfer.outgoing, transfer.incoming] {
+            let wallets = try half.transferWallets(in: context)
+            #expect(wallets.from == checking)
+            #expect(wallets.to == savings)
+        }
+    }
+
+    @Test func aHalfWhoseOtherHalfWasDeletedShowsOnlyItsOwnWallet() throws {
+        let transfer = try Transfer.create(draft(250_00), in: context)
+        try transfer.outgoing.delete(.onlyThisOne, in: context)
+
+        let wallets = try transfer.incoming.transferWallets(in: context)
+
+        #expect(wallets.from == nil)
+        #expect(wallets.to == savings)
+    }
+
     @Test func changingTheAmountAsksWhetherToUpdateBothHalves() throws {
         let transfer = try Transfer.create(draft(250_00), in: context)
         var edited = TransferHalfDraft(editing: transfer.outgoing)
         edited.amount = Money(cents: 255_00)
 
-        #expect(try transfer.outgoing.updateScopes(for: edited, in: context) == [.bothHalves, .onlyThisOne])
+        #expect(try transfer.outgoing.offersToUpdateOtherHalf(with: edited, in: context))
     }
 
     @Test func changingTheDateAsksWhetherToUpdateBothHalves() throws {
@@ -150,7 +170,7 @@ struct TransferTests {
         var edited = TransferHalfDraft(editing: transfer.incoming)
         edited.day = CalendarDay(year: 2026, month: 10, day: 8)
 
-        #expect(try transfer.incoming.updateScopes(for: edited, in: context) == [.bothHalves, .onlyThisOne])
+        #expect(try transfer.incoming.offersToUpdateOtherHalf(with: edited, in: context))
     }
 
     @Test func changingOnlyTheNoteChangesThisHalfWithoutAsking() throws {
@@ -158,8 +178,8 @@ struct TransferTests {
         var edited = TransferHalfDraft(editing: transfer.incoming)
         edited.note = "Emergency fund"
 
-        #expect(try transfer.incoming.updateScopes(for: edited, in: context) == [.onlyThisOne])
-        try transfer.incoming.update(with: edited, .onlyThisOne, in: context)
+        #expect(try !transfer.incoming.offersToUpdateOtherHalf(with: edited, in: context))
+        try transfer.incoming.update(with: edited, scope: .onlyThisOne, in: context)
         #expect(transfer.incoming.note == "Emergency fund")
         #expect(transfer.outgoing.note == "Rainy day fund")
     }
@@ -171,7 +191,7 @@ struct TransferTests {
         edited.amount = Money(cents: 255_00)
 
         #expect(transfer.outgoing.editFlow == .transferHalf)
-        #expect(try transfer.outgoing.updateScopes(for: edited, in: context) == [.onlyThisOne])
+        #expect(try !transfer.outgoing.offersToUpdateOtherHalf(with: edited, in: context))
     }
 
     @Test func changingOnlyThisOneLeavesTheHalvesDifferentLikeAFee() throws {
@@ -179,7 +199,7 @@ struct TransferTests {
         var edited = TransferHalfDraft(editing: transfer.outgoing)
         edited.amount = Money(cents: 255_00)
 
-        try transfer.outgoing.update(with: edited, .onlyThisOne, in: context)
+        try transfer.outgoing.update(with: edited, scope: .onlyThisOne, in: context)
 
         #expect(checking.balance(asOf: today) == Money(cents: 745_00))
         #expect(savings.balance(asOf: today) == Money(cents: 250_00))
@@ -191,7 +211,7 @@ struct TransferTests {
         var edited = TransferHalfDraft(editing: transfer.incoming)
         edited.amount = Money(cents: 300_00)
 
-        try transfer.incoming.update(with: edited, .bothHalves, in: context)
+        try transfer.incoming.update(with: edited, scope: .bothHalves, in: context)
 
         #expect(checking.balance(asOf: today) == Money(cents: 700_00))
         #expect(savings.balance(asOf: today) == Money(cents: 300_00))
@@ -201,11 +221,11 @@ struct TransferTests {
         let transfer = try Transfer.create(draft(250_00), in: context)
         var fee = TransferHalfDraft(editing: transfer.outgoing)
         fee.amount = Money(cents: 255_00)
-        try transfer.outgoing.update(with: fee, .onlyThisOne, in: context)
+        try transfer.outgoing.update(with: fee, scope: .onlyThisOne, in: context)
         var moved = TransferHalfDraft(editing: transfer.outgoing)
         moved.day = CalendarDay(year: 2026, month: 10, day: 2)
 
-        try transfer.outgoing.update(with: moved, .bothHalves, in: context)
+        try transfer.outgoing.update(with: moved, scope: .bothHalves, in: context)
 
         #expect(transfer.incoming.day == CalendarDay(year: 2026, month: 10, day: 2))
         #expect(transfer.incoming.amount == Money(cents: 250_00))
@@ -219,7 +239,7 @@ struct TransferTests {
 
         #expect(!edited.canSave)
         #expect(throws: TransferRuleError.missingAmount) {
-            try transfer.outgoing.update(with: edited, .bothHalves, in: context)
+            try transfer.outgoing.update(with: edited, scope: .bothHalves, in: context)
         }
         #expect(transfer.outgoing.amount == Money(cents: -250_00))
         #expect(transfer.incoming.amount == Money(cents: 250_00))
@@ -230,7 +250,7 @@ struct TransferTests {
         let startingBalance = try #require(savings.transactions?.first { !$0.category!.isTransferHalf })
 
         #expect(throws: TransferRuleError.notATransferHalf) {
-            try startingBalance.update(with: TransferHalfDraft(editing: transfer.incoming), .onlyThisOne, in: context)
+            try startingBalance.update(with: TransferHalfDraft(editing: transfer.incoming), scope: .onlyThisOne, in: context)
         }
         #expect(startingBalance.amount == Money(cents: 0))
     }

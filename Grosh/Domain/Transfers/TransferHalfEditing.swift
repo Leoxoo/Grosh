@@ -33,19 +33,18 @@ nonisolated enum TransferUpdateScope: Hashable, Sendable {
 }
 
 extension Transaction {
-    /// What the user is asked to choose between when saving `draft` over this transfer half, the default first.
-    /// A new amount or date offers to update the other half too; a new note, or a half whose other half was
-    /// deleted on its own, simply changes this one.
-    func updateScopes(for draft: TransferHalfDraft, in context: ModelContext) throws -> [TransferUpdateScope] {
+    /// Whether saving `draft` over this transfer half asks to update the other half too (Update Both / Only This
+    /// One): only for a new amount or date. A new note, or a half whose other half was deleted on its own, simply
+    /// changes this one.
+    func offersToUpdateOtherHalf(with draft: TransferHalfDraft, in context: ModelContext) throws -> Bool {
         let changesBoth = draft.amount.cents != abs(amountCents) || draft.day != day
-        guard changesBoth, try otherHalf(in: context) != nil else { return [.onlyThisOne] }
-        return [.bothHalves, .onlyThisOne]
+        return try changesBoth && otherHalf(in: context) != nil
     }
 
     /// Saves an edited transfer half, and with ``TransferUpdateScope/bothHalves`` carries a new amount or date over
     /// to the other half: a date-only change keeps a fee the halves already differ by. The note is this half's
     /// own. Saves. Nothing changes when the draft breaks a transfer rule.
-    func update(with draft: TransferHalfDraft, _ scope: TransferUpdateScope, in context: ModelContext) throws {
+    func update(with draft: TransferHalfDraft, scope: TransferUpdateScope, in context: ModelContext) throws {
         guard editFlow == .transferHalf else { throw TransferRuleError.notATransferHalf }
         try draft.validate()
         let changesAmount = draft.amount.cents != abs(amountCents)
@@ -63,5 +62,13 @@ extension Transaction {
     /// The other half of the transfer this transaction is half of, or `nil` once it was deleted on its own.
     func otherHalf(in context: ModelContext) throws -> Transaction? {
         try related(in: context).first { $0.category?.isTransferHalf == true }
+    }
+
+    /// Where the money of the transfer this transaction is half of left and where it went, seen from either half:
+    /// the Outgoing transfer's wallet and the Incoming transfer's. The other half's is `nil` once that half was
+    /// deleted on its own.
+    func transferWallets(in context: ModelContext) throws -> (from: Wallet?, to: Wallet?) {
+        let otherWallet = try otherHalf(in: context)?.wallet
+        return category?.lockedRole == .outgoingTransfer ? (wallet, otherWallet) : (otherWallet, wallet)
     }
 }

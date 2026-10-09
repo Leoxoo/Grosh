@@ -106,17 +106,15 @@ struct TransferHalfEditor: View {
     /// Where the money left and where it went: this half's wallet and, while it is there, the other half's.
     @ViewBuilder
     private var wallets: some View {
-        let other = try? transaction.otherHalf(in: context)
-        let isOutgoing = transaction.category?.lockedRole == .outgoingTransfer
-        WalletLabel(title: "From", wallet: isOutgoing ? transaction.wallet : other?.wallet)
-        WalletLabel(title: "To", wallet: isOutgoing ? other?.wallet : transaction.wallet)
+        let wallets = try? transaction.transferWallets(in: context)
+        WalletLabel(title: "From", wallet: wallets?.from)
+        WalletLabel(title: "To", wallet: wallets?.to)
     }
 
     /// Saves straight away, or first asks whether to update both halves when the amount or date changed.
     private func confirmSave() {
         do {
-            let scopes = try transaction.updateScopes(for: draftToSave, in: context)
-            if scopes.contains(.bothHalves) {
+            if try transaction.offersToUpdateOtherHalf(with: draftToSave, in: context) {
                 isAskingScope = true
             } else {
                 save(.onlyThisOne)
@@ -128,7 +126,7 @@ struct TransferHalfEditor: View {
 
     private func save(_ scope: TransferUpdateScope) {
         do {
-            try transaction.update(with: draftToSave, scope, in: context)
+            try transaction.update(with: draftToSave, scope: scope, in: context)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
