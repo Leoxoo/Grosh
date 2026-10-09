@@ -178,6 +178,62 @@ struct CardManagementTests {
         #expect(checking.balance(asOf: today) == Money(cents: -136_86))
     }
 
+    @Test func aCardMergesOnlyIntoTheOtherUnarchivedCardsPaidFromTheSameWallet() throws {
+        let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
+        let nfcu = try addCard("NFCU")
+        try addCard("Savings Debit", kind: .debit, paidFrom: savings)
+        try addCard("Navy Federal")
+        try addCard("Old Amex").archive()
+        try addCard("Apple Card")
+
+        #expect(nfcu.mergeTargets.map(\.name) == ["Navy Federal", "Apple Card"])
+    }
+
+    @Test func mergingIntoACardPaidFromAnotherWalletIsRefusedAndMovesNothing() throws {
+        let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
+        let nfcu = try addCard("NFCU")
+        let savingsDebit = try addCard("Savings Debit", kind: .debit, paidFrom: savings)
+        let lunch = try addExpense(12_76, paidWith: nfcu)
+
+        #expect(throws: CardRuleError.mergeIntoAnotherWallet) { try nfcu.merge(into: savingsDebit, in: context) }
+        #expect(lunch.card == nfcu)
+        #expect(Set(try allCards()) == [nfcu, savingsDebit])
+    }
+
+    @Test func mergingIntoAnArchivedCardIsRefused() throws {
+        let nfcu = try addCard("NFCU")
+        let oldAmex = try addCard("Old Amex")
+        oldAmex.archive()
+        let lunch = try addExpense(12_76, paidWith: nfcu)
+
+        #expect(throws: CardRuleError.mergeIntoArchived) { try nfcu.merge(into: oldAmex, in: context) }
+        #expect(lunch.card == nfcu)
+    }
+
+    @Test func aCardThatPaidForTransactionsKeepsItsPayingWallet() throws {
+        let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
+        let nfcu = try addCard("NFCU")
+        try addExpense(12_76, paidWith: nfcu)
+        var details = CardDetails(nfcu)
+        details.payingWallet = savings
+        details.name = "Navy Federal"
+
+        #expect(throws: CardRuleError.payingWalletHasTransactions) { try nfcu.update(with: details) }
+        #expect(nfcu.payingWallet == checking)
+        #expect(nfcu.name == "NFCU")
+    }
+
+    @Test func aCardWithoutTransactionsCanMoveToAnotherPayingWallet() throws {
+        let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
+        let unused = try addCard("PayPal")
+        var details = CardDetails(unused)
+        details.payingWallet = savings
+
+        try unused.update(with: details)
+
+        #expect(unused.payingWallet == savings)
+    }
+
     @Test func aCardCannotBeMergedIntoItself() throws {
         let amex = try addCard("Amex")
         let dinner = try addExpense(55_00, paidWith: amex)

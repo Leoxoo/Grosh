@@ -25,8 +25,14 @@ nonisolated enum CardRuleError: Error, Equatable {
     case invalidLastFourDigits
     /// Merging needs a different Card to move the transactions to.
     case mergeIntoItself
+    /// A Card only merges into a Card paid from the same wallet, so its transactions keep a Card their wallet offers.
+    case mergeIntoAnotherWallet
+    /// An archived Card is out of the pickers; unarchive it before merging into it.
+    case mergeIntoArchived
     /// A Card that paid for transactions can't be deleted; merge it into another Card instead.
     case hasTransactions
+    /// A Card that paid for transactions keeps its paying wallet, so those transactions keep a Card their wallet offers.
+    case payingWalletHasTransactions
 }
 
 extension CardDetails {
@@ -80,6 +86,9 @@ extension Card {
     /// Saves edited details. Nothing changes when the details break a Card rule.
     func update(with details: CardDetails) throws {
         try details.validate()
+        guard details.payingWallet == payingWallet || !hasTransactions else {
+            throw CardRuleError.payingWalletHasTransactions
+        }
         apply(details)
     }
 
@@ -124,9 +133,17 @@ extension Card {
         isArchived = false
     }
 
+    /// The Cards this one can be merged into: the other unarchived Cards paid from the same wallet, in the
+    /// user's order. Its transactions stay in their wallet, so they keep a Card that wallet offers.
+    var mergeTargets: [Card] {
+        Card.pickerChoices(for: payingWallet, keeping: nil).filter { $0 != self }
+    }
+
     /// Moves every transaction paid with this Card to `target`, then removes this Card.
     func merge(into target: Card, in context: ModelContext) throws {
         guard target != self else { throw CardRuleError.mergeIntoItself }
+        guard target.payingWallet == payingWallet else { throw CardRuleError.mergeIntoAnotherWallet }
+        guard !target.isArchived else { throw CardRuleError.mergeIntoArchived }
         for transaction in transactions ?? [] {
             transaction.card = target
         }

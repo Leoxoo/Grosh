@@ -9,11 +9,10 @@ struct CardMergeView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
-    @Query(sort: Card.userOrder) private var cards: [Card]
     @State private var target: Card?
     @State private var errorMessage: String?
 
-    private var targets: [Card] { cards.filter { $0 != source } }
+    private var targets: [Card] { source.mergeTargets }
 
     var body: some View {
         NavigationStack {
@@ -24,7 +23,6 @@ struct CardMergeView: View {
                             target = card
                         } label: {
                             CardRow(card: card)
-                                .foregroundStyle(card.isArchived ? .secondary : .primary)
                         }
                         .buttonStyle(.plain)
                     }
@@ -36,7 +34,11 @@ struct CardMergeView: View {
             }
             .overlay {
                 if targets.isEmpty {
-                    ContentUnavailableView("No Other Cards", systemImage: "creditcard", description: Text("Add another Card to merge this one into."))
+                    ContentUnavailableView(
+                        "No Other Cards",
+                        systemImage: "creditcard",
+                        description: Text("A Card merges into another unarchived Card paid from the same wallet.")
+                    )
                 }
             }
             .navigationTitle("Merge Card")

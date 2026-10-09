@@ -50,6 +50,9 @@ struct CardEditor: View {
         return card
     }
 
+    /// A Card that paid for transactions keeps its paying wallet.
+    private var isPayingWalletFixed: Bool { editedCard?.hasTransactions == true }
+
     /// What will be saved: the statement date only counts for a Credit card.
     private var detailsToSave: CardDetails {
         var result = details
@@ -81,6 +84,7 @@ struct CardEditor: View {
                     }
                     .pickerStyle(.segmented)
                     WalletPicker(title: "Paying wallet", selection: $details.payingWallet)
+                        .disabled(isPayingWalletFixed)
                     TextField("Last 4 digits (optional)", text: lastFourDigits)
                         #if os(iOS)
                         .keyboardType(.numberPad)
@@ -88,6 +92,8 @@ struct CardEditor: View {
                 } footer: {
                     if wallets.isEmpty && details.payingWallet == nil {
                         Text("Add a wallet first. A Card is paid from a wallet and only offered on its transactions.")
+                    } else if isPayingWalletFixed {
+                        Text(CardRuleError.payingWalletHasTransactions.localizedDescription)
                     } else if let validationError, validationError != .missingName {
                         Text(validationError.localizedDescription)
                             .foregroundStyle(.red)
@@ -236,7 +242,10 @@ extension CardRuleError: LocalizedError {
         case .statementDayOutOfRange: String(localized: "A statement date is a day from 1 to 31.")
         case .invalidLastFourDigits: String(localized: "Enter all 4 last digits, or leave them blank.")
         case .mergeIntoItself: String(localized: "Choose another Card to merge into.")
+        case .mergeIntoAnotherWallet: String(localized: "Choose a Card paid from the same wallet.")
+        case .mergeIntoArchived: String(localized: "Unarchive that Card before merging into it.")
         case .hasTransactions: String(localized: "This Card paid for transactions. Merge it into another Card to remove it.")
+        case .payingWalletHasTransactions: String(localized: "This Card paid for transactions, so its paying wallet can't change.")
         }
     }
 }
