@@ -222,6 +222,40 @@ struct BalanceAdjustmentTests {
         #expect(!adjustment.canBeDuplicated)
     }
 
+    // MARK: Editing keeps it an adjustment
+
+    @Test func editingAnAdjustmentOffersOnlyExpenseAndIncome() throws {
+        let adjustment = try adjust(to: 15_55)
+        let coffee = try record(-4_50, "Café", on: today)
+
+        #expect(TransactionDraft(editing: adjustment).types == [.expense, .income])
+        #expect(TransactionDraft(editing: coffee).types == [.expense, .income, .debtLoan])
+    }
+
+    @Test func anAdjustmentCantBeEditedIntoALoanOrDebt() throws {
+        let adjustment = try adjust(to: 15_55)
+        var draft = TransactionDraft(editing: adjustment)
+        draft.type = .debtLoan
+        draft.category = try context.lockedCategory(.loan)
+
+        #expect(!draft.canSave)
+        #expect(throws: BalanceAdjustmentError.reasonDoesNotMatchDifference) { try adjustment.update(with: draft) }
+        #expect(adjustment.category == (try context.lockedCategory(.otherIncome)))
+        #expect(adjustment.amount == Money(cents: 15_55))
+    }
+
+    @Test func anAdjustmentEditedFromIncomeToExpenseStaysAnAdjustmentWithTheMatchingSign() throws {
+        let adjustment = try adjust(to: 15_55)
+        var draft = TransactionDraft(editing: adjustment)
+        draft.type = .expense
+        draft.category = try context.lockedCategory(.otherExpense)
+
+        try adjustment.update(with: draft)
+
+        #expect(adjustment.isBalanceAdjustment)
+        #expect(adjustment.amount == Money(cents: -15_55))
+    }
+
     // MARK: Recorded → actual
 
     @Test func theDetailShowsTheRecordedBalanceAndTheActualOneTyped() throws {

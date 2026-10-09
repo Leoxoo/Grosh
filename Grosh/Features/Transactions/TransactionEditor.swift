@@ -80,7 +80,7 @@ private struct TransactionForm: View {
             Form {
                 Section {
                     Picker("Type", selection: $draft.type) {
-                        ForEach(CategoryType.segments, id: \.self) { type in
+                        ForEach(draft.types, id: \.self) { type in
                             Text(type.title).tag(type)
                         }
                     }
