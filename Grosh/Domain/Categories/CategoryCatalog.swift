@@ -13,7 +13,14 @@ struct CategoryCatalog {
     func categories(of type: CategoryType, includingHidden: Bool = true) throws -> [Category] {
         let typeRaw = type.rawValue
         let all = try context.fetch(FetchDescriptor<Category>(predicate: #Predicate { $0.typeRaw == typeRaw }))
-        let tree = sorted(all.filter { $0.parent == nil }).flatMap { [$0] + sorted($0.children ?? []) }
+        return Self.tree(of: type, from: all, includingHidden: includingHidden)
+    }
+
+    /// Puts the categories of `type` found in `all` in tree order, as ``categories(of:includingHidden:)`` does.
+    /// For views that already hold the categories from a query.
+    static func tree(of type: CategoryType, from all: [Category], includingHidden: Bool = true) -> [Category] {
+        let topLevel = all.filter { $0.type == type && $0.parent == nil }
+        let tree = sorted(topLevel).flatMap { [$0] + sorted($0.children ?? []) }
         return includingHidden ? tree : tree.filter { !$0.isHiddenInTree }
     }
 
@@ -144,7 +151,7 @@ struct CategoryCatalog {
             transaction.category = target
         }
         var nextOrder = nextChildOrder(under: target)
-        for child in sorted(source.children ?? []) {
+        for child in Self.sorted(source.children ?? []) {
             child.parent = target
             child.sortOrder = nextOrder
             nextOrder += 1
@@ -199,7 +206,7 @@ struct CategoryCatalog {
         return (topLevel.map(\.sortOrder).max() ?? -1) + 1
     }
 
-    private func sorted(_ categories: [Category]) -> [Category] {
+    private static func sorted(_ categories: [Category]) -> [Category] {
         categories.sorted { ($0.sortOrder, $0.name) < ($1.sortOrder, $1.name) }
     }
 }
