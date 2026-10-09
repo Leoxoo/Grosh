@@ -3,18 +3,6 @@ import SwiftUI
 
 /// Adds a wallet (asking for the money it holds now, its Starting balance) or edits one.
 struct WalletEditor: View {
-    enum Mode: Identifiable {
-        case add
-        case edit(Wallet)
-
-        var id: AnyHashable {
-            switch self {
-            case .add: "add"
-            case .edit(let wallet): wallet.persistentModelID
-            }
-        }
-    }
-
     static let symbolChoices = [
         "wallet.bifold.fill", "creditcard.fill", "banknote.fill", "building.columns.fill",
         "dollarsign.circle.fill", "bitcoinsign.circle.fill", "chart.line.uptrend.xyaxis", "chart.pie.fill",
@@ -24,7 +12,7 @@ struct WalletEditor: View {
         "person.fill", "person.2.fill", "globe.americas.fill", "leaf.fill",
     ]
 
-    let mode: Mode
+    let mode: EditorMode<Wallet>
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
@@ -34,16 +22,9 @@ struct WalletEditor: View {
     @State private var startingDay = CalendarDay.today
     @State private var errorMessage: String?
 
-    init(mode: Mode) {
+    init(mode: EditorMode<Wallet>) {
         self.mode = mode
-        switch mode {
-        case .add: _draft = State(initialValue: WalletDraft())
-        case .edit(let wallet): _draft = State(initialValue: WalletDraft(wallet))
-        }
-    }
-
-    private var isAdding: Bool {
-        if case .add = mode { true } else { false }
+        _draft = State(initialValue: mode.editing.map(WalletDraft.init) ?? WalletDraft())
     }
 
     /// The Starting balance typed so far; an empty field means $0.
@@ -53,7 +34,7 @@ struct WalletEditor: View {
             : Money(typedAmount: startingAmountText)
     }
 
-    private var canSave: Bool { (try? draft.validate()) != nil && (!isAdding || startingBalance != nil) }
+    private var canSave: Bool { (try? draft.validate()) != nil && (!mode.isAdding || startingBalance != nil) }
 
     var body: some View {
         NavigationStack {
@@ -68,7 +49,7 @@ struct WalletEditor: View {
                     Text("The Total on Home adds up the wallets that are included.")
                 }
 
-                if isAdding {
+                if mode.isAdding {
                     startingBalanceSection
                 }
 
@@ -80,7 +61,7 @@ struct WalletEditor: View {
                     PaletteColorGrid(selection: $draft.color)
                 }
 
-                if case .edit(let wallet) = mode {
+                if let wallet = mode.editing {
                     Section {
                         if wallet.isArchived {
                             Button("Unarchive Wallet", systemImage: "tray.and.arrow.up") {
@@ -99,13 +80,13 @@ struct WalletEditor: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle(isAdding ? "Add Wallet" : "Edit Wallet")
+            .navigationTitle(mode.isAdding ? "Add Wallet" : "Edit Wallet")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(isAdding ? "Add" : "Save", action: save)
+                    Button(mode.isAdding ? "Add" : "Save", action: save)
                         .disabled(!canSave)
                 }
             }

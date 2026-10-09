@@ -5,7 +5,7 @@ import SwiftUI
 struct WalletListView: View {
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     @Query(filter: #Predicate<Wallet> { $0.isArchived }, sort: Wallet.userOrder) private var archivedWallets: [Wallet]
-    @State private var editorMode: WalletEditor.Mode?
+    @State private var editorMode: EditorMode<Wallet>?
 
     private var today: CalendarDay { .today }
 

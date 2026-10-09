@@ -5,7 +5,7 @@ import SwiftUI
 struct CardListView: View {
     @Query(filter: #Predicate<Card> { !$0.isArchived }, sort: Card.userOrder) private var cards: [Card]
     @Query(filter: #Predicate<Card> { $0.isArchived }, sort: Card.userOrder) private var archivedCards: [Card]
-    @State private var editorMode: CardEditor.Mode?
+    @State private var editorMode: EditorMode<Card>?
     @State private var mergeSource: Card?
 
     var body: some View {

@@ -3,19 +3,7 @@ import SwiftUI
 
 /// Adds a Card or edits one. Editing also archives, merges or deletes it.
 struct CardEditor: View {
-    enum Mode: Identifiable {
-        case add
-        case edit(Card)
-
-        var id: AnyHashable {
-            switch self {
-            case .add: "add"
-            case .edit(let card): card.persistentModelID
-            }
-        }
-    }
-
-    let mode: Mode
+    let mode: EditorMode<Card>
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
@@ -29,24 +17,17 @@ struct CardEditor: View {
     @State private var isConfirmingDelete = false
     @State private var errorMessage: String?
 
-    init(mode: Mode) {
+    init(mode: EditorMode<Card>) {
         self.mode = mode
-        let draft = switch mode {
-        case .add: CardDraft(name: "", kind: .credit, payingWallet: nil)
-        case .edit(let card): CardDraft(card)
-        }
+        let draft = mode.editing.map(CardDraft.init) ?? CardDraft(name: "", kind: .credit, payingWallet: nil)
         _draft = State(initialValue: draft)
         _hasStatementDate = State(initialValue: draft.statementDay != nil)
         _statementDay = State(initialValue: draft.statementDay ?? 1)
     }
 
-    private var isAdding: Bool {
-        if case .add = mode { true } else { false }
-    }
-
     /// The Card being edited, until it is merged away or deleted (the sheet may draw once more while closing).
     private var editedCard: Card? {
-        guard case .edit(let card) = mode, card.modelContext != nil, !card.isDeleted else { return nil }
+        guard let card = mode.editing, card.modelContext != nil, !card.isDeleted else { return nil }
         return card
     }
 
@@ -115,13 +96,13 @@ struct CardEditor: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle(isAdding ? "Add Card" : "Edit Card")
+            .navigationTitle(mode.isAdding ? "Add Card" : "Edit Card")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(isAdding ? "Add" : "Save", action: save)
+                    Button(mode.isAdding ? "Add" : "Save", action: save)
                         .disabled(validationError != nil)
                 }
             }
