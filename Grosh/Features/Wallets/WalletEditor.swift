@@ -131,7 +131,7 @@ struct WalletEditor: View {
                     Section {
                         if wallet.isArchived {
                             Button("Unarchive Wallet", systemImage: "tray.and.arrow.up") {
-                                try? wallet.unarchive(in: context)
+                                wallet.unarchive()
                                 dismiss()
                             }
                         } else {

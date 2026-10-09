@@ -86,15 +86,15 @@ struct WalletManagementTests {
         #expect(checking.isArchived == false)
     }
 
-    @Test func anUnarchivedWalletReturnsAtTheEndOfTheList() throws {
+    @Test func anUnarchivedWalletReturnsToItsPlaceInTheUsersOrder() throws {
         try addWallet("Checking")
         let oldBank = try addWallet("Old bank", startingBalance: 300_00)
         try addWallet("Cash")
         oldBank.archive()
 
-        try oldBank.unarchive(in: context)
+        oldBank.unarchive()
 
-        #expect(try unarchivedNames() == ["Checking", "Cash", "Old bank"])
+        #expect(try unarchivedNames() == ["Checking", "Old bank", "Cash"])
         #expect(Wallet.total(of: try context.fetch(Wallet.unarchived), asOf: today) == Money(cents: 300_00))
     }
 }

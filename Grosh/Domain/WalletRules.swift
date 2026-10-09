@@ -58,10 +58,8 @@ extension Wallet {
         isArchived = true
     }
 
-    /// Brings an archived wallet back, at the end of the user's order.
-    func unarchive(in context: ModelContext) throws {
-        guard isArchived else { return }
-        sortOrder = try Self.nextSortOrder(in: context)
+    /// Brings an archived wallet back into its place in the user's order.
+    func unarchive() {
         isArchived = false
     }
 

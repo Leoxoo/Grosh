@@ -3,7 +3,6 @@ import SwiftUI
 
 /// Account → Wallets: every wallet in the user's order. Drag to reorder, tap to edit, swipe to archive.
 struct WalletListView: View {
-    @Environment(\.modelContext) private var context
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     @Query(filter: #Predicate<Wallet> { $0.isArchived }, sort: Wallet.userOrder) private var archivedWallets: [Wallet]
     @State private var editorMode: WalletEditor.Mode?
@@ -49,11 +48,11 @@ struct WalletListView: View {
                         }
                         .buttonStyle(.plain)
                         .swipeActions {
-                            Button("Unarchive", systemImage: "tray.and.arrow.up") { unarchive(wallet) }
+                            Button("Unarchive", systemImage: "tray.and.arrow.up") { wallet.unarchive() }
                                 .tint(.green)
                         }
                         .contextMenu {
-                            Button("Unarchive", systemImage: "tray.and.arrow.up") { unarchive(wallet) }
+                            Button("Unarchive", systemImage: "tray.and.arrow.up") { wallet.unarchive() }
                         }
                     }
                 } header: {
@@ -88,10 +87,6 @@ struct WalletListView: View {
         .sheet(item: $editorMode) { mode in
             WalletEditor(mode: mode)
         }
-    }
-
-    private func unarchive(_ wallet: Wallet) {
-        try? wallet.unarchive(in: context)
     }
 }
 
