@@ -2,12 +2,24 @@ import Foundation
 import SwiftData
 
 extension Transaction {
-    /// Whether `self` is listed above `other`: newer days first and, within a day, the most recently entered first.
-    /// Transactions entered at the same moment (as an import does) fall back to their saved identity, so their
-    /// order never depends on the order the store hands them back in.
+    /// The order every transaction list shows: newest day first and, within a day, the most recently entered
+    /// first. Store fetches sort by it; ``isListed(before:)`` adds the tie-break a fetch can't express.
+    static let listOrder: [SortDescriptor<Transaction>] = [
+        SortDescriptor(\.dayRaw, order: .reverse),
+        SortDescriptor(\.createdAt, order: .reverse),
+    ]
+
+    /// Whether `self` is listed above `other` in ``listOrder``. Transactions entered at the same moment (as an
+    /// import does) fall back to their saved identity, so their order never depends on the order the store hands
+    /// them back in.
     func isListed(before other: Transaction) -> Bool {
-        if dayRaw != other.dayRaw { return dayRaw > other.dayRaw }
-        if createdAt != other.createdAt { return createdAt > other.createdAt }
+        for descriptor in Self.listOrder {
+            switch descriptor.compare(self, other) {
+            case .orderedAscending: return true
+            case .orderedDescending: return false
+            case .orderedSame: continue
+            }
+        }
         return persistentModelID > other.persistentModelID
     }
 }

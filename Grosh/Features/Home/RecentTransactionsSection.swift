@@ -19,7 +19,7 @@ struct RecentTransactionsSection: View {
                 Text("Transactions you add show up here.")
                     .foregroundStyle(.secondary)
             }
-            ForEach(transactions) { transaction in
+            ForEach(transactions.inListOrder()) { transaction in
                 NavigationLink {
                     TransactionDetailView(transaction: transaction)
                 } label: {
