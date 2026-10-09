@@ -60,7 +60,7 @@ struct TransferTests {
     @Test func aTransferStartedWhileViewingAWalletStartsFromThatWallet() throws {
         let cash = try Wallet.create(name: "Cash", startingBalance: Money(cents: 0), on: today, in: context)
 
-        let suggested = TransactionDefaults.suggestTransfer(on: today, from: cash, in: context)
+        let suggested = TransactionDefaults.suggestTransfer(on: today, viewing: cash, in: context)
 
         #expect(suggested.from == cash)
         #expect(suggested.to == checking)

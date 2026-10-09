@@ -15,14 +15,23 @@ struct BalanceAdjustmentTests {
         store = try CategoryFixture()
     }
 
-    /// Records `cents` (signed) in Checking on `day`, filed under `categoryName`.
+    /// Records `cents` (signed) in `wallet` (Checking unless given) on `day`, filed under `categoryName`.
     @discardableResult
-    private func record(_ cents: Int, _ categoryName: String, _ type: CategoryType = .expense, on day: CalendarDay) throws -> Transaction {
+    private func record(
+        _ cents: Int, _ categoryName: String, _ type: CategoryType = .expense, in wallet: Wallet? = nil, on day: CalendarDay
+    ) throws -> Transaction {
         let transaction = Transaction(amount: Money(cents: cents), day: day, wallet: nil, category: nil)
         context.insert(transaction)
-        transaction.wallet = checking
+        transaction.wallet = wallet ?? checking
         transaction.category = try store.category(categoryName, type)
         return transaction
+    }
+
+    /// A second wallet, after Checking.
+    private func addSavings() -> Wallet {
+        let savings = Wallet(name: "Savings")
+        context.insert(savings)
+        return savings
     }
 
     /// Adjusts Checking to a real balance of `cents` on `day`.
@@ -53,6 +62,28 @@ struct BalanceAdjustmentTests {
 
         #expect(checking.balance(asOf: fifth) == Money(cents: 900_00))
         #expect(checking.balance(asOf: today) == Money(cents: 860_00))
+    }
+
+    // MARK: Where Adjust Balance starts
+
+    @Test func adjustingWhileViewingAWalletStartsTodayInThatWallet() throws {
+        try record(500_00, "Salary", .income, on: today)
+        let savings = addSavings()
+
+        let suggested = try TransactionDefaults.suggestBalanceAdjustment(on: today, viewing: savings, in: context)
+
+        #expect(suggested.wallet == savings)
+        #expect(suggested.day == today)
+    }
+
+    @Test func adjustingFromTheTotalStartsInTheLastUsedWallet() throws {
+        let savings = addSavings()
+        try record(-4_50, "Café", on: today).createdAt = .distantPast
+        try record(75_00, "Salary", .income, in: savings, on: today)
+
+        let suggested = try TransactionDefaults.suggestBalanceAdjustment(on: today, in: context)
+
+        #expect(suggested.wallet == savings)
     }
 
     // MARK: The real balance starts from the recorded one
@@ -89,12 +120,8 @@ struct BalanceAdjustmentTests {
 
     @Test func changingTheWalletStartsAgainFromThatWalletsRecordedBalance() throws {
         try record(500_00, "Salary", .income, on: today)
-        let savings = Wallet(name: "Savings")
-        context.insert(savings)
-        let deposit = Transaction(amount: Money(cents: 75_00), day: today, wallet: nil, category: nil)
-        context.insert(deposit)
-        deposit.wallet = savings
-        deposit.category = try store.category("Salary", .income)
+        let savings = addSavings()
+        try record(75_00, "Salary", .income, in: savings, on: today)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
         draft.actualBalance = Money(cents: 450_00)
 

@@ -10,7 +10,7 @@ struct TransferEditor: View {
     @Environment(\.modelContext) private var context
 
     var body: some View {
-        TransferForm(startingDraft: TransactionDefaults.suggestTransfer(on: .today, from: viewedWallet, in: context))
+        TransferForm(startingDraft: TransactionDefaults.suggestTransfer(on: .today, viewing: viewedWallet, in: context))
     }
 }
 

@@ -101,6 +101,16 @@ struct BalanceAdjustmentDraft {
     var canSave: Bool { (try? validate()) != nil }
 }
 
+extension TransactionDefaults {
+    /// The starting values of Adjust Balance, dated `today`: in the ``wallet(viewing:in:)`` (the wallet the
+    /// screen shows, or else the last-used one), with its real balance at the recorded one.
+    static func suggestBalanceAdjustment(
+        on today: CalendarDay, viewing viewed: Wallet? = nil, in context: ModelContext
+    ) throws -> BalanceAdjustmentDraft {
+        try BalanceAdjustmentDraft(wallet: wallet(viewing: viewed, in: context), day: today, in: context)
+    }
+}
+
 /// Why a balance adjustment can't be recorded.
 nonisolated enum BalanceAdjustmentRuleError: Error, Equatable {
     /// The keypad can't work out the real balance typed, such as when dividing by zero.

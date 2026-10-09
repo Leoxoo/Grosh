@@ -4,8 +4,9 @@ import SwiftUI
 /// Adjust Balance: the user types a wallet's real balance on a day, and the difference from what its transactions
 /// add up to is recorded as one balance adjustment, filed under a reason.
 struct AdjustBalanceEditor: View {
-    /// The wallet to adjust, or `nil` to start from the suggested one.
-    let wallet: Wallet?
+    /// The wallet the screen it was opened from shows, which the adjustment starts in; `nil` (the Total) starts in
+    /// the suggested one.
+    var viewedWallet: Wallet?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
@@ -30,8 +31,7 @@ struct AdjustBalanceEditor: View {
     }
 
     private var startingDraft: BalanceAdjustmentDraft? {
-        let wallet = wallet ?? TransactionDefaults.suggest(on: .today, in: context).wallet
-        return try? BalanceAdjustmentDraft(wallet: wallet, day: .today, in: context)
+        try? TransactionDefaults.suggestBalanceAdjustment(on: .today, viewing: viewedWallet, in: context)
     }
 }
 
@@ -159,6 +159,6 @@ private struct AdjustBalanceForm: View {
 }
 
 #Preview {
-    AdjustBalanceEditor(wallet: nil)
+    AdjustBalanceEditor()
         .modelContainer(try! GroshStore.makeContainer(inMemory: true))
 }
