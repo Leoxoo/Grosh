@@ -14,6 +14,11 @@ struct AccountView: View {
                     } label: {
                         Label("Wallets", systemImage: "wallet.bifold")
                     }
+                    NavigationLink {
+                        CardListView()
+                    } label: {
+                        Label("Cards", systemImage: "creditcard")
+                    }
                 }
 
                 Section {
