@@ -1,9 +1,5 @@
 import SwiftUI
 
-extension Wallet {
-    var color: PaletteColor { PaletteColor(rawValue: colorName) ?? .green }
-}
-
 /// A wallet's icon, name and balance, as listed on Home and in Account → Wallets.
 struct WalletRow: View {
     let wallet: Wallet

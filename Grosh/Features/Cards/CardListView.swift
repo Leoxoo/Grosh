@@ -5,8 +5,9 @@ import SwiftUI
 struct CardListView: View {
     @Query(filter: #Predicate<Card> { !$0.isArchived }, sort: Card.userOrder) private var cards: [Card]
     @Query(filter: #Predicate<Card> { $0.isArchived }, sort: Card.userOrder) private var archivedCards: [Card]
-    @State private var editorMode: CardEditor.Mode?
+    @State private var editorMode: EditorMode<Card>?
     @State private var mergeSource: Card?
+    @State private var errorMessage: String?
 
     var body: some View {
         List {
@@ -14,7 +15,7 @@ struct CardListView: View {
                 ForEach(cards) { card in
                     row(card)
                         .swipeActions {
-                            Button("Archive", systemImage: "archivebox") { card.archive() }
+                            Button("Archive", systemImage: "archivebox") { perform { try card.archive() } }
                                 .tint(.orange)
                         }
                 }
@@ -30,7 +31,7 @@ struct CardListView: View {
                         row(card)
                             .foregroundStyle(.secondary)
                             .swipeActions {
-                                Button("Unarchive", systemImage: "tray.and.arrow.up") { card.unarchive() }
+                                Button("Unarchive", systemImage: "tray.and.arrow.up") { perform { try card.unarchive() } }
                                     .tint(.green)
                             }
                     }
@@ -64,6 +65,7 @@ struct CardListView: View {
         .sheet(item: $mergeSource) { card in
             CardMergeView(source: card)
         }
+        .errorAlert("Couldn't Change Card", message: $errorMessage)
     }
 
     private func row(_ card: Card) -> some View {
@@ -76,11 +78,20 @@ struct CardListView: View {
         .contextMenu {
             Button("Edit", systemImage: "pencil") { editorMode = .edit(card) }
             if card.isArchived {
-                Button("Unarchive", systemImage: "tray.and.arrow.up") { card.unarchive() }
+                Button("Unarchive", systemImage: "tray.and.arrow.up") { perform { try card.unarchive() } }
             } else {
-                Button("Archive", systemImage: "archivebox") { card.archive() }
+                Button("Archive", systemImage: "archivebox") { perform { try card.archive() } }
             }
             Button("Merge into Another Card…", systemImage: "arrow.triangle.merge") { mergeSource = card }
+        }
+    }
+
+    /// Runs a change, or shows why it was refused.
+    private func perform(_ change: () throws -> Void) {
+        do {
+            try change()
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }

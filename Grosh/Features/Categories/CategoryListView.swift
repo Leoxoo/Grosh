@@ -56,6 +56,24 @@ struct CategoryListView: View {
             } footer: {
                 Text("Hidden categories leave the picker but stay on their transactions.")
             }
+
+            Section {
+                ForEach(CategoryCatalog.tree(of: .system, from: allCategories)) { category in
+                    Button {
+                        editorMode = .edit(category)
+                    } label: {
+                        row(for: category)
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button("Edit", systemImage: "pencil") { editorMode = .edit(category) }
+                    }
+                }
+            } header: {
+                Text("The app's own categories")
+            } footer: {
+                Text("The app files transactions under these itself, such as a new wallet's Starting balance. You can change their icons.")
+            }
         }
         .navigationTitle("Categories")
         .toolbar {
@@ -82,14 +100,7 @@ struct CategoryListView: View {
         } message: { category in
             Text(CategoryEditor.deleteMessage(for: category))
         }
-        .alert("Couldn't Change Category", isPresented: Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
-        )) {
-            Button("OK") { errorMessage = nil }
-        } message: {
-            Text(errorMessage ?? "")
-        }
+        .errorAlert("Couldn't Change Category", message: $errorMessage)
     }
 
     private func row(for category: Category) -> some View {

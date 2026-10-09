@@ -1,8 +1,8 @@
 import Foundation
 import SwiftData
 
-/// What the user enters for a Card when adding or editing it.
-nonisolated struct CardDetails {
+/// The editable fields of a Card, as the Add/Edit form holds them before the Card rules check and save them.
+nonisolated struct CardDraft {
     var name: String
     var kind: CardKind
     var payingWallet: Wallet?
@@ -25,12 +25,35 @@ nonisolated enum CardRuleError: Error, Equatable {
     case invalidLastFourDigits
     /// Merging needs a different Card to move the transactions to.
     case mergeIntoItself
+    /// A Card only merges into a Card paid from the same wallet, so its transactions keep a Card their wallet offers.
+    case mergeIntoAnotherWallet
+    /// An archived Card is out of the pickers; unarchive it before merging into it.
+    case mergeIntoArchived
     /// A Card that paid for transactions can't be deleted; merge it into another Card instead.
     case hasTransactions
+    /// A Card that paid for transactions keeps its paying wallet, so those transactions keep a Card their wallet offers.
+    case payingWalletHasTransactions
 }
 
-extension CardDetails {
-    /// The details a Card has now, to start editing from.
+extension CardRuleError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .missingName: String(localized: "Give the Card a name.")
+        case .missingPayingWallet: String(localized: "Choose the wallet this Card is paid from.")
+        case .statementDateRequiresCredit: String(localized: "Only Credit cards have a statement date.")
+        case .statementDayOutOfRange: String(localized: "A statement date is a day from 1 to 31.")
+        case .invalidLastFourDigits: String(localized: "Enter all 4 last digits, or leave them blank.")
+        case .mergeIntoItself: String(localized: "Choose another Card to merge into.")
+        case .mergeIntoAnotherWallet: String(localized: "Choose a Card paid from the same wallet.")
+        case .mergeIntoArchived: String(localized: "Unarchive that Card before merging into it.")
+        case .hasTransactions: String(localized: "This Card paid for transactions. Merge it into another Card to remove it.")
+        case .payingWalletHasTransactions: String(localized: "This Card paid for transactions, so its paying wallet can't change.")
+        }
+    }
+}
+
+extension CardDraft {
+    /// The Card's current fields, ready to edit.
     init(_ card: Card) {
         self.init(
             name: card.name,
@@ -50,7 +73,7 @@ extension CardDetails {
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    /// Checks the details against the Card rules before anything is saved.
+    /// Checks the draft against the Card rules before anything is saved.
     func validate() throws {
         guard !trimmedName.isEmpty else { throw CardRuleError.missingName }
         guard payingWallet != nil else { throw CardRuleError.missingPayingWallet }
@@ -67,38 +90,34 @@ extension CardDetails {
 }
 
 extension Card {
-    /// Adds a Card.
+    /// Adds a Card. Saves.
     @discardableResult
-    static func create(_ details: CardDetails, in context: ModelContext) throws -> Card {
-        try details.validate()
-        let card = Card(name: details.name, kind: details.kind, payingWallet: nil, sortOrder: try nextSortOrder(in: context))
+    static func create(_ draft: CardDraft, in context: ModelContext) throws -> Card {
+        try draft.validate()
+        let card = Card(name: draft.name, kind: draft.kind, payingWallet: nil, sortOrder: try context.nextSortOrder(\Card.sortOrder))
         context.insert(card)
-        card.apply(details)
+        card.apply(draft)
+        try context.save()
         return card
     }
 
-    /// Saves edited details. Nothing changes when the details break a Card rule.
-    func update(with details: CardDetails) throws {
-        try details.validate()
-        apply(details)
+    /// Saves an edited draft. Nothing changes when the draft breaks a Card rule.
+    func update(with draft: CardDraft) throws {
+        try draft.validate()
+        guard draft.payingWallet == payingWallet || !hasTransactions else {
+            throw CardRuleError.payingWalletHasTransactions
+        }
+        apply(draft)
+        try modelContext?.save()
     }
 
-    private func apply(_ details: CardDetails) {
-        name = details.trimmedName
-        kind = details.kind
-        payingWallet = details.payingWallet
-        colorName = details.color.rawValue
-        lastFourDigits = details.storedLastFourDigits
-        statementDay = details.statementDay
-    }
-
-    var color: PaletteColor { PaletteColor(rawValue: colorName) ?? .blue }
-
-    /// The position after every Card already in the store, archived ones included.
-    private static func nextSortOrder(in context: ModelContext) throws -> Int {
-        var descriptor = FetchDescriptor<Card>(sortBy: [SortDescriptor(\.sortOrder, order: .reverse)])
-        descriptor.fetchLimit = 1
-        return try context.fetch(descriptor).first.map { $0.sortOrder + 1 } ?? 0
+    private func apply(_ draft: CardDraft) {
+        name = draft.trimmedName
+        kind = draft.kind
+        payingWallet = draft.payingWallet
+        color = draft.color
+        lastFourDigits = draft.storedLastFourDigits
+        statementDay = draft.statementDay
     }
 
     /// The order Cards are listed in everywhere: the order they were added.
@@ -114,44 +133,51 @@ extension Card {
         return offered + [current]
     }
 
-    /// Retires the Card: it leaves every picker but stays on the transactions it paid for.
-    func archive() {
+    /// Retires the Card: it leaves every picker but stays on the transactions it paid for. Saves.
+    func archive() throws {
         isArchived = true
+        try modelContext?.save()
     }
 
-    /// Brings an archived Card back into the pickers.
-    func unarchive() {
+    /// Brings an archived Card back into the pickers. Saves.
+    func unarchive() throws {
         isArchived = false
+        try modelContext?.save()
     }
 
-    /// Moves every transaction paid with this Card to `target`, then removes this Card.
+    /// The Cards this one can be merged into: the other unarchived Cards paid from the same wallet, in the
+    /// user's order. Its transactions stay in their wallet, so they keep a Card that wallet offers.
+    var mergeTargets: [Card] {
+        Card.pickerChoices(for: payingWallet, keeping: nil).filter { $0 != self }
+    }
+
+    /// Moves every transaction paid with this Card to `target`, then removes this Card. Saves.
     func merge(into target: Card, in context: ModelContext) throws {
         guard target != self else { throw CardRuleError.mergeIntoItself }
+        guard target.payingWallet == payingWallet else { throw CardRuleError.mergeIntoAnotherWallet }
+        guard !target.isArchived else { throw CardRuleError.mergeIntoArchived }
         for transaction in transactions ?? [] {
             transaction.card = target
         }
         context.delete(self)
+        try context.save()
     }
 
     /// Whether any transaction was paid with this Card, so it can only go away by merging.
     var hasTransactions: Bool { !(transactions ?? []).isEmpty }
 
-    /// Removes a Card that never paid for anything. A Card with transactions must be merged instead.
+    /// Removes a Card that never paid for anything. A Card with transactions must be merged instead. Saves.
     func delete(in context: ModelContext) throws {
         guard !hasTransactions else { throw CardRuleError.hasTransactions }
         context.delete(self)
+        try context.save()
     }
 
     /// The day this Credit card's statement closes in the given month, or `nil` when it has no statement date.
     /// A statement date past the month's end (the 31st in April) falls on the month's last day.
     func statementClosingDay(year: Int, month: Int) -> CalendarDay? {
         guard let statementDay else { return nil }
-        let isLeapYear = year.isMultiple(of: 4) && (!year.isMultiple(of: 100) || year.isMultiple(of: 400))
-        let daysInMonth = switch month {
-        case 2: isLeapYear ? 29 : 28
-        case 4, 6, 9, 11: 30
-        default: 31
-        }
+        let daysInMonth = CalendarMonth(year: year, month: month).dayCount
         return CalendarDay(year: year, month: month, day: min(statementDay, daysInMonth))
     }
 }

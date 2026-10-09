@@ -122,14 +122,7 @@ private struct TransactionForm: View {
                     isShowingDetails = true
                 }
             }
-            .alert("Couldn't Save Transaction", isPresented: Binding(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
-            )) {
-                Button("OK") { errorMessage = nil }
-            } message: {
-                Text(errorMessage ?? "")
-            }
+            .errorAlert("Couldn't Save Transaction", message: $errorMessage)
         }
         #if os(macOS)
         .frame(minWidth: 420, idealWidth: 460, minHeight: 640, idealHeight: 720)
@@ -139,13 +132,15 @@ private struct TransactionForm: View {
     private var mainSection: some View {
         Section {
             WalletPicker(title: "Wallet", selection: $draft.wallet)
-            AmountRow(title: "Amount", entry: $entry, currencyCode: currencyCode, tint: amountTint) {
+            AmountRow(title: "Amount", entry: $entry, currencyCode: currencyCode, tint: Money(cents: draft.sign).tint) {
                 focus = .amount
                 isKeypadShown.toggle()
             }
             .focused($focus, equals: .amount)
             CategoryPicker(title: "Category", type: draft.type, selection: $draft.category)
-            CardPicker(title: "Card", wallet: draft.wallet, selection: $draft.card)
+            if draft.offersCard {
+                CardPicker(title: "Card", wallet: draft.wallet, selection: $draft.card)
+            }
             TextField("Note", text: $draft.note, axis: .vertical)
                 .focused($focus, equals: .note)
             DayStepper(title: "Date", day: $draft.day)
@@ -190,12 +185,6 @@ private struct TransactionForm: View {
         }
     }
 
-    /// Red for money going out, green for money coming in.
-    private var amountTint: Color {
-        let sign = draft.category?.sign ?? (draft.type == .expense ? -1 : draft.type == .income ? 1 : 0)
-        return sign < 0 ? .red : sign > 0 ? .green : .primary
-    }
-
     private func save() {
         do {
             switch mode {
@@ -204,7 +193,6 @@ private struct TransactionForm: View {
             case .edit(let transaction):
                 try transaction.update(with: draftToSave)
             }
-            try context.save()
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
@@ -234,17 +222,6 @@ private extension TransactionDraft {
     /// Whether any of the "more details" are filled in, so they open already showing.
     var hasDetails: Bool {
         type == .debtLoan || !withName.isEmpty || isExcludedFromReport || !eventName.isEmpty
-    }
-}
-
-extension TransactionRuleError: LocalizedError {
-    var errorDescription: String? {
-        switch self {
-        case .missingWallet: String(localized: "Choose a wallet.")
-        case .missingAmount: String(localized: "Enter an amount above zero.")
-        case .missingCategory: String(localized: "Choose a category.")
-        case .missingCard: String(localized: "Choose the Card this expense was paid with.")
-        }
     }
 }
 

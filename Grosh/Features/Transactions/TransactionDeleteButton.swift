@@ -37,14 +37,7 @@ struct TransactionDeleteButton: View {
                 Text("This transaction has \(relatedCount) related transactions.")
             }
         }
-        .alert("Couldn't Delete Transaction", isPresented: Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
-        )) {
-            Button("OK") { errorMessage = nil }
-        } message: {
-            Text(errorMessage ?? "")
-        }
+        .errorAlert("Couldn't Delete Transaction", message: $errorMessage)
     }
 
     private var title: String {

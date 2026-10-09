@@ -6,19 +6,13 @@ import Testing
 /// Saving what the Add Transaction sheet holds: signs, required fields and the Card rule.
 @MainActor
 struct AddTransactionTests {
-    private let container: ModelContainer
-    private var context: ModelContext { container.mainContext }
+    private let store: CategoryFixture
+    private var context: ModelContext { store.context }
+    private var checking: Wallet { store.wallet }
     private let today = CalendarDay(year: 2026, month: 10, day: 9)
-    private let checking: Wallet
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
-        try CategorySeeder.seedIfNeeded(in: container.mainContext)
-        checking = try Wallet.create(name: "Checking", startingBalance: Money(cents: 0), on: today, in: container.mainContext)
-    }
-
-    private func category(_ name: String, _ type: CategoryType = .expense) throws -> Grosh.Category {
-        try #require(try context.fetch(FetchDescriptor<Grosh.Category>()).first { $0.name == name && $0.type == type })
+        store = try CategoryFixture()
     }
 
     /// A draft of `type` in Checking for `cents`, filed under `categoryName`.
@@ -26,7 +20,7 @@ struct AddTransactionTests {
         var draft = TransactionDraft(type: type, day: today)
         draft.wallet = checking
         draft.amount = Money(cents: cents)
-        draft.category = try category(categoryName, type)
+        draft.category = try store.category(categoryName, type)
         return draft
     }
 
@@ -57,7 +51,7 @@ struct AddTransactionTests {
         let transaction = try Transaction.create(entered, in: context)
 
         #expect(transaction.wallet == checking)
-        #expect(transaction.category == (try category("Café")))
+        #expect(transaction.category == (try store.category("Café")))
         #expect(transaction.note == "Latte #treat")
         #expect(transaction.withName == "Anna")
         #expect(transaction.day == CalendarDay(year: 2026, month: 10, day: 7))
@@ -87,7 +81,7 @@ struct AddTransactionTests {
 
         #expect(!entered.canSave)
         #expect(throws: TransactionRuleError.missingWallet) { try Transaction.create(entered, in: context) }
-        #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 1) // just the Starting balance
+        #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 0)
     }
 
     @Test(arguments: [0, -500])
@@ -110,7 +104,7 @@ struct AddTransactionTests {
 
     @discardableResult
     private func addCard(_ name: String, paidFrom wallet: Wallet) throws -> Card {
-        try Card.create(CardDetails(name: name, kind: .credit, payingWallet: wallet), in: context)
+        try Card.create(CardDraft(name: name, kind: .credit, payingWallet: wallet), in: context)
     }
 
     @Test func anExpenseNeedsACardWhenItsWalletHasOne() throws {
@@ -152,6 +146,19 @@ struct AddTransactionTests {
         #expect(entered.canSave)
     }
 
+    @Test(arguments: [(CategoryType.expense, "Outgoing transfer"), (.income, "Incoming transfer")])
+    func aTransferHalfIsNeverOfferedACard(type: CategoryType, categoryName: String) throws {
+        let appleCard = try addCard("Apple Card", paidFrom: checking)
+        var entered = try draft(type, 50_000, categoryName)
+
+        #expect(!entered.offersCard)
+        #expect(!entered.requiresCard)
+        #expect(entered.canSave)
+
+        entered.card = appleCard
+        #expect(try Transaction.create(entered, in: context).card == nil)
+    }
+
     @Test func changingTheWalletClearsTheCard() throws {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
         var entered = try draft(.expense, 1276, "Café")
@@ -182,6 +189,36 @@ struct AddTransactionTests {
         #expect(!entered.isExcludedFromReport)
     }
 
+    @Test func switchingBetweenExpenseAndIncomeKeepsExcludeFromReport() throws {
+        var entered = try draft(.expense, 1276, "Café")
+        entered.isExcludedFromReport = true
+        let excludedLunch = try Transaction.create(entered, in: context)
+        var editing = TransactionDraft(editing: excludedLunch)
+
+        editing.type = .income
+        #expect(editing.isExcludedFromReport)
+
+        editing.type = .expense
+        editing.category = try store.category("Café")
+        try excludedLunch.update(with: editing)
+        #expect(excludedLunch.isExcludedFromReport)
+    }
+
+    @Test func leavingDebtLoanRestoresTheUsersExcludeFromReport() throws {
+        var entered = try draft(.expense, 1276, "Café")
+        entered.isExcludedFromReport = true
+
+        entered.type = .debtLoan
+        #expect(entered.isExcludedFromReport)
+        entered.isExcludedFromReport = false
+
+        entered.type = .expense
+        #expect(entered.isExcludedFromReport)
+
+        entered.type = .debtLoan
+        #expect(!entered.isExcludedFromReport)
+    }
+
     // MARK: Duplicate and Edit
 
     /// A Loan of 100.00 to Pasha on 05/27/2026, kept in the report, with a note and a Card.
@@ -203,7 +240,7 @@ struct AddTransactionTests {
         #expect(duplicate.type == .debtLoan)
         #expect(duplicate.wallet == checking)
         #expect(duplicate.amount == Money(cents: 10_000))
-        #expect(duplicate.category == (try category("Loan", .debtLoan)))
+        #expect(duplicate.category == (try store.category("Loan", .debtLoan)))
         #expect(duplicate.card == original.card)
         #expect(duplicate.note == "Rent help")
         #expect(duplicate.withName == "Pasha")
@@ -238,13 +275,13 @@ struct AddTransactionTests {
         var editing = TransactionDraft(editing: original)
         editing.amount = Money(cents: 12_000)
         editing.type = .debtLoan
-        editing.category = try category("Debt", .debtLoan)
+        editing.category = try store.category("Debt", .debtLoan)
         editing.note = "Borrowed instead"
 
         try original.update(with: editing)
 
         #expect(original.amountCents == 12_000)
-        #expect(original.category == (try category("Debt", .debtLoan)))
+        #expect(original.category == (try store.category("Debt", .debtLoan)))
         #expect(original.note == "Borrowed instead")
         #expect(original.createdAt == enteredAt)
     }

@@ -10,6 +10,7 @@ struct TransactionDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var editorMode: TransactionEditor.Mode?
+    @State private var isEditingStartingBalance = false
 
     var body: some View {
         Group {
@@ -25,6 +26,9 @@ struct TransactionDetailView: View {
         #endif
         .sheet(item: $editorMode) { mode in
             TransactionEditor(mode: mode)
+        }
+        .sheet(isPresented: $isEditingStartingBalance) {
+            StartingBalanceEditor(transaction: transaction)
         }
     }
 
@@ -47,7 +51,7 @@ struct TransactionDetailView: View {
             RelatedTransactionsSection(transaction: transaction)
 
             Section {
-                if transaction.isEditableInAddSheet {
+                if transaction.canBeDuplicated {
                     Button("Duplicate", systemImage: "plus.square.on.square") {
                         editorMode = .duplicate(transaction)
                     }
@@ -56,17 +60,24 @@ struct TransactionDetailView: View {
                     if let didDelete { didDelete() } else { dismiss() }
                 }
             } footer: {
-                if transaction.isEditableInAddSheet {
+                if transaction.canBeDuplicated {
                     Text("Duplicate opens a new transaction with the same details, dated today.")
                 }
             }
         }
         .toolbar {
-            if transaction.isEditableInAddSheet {
+            if let editFlow = transaction.editFlow {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Edit") { editorMode = .edit(transaction) }
+                    Button("Edit") { edit(with: editFlow) }
                 }
             }
+        }
+    }
+
+    private func edit(with flow: TransactionEditFlow) {
+        switch flow {
+        case .addSheet: editorMode = .edit(transaction)
+        case .startingBalance: isEditingStartingBalance = true
         }
     }
 
@@ -85,7 +96,7 @@ struct TransactionDetailView: View {
         if let card = transaction.card {
             LabeledContent("Card") {
                 HStack(spacing: 6) {
-                    Image(systemName: "creditcard.fill")
+                    Image(systemName: Card.symbolName)
                         .foregroundStyle(card.color.color)
                     Text(card.displayName)
                 }
@@ -109,11 +120,7 @@ private struct TransactionDetailHeader: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            SymbolCircle(
-                symbolName: transaction.category?.symbolName ?? "questionmark",
-                color: transaction.category?.color ?? .gray,
-                size: 48
-            )
+            CategoryIcon(category: transaction.category, size: 48)
             VStack(alignment: .leading, spacing: 4) {
                 Text(transaction.categoryName)
                     .font(.headline)

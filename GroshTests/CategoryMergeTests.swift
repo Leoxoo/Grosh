@@ -11,60 +11,47 @@ struct CategoryMergeTests {
         store = try CategoryFixture()
     }
 
-    private func category(_ name: String, _ type: CategoryType = .expense) throws -> Grosh.Category {
-        try store.category(name, type)
-    }
-
-    private func categoryExists(_ name: String) throws -> Bool {
-        try store.categoryExists(name)
-    }
-
-    @discardableResult
-    private func spend(_ cents: Int, on category: Grosh.Category) -> Transaction {
-        store.spend(cents, on: category)
-    }
-
     @Test func mergingASubcategoryMovesItsTransactionsToTheTargetAndRemovesIt() throws {
-        let cafe = try category("Café")
-        let restaurants = try category("Restaurants")
-        let latte = spend(450, on: cafe)
-        let espresso = spend(300, on: cafe)
-        let dinner = spend(4_200, on: restaurants)
+        let cafe = try store.category("Café")
+        let restaurants = try store.category("Restaurants")
+        let latte = store.spend(450, on: cafe)
+        let espresso = store.spend(300, on: cafe)
+        let dinner = store.spend(4_200, on: restaurants)
 
         try catalog.merge(cafe, into: restaurants)
 
         #expect(latte.category?.name == "Restaurants")
         #expect(espresso.category?.name == "Restaurants")
         #expect(dinner.category?.name == "Restaurants")
-        #expect(try !categoryExists("Café"))
-        #expect(try category("Food & Beverage").children?.map(\.name) == ["Restaurants"])
+        #expect(try !store.categoryExists("Café"))
+        #expect(try store.category("Food & Beverage").children?.map(\.name) == ["Restaurants"])
     }
 
     @Test func mergingAParentMovesItsSubcategoriesUnderTheTarget() throws {
-        let otherTransport = try category("Other Transport")
-        let personalTransport = try category("Personal Transport")
-        let busPass = spend(9_000, on: otherTransport)
-        let ride = spend(2_350, on: try category("Taxi"))
+        let otherTransport = try store.category("Other Transport")
+        let personalTransport = try store.category("Personal Transport")
+        let busPass = store.spend(9_000, on: otherTransport)
+        let ride = store.spend(2_350, on: try store.category("Taxi"))
 
         try catalog.merge(otherTransport, into: personalTransport)
 
         #expect(busPass.category?.name == "Personal Transport")
         #expect(ride.category?.name == "Taxi")
-        #expect(try category("Taxi").parent?.name == "Personal Transport")
+        #expect(try store.category("Taxi").parent?.name == "Personal Transport")
         #expect(Set((personalTransport.children ?? []).map(\.name)) == [
             "Vehicle Maintenance", "Parking Fees", "Petrol", "Taxi", "Public Transport", "Other Fuel",
         ])
-        #expect(try !categoryExists("Other Transport"))
+        #expect(try !store.categoryExists("Other Transport"))
     }
 
     @Test func mergingATopLevelCategoryWithoutSubcategoriesMovesItsTransactions() throws {
-        let withdrawal = try category("Withdrawal")
-        let atm = spend(10_000, on: withdrawal)
+        let withdrawal = try store.category("Withdrawal")
+        let atm = store.spend(10_000, on: withdrawal)
 
-        try catalog.merge(withdrawal, into: try category("Unknown transaction"))
+        try catalog.merge(withdrawal, into: try store.category("Unknown transaction"))
 
         #expect(atm.category?.name == "Unknown transaction")
-        #expect(try !categoryExists("Withdrawal"))
+        #expect(try !store.categoryExists("Withdrawal"))
     }
 
     @Test(arguments: [
@@ -73,29 +60,29 @@ struct CategoryMergeTests {
         ("Outgoing transfer", "Other Expense"),
     ])
     func lockedCategoriesCantBeMergedEitherWay(source: String, target: String) throws {
-        let lockedOrNot = try category(source)
-        let purchase = spend(1_000, on: lockedOrNot)
+        let lockedOrNot = try store.category(source)
+        let purchase = store.spend(1_000, on: lockedOrNot)
 
-        #expect(throws: CategoryError.locked) {
-            try catalog.merge(lockedOrNot, into: try category(target))
+        #expect(throws: CategoryRuleError.locked) {
+            try catalog.merge(lockedOrNot, into: try store.category(target))
         }
         #expect(purchase.category?.name == source)
-        #expect(try categoryExists(source))
+        #expect(try store.categoryExists(source))
     }
 
     @Test func aCategoryCantBeMergedIntoAnotherType() throws {
-        #expect(throws: CategoryError.differentType) {
-            try catalog.merge(try category("Gifts & Donations"), into: try category("Gifts", .income))
+        #expect(throws: CategoryRuleError.differentType) {
+            try catalog.merge(try store.category("Gifts & Donations"), into: try store.category("Gifts", .income))
         }
-        #expect(try categoryExists("Gifts & Donations"))
+        #expect(try store.categoryExists("Gifts & Donations"))
     }
 
     @Test func aCategoryCantBeMergedIntoItself() throws {
-        let products = try category("Products")
-        #expect(throws: CategoryError.sameCategory) {
+        let products = try store.category("Products")
+        #expect(throws: CategoryRuleError.sameCategory) {
             try catalog.merge(products, into: products)
         }
-        #expect(try categoryExists("Products"))
+        #expect(try store.categoryExists("Products"))
     }
 
     @Test(arguments: [
@@ -103,25 +90,25 @@ struct CategoryMergeTests {
         ("Personal Transport", "Petrol"),
     ])
     func aParentWithSubcategoriesCantBeMergedIntoASubcategory(source: String, target: String) throws {
-        #expect(throws: CategoryError.tooDeep) {
-            try catalog.merge(try category(source), into: try category(target))
+        #expect(throws: CategoryRuleError.tooDeep) {
+            try catalog.merge(try store.category(source), into: try store.category(target))
         }
-        #expect(try category("Taxi").parent?.name == "Other Transport")
-        #expect(try category("Petrol").parent?.name == "Personal Transport")
+        #expect(try store.category("Taxi").parent?.name == "Other Transport")
+        #expect(try store.category("Petrol").parent?.name == "Personal Transport")
     }
 
     @Test func aSubcategoryCanBeMergedIntoItsOwnParent() throws {
-        let petrol = try category("Petrol")
-        let fillUp = spend(5_500, on: petrol)
+        let petrol = try store.category("Petrol")
+        let fillUp = store.spend(5_500, on: petrol)
 
-        try catalog.merge(petrol, into: try category("Personal Transport"))
+        try catalog.merge(petrol, into: try store.category("Personal Transport"))
 
         #expect(fillUp.category?.name == "Personal Transport")
-        #expect(try !categoryExists("Petrol"))
+        #expect(try !store.categoryExists("Petrol"))
     }
 
     @Test func aSubcategoryCanBeMergedIntoAnyUnlockedCategoryOfItsType() throws {
-        let targets = try catalog.mergeTargets(for: try category("Petrol")).map(\.name)
+        let targets = try catalog.mergeTargets(for: try store.category("Petrol")).map(\.name)
 
         #expect(targets.contains("Personal Transport"))
         #expect(targets.contains("Taxi"))
@@ -133,7 +120,7 @@ struct CategoryMergeTests {
     }
 
     @Test func aParentWithSubcategoriesCanOnlyBeMergedIntoAnotherTopLevelCategory() throws {
-        let targets = try catalog.mergeTargets(for: try category("Other Transport")).map(\.name)
+        let targets = try catalog.mergeTargets(for: try store.category("Other Transport")).map(\.name)
 
         #expect(targets.first == "Food & Beverage")
         #expect(targets.contains("Personal Transport"))
@@ -144,6 +131,6 @@ struct CategoryMergeTests {
     }
 
     @Test func lockedCategoriesHaveNoMergeTargets() throws {
-        #expect(try catalog.mergeTargets(for: try category("Other Expense")).isEmpty)
+        #expect(try catalog.mergeTargets(for: try store.category("Other Expense")).isEmpty)
     }
 }

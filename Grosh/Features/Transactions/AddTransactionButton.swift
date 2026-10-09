@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// The green + that opens the Add Transaction sheet.
+/// The green + that opens the Add Transaction sheet, which ``SwiftUI/View/presentsAddTransaction()`` presents.
 struct AddTransactionButton: View {
-    @State private var isAdding = false
+    @Environment(\.isAddingTransaction) private var isAdding
 
     var body: some View {
         Button {
-            isAdding = true
+            isAdding?.wrappedValue = true
         } label: {
             Image(systemName: "plus")
                 .font(.title2.weight(.semibold))
@@ -20,9 +20,7 @@ struct AddTransactionButton: View {
         #endif
         .tint(.green)
         .accessibilityLabel("Add Transaction")
-        .sheet(isPresented: $isAdding) {
-            TransactionEditor(mode: .add)
-        }
+        .disabled(isAdding == nil)
     }
 }
 

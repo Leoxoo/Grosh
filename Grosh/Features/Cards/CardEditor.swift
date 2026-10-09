@@ -3,25 +3,13 @@ import SwiftUI
 
 /// Adds a Card or edits one. Editing also archives, merges or deletes it.
 struct CardEditor: View {
-    enum Mode: Identifiable {
-        case add
-        case edit(Card)
-
-        var id: AnyHashable {
-            switch self {
-            case .add: "add"
-            case .edit(let card): card.persistentModelID
-            }
-        }
-    }
-
-    let mode: Mode
+    let mode: EditorMode<Card>
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query(Wallet.unarchived) private var wallets: [Wallet]
 
-    @State private var details: CardDetails
+    @State private var draft: CardDraft
     /// Whether a Credit card has a statement date. The day is remembered while the user flips the kind back and forth.
     @State private var hasStatementDate: Bool
     @State private var statementDay: Int
@@ -29,37 +17,33 @@ struct CardEditor: View {
     @State private var isConfirmingDelete = false
     @State private var errorMessage: String?
 
-    init(mode: Mode) {
+    init(mode: EditorMode<Card>) {
         self.mode = mode
-        let details = switch mode {
-        case .add: CardDetails(name: "", kind: .credit, payingWallet: nil)
-        case .edit(let card): CardDetails(card)
-        }
-        _details = State(initialValue: details)
-        _hasStatementDate = State(initialValue: details.statementDay != nil)
-        _statementDay = State(initialValue: details.statementDay ?? 1)
-    }
-
-    private var isAdding: Bool {
-        if case .add = mode { true } else { false }
+        let draft = mode.editing.map(CardDraft.init) ?? CardDraft(name: "", kind: .credit, payingWallet: nil)
+        _draft = State(initialValue: draft)
+        _hasStatementDate = State(initialValue: draft.statementDay != nil)
+        _statementDay = State(initialValue: draft.statementDay ?? 1)
     }
 
     /// The Card being edited, until it is merged away or deleted (the sheet may draw once more while closing).
     private var editedCard: Card? {
-        guard case .edit(let card) = mode, card.modelContext != nil, !card.isDeleted else { return nil }
+        guard let card = mode.editing, card.modelContext != nil, !card.isDeleted else { return nil }
         return card
     }
 
+    /// A Card that paid for transactions keeps its paying wallet.
+    private var isPayingWalletFixed: Bool { editedCard?.hasTransactions == true }
+
     /// What will be saved: the statement date only counts for a Credit card.
-    private var detailsToSave: CardDetails {
-        var result = details
-        result.statementDay = details.kind == .credit && hasStatementDate ? statementDay : nil
+    private var draftToSave: CardDraft {
+        var result = draft
+        result.statementDay = draft.kind == .credit && hasStatementDate ? statementDay : nil
         return result
     }
 
     private var validationError: CardRuleError? {
         do {
-            try detailsToSave.validate()
+            try draftToSave.validate()
             return nil
         } catch {
             return error as? CardRuleError
@@ -71,23 +55,26 @@ struct CardEditor: View {
             Form {
                 Section {
                     HStack(spacing: 12) {
-                        SymbolCircle(symbolName: "creditcard.fill", color: details.color, size: 40)
-                        TextField("Name", text: $details.name)
+                        SymbolCircle(symbolName: Card.symbolName, color: draft.color, size: 40)
+                        TextField("Name", text: $draft.name)
                     }
-                    Picker("Kind", selection: $details.kind) {
+                    Picker("Kind", selection: $draft.kind) {
                         ForEach(CardKind.allCases, id: \.self) { kind in
                             Text(kind.title).tag(kind)
                         }
                     }
                     .pickerStyle(.segmented)
-                    WalletPicker(title: "Paying wallet", selection: $details.payingWallet)
+                    WalletPicker(title: "Paying wallet", selection: $draft.payingWallet)
+                        .disabled(isPayingWalletFixed)
                     TextField("Last 4 digits (optional)", text: lastFourDigits)
                         #if os(iOS)
                         .keyboardType(.numberPad)
                         #endif
                 } footer: {
-                    if wallets.isEmpty && details.payingWallet == nil {
+                    if wallets.isEmpty && draft.payingWallet == nil {
                         Text("Add a wallet first. A Card is paid from a wallet and only offered on its transactions.")
+                    } else if isPayingWalletFixed {
+                        Text(CardRuleError.payingWalletHasTransactions.localizedDescription)
                     } else if let validationError, validationError != .missingName {
                         Text(validationError.localizedDescription)
                             .foregroundStyle(.red)
@@ -96,12 +83,12 @@ struct CardEditor: View {
                     }
                 }
 
-                if details.kind == .credit {
+                if draft.kind == .credit {
                     statementSection
                 }
 
                 Section("Color") {
-                    PaletteColorGrid(selection: $details.color)
+                    PaletteColorGrid(selection: $draft.color)
                 }
 
                 if let card = editedCard {
@@ -109,19 +96,19 @@ struct CardEditor: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle(isAdding ? "Add Card" : "Edit Card")
+            .navigationTitle(mode.isAdding ? "Add Card" : "Edit Card")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(isAdding ? "Add" : "Save", action: save)
+                    Button(mode.isAdding ? "Add" : "Save", action: save)
                         .disabled(validationError != nil)
                 }
             }
             .onAppear {
-                if details.payingWallet == nil {
-                    details.payingWallet = wallets.first
+                if draft.payingWallet == nil {
+                    draft.payingWallet = wallets.first
                 }
             }
             .sheet(isPresented: $isMerging) {
@@ -129,22 +116,15 @@ struct CardEditor: View {
                     CardMergeView(source: card) { dismiss() }
                 }
             }
-            .alert("Couldn't Save Card", isPresented: Binding(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
-            )) {
-                Button("OK") { errorMessage = nil }
-            } message: {
-                Text(errorMessage ?? "")
-            }
+            .errorAlert("Couldn't Save Card", message: $errorMessage)
         }
     }
 
     /// The last 4 digits field, which keeps only up to four digits as the user types.
     private var lastFourDigits: Binding<String> {
         Binding(
-            get: { details.lastFourDigits ?? "" },
-            set: { details.lastFourDigits = String($0.filter { ("0"..."9").contains($0) }.prefix(4)) }
+            get: { draft.lastFourDigits ?? "" },
+            set: { draft.lastFourDigits = String($0.filter { ("0"..."9").contains($0) }.prefix(4)) }
         )
     }
 
@@ -172,13 +152,11 @@ struct CardEditor: View {
         Section {
             if card.isArchived {
                 Button("Unarchive Card", systemImage: "tray.and.arrow.up") {
-                    card.unarchive()
-                    dismiss()
+                    perform { try card.unarchive() }
                 }
             } else {
                 Button("Archive Card", systemImage: "archivebox") {
-                    card.archive()
-                    dismiss()
+                    perform { try card.archive() }
                 }
             }
             Button("Merge into Another Card…", systemImage: "arrow.triangle.merge") {
@@ -189,7 +167,7 @@ struct CardEditor: View {
                     isConfirmingDelete = true
                 }
                 .confirmationDialog("Delete “\(card.name)”?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
-                    Button("Delete Card", role: .destructive) { delete(card) }
+                    Button("Delete Card", role: .destructive) { perform { try card.delete(in: context) } }
                 }
             }
         } footer: {
@@ -202,71 +180,23 @@ struct CardEditor: View {
     }
 
     private func save() {
-        do {
+        perform {
             switch mode {
             case .add:
-                try Card.create(detailsToSave, in: context)
+                try Card.create(draftToSave, in: context)
             case .edit(let card):
-                try card.update(with: detailsToSave)
+                try card.update(with: draftToSave)
             }
-            try context.save()
-            dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 
-    private func delete(_ card: Card) {
+    /// Runs a change and closes the sheet, or shows why the change was refused.
+    private func perform(_ change: () throws -> Void) {
         do {
-            try card.delete(in: context)
-            try context.save()
+            try change()
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
         }
-    }
-}
-
-extension CardRuleError: LocalizedError {
-    var errorDescription: String? {
-        switch self {
-        case .missingName: String(localized: "Give the Card a name.")
-        case .missingPayingWallet: String(localized: "Choose the wallet this Card is paid from.")
-        case .statementDateRequiresCredit: String(localized: "Only Credit cards have a statement date.")
-        case .statementDayOutOfRange: String(localized: "A statement date is a day from 1 to 31.")
-        case .invalidLastFourDigits: String(localized: "Enter all 4 last digits, or leave them blank.")
-        case .mergeIntoItself: String(localized: "Choose another Card to merge into.")
-        case .hasTransactions: String(localized: "This Card paid for transactions. Merge it into another Card to remove it.")
-        }
-    }
-}
-
-/// The palette as a grid of color swatches.
-private struct PaletteColorGrid: View {
-    @Binding var selection: PaletteColor
-
-    var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 32), spacing: 12)], spacing: 12) {
-            ForEach(PaletteColor.allCases, id: \.self) { choice in
-                Button {
-                    selection = choice
-                } label: {
-                    Circle()
-                        .fill(choice.color.gradient)
-                        .frame(width: 30, height: 30)
-                        .overlay {
-                            if choice == selection {
-                                Image(systemName: "checkmark")
-                                    .font(.caption.bold())
-                                    .foregroundStyle(.white)
-                            }
-                        }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(choice.rawValue.capitalized)
-                .accessibilityAddTraits(choice == selection ? .isSelected : [])
-            }
-        }
-        .padding(.vertical, 4)
     }
 }

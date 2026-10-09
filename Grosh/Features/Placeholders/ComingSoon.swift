@@ -1,3 +1,5 @@
+import Foundation
+
 /// The parts of the app that are intentionally empty in v1, and what each one says while it waits.
 enum ComingSoon: CaseIterable {
     case budgets
@@ -10,10 +12,10 @@ enum ComingSoon: CaseIterable {
 
     var title: String {
         switch self {
-        case .budgets: "Budgets"
-        case .reportThisMonth: "Report this month"
-        case .topSpending: "Top spending"
-        case .recurringTransactions: "Recurring transactions"
+        case .budgets: String(localized: "Budgets")
+        case .reportThisMonth: String(localized: "Report this month")
+        case .topSpending: String(localized: "Top spending")
+        case .recurringTransactions: String(localized: "Recurring transactions")
         }
     }
 
@@ -31,13 +33,13 @@ enum ComingSoon: CaseIterable {
     var message: String {
         switch self {
         case .budgets:
-            "Set a spending limit for a category and see how much is left each month."
+            String(localized: "Set a spending limit for a category and see how much is left each month.")
         case .reportThisMonth:
-            "A chart of this month's income and spending will appear here."
+            String(localized: "A chart of this month's income and spending will appear here.")
         case .topSpending:
-            "Your biggest spending categories this month will appear here."
+            String(localized: "Your biggest spending categories this month will appear here.")
         case .recurringTransactions:
-            "Bills and income that repeat will be added for you on their dates."
+            String(localized: "Bills and income that repeat will be added for you on their dates.")
         }
     }
 }

@@ -6,15 +6,22 @@ extension CategoryType {
 
     var title: String {
         switch self {
-        case .expense: "Expense"
-        case .income: "Income"
-        case .debtLoan: "Debt/Loan"
-        case .system: "System"
+        case .expense: String(localized: "Expense")
+        case .income: String(localized: "Income")
+        case .debtLoan: String(localized: "Debt/Loan")
+        case .system: String(localized: "System")
         }
     }
+}
 
-    /// Expense and Income categories are the user's own; Debt/Loan and system categories are fixed.
-    var isUserManaged: Bool { self == .expense || self == .income }
+/// A category's icon on its colored circle; a question mark on gray for a transaction filed under none.
+struct CategoryIcon: View {
+    let category: Category?
+    var size: CGFloat = 32
+
+    var body: some View {
+        SymbolCircle(symbolName: category?.symbolName ?? "questionmark", color: category?.color ?? .gray, size: size)
+    }
 }
 
 /// A category's icon and name, as rows and pickers show it. Subcategories are indented under their parent.
@@ -24,7 +31,7 @@ struct CategoryLabel: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            SymbolCircle(symbolName: category.symbolName, color: category.color)
+            CategoryIcon(category: category)
             Text(category.name)
         }
         .padding(.leading, indentsSubcategories && category.parent != nil ? 28 : 0)

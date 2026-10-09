@@ -2,13 +2,14 @@ import Foundation
 import SwiftData
 
 extension Transaction {
-    /// Records the draft as a new transaction, entered now.
+    /// Records the draft as a new transaction, entered now. Saves.
     @discardableResult
     static func create(_ draft: TransactionDraft, in context: ModelContext) throws -> Transaction {
         try draft.validate()
         let transaction = Transaction(amount: Money(cents: 0), day: draft.day, wallet: nil, category: nil)
         context.insert(transaction)
         transaction.apply(draft)
+        try context.save()
         return transaction
     }
 
@@ -17,14 +18,15 @@ extension Transaction {
     func update(with draft: TransactionDraft) throws {
         try draft.validate()
         apply(draft)
+        try modelContext?.save()
     }
 
     private func apply(_ draft: TransactionDraft) {
-        amountCents = draft.amount.cents * (draft.category?.sign ?? 1)
+        amountCents = draft.amount.cents * draft.sign
         day = draft.day
         wallet = draft.wallet
         category = draft.category
-        card = draft.card
+        card = draft.offersCard ? draft.card : nil
         note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
         withName = draft.withName.trimmingCharacters(in: .whitespacesAndNewlines)
         isExcludedFromReport = draft.isExcludedFromReport

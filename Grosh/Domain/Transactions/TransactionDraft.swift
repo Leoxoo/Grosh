@@ -3,17 +3,24 @@ import Foundation
 /// What the Add Transaction sheet holds before it is saved. The amount is entered positive; the category
 /// sets the sign.
 struct TransactionDraft {
-    /// Expense, Income or Debt/Loan. Switching it drops a category of the old type and starts the
-    /// Exclude from report switch at the new type's default.
+    /// Expense, Income or Debt/Loan. Switching it drops a category of the old type. Switching onto or off
+    /// Debt/Loan also swaps the Exclude from report switch: to the value the user left there before, or else
+    /// to the new type's default. Switching between Expense and Income leaves it alone.
     var type: CategoryType {
         didSet {
             guard type != oldValue else { return }
             if category?.type != type {
                 category = nil
             }
-            isExcludedFromReport = TransactionDefaults.isExcludedFromReport(type)
+            guard (type == .debtLoan) != (oldValue == .debtLoan) else { return }
+            let leftBehind = isExcludedFromReport
+            isExcludedFromReport = excludedFromReportAcrossDebtLoan ?? TransactionDefaults.isExcludedFromReport(type)
+            excludedFromReportAcrossDebtLoan = leftBehind
         }
     }
+
+    /// The Exclude from report value on the other side of the Debt/Loan switch, restored on switching back.
+    private var excludedFromReportAcrossDebtLoan: Bool?
 
     /// Changing it drops the Card, which is only offered on its paying wallet's transactions.
     var wallet: Wallet? {
@@ -71,6 +78,20 @@ nonisolated enum TransactionRuleError: Error, Equatable {
     case missingCategory
     /// An expense in a wallet that has a Card must say which Card paid for it.
     case missingCard
+    /// Only a wallet's Starting balance is edited as one.
+    case notAStartingBalance
+}
+
+extension TransactionRuleError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .missingWallet: String(localized: "Choose a wallet.")
+        case .missingAmount: String(localized: "Enter an amount above zero.")
+        case .missingCategory: String(localized: "Choose a category.")
+        case .missingCard: String(localized: "Choose the Card this expense was paid with.")
+        case .notAStartingBalance: String(localized: "Only a wallet's Starting balance can be edited here.")
+        }
+    }
 }
 
 extension TransactionDraft {
@@ -82,10 +103,21 @@ extension TransactionDraft {
         guard card != nil || !requiresCard else { throw TransactionRuleError.missingCard }
     }
 
+    /// Whether the transaction can name a Card at all: every transaction but the two halves of a transfer.
+    var offersCard: Bool {
+        category?.isTransferHalf != true
+    }
+
     /// Whether the transaction must name its Card: an expense in a wallet that has at least one (unarchived) Card.
-    /// The Card is optional on Income and Debt/Loan.
+    /// The Card is optional on Income and Debt/Loan, and never offered on a transfer.
     var requiresCard: Bool {
-        type == .expense && !Card.pickerChoices(for: wallet, keeping: nil).isEmpty
+        type == .expense && offersCard && !Card.pickerChoices(for: wallet, keeping: nil).isEmpty
+    }
+
+    /// Whether the amount adds to the wallet (`1`) or takes from it (`-1`): the category's ``Category/sign``, or
+    /// before one is chosen, the type's. `0` while a Debt/Loan has neither Loan nor Debt picked.
+    var sign: Int {
+        category?.sign ?? (type == .expense ? -1 : type == .income ? 1 : 0)
     }
 
     /// Whether every required field is filled, so Save can be enabled.

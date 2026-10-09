@@ -65,7 +65,7 @@ struct SuggestDefaultsTests {
         let cash = try addWallet("Cash")
         try spend(in: checking, minutesAgo: 10)
         try spend(in: cash, minutesAgo: 5)
-        cash.archive()
+        try cash.archive()
 
         #expect(TransactionDefaults.suggest(on: today, in: context).wallet == checking)
     }
@@ -74,7 +74,7 @@ struct SuggestDefaultsTests {
         let checking = try addWallet("Checking")
         let cash = try addWallet("Cash")
         try spend(in: cash, minutesAgo: 5)
-        cash.archive()
+        try cash.archive()
 
         #expect(TransactionDefaults.suggest(on: today, in: context).wallet == checking)
     }

@@ -24,7 +24,7 @@ struct CategoryDeleteTests {
         let vet = store.spend(12_000, on: pets)
         #expect(!catalog.canDelete(pets))
 
-        #expect(throws: CategoryError.hasTransactions) {
+        #expect(throws: CategoryRuleError.hasTransactions) {
             try catalog.delete(pets)
         }
         #expect(vet.category?.name == "Pets")
@@ -43,7 +43,7 @@ struct CategoryDeleteTests {
         store.spend(2_500, on: try store.category("Range"))
         #expect(!catalog.canDelete(gunsAndAmmo))
 
-        #expect(throws: CategoryError.hasTransactions) {
+        #expect(throws: CategoryRuleError.hasTransactions) {
             try catalog.delete(gunsAndAmmo)
         }
         #expect(try store.category("Range").parent?.name == "Guns and Ammo")
@@ -54,7 +54,7 @@ struct CategoryDeleteTests {
         let locked = try store.category(name)
         #expect(!catalog.canDelete(locked))
 
-        #expect(throws: CategoryError.locked) {
+        #expect(throws: CategoryRuleError.locked) {
             try catalog.delete(locked)
         }
         #expect(try store.categoryExists(name))

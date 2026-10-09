@@ -3,10 +3,10 @@ import SwiftUI
 
 /// Account → Wallets: every wallet in the user's order. Drag to reorder, tap to edit, swipe to archive.
 struct WalletListView: View {
-    @Environment(\.modelContext) private var context
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     @Query(filter: #Predicate<Wallet> { $0.isArchived }, sort: Wallet.userOrder) private var archivedWallets: [Wallet]
-    @State private var editorMode: WalletEditor.Mode?
+    @State private var editorMode: EditorMode<Wallet>?
+    @State private var errorMessage: String?
 
     private var today: CalendarDay { .today }
 
@@ -21,16 +21,16 @@ struct WalletListView: View {
                     }
                     .buttonStyle(.plain)
                     .swipeActions {
-                        Button("Archive", systemImage: "archivebox") { wallet.archive() }
+                        Button("Archive", systemImage: "archivebox") { perform { try wallet.archive() } }
                             .tint(.orange)
                     }
                     .contextMenu {
                         Button("Edit", systemImage: "pencil") { editorMode = .edit(wallet) }
-                        Button("Archive", systemImage: "archivebox") { wallet.archive() }
+                        Button("Archive", systemImage: "archivebox") { perform { try wallet.archive() } }
                     }
                 }
                 .onMove { source, destination in
-                    Wallet.move(wallets, fromOffsets: source, toOffset: destination)
+                    perform { try Wallet.move(wallets, fromOffsets: source, toOffset: destination) }
                 }
             } footer: {
                 if wallets.count > 1 {
@@ -49,11 +49,11 @@ struct WalletListView: View {
                         }
                         .buttonStyle(.plain)
                         .swipeActions {
-                            Button("Unarchive", systemImage: "tray.and.arrow.up") { unarchive(wallet) }
+                            Button("Unarchive", systemImage: "tray.and.arrow.up") { perform { try wallet.unarchive() } }
                                 .tint(.green)
                         }
                         .contextMenu {
-                            Button("Unarchive", systemImage: "tray.and.arrow.up") { unarchive(wallet) }
+                            Button("Unarchive", systemImage: "tray.and.arrow.up") { perform { try wallet.unarchive() } }
                         }
                     }
                 } header: {
@@ -88,10 +88,16 @@ struct WalletListView: View {
         .sheet(item: $editorMode) { mode in
             WalletEditor(mode: mode)
         }
+        .errorAlert("Couldn't Change Wallet", message: $errorMessage)
     }
 
-    private func unarchive(_ wallet: Wallet) {
-        try? wallet.unarchive(in: context)
+    /// Runs a change, or shows why it was refused.
+    private func perform(_ change: () throws -> Void) {
+        do {
+            try change()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }
 

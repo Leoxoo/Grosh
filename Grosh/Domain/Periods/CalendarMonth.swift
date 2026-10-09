@@ -24,15 +24,13 @@ nonisolated struct CalendarMonth: Hashable, Sendable {
 
     var firstDay: CalendarDay { CalendarDay(year: year, month: month, day: 1) }
 
-    var lastDay: CalendarDay {
-        CalendarDay(year: year, month: month, day: Self.gregorian.range(of: .day, in: .month, for: firstDay.date(in: Self.gregorian))?.count ?? 28)
-    }
+    var lastDay: CalendarDay { CalendarDay(year: year, month: month, day: dayCount) }
 
-    private static let gregorian: Calendar = {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC") ?? .gmt
-        return calendar
-    }()
+    /// How many days the month has: 28 to 31.
+    var dayCount: Int {
+        let calendar = Calendar.utcGregorian
+        return calendar.range(of: .day, in: .month, for: firstDay.date(in: calendar))?.count ?? 28
+    }
 }
 
 /// Months compare in calendar order.

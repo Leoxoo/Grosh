@@ -11,7 +11,8 @@ extension Wallet {
     }
 
     /// Applies a drag in `ordered` (a list in the user's order) by renumbering the wallets in their new order.
-    static func move(_ ordered: [Wallet], fromOffsets source: IndexSet, toOffset destination: Int) {
+    /// Saves.
+    static func move(_ ordered: [Wallet], fromOffsets source: IndexSet, toOffset destination: Int) throws {
         let moving = source.map { ordered[$0] }
         var reordered = ordered.enumerated().filter { !source.contains($0.offset) }.map(\.element)
         let insertionIndex = destination - source.count(in: 0..<destination)
@@ -19,50 +20,38 @@ extension Wallet {
         for (position, wallet) in reordered.enumerated() {
             wallet.sortOrder = position
         }
+        try ordered.first?.modelContext?.save()
     }
 
-    /// The position after every wallet already in the store, archived ones included.
-    private static func nextSortOrder(in context: ModelContext) throws -> Int {
-        var descriptor = FetchDescriptor<Wallet>(sortBy: [SortDescriptor(\.sortOrder, order: .reverse)])
-        descriptor.fetchLimit = 1
-        return try context.fetch(descriptor).first.map { $0.sortOrder + 1 } ?? 0
-    }
-
-    /// Adds a wallet and records the money it already holds as its Starting balance: its first transaction,
-    /// under the locked Starting balance category and always excluded from report.
+    /// Adds a wallet named `name` with its Starting balance, as ``create(_:startingBalance:on:in:)`` does.
     @discardableResult
     static func create(
         name: String,
-        symbolName: String = "wallet.bifold.fill",
-        color: PaletteColor = .green,
+        symbolName: String = WalletDraft().symbolName,
+        color: PaletteColor = WalletDraft().color,
         includeInTotal: Bool = true,
         startingBalance: Money,
         on day: CalendarDay,
         in context: ModelContext
     ) throws -> Wallet {
-        let category = try context.lockedCategory(.startingBalance)
-        let wallet = Wallet(name: name, symbolName: symbolName, color: color, sortOrder: try nextSortOrder(in: context))
-        wallet.includeInTotal = includeInTotal
-        context.insert(wallet)
-
-        let starting = Transaction(amount: startingBalance, day: day, wallet: nil, category: nil)
-        starting.isExcludedFromReport = true
-        context.insert(starting)
-        starting.wallet = wallet
-        starting.category = category
-        return wallet
+        var draft = WalletDraft()
+        draft.name = name
+        draft.symbolName = symbolName
+        draft.color = color
+        draft.includeInTotal = includeInTotal
+        return try create(draft, startingBalance: startingBalance, on: day, in: context)
     }
 
-    /// Retires the wallet: it leaves the Total and every picker, but keeps all of its transactions.
-    func archive() {
+    /// Retires the wallet: it leaves the Total and every picker, but keeps all of its transactions. Saves.
+    func archive() throws {
         isArchived = true
+        try modelContext?.save()
     }
 
-    /// Brings an archived wallet back, at the end of the user's order.
-    func unarchive(in context: ModelContext) throws {
-        guard isArchived else { return }
-        sortOrder = try Self.nextSortOrder(in: context)
+    /// Brings an archived wallet back into its place in the user's order. Saves.
+    func unarchive() throws {
         isArchived = false
+        try modelContext?.save()
     }
 
     /// The wallet's balance on `today`: the sum of its transactions dated today or earlier.
