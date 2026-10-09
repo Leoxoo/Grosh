@@ -152,6 +152,19 @@ struct AddTransactionTests {
         #expect(entered.canSave)
     }
 
+    @Test(arguments: [(CategoryType.expense, "Outgoing transfer"), (.income, "Incoming transfer")])
+    func aTransferHalfIsNeverOfferedACard(type: CategoryType, categoryName: String) throws {
+        let appleCard = try addCard("Apple Card", paidFrom: checking)
+        var entered = try draft(type, 50_000, categoryName)
+
+        #expect(!entered.offersCard)
+        #expect(!entered.requiresCard)
+        #expect(entered.canSave)
+
+        entered.card = appleCard
+        #expect(try Transaction.create(entered, in: context).card == nil)
+    }
+
     @Test func changingTheWalletClearsTheCard() throws {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
         var entered = try draft(.expense, 1276, "Café")

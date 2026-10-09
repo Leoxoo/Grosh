@@ -214,6 +214,9 @@ struct CategoryCatalog {
 extension Category {
     /// Hidden itself, or a subcategory of a hidden parent.
     var isHiddenInTree: Bool { isHidden || parent?.isHidden == true }
+
+    /// Outgoing transfer or Incoming transfer: one half of a Transfer, which never carries a Card.
+    var isTransferHalf: Bool { lockedRole == .outgoingTransfer || lockedRole == .incomingTransfer }
 }
 
 extension LockedRole {

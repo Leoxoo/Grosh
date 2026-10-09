@@ -145,7 +145,9 @@ private struct TransactionForm: View {
             }
             .focused($focus, equals: .amount)
             CategoryPicker(title: "Category", type: draft.type, selection: $draft.category)
-            CardPicker(title: "Card", wallet: draft.wallet, selection: $draft.card)
+            if draft.offersCard {
+                CardPicker(title: "Card", wallet: draft.wallet, selection: $draft.card)
+            }
             TextField("Note", text: $draft.note, axis: .vertical)
                 .focused($focus, equals: .note)
             DayStepper(title: "Date", day: $draft.day)

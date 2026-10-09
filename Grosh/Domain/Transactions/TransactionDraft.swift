@@ -89,10 +89,15 @@ extension TransactionDraft {
         guard card != nil || !requiresCard else { throw TransactionRuleError.missingCard }
     }
 
+    /// Whether the transaction can name a Card at all: every transaction but the two halves of a transfer.
+    var offersCard: Bool {
+        category?.isTransferHalf != true
+    }
+
     /// Whether the transaction must name its Card: an expense in a wallet that has at least one (unarchived) Card.
-    /// The Card is optional on Income and Debt/Loan.
+    /// The Card is optional on Income and Debt/Loan, and never offered on a transfer.
     var requiresCard: Bool {
-        type == .expense && !Card.pickerChoices(for: wallet, keeping: nil).isEmpty
+        type == .expense && offersCard && !Card.pickerChoices(for: wallet, keeping: nil).isEmpty
     }
 
     /// Whether every required field is filled, so Save can be enabled.

@@ -24,7 +24,7 @@ extension Transaction {
         day = draft.day
         wallet = draft.wallet
         category = draft.category
-        card = draft.card
+        card = draft.offersCard ? draft.card : nil
         note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
         withName = draft.withName.trimmingCharacters(in: .whitespacesAndNewlines)
         isExcludedFromReport = draft.isExcludedFromReport
