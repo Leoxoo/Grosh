@@ -1,3 +1,5 @@
+import Foundation
+
 /// A date without a time of day. Transactions happen on a day, not at a moment, so a day never shifts
 /// when the device's time zone changes.
 nonisolated struct CalendarDay: Hashable, Sendable {
@@ -17,4 +19,20 @@ nonisolated struct CalendarDay: Hashable, Sendable {
     }
 
     var rawValue: Int { year * 10_000 + month * 100 + day }
+}
+
+extension CalendarDay {
+    /// The day `date` falls on in `calendar` (the user's calendar and time zone by default).
+    init(_ date: Date, in calendar: Calendar = .current) {
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        self.init(year: parts.year ?? 0, month: parts.month ?? 1, day: parts.day ?? 1)
+    }
+
+    /// The day it is now on the user's calendar.
+    static var today: CalendarDay { CalendarDay(Date.now) }
+
+    /// The start of this day in `calendar`, for date pickers and other APIs that take a `Date`.
+    func date(in calendar: Calendar = .current) -> Date {
+        calendar.date(from: DateComponents(year: year, month: month, day: day)) ?? .distantPast
+    }
 }
