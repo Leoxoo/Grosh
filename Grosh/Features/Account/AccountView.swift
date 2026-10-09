@@ -19,6 +19,11 @@ struct AccountView: View {
                     } label: {
                         Label("Categories", systemImage: "square.grid.2x2")
                     }
+                    NavigationLink {
+                        CardListView()
+                    } label: {
+                        Label("Cards", systemImage: "creditcard")
+                    }
                 }
 
                 Section {
