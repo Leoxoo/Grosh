@@ -133,23 +133,3 @@ struct TransferHalfEditor: View {
         }
     }
 }
-
-/// A read-only wallet row: its icon and name, or a dash once that half of the transfer was deleted.
-private struct WalletLabel: View {
-    let title: LocalizedStringKey
-    let wallet: Wallet?
-
-    var body: some View {
-        LabeledContent(title) {
-            if let wallet {
-                HStack(spacing: 6) {
-                    Image(systemName: wallet.symbolName)
-                        .foregroundStyle(wallet.color.color)
-                    Text(wallet.name)
-                }
-            } else {
-                Text("—")
-            }
-        }
-    }
-}
