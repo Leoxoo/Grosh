@@ -232,6 +232,46 @@ struct AmountEntryTests {
         #expect(existing.cents == 127)
     }
 
+    // MARK: Changing the sign
+
+    @Test func changingTheSignTurnsAnAmountIntoItsNegativeAndBack() {
+        var typed = entry(.digit(1), .digit(2), .digit(7), .digit(6))
+
+        typed.changeSign()
+        #expect(typed.cents == -1276)
+
+        typed.changeSign()
+        #expect(typed.cents == 1276)
+    }
+
+    @Test func changingTheSignWorksOutACalculationFirst() {
+        var typed = calculate("1000", .subtract, "250")
+        typed.press(.operation(.add))
+        typed.press(.digit(5))
+
+        typed.changeSign()
+
+        #expect(typed.cents == -755)
+        #expect(!typed.isCalculation)
+    }
+
+    @Test func aDigitAfterChangingTheSignStartsANewAmount() {
+        var typed = entry(.digit(1), .digit(2))
+        typed.changeSign()
+
+        typed.press(.digit(3))
+
+        #expect(typed.cents == 3)
+    }
+
+    @Test func changingTheSignOfAnErrorLeavesTheError() {
+        var typed = calculate("100", .divide, "0")
+
+        typed.changeSign()
+
+        #expect(typed.cents == nil)
+    }
+
     // MARK: Typing on a Mac keyboard
 
     @Test func typingOnAKeyboardIsCentsFirstToo() {

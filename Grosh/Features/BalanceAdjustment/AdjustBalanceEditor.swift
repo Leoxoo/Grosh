@@ -111,8 +111,7 @@ private struct AdjustBalanceForm: View {
                 isKeypadShown.toggle()
             }
             .focused($focus, equals: .amount)
-            Button("Change Sign", systemImage: "plusminus", action: changeSign)
-                .disabled(draft.realBalance == nil)
+            ChangeSignButton(entry: $draft.realBalanceEntry)
         } footer: {
             if draft.wallet == nil {
                 Text("Add a wallet first, in Account → Wallets.")
@@ -140,12 +139,6 @@ private struct AdjustBalanceForm: View {
                 Text("The reason is any Income category when the balance goes up, or any Expense category when it goes down. It counts in reports unless excluded, and never needs a Card.")
             }
         }
-    }
-
-    /// Turns a balance above zero into a debt of the same size, and back.
-    private func changeSign() {
-        guard let cents = draft.realBalance?.cents else { return }
-        draft.realBalanceEntry = AmountEntry(cents: -cents)
     }
 
     private func save() {

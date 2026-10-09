@@ -53,8 +53,7 @@ struct StartingBalanceEditor: View {
                         isKeypadShown.toggle()
                     }
                     .focused($focus, equals: .amount)
-                    Button("Change Sign", systemImage: "plusminus", action: changeSign)
-                        .disabled(entry.cents == nil)
+                    ChangeSignButton(entry: $entry)
                     DayStepper(title: "Date", day: $draft.day)
                     TextField("Note", text: $draft.note, axis: .vertical)
                         .focused($focus, equals: .note)
@@ -93,12 +92,6 @@ struct StartingBalanceEditor: View {
         #if os(macOS)
         .frame(minWidth: 420, idealWidth: 460, minHeight: 560, idealHeight: 640)
         #endif
-    }
-
-    /// Turns a balance above zero into a debt of the same size, and back.
-    private func changeSign() {
-        guard let cents = entry.cents else { return }
-        entry = AmountEntry(cents: -cents)
     }
 
     private func save() {
