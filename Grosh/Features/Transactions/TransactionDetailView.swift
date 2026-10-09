@@ -120,11 +120,7 @@ private struct TransactionDetailHeader: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            SymbolCircle(
-                symbolName: transaction.category?.symbolName ?? "questionmark",
-                color: transaction.category?.color ?? .gray,
-                size: 48
-            )
+            CategoryIcon(category: transaction.category, size: 48)
             VStack(alignment: .leading, spacing: 4) {
                 Text(transaction.categoryName)
                     .font(.headline)

@@ -14,6 +14,16 @@ extension CategoryType {
     }
 }
 
+/// A category's icon on its colored circle; a question mark on gray for a transaction filed under none.
+struct CategoryIcon: View {
+    let category: Category?
+    var size: CGFloat = 32
+
+    var body: some View {
+        SymbolCircle(symbolName: category?.symbolName ?? "questionmark", color: category?.color ?? .gray, size: size)
+    }
+}
+
 /// A category's icon and name, as rows and pickers show it. Subcategories are indented under their parent.
 struct CategoryLabel: View {
     let category: Category
@@ -21,7 +31,7 @@ struct CategoryLabel: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            SymbolCircle(symbolName: category.symbolName, color: category.color)
+            CategoryIcon(category: category)
             Text(category.name)
         }
         .padding(.leading, indentsSubcategories && category.parent != nil ? 28 : 0)

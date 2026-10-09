@@ -7,10 +7,7 @@ struct TransactionRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            SymbolCircle(
-                symbolName: transaction.category?.symbolName ?? "questionmark",
-                color: transaction.category?.color ?? .gray
-            )
+            CategoryIcon(category: transaction.category)
             VStack(alignment: .leading, spacing: 2) {
                 Text(transaction.categoryName)
                     .lineLimit(1)
