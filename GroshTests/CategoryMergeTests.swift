@@ -76,7 +76,7 @@ struct CategoryMergeTests {
         let lockedOrNot = try category(source)
         let purchase = spend(1_000, on: lockedOrNot)
 
-        #expect(throws: CategoryError.locked) {
+        #expect(throws: CategoryRuleError.locked) {
             try catalog.merge(lockedOrNot, into: try category(target))
         }
         #expect(purchase.category?.name == source)
@@ -84,7 +84,7 @@ struct CategoryMergeTests {
     }
 
     @Test func aCategoryCantBeMergedIntoAnotherType() throws {
-        #expect(throws: CategoryError.differentType) {
+        #expect(throws: CategoryRuleError.differentType) {
             try catalog.merge(try category("Gifts & Donations"), into: try category("Gifts", .income))
         }
         #expect(try categoryExists("Gifts & Donations"))
@@ -92,7 +92,7 @@ struct CategoryMergeTests {
 
     @Test func aCategoryCantBeMergedIntoItself() throws {
         let products = try category("Products")
-        #expect(throws: CategoryError.sameCategory) {
+        #expect(throws: CategoryRuleError.sameCategory) {
             try catalog.merge(products, into: products)
         }
         #expect(try categoryExists("Products"))
@@ -103,7 +103,7 @@ struct CategoryMergeTests {
         ("Personal Transport", "Petrol"),
     ])
     func aParentWithSubcategoriesCantBeMergedIntoASubcategory(source: String, target: String) throws {
-        #expect(throws: CategoryError.tooDeep) {
+        #expect(throws: CategoryRuleError.tooDeep) {
             try catalog.merge(try category(source), into: try category(target))
         }
         #expect(try category("Taxi").parent?.name == "Other Transport")

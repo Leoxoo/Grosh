@@ -6,10 +6,10 @@ extension CategoryType {
 
     var title: String {
         switch self {
-        case .expense: "Expense"
-        case .income: "Income"
-        case .debtLoan: "Debt/Loan"
-        case .system: "System"
+        case .expense: String(localized: "Expense")
+        case .income: String(localized: "Income")
+        case .debtLoan: String(localized: "Debt/Loan")
+        case .system: String(localized: "System")
         }
     }
 

@@ -59,7 +59,7 @@ struct CategoryCatalog {
         }
         let isRetyped = draft.type != category.type
         let children = category.children ?? []
-        if isRetyped, hasTransactions(category) { throw CategoryError.hasTransactions }
+        if isRetyped, hasTransactions(category) { throw CategoryRuleError.hasTransactions }
         try checkPlacement(draft, for: category)
         let name = try checkedName(draft, for: category)
         if isRetyped {
@@ -94,7 +94,7 @@ struct CategoryCatalog {
     /// A locked category's icon is all that may change.
     private func updateIcon(of category: Category, to draft: CategoryDraft) throws {
         guard draft.name == category.name, draft.type == category.type, draft.parent == category.parent else {
-            throw CategoryError.locked
+            throw CategoryRuleError.locked
         }
         category.symbolName = draft.symbolName
         category.color = draft.color
@@ -103,19 +103,19 @@ struct CategoryCatalog {
 
     /// Checks the draft's type and parent. `category` is the one being edited, if any.
     private func checkPlacement(_ draft: CategoryDraft, for category: Category?) throws {
-        guard draft.type == .expense || draft.type == .income else { throw CategoryError.fixedType }
+        guard draft.type == .expense || draft.type == .income else { throw CategoryRuleError.fixedType }
         guard let parent = draft.parent else { return }
-        guard parent != category else { throw CategoryError.sameCategory }
-        guard !parent.isLocked else { throw CategoryError.locked }
-        guard parent.type == draft.type else { throw CategoryError.differentType }
-        guard parent.parent == nil, (category?.children ?? []).isEmpty else { throw CategoryError.tooDeep }
+        guard parent != category else { throw CategoryRuleError.sameCategory }
+        guard !parent.isLocked else { throw CategoryRuleError.locked }
+        guard parent.type == draft.type else { throw CategoryRuleError.differentType }
+        guard parent.parent == nil, (category?.children ?? []).isEmpty else { throw CategoryRuleError.tooDeep }
     }
 
     /// The draft's name without surrounding spaces, once it is known to be unique within the draft's type.
     /// `category` is the one being edited, which may keep its own name.
     private func checkedName(_ draft: CategoryDraft, for category: Category?) throws -> String {
         let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { throw CategoryError.nameRequired }
+        guard !name.isEmpty else { throw CategoryRuleError.nameRequired }
         try checkNameIsFree(name, in: draft.type, except: category)
         return name
     }
@@ -124,14 +124,14 @@ struct CategoryCatalog {
         let taken = try categories(of: type).contains {
             $0 != category && $0.name.compare(name, options: .caseInsensitive) == .orderedSame
         }
-        guard !taken else { throw CategoryError.nameTaken }
+        guard !taken else { throw CategoryRuleError.nameTaken }
     }
 
     // MARK: Hiding
 
     /// Hides a category from the picker (its subcategories too) or brings it back. Its transactions keep it.
     func setHidden(_ category: Category, _ isHidden: Bool) throws {
-        guard !category.isLocked else { throw CategoryError.locked }
+        guard !category.isLocked else { throw CategoryRuleError.locked }
         category.isHidden = isHidden
         try context.save()
     }
@@ -161,11 +161,11 @@ struct CategoryCatalog {
     }
 
     private func checkMerge(_ source: Category, into target: Category) throws {
-        guard !source.isLocked, !target.isLocked else { throw CategoryError.locked }
-        guard source != target else { throw CategoryError.sameCategory }
-        guard source.type == target.type else { throw CategoryError.differentType }
+        guard !source.isLocked, !target.isLocked else { throw CategoryRuleError.locked }
+        guard source != target else { throw CategoryRuleError.sameCategory }
+        guard source.type == target.type else { throw CategoryRuleError.differentType }
         // A parent's subcategories end up under the target, so the target must be top-level.
-        guard (source.children ?? []).isEmpty || target.parent == nil else { throw CategoryError.tooDeep }
+        guard (source.children ?? []).isEmpty || target.parent == nil else { throw CategoryRuleError.tooDeep }
     }
 
     // MARK: Deleting
@@ -185,8 +185,8 @@ struct CategoryCatalog {
     }
 
     private func checkDelete(_ category: Category) throws {
-        guard !category.isLocked else { throw CategoryError.locked }
-        guard !hasTransactions(category) else { throw CategoryError.hasTransactions }
+        guard !category.isLocked else { throw CategoryRuleError.locked }
+        guard !hasTransactions(category) else { throw CategoryRuleError.hasTransactions }
     }
 
     /// Whether the category or any of its subcategories has transactions.

@@ -1,10 +1,10 @@
 import SwiftUI
 
 extension CardKind {
-    var title: LocalizedStringKey {
+    var title: String {
         switch self {
-        case .debit: "Debit"
-        case .credit: "Credit"
+        case .debit: String(localized: "Debit")
+        case .credit: String(localized: "Credit")
         }
     }
 }
@@ -43,7 +43,7 @@ struct CardRow: View {
     }
 
     private var summary: String {
-        var parts = [card.kind == .debit ? String(localized: "Debit") : String(localized: "Credit")]
+        var parts = [card.kind.title]
         if let wallet = card.payingWallet {
             parts.append(wallet.name)
         }

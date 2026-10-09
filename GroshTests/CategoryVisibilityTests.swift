@@ -70,7 +70,7 @@ struct CategoryVisibilityTests {
     @Test func lockedCategoriesCantBeHidden() throws {
         let otherExpense = try store.category("Other Expense")
 
-        #expect(throws: CategoryError.locked) {
+        #expect(throws: CategoryRuleError.locked) {
             try catalog.setHidden(otherExpense, true)
         }
         #expect(!otherExpense.isHidden)

@@ -163,7 +163,7 @@ struct CategoryEditor: View {
             }
         } footer: {
             if isLocked {
-                Text(CategoryError.locked.localizedDescription)
+                Text(CategoryRuleError.locked.localizedDescription)
             } else if !canChangeType {
                 Text("This category has transactions, so its type can't change.")
             } else if !(editing?.children ?? []).isEmpty {

@@ -110,7 +110,7 @@ struct AddTransactionTests {
 
     @discardableResult
     private func addCard(_ name: String, paidFrom wallet: Wallet) throws -> Card {
-        try Card.create(CardDetails(name: name, kind: .credit, payingWallet: wallet), in: context)
+        try Card.create(CardDraft(name: name, kind: .credit, payingWallet: wallet), in: context)
     }
 
     @Test func anExpenseNeedsACardWhenItsWalletHasOne() throws {

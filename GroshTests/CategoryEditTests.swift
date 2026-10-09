@@ -26,7 +26,7 @@ struct CategoryEditTests {
 
     @Test(arguments: ["Products", "café", " RESTAURANTS "])
     func namesAreUniqueWithinAType(name: String) throws {
-        #expect(throws: CategoryError.nameTaken) {
+        #expect(throws: CategoryRuleError.nameTaken) {
             try catalog.add(CategoryDraft(name: name, type: .expense))
         }
         #expect(try names(.expense).count == 64)
@@ -41,7 +41,7 @@ struct CategoryEditTests {
 
     @Test(arguments: ["", "   "])
     func aCategoryNeedsAName(name: String) throws {
-        #expect(throws: CategoryError.nameRequired) {
+        #expect(throws: CategoryRuleError.nameRequired) {
             try catalog.add(CategoryDraft(name: name, type: .expense))
         }
     }
@@ -61,19 +61,19 @@ struct CategoryEditTests {
     }
 
     @Test func aSubcategoryCantHaveSubcategories() throws {
-        #expect(throws: CategoryError.tooDeep) {
+        #expect(throws: CategoryRuleError.tooDeep) {
             try catalog.add(CategoryDraft(name: "Espresso", type: .expense, parent: try store.category("Café")))
         }
     }
 
     @Test func aSubcategoryHasItsParentsType() throws {
-        #expect(throws: CategoryError.differentType) {
+        #expect(throws: CategoryRuleError.differentType) {
             try catalog.add(CategoryDraft(name: "Bonus", type: .income, parent: try store.category("Products")))
         }
     }
 
     @Test func lockedCategoriesCantHaveSubcategories() throws {
-        #expect(throws: CategoryError.locked) {
+        #expect(throws: CategoryRuleError.locked) {
             try catalog.add(CategoryDraft(name: "Misc", type: .expense, parent: try store.category("Other Expense")))
         }
     }
@@ -108,7 +108,7 @@ struct CategoryEditTests {
         var draft = CategoryDraft(cafe)
         draft.name = "Restaurants"
 
-        #expect(throws: CategoryError.nameTaken) {
+        #expect(throws: CategoryRuleError.nameTaken) {
             try catalog.update(cafe, to: draft)
         }
         #expect(cafe.name == "Café")
@@ -136,7 +136,7 @@ struct CategoryEditTests {
         var draft = CategoryDraft(food)
         draft.parent = try store.category("Shopping")
 
-        #expect(throws: CategoryError.tooDeep) {
+        #expect(throws: CategoryRuleError.tooDeep) {
             try catalog.update(food, to: draft)
         }
         #expect(food.parent == nil)
@@ -162,7 +162,7 @@ struct CategoryEditTests {
         var toTop = keepsParent
         toTop.parent = nil
 
-        #expect(throws: CategoryError.differentType) {
+        #expect(throws: CategoryRuleError.differentType) {
             try catalog.update(va, to: keepsParent)
         }
         try catalog.update(va, to: toTop)
@@ -178,7 +178,7 @@ struct CategoryEditTests {
         var draft = CategoryDraft(parent)
         draft.type = .income
 
-        #expect(throws: CategoryError.hasTransactions) {
+        #expect(throws: CategoryRuleError.hasTransactions) {
             try catalog.update(parent, to: draft)
         }
         #expect(parent.type == .expense)
@@ -190,7 +190,7 @@ struct CategoryEditTests {
         var draft = CategoryDraft(gifts)
         draft.type = .income
 
-        #expect(throws: CategoryError.nameTaken) {
+        #expect(throws: CategoryRuleError.nameTaken) {
             try catalog.update(gifts, to: draft)
         }
         #expect(gifts.type == .expense)
@@ -223,7 +223,7 @@ struct CategoryEditTests {
         moved.parent = try store.category("Products")
 
         for draft in [renamed, retyped, moved] {
-            #expect(throws: CategoryError.locked) {
+            #expect(throws: CategoryRuleError.locked) {
                 try catalog.update(otherExpense, to: draft)
             }
         }
@@ -254,7 +254,7 @@ struct CategoryEditTests {
 
     @Test(arguments: [CategoryType.debtLoan, .system])
     func onlyExpenseAndIncomeCategoriesCanBeAdded(type: CategoryType) throws {
-        #expect(throws: CategoryError.fixedType) {
+        #expect(throws: CategoryRuleError.fixedType) {
             try catalog.add(CategoryDraft(name: "Mortgage", type: type))
         }
     }

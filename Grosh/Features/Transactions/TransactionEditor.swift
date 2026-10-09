@@ -239,18 +239,6 @@ private extension TransactionDraft {
     }
 }
 
-extension TransactionRuleError: LocalizedError {
-    var errorDescription: String? {
-        switch self {
-        case .missingWallet: String(localized: "Choose a wallet.")
-        case .missingAmount: String(localized: "Enter an amount above zero.")
-        case .missingCategory: String(localized: "Choose a category.")
-        case .missingCard: String(localized: "Choose the Card this expense was paid with.")
-        case .notAStartingBalance: String(localized: "Only a wallet's Starting balance can be edited here.")
-        }
-    }
-}
-
 #Preview {
     TransactionEditor(mode: .add)
         .modelContainer(try! GroshStore.makeContainer(inMemory: true))

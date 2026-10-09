@@ -1,8 +1,8 @@
 import Foundation
 import SwiftData
 
-/// What the user enters for a Card when adding or editing it.
-nonisolated struct CardDetails {
+/// The editable fields of a Card, as the Add/Edit form holds them before the Card rules check and save them.
+nonisolated struct CardDraft {
     var name: String
     var kind: CardKind
     var payingWallet: Wallet?
@@ -35,8 +35,25 @@ nonisolated enum CardRuleError: Error, Equatable {
     case payingWalletHasTransactions
 }
 
-extension CardDetails {
-    /// The details a Card has now, to start editing from.
+extension CardRuleError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .missingName: String(localized: "Give the Card a name.")
+        case .missingPayingWallet: String(localized: "Choose the wallet this Card is paid from.")
+        case .statementDateRequiresCredit: String(localized: "Only Credit cards have a statement date.")
+        case .statementDayOutOfRange: String(localized: "A statement date is a day from 1 to 31.")
+        case .invalidLastFourDigits: String(localized: "Enter all 4 last digits, or leave them blank.")
+        case .mergeIntoItself: String(localized: "Choose another Card to merge into.")
+        case .mergeIntoAnotherWallet: String(localized: "Choose a Card paid from the same wallet.")
+        case .mergeIntoArchived: String(localized: "Unarchive that Card before merging into it.")
+        case .hasTransactions: String(localized: "This Card paid for transactions. Merge it into another Card to remove it.")
+        case .payingWalletHasTransactions: String(localized: "This Card paid for transactions, so its paying wallet can't change.")
+        }
+    }
+}
+
+extension CardDraft {
+    /// The Card's current fields, ready to edit.
     init(_ card: Card) {
         self.init(
             name: card.name,
@@ -56,7 +73,7 @@ extension CardDetails {
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    /// Checks the details against the Card rules before anything is saved.
+    /// Checks the draft against the Card rules before anything is saved.
     func validate() throws {
         guard !trimmedName.isEmpty else { throw CardRuleError.missingName }
         guard payingWallet != nil else { throw CardRuleError.missingPayingWallet }
@@ -75,30 +92,30 @@ extension CardDetails {
 extension Card {
     /// Adds a Card.
     @discardableResult
-    static func create(_ details: CardDetails, in context: ModelContext) throws -> Card {
-        try details.validate()
-        let card = Card(name: details.name, kind: details.kind, payingWallet: nil, sortOrder: try nextSortOrder(in: context))
+    static func create(_ draft: CardDraft, in context: ModelContext) throws -> Card {
+        try draft.validate()
+        let card = Card(name: draft.name, kind: draft.kind, payingWallet: nil, sortOrder: try nextSortOrder(in: context))
         context.insert(card)
-        card.apply(details)
+        card.apply(draft)
         return card
     }
 
-    /// Saves edited details. Nothing changes when the details break a Card rule.
-    func update(with details: CardDetails) throws {
-        try details.validate()
-        guard details.payingWallet == payingWallet || !hasTransactions else {
+    /// Saves an edited draft. Nothing changes when the draft breaks a Card rule.
+    func update(with draft: CardDraft) throws {
+        try draft.validate()
+        guard draft.payingWallet == payingWallet || !hasTransactions else {
             throw CardRuleError.payingWalletHasTransactions
         }
-        apply(details)
+        apply(draft)
     }
 
-    private func apply(_ details: CardDetails) {
-        name = details.trimmedName
-        kind = details.kind
-        payingWallet = details.payingWallet
-        colorName = details.color.rawValue
-        lastFourDigits = details.storedLastFourDigits
-        statementDay = details.statementDay
+    private func apply(_ draft: CardDraft) {
+        name = draft.trimmedName
+        kind = draft.kind
+        payingWallet = draft.payingWallet
+        colorName = draft.color.rawValue
+        lastFourDigits = draft.storedLastFourDigits
+        statementDay = draft.statementDay
     }
 
     var color: PaletteColor { PaletteColor(rawValue: colorName) ?? .blue }
