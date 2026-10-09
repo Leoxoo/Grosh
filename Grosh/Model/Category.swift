@@ -63,4 +63,9 @@ final class Category {
     }
 
     var isLocked: Bool { lockedRole != nil }
+
+    var color: PaletteColor {
+        get { PaletteColor(rawValue: colorName) ?? .gray }
+        set { colorName = newValue.rawValue }
+    }
 }
