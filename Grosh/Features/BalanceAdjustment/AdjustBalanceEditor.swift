@@ -45,25 +45,12 @@ private struct AdjustBalanceForm: View {
     @Environment(\.modelContext) private var context
 
     @State private var draft: BalanceAdjustmentDraft
-    /// The real balance being typed. It starts at the recorded balance; the first digit replaces it.
-    @State private var entry: AmountEntry
     @State private var isKeypadShown = true
     @State private var errorMessage: String?
     @FocusState private var focus: Field?
 
     init(startingDraft: BalanceAdjustmentDraft) {
         _draft = State(initialValue: startingDraft)
-        _entry = State(initialValue: AmountEntry(cents: startingDraft.actualBalance.cents))
-    }
-
-    private var currencyCode: String { draft.wallet?.currencyCode ?? Money.defaultCurrencyCode }
-
-    /// The draft with the real balance the keypad comes to, or `nil` while the keypad shows an error.
-    private var draftToSave: BalanceAdjustmentDraft? {
-        guard let cents = entry.cents else { return nil }
-        var result = draft
-        result.actualBalance = Money(cents: cents, currencyCode: currencyCode)
-        return result
     }
 
     var body: some View {
@@ -75,7 +62,7 @@ private struct AdjustBalanceForm: View {
             .formStyle(.grouped)
             .safeAreaInset(edge: .bottom) {
                 if isKeypadShown {
-                    AmountKeypad(entry: $entry)
+                    AmountKeypad(entry: $draft.actualBalanceEntry)
                         .background(.bar)
                 }
             }
@@ -89,7 +76,7 @@ private struct AdjustBalanceForm: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
-                        .disabled(draftToSave?.canSave != true)
+                        .disabled(!draft.canSave)
                 }
             }
             .defaultFocus($focus, .amount)
@@ -97,10 +84,6 @@ private struct AdjustBalanceForm: View {
                 if focus == .note {
                     isKeypadShown = false
                 }
-            }
-            .onChange(of: draft.wallet) {
-                // The real balance typed belonged to the other wallet: start again from this one's.
-                entry = AmountEntry(cents: draft.recordedBalance?.cents ?? 0)
             }
             .errorAlert("Couldn't Adjust Balance", message: $errorMessage)
         }
@@ -120,16 +103,16 @@ private struct AdjustBalanceForm: View {
             }
             AmountRow(
                 title: "Actual balance",
-                entry: $entry,
-                currencyCode: currencyCode,
-                tint: Money(cents: entry.cents ?? 0).tint
+                entry: $draft.actualBalanceEntry,
+                currencyCode: draft.currencyCode,
+                tint: Money(cents: draft.actualBalance?.cents ?? 0).tint
             ) {
                 focus = .amount
                 isKeypadShown.toggle()
             }
             .focused($focus, equals: .amount)
             Button("Change Sign", systemImage: "plusminus", action: changeSign)
-                .disabled(entry.cents == nil)
+                .disabled(draft.actualBalance == nil)
         } footer: {
             if draft.wallet == nil {
                 Text("Add a wallet first, in Account → Wallets.")
@@ -142,16 +125,16 @@ private struct AdjustBalanceForm: View {
     private var reasonSection: some View {
         Section {
             LabeledContent("Difference") {
-                AmountText(amount: draftToSave?.difference ?? Money(cents: 0, currencyCode: currencyCode), showsPlusSign: true)
+                AmountText(amount: draft.difference ?? Money(cents: 0, currencyCode: draft.currencyCode), showsPlusSign: true)
             }
-            if let reasonType = draftToSave?.reasonType {
-                CategoryPicker(title: "Reason", type: reasonType, selection: reason)
+            if let reasonType = draft.reasonType {
+                CategoryPicker(title: "Reason", type: reasonType, selection: $draft.category)
             }
             TextField("Note", text: $draft.note, axis: .vertical)
                 .focused($focus, equals: .note)
             Toggle("Exclude from report", isOn: $draft.isExcludedFromReport)
         } footer: {
-            if draftToSave?.reasonType == nil {
+            if draft.reasonType == nil {
                 Text("The recorded balance already matches. Type the real balance to adjust it.")
             } else {
                 Text("The reason is any Income category when the balance goes up, or any Expense category when it goes down. It counts in reports unless excluded, and never needs a Card.")
@@ -159,24 +142,15 @@ private struct AdjustBalanceForm: View {
         }
     }
 
-    /// The reason as the picker shows it: the one that applies to the difference typed so far.
-    private var reason: Binding<Category?> {
-        Binding(
-            get: { draftToSave?.category },
-            set: { draft.category = $0 }
-        )
-    }
-
     /// Turns a balance above zero into a debt of the same size, and back.
     private func changeSign() {
-        guard let cents = entry.cents else { return }
-        entry = AmountEntry(cents: -cents)
+        guard let cents = draft.actualBalance?.cents else { return }
+        draft.actualBalanceEntry = AmountEntry(cents: -cents)
     }
 
     private func save() {
-        guard let draftToSave else { return }
         do {
-            try Transaction.adjustBalance(draftToSave, in: context)
+            try Transaction.adjustBalance(draft, in: context)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

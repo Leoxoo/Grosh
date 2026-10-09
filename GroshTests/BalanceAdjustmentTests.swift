@@ -55,6 +55,78 @@ struct BalanceAdjustmentTests {
         #expect(checking.balance(asOf: today) == Money(cents: 860_00))
     }
 
+    // MARK: The real balance starts from the recorded one
+
+    @Test func theRealBalanceStartsAtTheRecordedBalanceSoThereIsNothingToAdjust() throws {
+        try record(500_00, "Salary", .income, on: today)
+
+        let draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
+
+        #expect(draft.actualBalance == Money(cents: 500_00))
+        #expect(!draft.canSave)
+    }
+
+    @Test func changingTheDayBeforeTypingStartsAgainFromThatDaysRecordedBalance() throws {
+        try record(500_00, "Salary", .income, on: today)
+        var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
+
+        draft.day = today.adding(days: -1)
+
+        #expect(draft.actualBalance == Money(cents: 0))
+        #expect(!draft.canSave)
+    }
+
+    @Test func changingTheDayKeepsARealBalanceAlreadyTyped() throws {
+        try record(500_00, "Salary", .income, on: today)
+        var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
+        draft.actualBalanceEntry.press(.digit(7))
+
+        draft.day = today.adding(days: -1)
+
+        #expect(draft.actualBalance == Money(cents: 7))
+        #expect(draft.difference == Money(cents: 7))
+    }
+
+    @Test func changingTheWalletStartsAgainFromThatWalletsRecordedBalance() throws {
+        try record(500_00, "Salary", .income, on: today)
+        let savings = Wallet(name: "Savings")
+        context.insert(savings)
+        let deposit = Transaction(amount: Money(cents: 75_00), day: today, wallet: nil, category: nil)
+        context.insert(deposit)
+        deposit.wallet = savings
+        deposit.category = try store.category("Salary", .income)
+        var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
+        draft.actualBalance = Money(cents: 450_00)
+
+        draft.wallet = savings
+
+        #expect(draft.actualBalance == Money(cents: 75_00))
+        #expect(!draft.canSave)
+    }
+
+    @Test func theFirstDigitTypedReplacesTheRecordedBalance() throws {
+        try record(500_00, "Salary", .income, on: today)
+        var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
+
+        draft.actualBalanceEntry.press(.digit(4))
+        draft.actualBalanceEntry.press(.digit(2))
+
+        #expect(draft.actualBalance == Money(cents: 42))
+        #expect(draft.difference == Money(cents: -499_58))
+    }
+
+    @Test func aRealBalanceTheKeypadCantWorkOutCantBeSaved() throws {
+        try record(500_00, "Salary", .income, on: today)
+        var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
+
+        for key: KeypadKey in [.digit(4), .operation(.divide), .digit(0), .equals] {
+            draft.actualBalanceEntry.press(key)
+        }
+
+        #expect(draft.actualBalance == nil)
+        #expect(!draft.canSave)
+    }
+
     // MARK: The reason
 
     @Test func aRealBalanceAboveTheRecordedOneIsOtherIncome() throws {
