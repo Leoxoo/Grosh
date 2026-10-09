@@ -8,7 +8,7 @@ struct RootView: View {
                 HomeView()
             }
             Tab("Transactions", systemImage: "wallet.bifold") {
-                PlaceholderScreen(title: "Transactions", systemImage: "wallet.bifold")
+                TransactionsView()
             }
             Tab("Budgets", systemImage: "chart.pie") {
                 BudgetsView()
@@ -23,19 +23,6 @@ struct RootView: View {
         // iPad opens on the sidebar too, not the floating tab bar; iPhone keeps its tab bar.
         .defaultAdaptableTabBarPlacement(.sidebar)
         #endif
-    }
-}
-
-/// Stands in for a tab until its real screen is built.
-private struct PlaceholderScreen: View {
-    let title: String
-    let systemImage: String
-
-    var body: some View {
-        NavigationStack {
-            ContentUnavailableView(title, systemImage: systemImage, description: Text("Coming soon"))
-                .navigationTitle(title)
-        }
     }
 }
 

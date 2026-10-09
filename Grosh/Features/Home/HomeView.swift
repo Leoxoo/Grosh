@@ -35,8 +35,9 @@ struct HomeView: View {
                     }
                 }
 
-                // Recent transactions go below the coming-soon cards.
                 HomeComingSoonCards()
+
+                RecentTransactionsSection()
             }
             .navigationTitle("Home")
             .addTransactionButton()
