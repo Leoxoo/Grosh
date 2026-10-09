@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// The Account tab: where the user manages wallets, categories, Cards and app settings.
+/// The Account tab: Wallets, Categories, Cards, Debts & Loans, Import, Export, Currency, Recurring transactions.
 struct AccountView: View {
     @AppStorage(CurrencyPickerView.currencyCodeKey) private var currencyCode = Money.defaultCurrencyCode
 
@@ -26,6 +26,10 @@ struct AccountView: View {
                             Label("Currency", systemImage: "dollarsign.circle")
                         }
                     }
+                }
+
+                Section {
+                    RecurringTransactionsRow()
                 }
             }
             .navigationTitle("Account")

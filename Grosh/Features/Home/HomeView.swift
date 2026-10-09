@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// Home: the Total, the user's wallets, and (later) recent transactions.
+/// The Home tab: the Total, the user's wallets, and the coming-soon cards.
 struct HomeView: View {
     /// Remembers across launches whether the Total is hidden.
     static let isTotalHiddenKey = "home.isTotalHidden"
@@ -34,6 +34,9 @@ struct HomeView: View {
                             .textCase(nil)
                     }
                 }
+
+                // Recent transactions go below the coming-soon cards.
+                HomeComingSoonCards()
             }
             .navigationTitle("Home")
         }

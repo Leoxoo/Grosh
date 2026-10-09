@@ -11,7 +11,7 @@ struct RootView: View {
                 PlaceholderScreen(title: "Transactions", systemImage: "wallet.bifold")
             }
             Tab("Budgets", systemImage: "chart.pie") {
-                PlaceholderScreen(title: "Budgets", systemImage: "chart.pie")
+                BudgetsView()
             }
             Tab("Account", systemImage: "person.crop.circle") {
                 AccountView()
