@@ -10,6 +10,7 @@ struct TransactionDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var editorMode: TransactionEditor.Mode?
+    @State private var isEditingStartingBalance = false
 
     var body: some View {
         Group {
@@ -25,6 +26,9 @@ struct TransactionDetailView: View {
         #endif
         .sheet(item: $editorMode) { mode in
             TransactionEditor(mode: mode)
+        }
+        .sheet(isPresented: $isEditingStartingBalance) {
+            StartingBalanceEditor(transaction: transaction)
         }
     }
 
@@ -62,11 +66,18 @@ struct TransactionDetailView: View {
             }
         }
         .toolbar {
-            if transaction.editFlow == .addSheet {
+            if let editFlow = transaction.editFlow {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Edit") { editorMode = .edit(transaction) }
+                    Button("Edit") { edit(with: editFlow) }
                 }
             }
+        }
+    }
+
+    private func edit(with flow: TransactionEditFlow) {
+        switch flow {
+        case .addSheet: editorMode = .edit(transaction)
+        case .startingBalance: isEditingStartingBalance = true
         }
     }
 

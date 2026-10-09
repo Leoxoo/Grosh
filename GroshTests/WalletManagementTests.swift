@@ -38,6 +38,42 @@ struct WalletManagementTests {
         #expect(savings.balance(asOf: today) == Money(cents: 1_250_00))
     }
 
+    @Test func editingAStartingBalanceKeepsTheSignAsEntered() throws {
+        let creditLine = try addWallet("Credit line", startingBalance: -250_00)
+        let starting = try #require(creditLine.transactions?.first)
+        var edit = StartingBalanceDraft(editing: starting)
+        #expect(edit.amount == Money(cents: -250_00))
+
+        edit.amount = Money(cents: -300_00)
+        edit.day = CalendarDay(year: 2026, month: 9, day: 1)
+        edit.note = " Balance on the September statement "
+        try starting.update(with: edit)
+
+        #expect(starting.amount == Money(cents: -300_00))
+        #expect(starting.day == CalendarDay(year: 2026, month: 9, day: 1))
+        #expect(starting.note == "Balance on the September statement")
+        #expect(starting.category?.lockedRole == .startingBalance)
+        #expect(starting.isExcludedFromReport)
+        #expect(creditLine.balance(asOf: today) == Money(cents: -300_00))
+
+        edit.amount = Money(cents: 1_000_00)
+        try starting.update(with: edit)
+        #expect(creditLine.balance(asOf: today) == Money(cents: 1_000_00))
+    }
+
+    @Test func onlyAStartingBalanceTakesAStartingBalanceEdit() throws {
+        let checking = try addWallet("Checking")
+        let salary = Transaction(amount: Money(cents: 2_000_00), day: today, wallet: nil, category: nil)
+        context.insert(salary)
+        salary.wallet = checking
+        salary.category = try context.lockedCategory(.otherIncome)
+        var edit = StartingBalanceDraft(editing: salary)
+        edit.amount = Money(cents: -5_00)
+
+        #expect(throws: TransactionRuleError.notAStartingBalance) { try salary.update(with: edit) }
+        #expect(salary.amount == Money(cents: 2_000_00))
+    }
+
     private func unarchivedNames() throws -> [String] {
         try context.fetch(Wallet.unarchived).map(\.name)
     }

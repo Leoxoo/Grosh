@@ -78,6 +78,8 @@ nonisolated enum TransactionRuleError: Error, Equatable {
     case missingCategory
     /// An expense in a wallet that has a Card must say which Card paid for it.
     case missingCard
+    /// Only a wallet's Starting balance is edited as one.
+    case notAStartingBalance
 }
 
 extension TransactionDraft {
