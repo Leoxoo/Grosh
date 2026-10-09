@@ -202,7 +202,7 @@ struct WalletEditor: View {
             case .edit(let wallet):
                 wallet.name = trimmedName
                 wallet.symbolName = symbolName
-                wallet.colorName = color.rawValue
+                wallet.color = color
                 wallet.includeInTotal = includeInTotal
             }
             try context.save()

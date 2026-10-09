@@ -113,12 +113,10 @@ extension Card {
         name = draft.trimmedName
         kind = draft.kind
         payingWallet = draft.payingWallet
-        colorName = draft.color.rawValue
+        color = draft.color
         lastFourDigits = draft.storedLastFourDigits
         statementDay = draft.statementDay
     }
-
-    var color: PaletteColor { PaletteColor(rawValue: colorName) ?? .blue }
 
     /// The position after every Card already in the store, archived ones included.
     private static func nextSortOrder(in context: ModelContext) throws -> Int {

@@ -29,12 +29,17 @@ final class Card {
         self.name = name
         self.kindRaw = kind.rawValue
         self.payingWallet = payingWallet
-        self.colorName = color.rawValue
+        self.color = color
         self.sortOrder = sortOrder
     }
 
     var kind: CardKind {
         get { CardKind(rawValue: kindRaw) ?? .credit }
         set { kindRaw = newValue.rawValue }
+    }
+
+    var color: PaletteColor {
+        get { PaletteColor(storedName: colorName) }
+        set { colorName = newValue.rawValue }
     }
 }

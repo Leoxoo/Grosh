@@ -46,7 +46,7 @@ final class Category {
         self.name = name
         self.typeRaw = type.rawValue
         self.symbolName = symbolName
-        self.colorName = color.rawValue
+        self.color = color
         self.lockedRoleRaw = lockedRole?.rawValue
         self.parent = parent
         self.sortOrder = sortOrder
@@ -65,7 +65,7 @@ final class Category {
     var isLocked: Bool { lockedRole != nil }
 
     var color: PaletteColor {
-        get { PaletteColor(rawValue: colorName) ?? .gray }
+        get { PaletteColor(storedName: colorName) }
         set { colorName = newValue.rawValue }
     }
 }

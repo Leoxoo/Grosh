@@ -22,7 +22,12 @@ final class Wallet {
     init(name: String, symbolName: String = "wallet.bifold.fill", color: PaletteColor = .green, sortOrder: Int = 0) {
         self.name = name
         self.symbolName = symbolName
-        self.colorName = color.rawValue
+        self.color = color
         self.sortOrder = sortOrder
+    }
+
+    var color: PaletteColor {
+        get { PaletteColor(storedName: colorName) }
+        set { colorName = newValue.rawValue }
     }
 }
