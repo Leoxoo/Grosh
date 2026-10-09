@@ -38,6 +38,38 @@ struct WalletManagementTests {
         #expect(savings.balance(asOf: today) == Money(cents: 1_250_00))
     }
 
+    @Test func aWalletNeedsAName() throws {
+        var draft = WalletDraft()
+        draft.name = "  "
+
+        #expect(throws: WalletRuleError.missingName) {
+            try Wallet.create(draft, startingBalance: Money(cents: 100_00), on: today, in: context)
+        }
+        #expect(try context.fetchCount(FetchDescriptor<Wallet>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 0)
+    }
+
+    @Test func editingAWalletSavesItsFieldsAndKeepsItsTransactions() throws {
+        let cash = try addWallet("Cash", startingBalance: 40_00)
+        var draft = WalletDraft(cash)
+        draft.name = " Pocket money "
+        draft.symbolName = "banknote.fill"
+        draft.color = .orange
+        draft.includeInTotal = false
+
+        try cash.update(with: draft)
+
+        #expect(cash.name == "Pocket money")
+        #expect(cash.symbolName == "banknote.fill")
+        #expect(cash.color == .orange)
+        #expect(!cash.includeInTotal)
+        #expect(cash.balance(asOf: today) == Money(cents: 40_00))
+
+        draft.name = ""
+        #expect(throws: WalletRuleError.missingName) { try cash.update(with: draft) }
+        #expect(cash.name == "Pocket money")
+    }
+
     @Test func editingAStartingBalanceKeepsTheSignAsEntered() throws {
         let creditLine = try addWallet("Credit line", startingBalance: -250_00)
         let starting = try #require(creditLine.transactions?.first)

@@ -29,35 +29,22 @@ struct WalletEditor: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
-    @State private var name: String
-    @State private var symbolName: String
-    @State private var color: PaletteColor
-    @State private var includeInTotal: Bool
+    @State private var draft: WalletDraft
     @State private var startingAmountText = ""
-    @State private var startingDate = CalendarDay.today.date()
+    @State private var startingDay = CalendarDay.today
     @State private var errorMessage: String?
 
     init(mode: Mode) {
         self.mode = mode
         switch mode {
-        case .add:
-            _name = State(initialValue: "")
-            _symbolName = State(initialValue: "wallet.bifold.fill")
-            _color = State(initialValue: .green)
-            _includeInTotal = State(initialValue: true)
-        case .edit(let wallet):
-            _name = State(initialValue: wallet.name)
-            _symbolName = State(initialValue: wallet.symbolName)
-            _color = State(initialValue: wallet.color)
-            _includeInTotal = State(initialValue: wallet.includeInTotal)
+        case .add: _draft = State(initialValue: WalletDraft())
+        case .edit(let wallet): _draft = State(initialValue: WalletDraft(wallet))
         }
     }
 
     private var isAdding: Bool {
         if case .add = mode { true } else { false }
     }
-
-    private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     /// The Starting balance typed so far; an empty field means $0.
     private var startingBalance: Money? {
@@ -66,17 +53,17 @@ struct WalletEditor: View {
             : Money(typedAmount: startingAmountText)
     }
 
-    private var canSave: Bool { !trimmedName.isEmpty && (!isAdding || startingBalance != nil) }
+    private var canSave: Bool { (try? draft.validate()) != nil && (!isAdding || startingBalance != nil) }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
                     HStack(spacing: 12) {
-                        SymbolCircle(symbolName: symbolName, color: color, size: 40)
-                        TextField("Name", text: $name)
+                        SymbolCircle(symbolName: draft.symbolName, color: draft.color, size: 40)
+                        TextField("Name", text: $draft.name)
                     }
-                    Toggle("Include in Total", isOn: $includeInTotal)
+                    Toggle("Include in Total", isOn: $draft.includeInTotal)
                 } footer: {
                     Text("The Total on Home adds up the wallets that are included.")
                 }
@@ -86,11 +73,11 @@ struct WalletEditor: View {
                 }
 
                 Section("Icon") {
-                    SymbolGrid(symbols: Self.symbolChoices, selection: $symbolName, color: color)
+                    SymbolGrid(symbols: Self.symbolChoices, selection: $draft.symbolName, color: draft.color)
                 }
 
                 Section("Color") {
-                    PaletteColorGrid(selection: $color)
+                    PaletteColorGrid(selection: $draft.color)
                 }
 
                 if case .edit(let wallet) = mode {
@@ -132,7 +119,7 @@ struct WalletEditor: View {
                 #if os(iOS)
                 .keyboardType(.numbersAndPunctuation)
                 #endif
-            DatePicker("Date", selection: $startingDate, displayedComponents: .date)
+            DayStepper(title: "Date", day: $startingDay)
         } header: {
             Text("Starting balance")
         } footer: {
@@ -149,20 +136,9 @@ struct WalletEditor: View {
         do {
             switch mode {
             case .add:
-                try Wallet.create(
-                    name: trimmedName,
-                    symbolName: symbolName,
-                    color: color,
-                    includeInTotal: includeInTotal,
-                    startingBalance: startingBalance ?? Money(cents: 0),
-                    on: CalendarDay(startingDate),
-                    in: context
-                )
+                try Wallet.create(draft, startingBalance: startingBalance ?? Money(cents: 0), on: startingDay, in: context)
             case .edit(let wallet):
-                wallet.name = trimmedName
-                wallet.symbolName = symbolName
-                wallet.color = color
-                wallet.includeInTotal = includeInTotal
+                try wallet.update(with: draft)
             }
             try context.save()
             dismiss()

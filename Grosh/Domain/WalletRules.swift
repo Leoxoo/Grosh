@@ -22,35 +22,29 @@ extension Wallet {
     }
 
     /// The position after every wallet already in the store, archived ones included.
-    private static func nextSortOrder(in context: ModelContext) throws -> Int {
+    static func nextSortOrder(in context: ModelContext) throws -> Int {
         var descriptor = FetchDescriptor<Wallet>(sortBy: [SortDescriptor(\.sortOrder, order: .reverse)])
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first.map { $0.sortOrder + 1 } ?? 0
     }
 
-    /// Adds a wallet and records the money it already holds as its Starting balance: its first transaction,
-    /// under the locked Starting balance category and always excluded from report.
+    /// Adds a wallet named `name` with its Starting balance, as ``create(_:startingBalance:on:in:)`` does.
     @discardableResult
     static func create(
         name: String,
-        symbolName: String = "wallet.bifold.fill",
-        color: PaletteColor = .green,
+        symbolName: String = WalletDraft().symbolName,
+        color: PaletteColor = WalletDraft().color,
         includeInTotal: Bool = true,
         startingBalance: Money,
         on day: CalendarDay,
         in context: ModelContext
     ) throws -> Wallet {
-        let category = try context.lockedCategory(.startingBalance)
-        let wallet = Wallet(name: name, symbolName: symbolName, color: color, sortOrder: try nextSortOrder(in: context))
-        wallet.includeInTotal = includeInTotal
-        context.insert(wallet)
-
-        let starting = Transaction(amount: startingBalance, day: day, wallet: nil, category: nil)
-        starting.isExcludedFromReport = true
-        context.insert(starting)
-        starting.wallet = wallet
-        starting.category = category
-        return wallet
+        var draft = WalletDraft()
+        draft.name = name
+        draft.symbolName = symbolName
+        draft.color = color
+        draft.includeInTotal = includeInTotal
+        return try create(draft, startingBalance: startingBalance, on: day, in: context)
     }
 
     /// Retires the wallet: it leaves the Total and every picker, but keeps all of its transactions.
