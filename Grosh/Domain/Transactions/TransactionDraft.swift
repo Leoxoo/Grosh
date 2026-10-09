@@ -3,17 +3,24 @@ import Foundation
 /// What the Add Transaction sheet holds before it is saved. The amount is entered positive; the category
 /// sets the sign.
 struct TransactionDraft {
-    /// Expense, Income or Debt/Loan. Switching it drops a category of the old type and starts the
-    /// Exclude from report switch at the new type's default.
+    /// Expense, Income or Debt/Loan. Switching it drops a category of the old type. Switching onto or off
+    /// Debt/Loan also swaps the Exclude from report switch: to the value the user left there before, or else
+    /// to the new type's default. Switching between Expense and Income leaves it alone.
     var type: CategoryType {
         didSet {
             guard type != oldValue else { return }
             if category?.type != type {
                 category = nil
             }
-            isExcludedFromReport = TransactionDefaults.isExcludedFromReport(type)
+            guard (type == .debtLoan) != (oldValue == .debtLoan) else { return }
+            let leftBehind = isExcludedFromReport
+            isExcludedFromReport = excludedFromReportAcrossDebtLoan ?? TransactionDefaults.isExcludedFromReport(type)
+            excludedFromReportAcrossDebtLoan = leftBehind
         }
     }
+
+    /// The Exclude from report value on the other side of the Debt/Loan switch, restored on switching back.
+    private var excludedFromReportAcrossDebtLoan: Bool?
 
     /// Changing it drops the Card, which is only offered on its paying wallet's transactions.
     var wallet: Wallet? {

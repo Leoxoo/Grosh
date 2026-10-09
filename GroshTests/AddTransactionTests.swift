@@ -182,6 +182,36 @@ struct AddTransactionTests {
         #expect(!entered.isExcludedFromReport)
     }
 
+    @Test func switchingBetweenExpenseAndIncomeKeepsExcludeFromReport() throws {
+        var entered = try draft(.expense, 1276, "Café")
+        entered.isExcludedFromReport = true
+        let excludedLunch = try Transaction.create(entered, in: context)
+        var editing = TransactionDraft(editing: excludedLunch)
+
+        editing.type = .income
+        #expect(editing.isExcludedFromReport)
+
+        editing.type = .expense
+        editing.category = try category("Café")
+        try excludedLunch.update(with: editing)
+        #expect(excludedLunch.isExcludedFromReport)
+    }
+
+    @Test func leavingDebtLoanRestoresTheUsersExcludeFromReport() throws {
+        var entered = try draft(.expense, 1276, "Café")
+        entered.isExcludedFromReport = true
+
+        entered.type = .debtLoan
+        #expect(entered.isExcludedFromReport)
+        entered.isExcludedFromReport = false
+
+        entered.type = .expense
+        #expect(entered.isExcludedFromReport)
+
+        entered.type = .debtLoan
+        #expect(!entered.isExcludedFromReport)
+    }
+
     // MARK: Duplicate and Edit
 
     /// A Loan of 100.00 to Pasha on 05/27/2026, kept in the report, with a note and a Card.
