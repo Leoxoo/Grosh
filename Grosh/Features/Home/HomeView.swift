@@ -39,6 +39,7 @@ struct HomeView: View {
                 HomeComingSoonCards()
             }
             .navigationTitle("Home")
+            .addTransactionButton()
         }
     }
 }
