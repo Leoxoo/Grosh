@@ -86,45 +86,11 @@ struct WalletEditor: View {
                 }
 
                 Section("Icon") {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 40), spacing: 12)], spacing: 12) {
-                        ForEach(Self.symbolChoices, id: \.self) { symbol in
-                            Button {
-                                symbolName = symbol
-                            } label: {
-                                SymbolCircle(symbolName: symbol, color: symbol == symbolName ? color : .gray, size: 36)
-                                    .opacity(symbol == symbolName ? 1 : 0.5)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(symbol)
-                            .accessibilityAddTraits(symbol == symbolName ? .isSelected : [])
-                        }
-                    }
-                    .padding(.vertical, 4)
+                    SymbolGrid(symbols: Self.symbolChoices, selection: $symbolName, color: color)
                 }
 
                 Section("Color") {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 32), spacing: 12)], spacing: 12) {
-                        ForEach(PaletteColor.allCases, id: \.self) { choice in
-                            Button {
-                                color = choice
-                            } label: {
-                                Circle()
-                                    .fill(choice.color.gradient)
-                                    .frame(width: 30, height: 30)
-                                    .overlay {
-                                        if choice == color {
-                                            Image(systemName: "checkmark")
-                                                .font(.caption.bold())
-                                                .foregroundStyle(.white)
-                                        }
-                                    }
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(choice.rawValue.capitalized)
-                            .accessibilityAddTraits(choice == color ? .isSelected : [])
-                        }
-                    }
-                    .padding(.vertical, 4)
+                    PaletteColorGrid(selection: $color)
                 }
 
                 if case .edit(let wallet) = mode {

@@ -79,10 +79,6 @@ struct CategoryEditor: View {
         (try? catalog.parentOptions(of: draft.type, for: editing)) ?? []
     }
 
-    private var symbolChoices: [String] {
-        Self.symbolChoices.contains(draft.symbolName) ? Self.symbolChoices : [draft.symbolName] + Self.symbolChoices
-    }
-
     private var canSave: Bool { !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
@@ -174,49 +170,13 @@ struct CategoryEditor: View {
 
     private var iconSection: some View {
         Section("Icon") {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 40), spacing: 12)], spacing: 12) {
-                ForEach(symbolChoices, id: \.self) { symbol in
-                    Button {
-                        draft.symbolName = symbol
-                    } label: {
-                        SymbolCircle(
-                            symbolName: symbol, color: symbol == draft.symbolName ? draft.color : .gray, size: 36
-                        )
-                        .opacity(symbol == draft.symbolName ? 1 : 0.5)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(symbol)
-                    .accessibilityAddTraits(symbol == draft.symbolName ? .isSelected : [])
-                }
-            }
-            .padding(.vertical, 4)
+            SymbolGrid(symbols: Self.symbolChoices, selection: $draft.symbolName, color: draft.color)
         }
     }
 
     private var colorSection: some View {
         Section("Color") {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 32), spacing: 12)], spacing: 12) {
-                ForEach(PaletteColor.allCases, id: \.self) { choice in
-                    Button {
-                        draft.color = choice
-                    } label: {
-                        Circle()
-                            .fill(choice.color.gradient)
-                            .frame(width: 30, height: 30)
-                            .overlay {
-                                if choice == draft.color {
-                                    Image(systemName: "checkmark")
-                                        .font(.caption.bold())
-                                        .foregroundStyle(.white)
-                                }
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(choice.rawValue.capitalized)
-                    .accessibilityAddTraits(choice == draft.color ? .isSelected : [])
-                }
-            }
-            .padding(.vertical, 4)
+            PaletteColorGrid(selection: $draft.color)
         }
     }
 
