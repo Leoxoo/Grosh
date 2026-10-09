@@ -42,7 +42,11 @@ struct StartingBalanceEditor: View {
                 Section {
                     if let wallet = transaction.wallet {
                         LabeledContent("Wallet") {
-                            Label(wallet.name, systemImage: wallet.symbolName)
+                            HStack(spacing: 6) {
+                                Image(systemName: wallet.symbolName)
+                                    .foregroundStyle(wallet.color.color)
+                                Text(wallet.name)
+                            }
                         }
                     }
                     AmountRow(
