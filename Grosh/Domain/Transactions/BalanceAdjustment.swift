@@ -20,8 +20,8 @@ struct BalanceAdjustmentDraft {
     /// Off by default: an adjustment counts in reports like any other transaction.
     var isExcludedFromReport = false
 
-    private let otherIncome: Category
-    private let otherExpense: Category
+    /// The reason for money found and for money missing, unless the user picks another.
+    private let defaultReasons: [CategoryType: Category]
     /// The reason the user picked, kept while the difference changes sign so it comes back with the sign.
     private var pickedReason: Category?
     /// The real balance as typed on the keypad, or `nil` until the user types one.
@@ -32,8 +32,9 @@ struct BalanceAdjustmentDraft {
     init(wallet: Wallet?, day: CalendarDay, in context: ModelContext) throws {
         self.wallet = wallet
         self.day = day
-        otherIncome = try context.lockedCategory(.otherIncome)
-        otherExpense = try context.lockedCategory(.otherExpense)
+        defaultReasons = try [CategoryType.income, .expense].reduce(into: [:]) { reasons, type in
+            reasons[type] = try Self.defaultReason(for: type, in: context)
+        }
     }
 
     var currencyCode: String { wallet?.currencyCode ?? Money.defaultCurrencyCode }
@@ -72,13 +73,19 @@ struct BalanceAdjustmentDraft {
         differenceCents > 0 ? .income : differenceCents < 0 ? .expense : nil
     }
 
-    /// The reason the adjustment is filed under: any category of ``reasonType``, Other Income or Other Expense
-    /// unless the user picks another. A pick of the other type gives way to the default until the sign comes back.
+    /// The reason a balance adjustment of `type` is filed under unless another is picked: Other Income for money
+    /// found, Other Expense for money missing.
+    static func defaultReason(for type: CategoryType, in context: ModelContext) throws -> Category {
+        try context.lockedCategory(type == .income ? .otherIncome : .otherExpense)
+    }
+
+    /// The reason the adjustment is filed under: any category of ``reasonType``, the default reason unless the user
+    /// picks another. A pick of the other type gives way to the default until the sign comes back.
     var category: Category? {
         get {
             guard let reasonType else { return nil }
             if let pickedReason, pickedReason.type == reasonType { return pickedReason }
-            return reasonType == .income ? otherIncome : otherExpense
+            return defaultReasons[reasonType]
         }
         set { pickedReason = newValue }
     }
@@ -149,7 +156,7 @@ extension Transaction {
         guard let type = BalanceAdjustmentDraft.reasonType(for: difference.cents) else {
             throw BalanceAdjustmentRuleError.nothingToAdjust
         }
-        let category = try reason ?? context.lockedCategory(type == .income ? .otherIncome : .otherExpense)
+        let category = try reason ?? BalanceAdjustmentDraft.defaultReason(for: type, in: context)
         guard category.type == type else { throw BalanceAdjustmentRuleError.reasonDoesNotMatchDifference }
 
         let adjustment = Transaction(amount: difference, day: day, wallet: nil, category: nil)
