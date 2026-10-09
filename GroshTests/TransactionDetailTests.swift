@@ -57,23 +57,44 @@ struct TransactionDetailTests {
 
     // MARK: Edit and Duplicate
 
-    @Test func aStartingBalanceCanBeNeitherEditedNorDuplicatedInTheAddSheet() throws {
+    @Test func aStartingBalanceIsEditedOnItsOwnAndNeverDuplicated() throws {
         try CategorySeeder.seedIfNeeded(in: context)
         let wallet = try Wallet.create(
             name: "Credit line", startingBalance: Money(cents: -250_00), on: today, in: context
         )
         let startingBalance = try #require(wallet.transactions?.first)
 
-        #expect(!startingBalance.isEditableInAddSheet)
+        #expect(startingBalance.editFlow == .startingBalance)
+        #expect(!startingBalance.canBeDuplicated)
     }
 
-    @Test func anOrdinaryTransactionCanBeEditedAndDuplicated() throws {
+    @Test func anOrdinaryTransactionIsEditedAndDuplicatedInTheAddSheet() throws {
         try CategorySeeder.seedIfNeeded(in: context)
         let cafe = try #require(try context.fetch(FetchDescriptor<Grosh.Category>()).first { $0.name == "Café" })
         let coffee = record("coffee", -4_50, in: checking)
         coffee.category = cafe
 
-        #expect(coffee.isEditableInAddSheet)
+        #expect(coffee.editFlow == .addSheet)
+        #expect(coffee.canBeDuplicated)
+    }
+
+    @Test(arguments: [LockedRole.outgoingTransfer, .incomingTransfer, .debtCollection, .repayment])
+    func whatATransferOrRecordPaymentFiledIsNeitherEditedNorDuplicatedHere(role: LockedRole) throws {
+        try CategorySeeder.seedIfNeeded(in: context)
+        let payment = record("payment", 60_00, in: checking)
+        payment.category = try context.lockedCategory(role)
+
+        #expect(payment.editFlow == nil)
+        #expect(!payment.canBeDuplicated)
+    }
+
+    @Test func aLinkedTransactionIsNeitherEditedNorDuplicatedHere() throws {
+        try CategorySeeder.seedIfNeeded(in: context)
+        let lent = record("lent to Pasha", -100_00, in: checking, link: UUID())
+        lent.category = try context.lockedCategory(.loan)
+
+        #expect(lent.editFlow == nil)
+        #expect(!lent.canBeDuplicated)
     }
 
     // MARK: Deleting

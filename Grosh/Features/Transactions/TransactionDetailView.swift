@@ -47,7 +47,7 @@ struct TransactionDetailView: View {
             RelatedTransactionsSection(transaction: transaction)
 
             Section {
-                if transaction.isEditableInAddSheet {
+                if transaction.canBeDuplicated {
                     Button("Duplicate", systemImage: "plus.square.on.square") {
                         editorMode = .duplicate(transaction)
                     }
@@ -56,13 +56,13 @@ struct TransactionDetailView: View {
                     if let didDelete { didDelete() } else { dismiss() }
                 }
             } footer: {
-                if transaction.isEditableInAddSheet {
+                if transaction.canBeDuplicated {
                     Text("Duplicate opens a new transaction with the same details, dated today.")
                 }
             }
         }
         .toolbar {
-            if transaction.isEditableInAddSheet {
+            if transaction.editFlow == .addSheet {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Edit") { editorMode = .edit(transaction) }
                 }
