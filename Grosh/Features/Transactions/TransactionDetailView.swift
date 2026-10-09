@@ -11,6 +11,7 @@ struct TransactionDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var editorMode: TransactionEditor.Mode?
     @State private var isEditingStartingBalance = false
+    @State private var isEditingTransferHalf = false
 
     var body: some View {
         Group {
@@ -29,6 +30,9 @@ struct TransactionDetailView: View {
         }
         .sheet(isPresented: $isEditingStartingBalance) {
             StartingBalanceEditor(transaction: transaction)
+        }
+        .sheet(isPresented: $isEditingTransferHalf) {
+            TransferHalfEditor(transaction: transaction)
         }
     }
 
@@ -80,6 +84,7 @@ struct TransactionDetailView: View {
         switch flow {
         case .addSheet: editorMode = .edit(transaction)
         case .startingBalance: isEditingStartingBalance = true
+        case .transferHalf: isEditingTransferHalf = true
         }
     }
 
