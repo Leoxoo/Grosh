@@ -1,0 +1,117 @@
+[
+  {
+    "type": "expense",
+    "categories": [
+      { "name": "Food & Beverage", "icon": "fork.knife", "color": "orange", "children": [
+        { "name": "Café", "icon": "cup.and.saucer.fill" },
+        { "name": "Restaurants", "icon": "fork.knife.circle.fill" }
+      ] },
+      { "name": "Products", "icon": "cart.fill", "color": "green" },
+      { "name": "Bills & Utilities", "icon": "doc.text.fill", "color": "teal", "children": [
+        { "name": "Phone Bill", "icon": "phone.fill" },
+        { "name": "Water Bill", "icon": "drop.fill" },
+        { "name": "Electricity Bill", "icon": "bolt.fill" },
+        { "name": "Gas Bill", "icon": "flame.fill" },
+        { "name": "Valet/Trash Bill", "icon": "trash.fill" },
+        { "name": "Internet Bill", "icon": "wifi" },
+        { "name": "Rentals", "icon": "house.fill" }
+      ] },
+      { "name": "Personal Transport", "icon": "car.fill", "color": "blue", "children": [
+        { "name": "Vehicle Maintenance", "icon": "wrench.and.screwdriver.fill" },
+        { "name": "Parking Fees", "icon": "parkingsign" },
+        { "name": "Petrol", "icon": "fuelpump.fill" }
+      ] },
+      { "name": "Other Transport", "icon": "tram.fill", "color": "indigo", "children": [
+        { "name": "Taxi", "icon": "car.side.fill" },
+        { "name": "Public Transport", "icon": "bus.fill" },
+        { "name": "Other Fuel", "icon": "fuelpump" }
+      ] },
+      { "name": "Shopping", "icon": "bag.fill", "color": "pink", "children": [
+        { "name": "Accessories", "icon": "eyeglasses" },
+        { "name": "Books", "icon": "book.fill" },
+        { "name": "Clothing", "icon": "tshirt.fill" },
+        { "name": "Electronics", "icon": "desktopcomputer" },
+        { "name": "Footwear", "icon": "shoe.fill" },
+        { "name": "Home Improvement", "icon": "hammer.fill" },
+        { "name": "Personal Care", "icon": "hands.and.sparkles.fill" },
+        { "name": "Car accessories", "icon": "car.fill" },
+        { "name": "3D printing", "icon": "cube.fill" }
+      ] },
+      { "name": "Health & Fitness", "icon": "heart.fill", "color": "red", "children": [
+        { "name": "Doctor", "icon": "stethoscope" },
+        { "name": "Pharmacy", "icon": "pills.fill" },
+        { "name": "Sports", "icon": "figure.run" }
+      ] },
+      { "name": "Education", "icon": "graduationcap.fill", "color": "brown" },
+      { "name": "Entertainment", "icon": "popcorn.fill", "color": "purple", "children": [
+        { "name": "Games", "icon": "gamecontroller.fill" },
+        { "name": "Movies", "icon": "film.fill" },
+        { "name": "Cultural/Animals", "icon": "theatermasks.fill" },
+        { "name": "Apps", "icon": "apps.iphone" },
+        { "name": "Streaming Service", "icon": "play.tv.fill" }
+      ] },
+      { "name": "Gifts & Donations", "icon": "gift.fill", "color": "mint", "children": [
+        { "name": "Charity", "icon": "heart.circle.fill" },
+        { "name": "Friends & Lover", "icon": "person.2.fill" }
+      ] },
+      { "name": "Insurances", "icon": "checkmark.shield.fill", "color": "cyan", "children": [
+        { "name": "Car Insurance", "icon": "car.circle.fill" },
+        { "name": "Personal Insurance", "icon": "person.crop.circle.badge.checkmark" },
+        { "name": "Other Insurance", "icon": "shield.lefthalf.filled" },
+        { "name": "Apartment Insurance", "icon": "building.2.fill" }
+      ] },
+      { "name": "Fees & Charges", "icon": "percent", "color": "yellow", "children": [
+        { "name": "Tax Due", "icon": "building.columns.fill" }
+      ] },
+      { "name": "Guns and Ammo", "icon": "scope", "color": "brown", "children": [
+        { "name": "Gun accessories", "icon": "wrench.adjustable.fill" },
+        { "name": "Ammo", "icon": "circle.grid.3x3.fill" },
+        { "name": "Range", "icon": "target" }
+      ] },
+      { "name": "Investment", "icon": "chart.line.uptrend.xyaxis", "color": "green" },
+      { "name": "Children & Babies", "icon": "figure.and.child.holdinghands", "color": "cyan" },
+      { "name": "Marriage", "icon": "suit.heart.fill", "color": "pink" },
+      { "name": "Travel", "icon": "airplane", "color": "blue" },
+      { "name": "Pets", "icon": "pawprint.fill", "color": "orange" },
+      { "name": "Withdrawal", "icon": "banknote.fill", "color": "green" },
+      { "name": "Unknown transaction", "icon": "questionmark.circle.fill", "color": "gray" },
+      { "name": "Other Expense", "icon": "ellipsis.circle.fill", "color": "gray", "role": "otherExpense" },
+      { "name": "Outgoing transfer", "icon": "arrow.up.right.circle.fill", "color": "gray", "role": "outgoingTransfer" }
+    ]
+  },
+  {
+    "type": "income",
+    "categories": [
+      { "name": "Salary", "icon": "briefcase.fill", "color": "green" },
+      { "name": "Tips", "icon": "dollarsign.circle.fill", "color": "green" },
+      { "name": "Extra work", "icon": "clock.fill", "color": "blue" },
+      { "name": "Award", "icon": "trophy.fill", "color": "yellow" },
+      { "name": "Selling", "icon": "tag.fill", "color": "orange" },
+      { "name": "Sombodypaid", "icon": "person.fill.checkmark", "color": "teal" },
+      { "name": "Cashback", "icon": "arrow.uturn.backward.circle.fill", "color": "mint" },
+      { "name": "Tax Return", "icon": "building.columns.fill", "color": "teal" },
+      { "name": "Collect Interest", "icon": "percent", "color": "green" },
+      { "name": "Gifts", "icon": "gift.fill", "color": "pink" },
+      { "name": "School extra", "icon": "graduationcap.fill", "color": "brown", "children": [
+        { "name": "VA", "icon": "star.fill" }
+      ] },
+      { "name": "Other Income", "icon": "ellipsis.circle.fill", "color": "gray", "role": "otherIncome" },
+      { "name": "Incoming transfer", "icon": "arrow.down.left.circle.fill", "color": "gray", "role": "incomingTransfer" }
+    ]
+  },
+  {
+    "type": "debtLoan",
+    "categories": [
+      { "name": "Loan", "icon": "arrow.up.circle.fill", "color": "orange", "role": "loan" },
+      { "name": "Debt", "icon": "arrow.down.circle.fill", "color": "red", "role": "debt" },
+      { "name": "Debt Collection", "icon": "arrow.down.to.line.circle.fill", "color": "green", "role": "debtCollection" },
+      { "name": "Repayment", "icon": "arrow.up.to.line.circle.fill", "color": "blue", "role": "repayment" }
+    ]
+  },
+  {
+    "type": "system",
+    "categories": [
+      { "name": "Starting balance", "icon": "flag.fill", "color": "gray", "role": "startingBalance" }
+    ]
+  }
+]
