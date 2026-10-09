@@ -2,13 +2,14 @@ import Foundation
 import SwiftData
 
 extension Transaction {
-    /// Records the draft as a new transaction, entered now.
+    /// Records the draft as a new transaction, entered now. Saves.
     @discardableResult
     static func create(_ draft: TransactionDraft, in context: ModelContext) throws -> Transaction {
         try draft.validate()
         let transaction = Transaction(amount: Money(cents: 0), day: draft.day, wallet: nil, category: nil)
         context.insert(transaction)
         transaction.apply(draft)
+        try context.save()
         return transaction
     }
 
@@ -17,6 +18,7 @@ extension Transaction {
     func update(with draft: TransactionDraft) throws {
         try draft.validate()
         apply(draft)
+        try modelContext?.save()
     }
 
     private func apply(_ draft: TransactionDraft) {

@@ -193,7 +193,6 @@ private struct TransactionForm: View {
             case .edit(let transaction):
                 try transaction.update(with: draftToSave)
             }
-            try context.save()
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

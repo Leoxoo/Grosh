@@ -107,7 +107,6 @@ struct StartingBalanceEditor: View {
         guard let draftToSave else { return }
         do {
             try transaction.update(with: draftToSave)
-            try context.save()
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

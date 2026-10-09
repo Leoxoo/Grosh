@@ -123,7 +123,7 @@ struct WalletManagementTests {
         try addWallet("Cash")
         try addWallet("Savings")
 
-        Wallet.move(try context.fetch(Wallet.unarchived), fromOffsets: [2], toOffset: 0)
+        try Wallet.move(try context.fetch(Wallet.unarchived), fromOffsets: [2], toOffset: 0)
 
         #expect(try unarchivedNames() == ["Savings", "Checking", "Cash"])
         try addWallet("Brokerage")
@@ -136,7 +136,7 @@ struct WalletManagementTests {
         try addWallet("Savings")
 
         // SwiftUI's onMove reports the drop offset in the list before the move.
-        Wallet.move(try context.fetch(Wallet.unarchived), fromOffsets: [0], toOffset: 2)
+        try Wallet.move(try context.fetch(Wallet.unarchived), fromOffsets: [0], toOffset: 2)
 
         #expect(try unarchivedNames() == ["Cash", "Checking", "Savings"])
     }
@@ -145,7 +145,7 @@ struct WalletManagementTests {
         let checking = try addWallet("Checking", startingBalance: 100_00)
         let oldBank = try addWallet("Old bank", startingBalance: 300_00)
 
-        oldBank.archive()
+        try oldBank.archive()
 
         #expect(try unarchivedNames() == ["Checking"])
         #expect(Wallet.total(of: try context.fetch(FetchDescriptor<Wallet>()), asOf: today) == Money(cents: 100_00))
@@ -158,9 +158,9 @@ struct WalletManagementTests {
         try addWallet("Checking")
         let oldBank = try addWallet("Old bank", startingBalance: 300_00)
         try addWallet("Cash")
-        oldBank.archive()
+        try oldBank.archive()
 
-        oldBank.unarchive()
+        try oldBank.unarchive()
 
         #expect(try unarchivedNames() == ["Checking", "Old bank", "Cash"])
         #expect(Wallet.total(of: try context.fetch(Wallet.unarchived), asOf: today) == Money(cents: 300_00))

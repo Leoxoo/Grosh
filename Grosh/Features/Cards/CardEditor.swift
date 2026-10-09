@@ -152,13 +152,11 @@ struct CardEditor: View {
         Section {
             if card.isArchived {
                 Button("Unarchive Card", systemImage: "tray.and.arrow.up") {
-                    card.unarchive()
-                    dismiss()
+                    perform { try card.unarchive() }
                 }
             } else {
                 Button("Archive Card", systemImage: "archivebox") {
-                    card.archive()
-                    dismiss()
+                    perform { try card.archive() }
                 }
             }
             Button("Merge into Another Card…", systemImage: "arrow.triangle.merge") {
@@ -169,7 +167,7 @@ struct CardEditor: View {
                     isConfirmingDelete = true
                 }
                 .confirmationDialog("Delete “\(card.name)”?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
-                    Button("Delete Card", role: .destructive) { delete(card) }
+                    Button("Delete Card", role: .destructive) { perform { try card.delete(in: context) } }
                 }
             }
         } footer: {
@@ -182,24 +180,20 @@ struct CardEditor: View {
     }
 
     private func save() {
-        do {
+        perform {
             switch mode {
             case .add:
                 try Card.create(draftToSave, in: context)
             case .edit(let card):
                 try card.update(with: draftToSave)
             }
-            try context.save()
-            dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 
-    private func delete(_ card: Card) {
+    /// Runs a change and closes the sheet, or shows why the change was refused.
+    private func perform(_ change: () throws -> Void) {
         do {
-            try card.delete(in: context)
-            try context.save()
+            try change()
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

@@ -90,13 +90,14 @@ extension CardDraft {
 }
 
 extension Card {
-    /// Adds a Card.
+    /// Adds a Card. Saves.
     @discardableResult
     static func create(_ draft: CardDraft, in context: ModelContext) throws -> Card {
         try draft.validate()
         let card = Card(name: draft.name, kind: draft.kind, payingWallet: nil, sortOrder: try context.nextSortOrder(\Card.sortOrder))
         context.insert(card)
         card.apply(draft)
+        try context.save()
         return card
     }
 
@@ -107,6 +108,7 @@ extension Card {
             throw CardRuleError.payingWalletHasTransactions
         }
         apply(draft)
+        try modelContext?.save()
     }
 
     private func apply(_ draft: CardDraft) {
@@ -131,14 +133,16 @@ extension Card {
         return offered + [current]
     }
 
-    /// Retires the Card: it leaves every picker but stays on the transactions it paid for.
-    func archive() {
+    /// Retires the Card: it leaves every picker but stays on the transactions it paid for. Saves.
+    func archive() throws {
         isArchived = true
+        try modelContext?.save()
     }
 
-    /// Brings an archived Card back into the pickers.
-    func unarchive() {
+    /// Brings an archived Card back into the pickers. Saves.
+    func unarchive() throws {
         isArchived = false
+        try modelContext?.save()
     }
 
     /// The Cards this one can be merged into: the other unarchived Cards paid from the same wallet, in the
@@ -147,7 +151,7 @@ extension Card {
         Card.pickerChoices(for: payingWallet, keeping: nil).filter { $0 != self }
     }
 
-    /// Moves every transaction paid with this Card to `target`, then removes this Card.
+    /// Moves every transaction paid with this Card to `target`, then removes this Card. Saves.
     func merge(into target: Card, in context: ModelContext) throws {
         guard target != self else { throw CardRuleError.mergeIntoItself }
         guard target.payingWallet == payingWallet else { throw CardRuleError.mergeIntoAnotherWallet }
@@ -156,15 +160,17 @@ extension Card {
             transaction.card = target
         }
         context.delete(self)
+        try context.save()
     }
 
     /// Whether any transaction was paid with this Card, so it can only go away by merging.
     var hasTransactions: Bool { !(transactions ?? []).isEmpty }
 
-    /// Removes a Card that never paid for anything. A Card with transactions must be merged instead.
+    /// Removes a Card that never paid for anything. A Card with transactions must be merged instead. Saves.
     func delete(in context: ModelContext) throws {
         guard !hasTransactions else { throw CardRuleError.hasTransactions }
         context.delete(self)
+        try context.save()
     }
 
     /// The day this Credit card's statement closes in the given month, or `nil` when it has no statement date.

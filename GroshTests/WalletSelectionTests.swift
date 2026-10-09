@@ -35,12 +35,12 @@ struct WalletSelectionTests {
         #expect(all.filter(WalletSelection.wallet(checking).includes).map(\.note) == ["rent"])
     }
 
-    @Test func theTotalShowsTheTransactionsOfWalletsCountedInTheTotal() {
+    @Test func theTotalShowsTheTransactionsOfWalletsCountedInTheTotal() throws {
         let checking = wallet("Checking")
         let brokerage = wallet("Brokerage")
         brokerage.includeInTotal = false
         let oldBank = wallet("Old bank")
-        oldBank.archive()
+        try oldBank.archive()
         let all = [
             record("rent", -900_00, in: checking),
             record("stock sold", 300_00, in: brokerage),

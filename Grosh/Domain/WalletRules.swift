@@ -11,7 +11,8 @@ extension Wallet {
     }
 
     /// Applies a drag in `ordered` (a list in the user's order) by renumbering the wallets in their new order.
-    static func move(_ ordered: [Wallet], fromOffsets source: IndexSet, toOffset destination: Int) {
+    /// Saves.
+    static func move(_ ordered: [Wallet], fromOffsets source: IndexSet, toOffset destination: Int) throws {
         let moving = source.map { ordered[$0] }
         var reordered = ordered.enumerated().filter { !source.contains($0.offset) }.map(\.element)
         let insertionIndex = destination - source.count(in: 0..<destination)
@@ -19,6 +20,7 @@ extension Wallet {
         for (position, wallet) in reordered.enumerated() {
             wallet.sortOrder = position
         }
+        try ordered.first?.modelContext?.save()
     }
 
     /// Adds a wallet named `name` with its Starting balance, as ``create(_:startingBalance:on:in:)`` does.
@@ -40,14 +42,16 @@ extension Wallet {
         return try create(draft, startingBalance: startingBalance, on: day, in: context)
     }
 
-    /// Retires the wallet: it leaves the Total and every picker, but keeps all of its transactions.
-    func archive() {
+    /// Retires the wallet: it leaves the Total and every picker, but keeps all of its transactions. Saves.
+    func archive() throws {
         isArchived = true
+        try modelContext?.save()
     }
 
-    /// Brings an archived wallet back into its place in the user's order.
-    func unarchive() {
+    /// Brings an archived wallet back into its place in the user's order. Saves.
+    func unarchive() throws {
         isArchived = false
+        try modelContext?.save()
     }
 
     /// The wallet's balance on `today`: the sum of its transactions dated today or earlier.

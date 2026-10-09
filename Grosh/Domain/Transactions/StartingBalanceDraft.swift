@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 /// What the Starting balance editor holds: unlike the Add sheet, the amount is signed as entered, since a
 /// wallet such as a credit line can start below zero.
@@ -23,5 +24,6 @@ extension Transaction {
         amountCents = draft.amount.cents
         day = draft.day
         note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        try modelContext?.save()
     }
 }

@@ -141,7 +141,7 @@ struct CardManagementTests {
         let appleCard = try addCard("Apple Card")
         let lunch = try addExpense(12_76, paidWith: navyFederal)
 
-        navyFederal.archive()
+        try navyFederal.archive()
 
         #expect(Card.pickerChoices(for: checking, keeping: nil).map(\.name) == ["Apple Card"])
         #expect(lunch.card == navyFederal)
@@ -154,9 +154,9 @@ struct CardManagementTests {
     @Test func anUnarchivedCardReturnsToThePickerInItsPlace() throws {
         let navyFederal = try addCard("Navy Federal")
         try addCard("Apple Card")
-        navyFederal.archive()
+        try navyFederal.archive()
 
-        navyFederal.unarchive()
+        try navyFederal.unarchive()
 
         #expect(Card.pickerChoices(for: checking, keeping: nil).map(\.name) == ["Navy Federal", "Apple Card"])
     }
@@ -203,7 +203,7 @@ struct CardManagementTests {
     @Test func mergingIntoAnArchivedCardIsRefused() throws {
         let nfcu = try addCard("NFCU")
         let oldAmex = try addCard("Old Amex")
-        oldAmex.archive()
+        try oldAmex.archive()
         let lunch = try addExpense(12_76, paidWith: nfcu)
 
         #expect(throws: CardRuleError.mergeIntoArchived) { try nfcu.merge(into: oldAmex, in: context) }

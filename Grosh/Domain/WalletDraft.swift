@@ -43,6 +43,7 @@ extension WalletRuleError: LocalizedError {
 extension Wallet {
     /// Adds a wallet at the end of the user's order and records the money it already holds as its Starting
     /// balance: its first transaction, under the locked Starting balance category and always excluded from report.
+    /// Saves.
     @discardableResult
     static func create(
         _ draft: WalletDraft,
@@ -61,6 +62,7 @@ extension Wallet {
         context.insert(starting)
         starting.wallet = wallet
         starting.category = category
+        try context.save()
         return wallet
     }
 
@@ -68,6 +70,7 @@ extension Wallet {
     func update(with draft: WalletDraft) throws {
         try draft.validate()
         apply(draft)
+        try modelContext?.save()
     }
 
     private func apply(_ draft: WalletDraft) {

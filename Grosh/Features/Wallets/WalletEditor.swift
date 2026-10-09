@@ -65,13 +65,11 @@ struct WalletEditor: View {
                     Section {
                         if wallet.isArchived {
                             Button("Unarchive Wallet", systemImage: "tray.and.arrow.up") {
-                                wallet.unarchive()
-                                dismiss()
+                                perform { try wallet.unarchive() }
                             }
                         } else {
                             Button("Archive Wallet", systemImage: "archivebox") {
-                                wallet.archive()
-                                dismiss()
+                                perform { try wallet.archive() }
                             }
                         }
                     } footer: {
@@ -114,14 +112,20 @@ struct WalletEditor: View {
     }
 
     private func save() {
-        do {
+        perform {
             switch mode {
             case .add:
                 try Wallet.create(draft, startingBalance: startingBalance ?? Money(cents: 0), on: startingDay, in: context)
             case .edit(let wallet):
                 try wallet.update(with: draft)
             }
-            try context.save()
+        }
+    }
+
+    /// Runs a change and closes the sheet, or shows why the change was refused.
+    private func perform(_ change: () throws -> Void) {
+        do {
+            try change()
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

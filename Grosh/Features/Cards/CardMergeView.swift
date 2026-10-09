@@ -18,10 +18,7 @@ struct CardMergeView: View {
             consequences: consequences(into:),
             emptyDescription: String(localized: "A Card merges into another unarchived Card paid from the same wallet."),
             row: { CardRow(card: $0) },
-            merge: { target in
-                try source.merge(into: target, in: context)
-                try context.save()
-            },
+            merge: { try source.merge(into: $0, in: context) },
             onMerged: onMerged
         )
     }
