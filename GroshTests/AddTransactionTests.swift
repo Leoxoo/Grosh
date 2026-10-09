@@ -6,19 +6,13 @@ import Testing
 /// Saving what the Add Transaction sheet holds: signs, required fields and the Card rule.
 @MainActor
 struct AddTransactionTests {
-    private let container: ModelContainer
-    private var context: ModelContext { container.mainContext }
+    private let store: CategoryFixture
+    private var context: ModelContext { store.context }
+    private var checking: Wallet { store.wallet }
     private let today = CalendarDay(year: 2026, month: 10, day: 9)
-    private let checking: Wallet
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
-        try CategorySeeder.seedIfNeeded(in: container.mainContext)
-        checking = try Wallet.create(name: "Checking", startingBalance: Money(cents: 0), on: today, in: container.mainContext)
-    }
-
-    private func category(_ name: String, _ type: CategoryType = .expense) throws -> Grosh.Category {
-        try #require(try context.fetch(FetchDescriptor<Grosh.Category>()).first { $0.name == name && $0.type == type })
+        store = try CategoryFixture()
     }
 
     /// A draft of `type` in Checking for `cents`, filed under `categoryName`.
@@ -26,7 +20,7 @@ struct AddTransactionTests {
         var draft = TransactionDraft(type: type, day: today)
         draft.wallet = checking
         draft.amount = Money(cents: cents)
-        draft.category = try category(categoryName, type)
+        draft.category = try store.category(categoryName, type)
         return draft
     }
 
@@ -57,7 +51,7 @@ struct AddTransactionTests {
         let transaction = try Transaction.create(entered, in: context)
 
         #expect(transaction.wallet == checking)
-        #expect(transaction.category == (try category("Café")))
+        #expect(transaction.category == (try store.category("Café")))
         #expect(transaction.note == "Latte #treat")
         #expect(transaction.withName == "Anna")
         #expect(transaction.day == CalendarDay(year: 2026, month: 10, day: 7))
@@ -87,7 +81,7 @@ struct AddTransactionTests {
 
         #expect(!entered.canSave)
         #expect(throws: TransactionRuleError.missingWallet) { try Transaction.create(entered, in: context) }
-        #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 1) // just the Starting balance
+        #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 0)
     }
 
     @Test(arguments: [0, -500])
@@ -205,7 +199,7 @@ struct AddTransactionTests {
         #expect(editing.isExcludedFromReport)
 
         editing.type = .expense
-        editing.category = try category("Café")
+        editing.category = try store.category("Café")
         try excludedLunch.update(with: editing)
         #expect(excludedLunch.isExcludedFromReport)
     }
@@ -246,7 +240,7 @@ struct AddTransactionTests {
         #expect(duplicate.type == .debtLoan)
         #expect(duplicate.wallet == checking)
         #expect(duplicate.amount == Money(cents: 10_000))
-        #expect(duplicate.category == (try category("Loan", .debtLoan)))
+        #expect(duplicate.category == (try store.category("Loan", .debtLoan)))
         #expect(duplicate.card == original.card)
         #expect(duplicate.note == "Rent help")
         #expect(duplicate.withName == "Pasha")
@@ -281,13 +275,13 @@ struct AddTransactionTests {
         var editing = TransactionDraft(editing: original)
         editing.amount = Money(cents: 12_000)
         editing.type = .debtLoan
-        editing.category = try category("Debt", .debtLoan)
+        editing.category = try store.category("Debt", .debtLoan)
         editing.note = "Borrowed instead"
 
         try original.update(with: editing)
 
         #expect(original.amountCents == 12_000)
-        #expect(original.category == (try category("Debt", .debtLoan)))
+        #expect(original.category == (try store.category("Debt", .debtLoan)))
         #expect(original.note == "Borrowed instead")
         #expect(original.createdAt == enteredAt)
     }
