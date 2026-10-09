@@ -13,6 +13,9 @@ final class Transaction {
     var withName: String = ""
     var eventName: String = ""
     var isExcludedFromReport: Bool = false
+    /// Set on a balance adjustment: the difference between the wallet's recorded and real balance. It never
+    /// needs a Card, whatever its category.
+    var isBalanceAdjustment: Bool = false
     /// Transactions sharing a link are related: the two halves of a transfer, or a Loan and its Debt Collections.
     var linkID: UUID?
     /// When the transaction was entered; orders transactions within a day.

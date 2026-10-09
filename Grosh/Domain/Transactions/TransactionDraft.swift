@@ -41,6 +41,8 @@ struct TransactionDraft {
     var isExcludedFromReport = false
     /// The Event an imported transaction belongs to. Shown, never edited.
     private(set) var eventName = ""
+    /// Set when editing a balance adjustment, which never needs a Card. Saving keeps the transaction one.
+    private(set) var isBalanceAdjustment = false
 
     init(type: CategoryType, day: CalendarDay) {
         self.type = type
@@ -51,6 +53,7 @@ struct TransactionDraft {
     init(editing transaction: Transaction) {
         self.init(copying: transaction, day: transaction.day)
         eventName = transaction.eventName
+        isBalanceAdjustment = transaction.isBalanceAdjustment
     }
 
     /// A new transaction like `transaction`, dated `today` ("Duplicate").
@@ -108,10 +111,11 @@ extension TransactionDraft {
         category?.isTransferHalf != true
     }
 
-    /// Whether the transaction must name its Card: an expense in a wallet that has at least one (unarchived) Card.
-    /// The Card is optional on Income and Debt/Loan, and never offered on a transfer.
+    /// Whether the transaction must name its Card: an expense in a wallet that has at least one (unarchived) Card,
+    /// unless it is a balance adjustment. The Card is optional on Income and Debt/Loan, and never offered on a
+    /// transfer.
     var requiresCard: Bool {
-        type == .expense && offersCard && !Card.pickerChoices(for: wallet, keeping: nil).isEmpty
+        type == .expense && !isBalanceAdjustment && offersCard && !Card.pickerChoices(for: wallet, keeping: nil).isEmpty
     }
 
     /// Whether the amount adds to the wallet (`1`) or takes from it (`-1`): the category's ``Category/sign``, or

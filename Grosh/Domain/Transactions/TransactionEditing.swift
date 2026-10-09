@@ -25,6 +25,7 @@ extension Transaction {
         }
     }
 
-    /// Whether the detail offers Duplicate: only for what the Add sheet edits.
-    var canBeDuplicated: Bool { editFlow == .addSheet }
+    /// Whether the detail offers Duplicate: only for what the Add sheet edits, but never a balance adjustment,
+    /// whose copy wouldn't make any balance right.
+    var canBeDuplicated: Bool { editFlow == .addSheet && !isBalanceAdjustment }
 }
