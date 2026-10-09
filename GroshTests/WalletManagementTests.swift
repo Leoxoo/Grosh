@@ -1,0 +1,100 @@
+import SwiftData
+import Testing
+@testable import Grosh
+
+@MainActor
+struct WalletManagementTests {
+    private let container: ModelContainer
+    private var context: ModelContext { container.mainContext }
+    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+
+    init() throws {
+        container = try GroshStore.makeContainer(inMemory: true)
+        try CategorySeeder.seedIfNeeded(in: container.mainContext)
+    }
+
+    @discardableResult
+    private func addWallet(_ name: String, startingBalance cents: Int = 0, on day: CalendarDay? = nil) throws -> Wallet {
+        try Wallet.create(
+            name: name,
+            startingBalance: Money(cents: cents),
+            on: day ?? today,
+            in: context
+        )
+    }
+
+    @Test func aNewWalletRecordsItsMoneyAsAStartingBalanceTransaction() throws {
+        let lastWeek = CalendarDay(year: 2026, month: 10, day: 2)
+        let savings = try addWallet("Savings", startingBalance: 1_250_00, on: lastWeek)
+
+        let transactions = savings.transactions ?? []
+        #expect(transactions.count == 1)
+        let starting = try #require(transactions.first)
+        #expect(starting.amount == Money(cents: 1_250_00))
+        #expect(starting.day == lastWeek)
+        #expect(starting.category?.name == "Starting balance")
+        #expect(starting.category?.lockedRole == .startingBalance)
+        #expect(starting.isExcludedFromReport)
+        #expect(savings.balance(asOf: today) == Money(cents: 1_250_00))
+    }
+
+    private func unarchivedNames() throws -> [String] {
+        try context.fetch(Wallet.unarchived).map(\.name)
+    }
+
+    @Test func newWalletsJoinTheEndOfTheList() throws {
+        try addWallet("Checking")
+        try addWallet("Cash")
+        try addWallet("Savings")
+
+        #expect(try unarchivedNames() == ["Checking", "Cash", "Savings"])
+    }
+
+    @Test func theOrderSetByDragIsTheOrderEverywhere() throws {
+        try addWallet("Checking")
+        try addWallet("Cash")
+        try addWallet("Savings")
+
+        Wallet.move(try context.fetch(Wallet.unarchived), fromOffsets: [2], toOffset: 0)
+
+        #expect(try unarchivedNames() == ["Savings", "Checking", "Cash"])
+        try addWallet("Brokerage")
+        #expect(try unarchivedNames() == ["Savings", "Checking", "Cash", "Brokerage"])
+    }
+
+    @Test func draggingAWalletDownPlacesItWhereItWasDropped() throws {
+        try addWallet("Checking")
+        try addWallet("Cash")
+        try addWallet("Savings")
+
+        // SwiftUI's onMove reports the drop offset in the list before the move.
+        Wallet.move(try context.fetch(Wallet.unarchived), fromOffsets: [0], toOffset: 2)
+
+        #expect(try unarchivedNames() == ["Cash", "Checking", "Savings"])
+    }
+
+    @Test func anArchivedWalletLeavesThePickersAndTheTotalButKeepsItsTransactions() throws {
+        let checking = try addWallet("Checking", startingBalance: 100_00)
+        let oldBank = try addWallet("Old bank", startingBalance: 300_00)
+
+        oldBank.archive()
+
+        #expect(try unarchivedNames() == ["Checking"])
+        #expect(Wallet.total(of: try context.fetch(FetchDescriptor<Wallet>()), asOf: today) == Money(cents: 100_00))
+        #expect(oldBank.transactions?.count == 1)
+        #expect(oldBank.balance(asOf: today) == Money(cents: 300_00))
+        #expect(checking.isArchived == false)
+    }
+
+    @Test func anUnarchivedWalletReturnsAtTheEndOfTheList() throws {
+        try addWallet("Checking")
+        let oldBank = try addWallet("Old bank", startingBalance: 300_00)
+        try addWallet("Cash")
+        oldBank.archive()
+
+        try oldBank.unarchive(in: context)
+
+        #expect(try unarchivedNames() == ["Checking", "Cash", "Old bank"])
+        #expect(Wallet.total(of: try context.fetch(Wallet.unarchived), asOf: today) == Money(cents: 300_00))
+    }
+}

@@ -5,7 +5,7 @@ struct RootView: View {
     var body: some View {
         TabView {
             Tab("Home", systemImage: "house") {
-                PlaceholderScreen(title: "Home", systemImage: "house")
+                HomeView()
             }
             Tab("Transactions", systemImage: "wallet.bifold") {
                 PlaceholderScreen(title: "Transactions", systemImage: "wallet.bifold")
@@ -14,7 +14,7 @@ struct RootView: View {
                 PlaceholderScreen(title: "Budgets", systemImage: "chart.pie")
             }
             Tab("Account", systemImage: "person.crop.circle") {
-                PlaceholderScreen(title: "Account", systemImage: "person.crop.circle")
+                AccountView()
             }
         }
         .tabViewStyle(.sidebarAdaptable)
