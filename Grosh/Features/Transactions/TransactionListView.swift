@@ -75,6 +75,11 @@ struct TransactionListView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                TransactionsMenu(walletSelection: walletSelection)
+            }
+        }
         .addTransactionButton()
     }
 }
