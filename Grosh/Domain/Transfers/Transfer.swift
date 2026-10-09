@@ -19,12 +19,11 @@ extension Transfer {
         let note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
 
         func half(_ role: LockedRole, _ cents: Int, in wallet: Wallet?) throws -> Transaction {
-            let half = Transaction(
-                amount: Money(cents: cents), day: draft.day, wallet: nil,
-                category: try context.lockedCategory(role), note: note
-            )
+            let category = try context.lockedCategory(role)
+            let half = Transaction(amount: Money(cents: cents), day: draft.day, wallet: nil, category: nil, note: note)
             context.insert(half)
             half.wallet = wallet
+            half.category = category
             half.linkID = link
             return half
         }
