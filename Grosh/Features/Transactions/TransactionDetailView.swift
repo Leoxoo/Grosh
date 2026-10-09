@@ -9,9 +9,9 @@ struct TransactionDetailView: View {
     var didDelete: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
-    @State private var editorMode: TransactionEditor.Mode?
-    @State private var isEditingStartingBalance = false
-    @State private var isEditingTransferHalf = false
+    /// The editor Edit opened, while it is open.
+    @State private var editing: TransactionEditFlow?
+    @State private var isDuplicating = false
 
     var body: some View {
         Group {
@@ -25,14 +25,15 @@ struct TransactionDetailView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .sheet(item: $editorMode) { mode in
-            TransactionEditor(mode: mode)
+        .sheet(item: $editing) { flow in
+            switch flow {
+            case .addSheet: TransactionEditor(mode: .edit(transaction))
+            case .startingBalance: StartingBalanceEditor(transaction: transaction)
+            case .transferHalf: TransferHalfEditor(transaction: transaction)
+            }
         }
-        .sheet(isPresented: $isEditingStartingBalance) {
-            StartingBalanceEditor(transaction: transaction)
-        }
-        .sheet(isPresented: $isEditingTransferHalf) {
-            TransferHalfEditor(transaction: transaction)
+        .sheet(isPresented: $isDuplicating) {
+            TransactionEditor(mode: .duplicate(transaction))
         }
     }
 
@@ -59,7 +60,7 @@ struct TransactionDetailView: View {
             Section {
                 if transaction.canBeDuplicated {
                     Button("Duplicate", systemImage: "plus.square.on.square") {
-                        editorMode = .duplicate(transaction)
+                        isDuplicating = true
                     }
                 }
                 TransactionDeleteButton(transaction: transaction) {
@@ -74,17 +75,9 @@ struct TransactionDetailView: View {
         .toolbar {
             if let editFlow = transaction.editFlow {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Edit") { edit(with: editFlow) }
+                    Button("Edit") { editing = editFlow }
                 }
             }
-        }
-    }
-
-    private func edit(with flow: TransactionEditFlow) {
-        switch flow {
-        case .addSheet: editorMode = .edit(transaction)
-        case .startingBalance: isEditingStartingBalance = true
-        case .transferHalf: isEditingTransferHalf = true
         }
     }
 
@@ -159,4 +152,8 @@ private struct ExcludedFromReportBanner: View {
                 .foregroundStyle(.orange)
         }
     }
+}
+
+extension TransactionEditFlow: Identifiable {
+    var id: Self { self }
 }
