@@ -105,7 +105,7 @@ extension TransactionDraft {
         guard amount.cents > 0 else { throw TransactionRuleError.missingAmount }
         guard category != nil else { throw TransactionRuleError.missingCategory }
         guard types.contains(type) || !isBalanceAdjustment else {
-            throw BalanceAdjustmentError.reasonDoesNotMatchDifference
+            throw BalanceAdjustmentRuleError.reasonDoesNotMatchDifference
         }
         guard card != nil || !requiresCard else { throw TransactionRuleError.missingCard }
     }

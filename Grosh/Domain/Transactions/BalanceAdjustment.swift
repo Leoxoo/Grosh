@@ -86,8 +86,8 @@ struct BalanceAdjustmentDraft {
     /// Checks there is a wallet, a real balance and something to adjust before anything is saved.
     func validate() throws {
         guard wallet != nil else { throw TransactionRuleError.missingWallet }
-        guard actualBalance != nil else { throw BalanceAdjustmentError.missingRealBalance }
-        guard reasonType != nil else { throw BalanceAdjustmentError.nothingToAdjust }
+        guard actualBalance != nil else { throw BalanceAdjustmentRuleError.missingRealBalance }
+        guard reasonType != nil else { throw BalanceAdjustmentRuleError.nothingToAdjust }
     }
 
     /// Whether Save can be enabled.
@@ -95,7 +95,7 @@ struct BalanceAdjustmentDraft {
 }
 
 /// Why a balance adjustment can't be recorded.
-nonisolated enum BalanceAdjustmentError: Error, Equatable {
+nonisolated enum BalanceAdjustmentRuleError: Error, Equatable {
     /// The keypad can't work out the real balance typed, such as when dividing by zero.
     case missingRealBalance
     /// The real balance is what the wallet's transactions already add up to.
@@ -104,7 +104,7 @@ nonisolated enum BalanceAdjustmentError: Error, Equatable {
     case reasonDoesNotMatchDifference
 }
 
-extension BalanceAdjustmentError: LocalizedError {
+extension BalanceAdjustmentRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingRealBalance:
@@ -147,10 +147,10 @@ extension Transaction {
         in context: ModelContext
     ) throws -> Transaction {
         guard let type = BalanceAdjustmentDraft.reasonType(for: difference.cents) else {
-            throw BalanceAdjustmentError.nothingToAdjust
+            throw BalanceAdjustmentRuleError.nothingToAdjust
         }
         let category = try reason ?? context.lockedCategory(type == .income ? .otherIncome : .otherExpense)
-        guard category.type == type else { throw BalanceAdjustmentError.reasonDoesNotMatchDifference }
+        guard category.type == type else { throw BalanceAdjustmentRuleError.reasonDoesNotMatchDifference }
 
         let adjustment = Transaction(amount: difference, day: day, wallet: nil, category: nil)
         context.insert(adjustment)

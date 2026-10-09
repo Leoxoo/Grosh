@@ -209,7 +209,7 @@ struct BalanceAdjustmentTests {
     @Test func aReasonOfTheOtherTypeIsRefused() throws {
         let cafe = try store.category("Café")
 
-        #expect(throws: BalanceAdjustmentError.reasonDoesNotMatchDifference) {
+        #expect(throws: BalanceAdjustmentRuleError.reasonDoesNotMatchDifference) {
             try Transaction.recordBalanceAdjustment(Money(cents: 20_00), in: checking, on: today, reason: cafe, in: context)
         }
         #expect(checking.transactions?.isEmpty == true)
@@ -239,7 +239,7 @@ struct BalanceAdjustmentTests {
         draft.category = try context.lockedCategory(.loan)
 
         #expect(!draft.canSave)
-        #expect(throws: BalanceAdjustmentError.reasonDoesNotMatchDifference) { try adjustment.update(with: draft) }
+        #expect(throws: BalanceAdjustmentRuleError.reasonDoesNotMatchDifference) { try adjustment.update(with: draft) }
         #expect(adjustment.category == (try context.lockedCategory(.otherIncome)))
         #expect(adjustment.amount == Money(cents: 15_55))
     }
@@ -293,7 +293,7 @@ struct BalanceAdjustmentTests {
         draft.actualBalance = Money(cents: 100_00)
 
         #expect(!draft.canSave)
-        #expect(throws: BalanceAdjustmentError.nothingToAdjust) { try Transaction.adjustBalance(draft, in: context) }
+        #expect(throws: BalanceAdjustmentRuleError.nothingToAdjust) { try Transaction.adjustBalance(draft, in: context) }
         #expect(checking.transactions?.count == 1)
     }
 
