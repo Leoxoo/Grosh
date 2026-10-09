@@ -100,14 +100,7 @@ struct CategoryListView: View {
         } message: { category in
             Text(CategoryEditor.deleteMessage(for: category))
         }
-        .alert("Couldn't Change Category", isPresented: Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
-        )) {
-            Button("OK") { errorMessage = nil }
-        } message: {
-            Text(errorMessage ?? "")
-        }
+        .errorAlert("Couldn't Change Category", message: $errorMessage)
     }
 
     private func row(for category: Category) -> some View {

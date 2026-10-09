@@ -135,14 +135,7 @@ struct CardEditor: View {
                     CardMergeView(source: card) { dismiss() }
                 }
             }
-            .alert("Couldn't Save Card", isPresented: Binding(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
-            )) {
-                Button("OK") { errorMessage = nil }
-            } message: {
-                Text(errorMessage ?? "")
-            }
+            .errorAlert("Couldn't Save Card", message: $errorMessage)
         }
     }
 

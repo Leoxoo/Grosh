@@ -122,14 +122,7 @@ private struct TransactionForm: View {
                     isShowingDetails = true
                 }
             }
-            .alert("Couldn't Save Transaction", isPresented: Binding(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
-            )) {
-                Button("OK") { errorMessage = nil }
-            } message: {
-                Text(errorMessage ?? "")
-            }
+            .errorAlert("Couldn't Save Transaction", message: $errorMessage)
         }
         #if os(macOS)
         .frame(minWidth: 420, idealWidth: 460, minHeight: 640, idealHeight: 720)

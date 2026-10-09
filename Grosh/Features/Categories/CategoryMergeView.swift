@@ -72,14 +72,7 @@ struct CategoryMergeView: View {
             } message: {
                 Text("This can't be undone.")
             }
-            .alert("Couldn't Merge", isPresented: Binding(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
-            )) {
-                Button("OK") { errorMessage = nil }
-            } message: {
-                Text(errorMessage ?? "")
-            }
+            .errorAlert("Couldn't Merge", message: $errorMessage)
         }
     }
 

@@ -120,14 +120,7 @@ struct CategoryEditor: View {
             } message: {
                 if let editing { Text(Self.deleteMessage(for: editing)) }
             }
-            .alert("Couldn't Save Category", isPresented: Binding(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
-            )) {
-                Button("OK") { errorMessage = nil }
-            } message: {
-                Text(errorMessage ?? "")
-            }
+            .errorAlert("Couldn't Save Category", message: $errorMessage)
         }
     }
 

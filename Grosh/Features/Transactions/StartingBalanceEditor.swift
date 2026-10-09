@@ -90,14 +90,7 @@ struct StartingBalanceEditor: View {
                     isKeypadShown = false
                 }
             }
-            .alert("Couldn't Save Starting Balance", isPresented: Binding(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
-            )) {
-                Button("OK") { errorMessage = nil }
-            } message: {
-                Text(errorMessage ?? "")
-            }
+            .errorAlert("Couldn't Save Starting Balance", message: $errorMessage)
         }
         #if os(macOS)
         .frame(minWidth: 420, idealWidth: 460, minHeight: 560, idealHeight: 640)

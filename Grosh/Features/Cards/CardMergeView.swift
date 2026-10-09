@@ -60,14 +60,7 @@ struct CardMergeView: View {
             } message: { target in
                 Text("\(source.transactions?.count ?? 0) transactions move to “\(target.name)”. This can't be undone.")
             }
-            .alert("Couldn't Merge Cards", isPresented: Binding(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
-            )) {
-                Button("OK") { errorMessage = nil }
-            } message: {
-                Text(errorMessage ?? "")
-            }
+            .errorAlert("Couldn't Merge Cards", message: $errorMessage)
         }
     }
 

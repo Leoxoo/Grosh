@@ -122,14 +122,7 @@ struct WalletEditor: View {
                         .disabled(!canSave)
                 }
             }
-            .alert("Couldn't Save Wallet", isPresented: Binding(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
-            )) {
-                Button("OK") { errorMessage = nil }
-            } message: {
-                Text(errorMessage ?? "")
-            }
+            .errorAlert("Couldn't Save Wallet", message: $errorMessage)
         }
     }
 
