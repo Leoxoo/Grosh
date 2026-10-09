@@ -62,7 +62,7 @@ private struct AdjustBalanceForm: View {
             .formStyle(.grouped)
             .safeAreaInset(edge: .bottom) {
                 if isKeypadShown {
-                    AmountKeypad(entry: $draft.actualBalanceEntry)
+                    AmountKeypad(entry: $draft.realBalanceEntry)
                         .background(.bar)
                 }
             }
@@ -102,17 +102,17 @@ private struct AdjustBalanceForm: View {
                 }
             }
             AmountRow(
-                title: "Actual balance",
-                entry: $draft.actualBalanceEntry,
+                title: "Real balance",
+                entry: $draft.realBalanceEntry,
                 currencyCode: draft.currencyCode,
-                tint: Money(cents: draft.actualBalance?.cents ?? 0).tint
+                tint: Money(cents: draft.realBalance?.cents ?? 0).tint
             ) {
                 focus = .amount
                 isKeypadShown.toggle()
             }
             .focused($focus, equals: .amount)
             Button("Change Sign", systemImage: "plusminus", action: changeSign)
-                .disabled(draft.actualBalance == nil)
+                .disabled(draft.realBalance == nil)
         } footer: {
             if draft.wallet == nil {
                 Text("Add a wallet first, in Account → Wallets.")
@@ -144,8 +144,8 @@ private struct AdjustBalanceForm: View {
 
     /// Turns a balance above zero into a debt of the same size, and back.
     private func changeSign() {
-        guard let cents = draft.actualBalance?.cents else { return }
-        draft.actualBalanceEntry = AmountEntry(cents: -cents)
+        guard let cents = draft.realBalance?.cents else { return }
+        draft.realBalanceEntry = AmountEntry(cents: -cents)
     }
 
     private func save() {

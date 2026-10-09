@@ -38,7 +38,7 @@ struct BalanceAdjustmentTests {
     @discardableResult
     private func adjust(to cents: Int, on day: CalendarDay? = nil) throws -> Transaction {
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: day ?? today, in: context)
-        draft.actualBalance = Money(cents: cents)
+        draft.realBalance = Money(cents: cents)
         return try Transaction.adjustBalance(draft, in: context)
     }
 
@@ -93,7 +93,7 @@ struct BalanceAdjustmentTests {
 
         let draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
 
-        #expect(draft.actualBalance == Money(cents: 500_00))
+        #expect(draft.realBalance == Money(cents: 500_00))
         #expect(!draft.canSave)
     }
 
@@ -103,18 +103,18 @@ struct BalanceAdjustmentTests {
 
         draft.day = today.adding(days: -1)
 
-        #expect(draft.actualBalance == Money(cents: 0))
+        #expect(draft.realBalance == Money(cents: 0))
         #expect(!draft.canSave)
     }
 
     @Test func changingTheDayKeepsARealBalanceAlreadyTyped() throws {
         try record(500_00, "Salary", .income, on: today)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
-        draft.actualBalanceEntry.press(.digit(7))
+        draft.realBalanceEntry.press(.digit(7))
 
         draft.day = today.adding(days: -1)
 
-        #expect(draft.actualBalance == Money(cents: 7))
+        #expect(draft.realBalance == Money(cents: 7))
         #expect(draft.difference == Money(cents: 7))
     }
 
@@ -123,11 +123,11 @@ struct BalanceAdjustmentTests {
         let savings = addSavings()
         try record(75_00, "Salary", .income, in: savings, on: today)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
-        draft.actualBalance = Money(cents: 450_00)
+        draft.realBalance = Money(cents: 450_00)
 
         draft.wallet = savings
 
-        #expect(draft.actualBalance == Money(cents: 75_00))
+        #expect(draft.realBalance == Money(cents: 75_00))
         #expect(!draft.canSave)
     }
 
@@ -135,10 +135,10 @@ struct BalanceAdjustmentTests {
         try record(500_00, "Salary", .income, on: today)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
 
-        draft.actualBalanceEntry.press(.digit(4))
-        draft.actualBalanceEntry.press(.digit(2))
+        draft.realBalanceEntry.press(.digit(4))
+        draft.realBalanceEntry.press(.digit(2))
 
-        #expect(draft.actualBalance == Money(cents: 42))
+        #expect(draft.realBalance == Money(cents: 42))
         #expect(draft.difference == Money(cents: -499_58))
     }
 
@@ -147,10 +147,10 @@ struct BalanceAdjustmentTests {
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
 
         for key: KeypadKey in [.digit(4), .operation(.divide), .digit(0), .equals] {
-            draft.actualBalanceEntry.press(key)
+            draft.realBalanceEntry.press(key)
         }
 
-        #expect(draft.actualBalance == nil)
+        #expect(draft.realBalance == nil)
         #expect(!draft.canSave)
     }
 
@@ -177,7 +177,7 @@ struct BalanceAdjustmentTests {
     @Test func theReasonCanBeAnyCategoryOfTheMatchingType() throws {
         try record(100_00, "Salary", .income, on: today)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
-        draft.actualBalance = Money(cents: 101_20)
+        draft.realBalance = Money(cents: 101_20)
         draft.category = try store.category("Collect Interest", .income)
 
         let adjustment = try Transaction.adjustBalance(draft, in: context)
@@ -189,19 +189,19 @@ struct BalanceAdjustmentTests {
         try record(100_00, "Salary", .income, on: today)
         let interest = try store.category("Collect Interest", .income)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
-        draft.actualBalance = Money(cents: 101_20)
+        draft.realBalance = Money(cents: 101_20)
         draft.category = interest
 
-        draft.actualBalance = Money(cents: 98_00)
+        draft.realBalance = Money(cents: 98_00)
         #expect(draft.category == (try context.lockedCategory(.otherExpense)))
 
-        draft.actualBalance = Money(cents: 102_00)
+        draft.realBalance = Money(cents: 102_00)
         #expect(draft.category == interest)
     }
 
     @Test func theAdjustmentKeepsItsNoteAndExcludeFromReport() throws {
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
-        draft.actualBalance = Money(cents: 15_55)
+        draft.realBalance = Money(cents: 15_55)
         draft.note = "  Interest for September\n"
         draft.isExcludedFromReport = true
 
@@ -317,7 +317,7 @@ struct BalanceAdjustmentTests {
     @Test func aRealBalanceEqualToTheRecordedOneHasNothingToAdjust() throws {
         try record(100_00, "Salary", .income, on: today)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
-        draft.actualBalance = Money(cents: 100_00)
+        draft.realBalance = Money(cents: 100_00)
 
         #expect(!draft.canSave)
         #expect(throws: BalanceAdjustmentRuleError.nothingToAdjust) { try Transaction.adjustBalance(draft, in: context) }
@@ -326,7 +326,7 @@ struct BalanceAdjustmentTests {
 
     @Test func adjustingNeedsAWallet() throws {
         var draft = try BalanceAdjustmentDraft(wallet: nil, day: today, in: context)
-        draft.actualBalance = Money(cents: 100_00)
+        draft.realBalance = Money(cents: 100_00)
 
         #expect(!draft.canSave)
         #expect(throws: TransactionRuleError.missingWallet) { try Transaction.adjustBalance(draft, in: context) }

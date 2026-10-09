@@ -41,15 +41,15 @@ struct BalanceAdjustmentDraft {
 
     /// The real balance on the keypad: what the user typed, or until they type, the recorded balance on `day`,
     /// which the first digit replaces.
-    var actualBalanceEntry: AmountEntry {
+    var realBalanceEntry: AmountEntry {
         get { typedEntry ?? AmountEntry(cents: recordedBalance?.cents ?? 0) }
         set { typedEntry = newValue }
     }
 
     /// What the wallet really holds on `day`, or `nil` while the keypad can't work it out (dividing by zero).
     /// Setting it types it; setting `nil` starts again from the recorded balance.
-    var actualBalance: Money? {
-        get { actualBalanceEntry.cents.map { Money(cents: $0, currencyCode: currencyCode) } }
+    var realBalance: Money? {
+        get { realBalanceEntry.cents.map { Money(cents: $0, currencyCode: currencyCode) } }
         set { typedEntry = newValue.map { AmountEntry(cents: $0.cents) } }
     }
 
@@ -58,8 +58,8 @@ struct BalanceAdjustmentDraft {
 
     /// How far the real balance is from the recorded one: what the adjustment adds (above zero) or takes away.
     var difference: Money? {
-        guard let recordedBalance, let actualBalance else { return nil }
-        return Money(cents: actualBalance.cents - recordedBalance.cents, currencyCode: recordedBalance.currencyCode)
+        guard let recordedBalance, let realBalance else { return nil }
+        return Money(cents: realBalance.cents - recordedBalance.cents, currencyCode: recordedBalance.currencyCode)
     }
 
     /// The type the reason must be: Income when the real balance is higher, Expense when it is lower, `nil` while
@@ -93,7 +93,7 @@ struct BalanceAdjustmentDraft {
     /// Checks there is a wallet, a real balance and something to adjust before anything is saved.
     func validate() throws {
         guard wallet != nil else { throw TransactionRuleError.missingWallet }
-        guard actualBalance != nil else { throw BalanceAdjustmentRuleError.missingRealBalance }
+        guard realBalance != nil else { throw BalanceAdjustmentRuleError.missingRealBalance }
         guard reasonType != nil else { throw BalanceAdjustmentRuleError.nothingToAdjust }
     }
 
