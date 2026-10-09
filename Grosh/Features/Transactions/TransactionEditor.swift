@@ -132,7 +132,7 @@ private struct TransactionForm: View {
     private var mainSection: some View {
         Section {
             WalletPicker(title: "Wallet", selection: $draft.wallet)
-            AmountRow(title: "Amount", entry: $entry, currencyCode: currencyCode, tint: amountTint) {
+            AmountRow(title: "Amount", entry: $entry, currencyCode: currencyCode, tint: Money(cents: draft.sign).tint) {
                 focus = .amount
                 isKeypadShown.toggle()
             }
@@ -183,12 +183,6 @@ private struct TransactionForm: View {
                 Text("A transaction excluded from report still counts in balances, just not in income and spending.")
             }
         }
-    }
-
-    /// Red for money going out, green for money coming in.
-    private var amountTint: Color {
-        let sign = draft.category?.sign ?? (draft.type == .expense ? -1 : draft.type == .income ? 1 : 0)
-        return sign < 0 ? .red : sign > 0 ? .green : .primary
     }
 
     private func save() {

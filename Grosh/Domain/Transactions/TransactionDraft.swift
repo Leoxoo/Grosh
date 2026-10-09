@@ -114,6 +114,12 @@ extension TransactionDraft {
         type == .expense && offersCard && !Card.pickerChoices(for: wallet, keeping: nil).isEmpty
     }
 
+    /// Whether the amount adds to the wallet (`1`) or takes from it (`-1`): the category's ``Category/sign``, or
+    /// before one is chosen, the type's. `0` while a Debt/Loan has neither Loan nor Debt picked.
+    var sign: Int {
+        category?.sign ?? (type == .expense ? -1 : type == .income ? 1 : 0)
+    }
+
     /// Whether every required field is filled, so Save can be enabled.
     var canSave: Bool { (try? validate()) != nil }
 }

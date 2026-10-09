@@ -103,7 +103,7 @@ struct CategoryCatalog {
 
     /// Checks the draft's type and parent. `category` is the one being edited, if any.
     private func checkPlacement(_ draft: CategoryDraft, for category: Category?) throws {
-        guard draft.type == .expense || draft.type == .income else { throw CategoryRuleError.fixedType }
+        guard draft.type.isUserManaged else { throw CategoryRuleError.fixedType }
         guard let parent = draft.parent else { return }
         guard parent != category else { throw CategoryRuleError.sameCategory }
         guard !parent.isLocked else { throw CategoryRuleError.locked }
@@ -217,6 +217,11 @@ extension Category {
 
     /// Outgoing transfer or Incoming transfer: one half of a Transfer, which never carries a Card.
     var isTransferHalf: Bool { lockedRole == .outgoingTransfer || lockedRole == .incomingTransfer }
+}
+
+extension CategoryType {
+    /// Expense and Income categories are the user's own; Debt/Loan and system categories are fixed.
+    var isUserManaged: Bool { self == .expense || self == .income }
 }
 
 extension LockedRole {

@@ -20,7 +20,7 @@ extension Transaction {
     }
 
     private func apply(_ draft: TransactionDraft) {
-        amountCents = draft.amount.cents * (draft.category?.sign ?? 1)
+        amountCents = draft.amount.cents * draft.sign
         day = draft.day
         wallet = draft.wallet
         category = draft.category
