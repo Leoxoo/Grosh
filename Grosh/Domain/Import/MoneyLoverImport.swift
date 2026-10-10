@@ -36,17 +36,26 @@ enum MoneyLoverImport {
         }
     }
 
-    /// Deletes every transaction, Card and wallet. Categories stay. Doesn't save. One by one, rather than as batch
-    /// deletes, which would be faster but take effect in the store right away, where a rollback can't undo them.
+    /// Deletes every transaction, Card and wallet. Categories stay. Doesn't save.
+    ///
+    /// One by one, rather than as batch deletes, which take effect in the store right away, where a rollback can't
+    /// undo them. Each category, Card and wallet lets go of its transactions first: left to update those lists one
+    /// deleted transaction at a time, saving ~6,000 deletes takes several seconds rather than a fraction of one.
     private static func removeAllData(in context: ModelContext) throws {
-        for transaction in try context.fetch(FetchDescriptor<Transaction>()) {
-            context.delete(transaction)
+        for category in try context.fetch(FetchDescriptor<Category>()) {
+            category.transactions = []
         }
         for card in try context.fetch(FetchDescriptor<Card>()) {
+            card.transactions = []
             context.delete(card)
         }
         for wallet in try context.fetch(FetchDescriptor<Wallet>()) {
+            wallet.transactions = []
+            wallet.cards = []
             context.delete(wallet)
+        }
+        for transaction in try context.fetch(FetchDescriptor<Transaction>()) {
+            context.delete(transaction)
         }
     }
 }
