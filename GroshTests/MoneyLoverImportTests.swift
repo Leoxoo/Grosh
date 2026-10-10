@@ -102,6 +102,62 @@ struct MoneyLoverImportTests {
         #expect(try context.fetchCount(FetchDescriptor<Grosh.Category>()) == before + 2)
     }
 
+    // MARK: Cards
+
+    private func cards() throws -> [Card] {
+        try context.fetch(FetchDescriptor<Card>(sortBy: Card.userOrder))
+    }
+
+    @Test func aCardHashtagBecomesTheRowsCardPaidFromCheckingAndLeavesTheNote() throws {
+        try importing(export(
+            "1,10/05/2026,Products,-20.00,USD,Checking (Navy Federal),Groceries #chase ,,,,",
+            "2,10/05/2026,Café,-3.00,USD,Checking (Navy Federal),#checking Coffee,,,,",
+            "3,10/05/2026,Salary,900,USD,Saving (Apple),Pay,,,,"
+        ))
+
+        let checking = try wallet("Checking (Navy Federal)")
+        let imported = try rows(in: "Checking (Navy Federal)")
+        #expect(imported.map(\.note) == ["Groceries", "Coffee"])
+        #expect(imported.map { $0.card?.name } == ["Chase", "Navy Federal Debit"])
+        #expect(try cards().map(\.name) == ["Navy Federal Debit", "Chase"])
+        #expect(try cards().map(\.kind) == [.debit, .credit])
+        #expect(try cards().allSatisfy { $0.payingWallet == checking })
+    }
+
+    @Test func cardHashtagsAreFoundInAnyCaseAndAnywhereInTheNote() throws {
+        try importing(export("1,10/05/2026,Café,-3.00,USD,Checking (Navy Federal),Lunch #BoA downtown,,,,"))
+
+        let lunch = try #require(try rows(in: "Checking (Navy Federal)").first)
+        #expect(lunch.card?.name == "Bank of America")
+        #expect(lunch.note == "Lunch downtown")
+    }
+
+    @Test func theFirstCardHashtagWinsAndEveryOtherHashtagStays() throws {
+        try importing(export("1,10/05/2026,Travel,-90.00,USD,Checking (Navy Federal),Hotel #trip #citi #amex,,,,"))
+
+        let hotel = try #require(try rows(in: "Checking (Navy Federal)").first)
+        #expect(hotel.card?.name == "Citi")
+        #expect(hotel.note == "Hotel #trip #amex")
+        #expect(try cards().map(\.name) == ["Citi"])
+    }
+
+    @Test func aRowWithoutACardHashtagGetsNoCard() throws {
+        try importing(export(
+            "1,10/05/2026,Café,-3.00,USD,Checking (Navy Federal),Coffee #chasefreedom,,,,",
+            "2,10/05/2026,Café,-3.00,USD,Checking (Navy Federal),Coffee,,,,"
+        ))
+
+        #expect(try rows(in: "Checking (Navy Federal)").allSatisfy { $0.card == nil })
+        #expect(try rows(in: "Checking (Navy Federal)").first?.note == "Coffee #chasefreedom")
+        #expect(try cards().isEmpty)
+    }
+
+    @Test func withoutACheckingWalletACardIsPaidFromTheWalletOfItsFirstRow() throws {
+        try importing(export("1,10/05/2026,Café,-3.00,USD,Cash,Coffee #paypal,,,,"))
+
+        #expect(try cards().map(\.payingWallet) == [try wallet("Cash")])
+    }
+
     // MARK: Replacing all data
 
     /// Data the user had before importing: a wallet with a Card, an expense paid with it, and a category of their own.

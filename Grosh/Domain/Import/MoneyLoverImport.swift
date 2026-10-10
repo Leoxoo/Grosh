@@ -33,17 +33,33 @@ enum MoneyLoverImport {
                 starting.category = startingBalance
             }
 
-            for (index, row) in rows.enumerated() {
-                let transaction = Transaction(
-                    amount: row.amount, day: row.day, wallet: nil, category: nil, note: row.note
+            var cards: [MoneyLoverCardTag: Card] = [:]
+            func card(for tag: MoneyLoverCardTag, firstUsedIn wallet: Wallet?) -> Card {
+                if let card = cards[tag] { return card }
+                let card = Card(
+                    name: tag.cardName, kind: tag.kind,
+                    payingWallet: nil, color: tag.color,
+                    sortOrder: MoneyLoverCardTag.all.firstIndex(of: tag) ?? cards.count
                 )
+                context.insert(card)
+                card.payingWallet = wallets[MoneyLoverCardTag.payingWalletName] ?? wallet
+                cards[tag] = card
+                return card
+            }
+
+            for (index, row) in rows.enumerated() {
+                let wallet = wallets[row.walletName]
+                let tagged = MoneyLoverCardTag.first(in: row.note)
+                let note = (tagged?.note ?? row.note).trimmingCharacters(in: .whitespacesAndNewlines)
+                let transaction = Transaction(amount: row.amount, day: row.day, wallet: nil, category: nil, note: note)
                 transaction.createdAt = now.addingTimeInterval(-Double(index))
                 transaction.withName = row.withName
                 transaction.eventName = row.eventName
                 transaction.isExcludedFromReport = row.isExcludedFromReport
                 context.insert(transaction)
-                transaction.wallet = wallets[row.walletName]
+                transaction.wallet = wallet
                 transaction.category = categories.category(named: row.categoryName, for: row.amount)
+                transaction.card = tagged.map { card(for: $0.tag, firstUsedIn: wallet) }
             }
             try context.save()
         } catch {
