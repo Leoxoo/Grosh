@@ -127,10 +127,10 @@ private struct Importer {
     }
 
     /// Works out which rows are paid with a Card, from the card hashtags in their notes, and adds those Cards in the
-    /// order ``MoneyLoverCardTag/all`` lists them, so every Card has rows. A row only gets a Card where the app would
-    /// offer one (``TransactionDraft/offersCard``, ``Card/pickerChoices(for:keeping:)``): never on a transfer row,
-    /// linked or not, and only in the Card's paying wallet. That is Checking (Navy Federal), or when the file has no
-    /// such wallet, the wallet of the first row the Card could be given on.
+    /// order ``MoneyLoverCardMapping/tags`` lists them, so every Card has rows. A row only gets a Card where the app
+    /// would offer one (``TransactionDraft/offersCard``, ``Card/pickerChoices(for:keeping:)``): never on a transfer
+    /// row, linked or not, and only in the Card's paying wallet. That is ``MoneyLoverCardMapping/payingWalletName``,
+    /// or when the file has no such wallet, the wallet of the first row the Card could be given on.
     ///
     /// Returns, for each row filed under `categories`, its Card and its note without that Card's hashtag; or no Card
     /// and its note as it is, hashtag included.
@@ -141,14 +141,16 @@ private struct Importer {
             guard !categories[index].isTransferHalf, let wallet = wallets[row.walletName],
                   let tagged = MoneyLoverCardTag.extractFirst(from: row.note)
             else { return nil }
-            let payingWallet = payingWallets[tagged.tag] ?? wallets[MoneyLoverCardTag.payingWalletName] ?? wallet
+            let payingWallet = payingWallets[tagged.tag] ?? wallets[MoneyLoverCardMapping.payingWalletName] ?? wallet
             payingWallets[tagged.tag] = payingWallet
             return payingWallet == wallet ? tagged : nil
         }
         let used = Set(tagged.compactMap { $0?.tag })
-        for tag in MoneyLoverCardTag.all where used.contains(tag) {
-            let draft = CardDraft(name: tag.cardName, kind: tag.kind, payingWallet: payingWallets[tag], color: tag.color)
-            cards[tag] = try Card.insert(draft, in: context)
+        for tag in MoneyLoverCardMapping.tags where used.contains(tag) {
+            cards[tag] = try Card.insert(
+                CardDraft(name: tag.cardName, kind: tag.kind, payingWallet: payingWallets[tag], color: tag.color),
+                in: context
+            )
         }
         return zip(rows, tagged).map { row, tagged in
             tagged.map { (cards[$0.tag], $0.noteWithoutTag) } ?? (nil, row.note)

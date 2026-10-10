@@ -469,7 +469,9 @@ struct MoneyLoverImportTests {
             try importing(export("1,10/05/2026,Café,-10.91,USD,Checking,Coffee,,,,"))
         }
 
-        #expect(error?.localizedDescription == "Grosh can't do this without its “Other Income” category, which is missing.")
+        #expect(
+            error?.localizedDescription == "Grosh can't do this without its “Other Income” category, which is missing."
+        )
         #expect(try context.fetch(FetchDescriptor<Wallet>()).map(\.name) == ["Old wallet"])
     }
 

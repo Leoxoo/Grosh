@@ -1,6 +1,7 @@
 import Foundation
 
-/// A hashtag the user's MoneyLover notes name a Card with, and the Card it becomes on import.
+/// A hashtag the user's MoneyLover notes name a Card with, and the Card it becomes on import
+/// (``MoneyLoverCardMapping``).
 nonisolated struct MoneyLoverCardTag: Hashable, Sendable {
     /// Lowercase, with its `#`.
     let tag: String
@@ -10,32 +11,15 @@ nonisolated struct MoneyLoverCardTag: Hashable, Sendable {
 }
 
 extension MoneyLoverCardTag {
-    /// The user's card hashtags, in the order their Cards are listed. Data, not logic: it is the user's own and
-    /// changes with their cards.
-    static let all: [MoneyLoverCardTag] = [
-        MoneyLoverCardTag(tag: "#checking", cardName: "Navy Federal Debit", kind: .debit, color: .blue),
-        MoneyLoverCardTag(tag: "#nfcu", cardName: "Navy Federal", kind: .credit, color: .indigo),
-        MoneyLoverCardTag(tag: "#wellsfargo", cardName: "Wells Fargo", kind: .credit, color: .red),
-        MoneyLoverCardTag(tag: "#applecard", cardName: "Apple Card", kind: .credit, color: .gray),
-        MoneyLoverCardTag(tag: "#boa", cardName: "Bank of America", kind: .credit, color: .pink),
-        MoneyLoverCardTag(tag: "#citi", cardName: "Citi", kind: .credit, color: .cyan),
-        MoneyLoverCardTag(tag: "#amex", cardName: "Amex", kind: .credit, color: .teal),
-        MoneyLoverCardTag(tag: "#chase", cardName: "Chase", kind: .credit, color: .purple),
-        MoneyLoverCardTag(tag: "#discover", cardName: "Discover", kind: .credit, color: .orange),
-        MoneyLoverCardTag(tag: "#petal", cardName: "Petal", kind: .credit, color: .mint),
-        MoneyLoverCardTag(tag: "#paypal", cardName: "PayPal", kind: .credit, color: .yellow),
-    ]
-
-    /// The wallet every imported Card is paid from, when the export has it.
-    static let payingWalletName = "Checking (Navy Federal)"
-
-    /// Takes the first card hashtag, ignoring case, out of `note`: the tag, and the note without it, its spaces
-    /// tidied. A longer hashtag (`#chasefreedom`) isn't `#chase`. Every other hashtag, another card's included, stays
-    /// in the note. `nil` for a note without a card hashtag.
-    static func extractFirst(from note: String) -> (tag: MoneyLoverCardTag, noteWithoutTag: String)? {
+    /// Takes the first card hashtag of `tags`, ignoring case, out of `note`: the tag, and the note without it, its
+    /// spaces tidied. A longer hashtag (`#chasefreedom`) isn't `#chase`. Every other hashtag, another card's included,
+    /// stays in the note. `nil` for a note without a card hashtag.
+    static func extractFirst(
+        from note: String, among tags: [MoneyLoverCardTag] = MoneyLoverCardMapping.tags
+    ) -> (tag: MoneyLoverCardTag, noteWithoutTag: String)? {
         for match in note.matches(of: #/\#\w+/#) {
             let text = note[match.range].lowercased()
-            guard let tag = all.first(where: { $0.tag == text }) else { continue }
+            guard let tag = tags.first(where: { $0.tag == text }) else { continue }
             let before = note[..<match.range.lowerBound].trimmingSuffix(while: \.isSpaceOrTab)
             let after = note[match.range.upperBound...].trimmingPrefix(while: \.isSpaceOrTab)
             let atLineEdge = before.isEmpty || after.isEmpty
