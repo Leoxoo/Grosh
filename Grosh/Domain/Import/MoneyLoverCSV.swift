@@ -115,11 +115,18 @@ nonisolated enum MoneyLoverCSV {
         return CalendarDay(year: year, month: month, day: day)
     }
 
-    /// Splits CSV text into records of fields, each with the line of the file it starts on. A field in double
-    /// quotes may hold commas, line breaks and doubled quotes (`""` for one `"`). Blank lines are skipped.
-    static func records(in text: String) -> [(line: Int, fields: [String])] {
+    /// One record of a CSV file: its fields, and the line of the file it starts on.
+    struct Record {
+        /// The header is line 1.
+        let line: Int
+        let fields: [String]
+    }
+
+    /// Splits CSV text into records. A field in double quotes may hold commas, line breaks and doubled quotes
+    /// (`""` for one `"`). Blank lines are skipped.
+    static func records(in text: String) -> [Record] {
         enum State { case fieldStart, unquoted, quoted, quoteInQuoted }
-        var records: [(line: Int, fields: [String])] = []
+        var records: [Record] = []
         var record: [String] = []
         var field = ""
         var state = State.fieldStart
@@ -134,7 +141,7 @@ nonisolated enum MoneyLoverCSV {
         func endRecord() {
             if state != .fieldStart || !record.isEmpty || !field.isEmpty {
                 endField()
-                records.append((recordLine, record))
+                records.append(Record(line: recordLine, fields: record))
             }
             record = []
             state = .fieldStart

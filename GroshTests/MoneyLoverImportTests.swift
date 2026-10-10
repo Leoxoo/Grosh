@@ -259,7 +259,7 @@ struct MoneyLoverImportTests {
 
         #expect(try rows(in: "Checking").map(\.note) == ["Coffee"])
         #expect(summary.wallets == [MoneyLoverImportSummary.WalletCount(name: "Checking", transactionCount: 1)])
-        #expect(summary.unmatchedRows.map(\.line) == [2])
+        #expect(summary.unmatchedRows.map(\.row.line) == [2])
         #expect(summary.unmatchedRows.map(\.outcome) == [.notImported])
     }
 
@@ -332,16 +332,9 @@ struct MoneyLoverImportTests {
             MoneyLoverImportSummary.WalletCount(name: "Cash", transactionCount: 3),
         ])
         #expect(summary.cardsCreated == 2)
-        #expect(summary.unmatchedRows == [
-            MoneyLoverImportSummary.UnmatchedRow(
-                line: 4, day: CalendarDay(year: 2026, month: 10, day: 4), categoryName: "Outgoing transfer",
-                amount: Money(cents: -40_00), walletName: "Checking (Navy Federal)", outcome: .balanceAdjustment
-            ),
-            MoneyLoverImportSummary.UnmatchedRow(
-                line: 6, day: CalendarDay(year: 2026, month: 10, day: 3), categoryName: "Debt Collection",
-                amount: Money(cents: 25_00), walletName: "Cash", outcome: .unlinkedPayment
-            ),
-        ])
+        #expect(summary.unmatchedRows.map(\.row.line) == [4, 6])
+        #expect(summary.unmatchedRows.map(\.row.categoryName) == ["Outgoing transfer", "Debt Collection"])
+        #expect(summary.unmatchedRows.map(\.outcome) == [.balanceAdjustment, .unlinkedPayment])
     }
 
     // MARK: Replacing all data

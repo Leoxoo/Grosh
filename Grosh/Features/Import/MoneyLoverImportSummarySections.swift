@@ -24,8 +24,8 @@ struct MoneyLoverImportSummarySections: View {
                 Text("Every transfer and payment was matched.")
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(summary.unmatchedRows, id: \.line) { row in
-                    UnmatchedRowView(row: row)
+                ForEach(summary.unmatchedRows, id: \.row.line) { unmatched in
+                    UnmatchedRowView(unmatched: unmatched)
                 }
             }
         } header: {
@@ -36,7 +36,8 @@ struct MoneyLoverImportSummarySections: View {
 
 /// One row the import couldn't match: where it is in the file, what it was, and what became of it.
 private struct UnmatchedRowView: View {
-    let row: MoneyLoverImportSummary.UnmatchedRow
+    let unmatched: MoneyLoverImportSummary.UnmatchedRow
+    private var row: MoneyLoverRow { unmatched.row }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
@@ -45,7 +46,7 @@ private struct UnmatchedRowView: View {
                 Text("Line \(row.line) · \(row.day.date().formatted(date: .numeric, time: .omitted)) · \(row.walletName)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text(row.outcome.wording)
+                Text(unmatched.outcome.wording)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -72,8 +73,12 @@ private extension MoneyLoverImportSummary.UnmatchedRow.Outcome {
             cardsCreated: 4,
             unmatchedRows: [
                 .init(
-                    line: 18, day: CalendarDay(year: 2026, month: 9, day: 2), categoryName: "Incoming transfer",
-                    amount: Money(cents: 120_00), walletName: "Cash", outcome: .balanceAdjustment
+                    row: MoneyLoverRow(
+                        line: 18, day: CalendarDay(year: 2026, month: 9, day: 2), categoryName: "Incoming transfer",
+                        amount: Money(cents: 120_00), walletName: "Cash", note: "", withName: "", eventName: "",
+                        isExcludedFromReport: true
+                    ),
+                    outcome: .balanceAdjustment
                 ),
             ]
         ))

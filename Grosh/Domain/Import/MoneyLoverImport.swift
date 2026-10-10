@@ -109,12 +109,7 @@ private struct Importer {
             },
             cardsCreated: cards.count,
             unmatchedRows: zip(rows, imported).compactMap { row, transaction in
-                unmatched[ObjectIdentifier(transaction)].map { outcome in
-                    .init(
-                        line: row.line, day: row.day, categoryName: row.categoryName, amount: row.amount,
-                        walletName: row.walletName, outcome: outcome
-                    )
-                }
+                unmatched[ObjectIdentifier(transaction)].map { .init(row: row, outcome: $0) }
             }
         )
     }

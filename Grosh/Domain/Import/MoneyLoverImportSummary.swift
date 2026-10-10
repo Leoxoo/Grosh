@@ -21,12 +21,8 @@ nonisolated struct MoneyLoverImportSummary: Equatable, Sendable {
             case unlinkedPayment
         }
 
-        /// The line of the file the row starts on; the header is line 1.
-        let line: Int
-        let day: CalendarDay
-        let categoryName: String
-        let amount: Money
-        let walletName: String
+        /// The row as the file lists it.
+        let row: MoneyLoverRow
         let outcome: Outcome
     }
 
