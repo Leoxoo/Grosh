@@ -35,6 +35,15 @@ struct CategoryCatalog {
     /// Adds a category at the end of its parent's subcategories, or of its type's top-level categories.
     @discardableResult
     func add(_ draft: CategoryDraft) throws -> Category {
+        let category = try insert(draft)
+        try context.save()
+        return category
+    }
+
+    /// ``add(_:)`` without the save, for a caller that saves once after adding many, such as an import. The same
+    /// rules apply.
+    @discardableResult
+    func insert(_ draft: CategoryDraft) throws -> Category {
         try checkPlacement(draft, for: nil)
         let name = try checkedName(draft, for: nil)
         let category = Category(
@@ -46,7 +55,6 @@ struct CategoryCatalog {
             sortOrder: try nextOrder(of: draft.type, under: draft.parent)
         )
         context.insert(category)
-        try context.save()
         return category
     }
 

@@ -14,16 +14,15 @@ nonisolated struct MoneyLoverImportSummary: Equatable, Sendable {
         enum Outcome: Equatable, Sendable {
             /// A transfer row with no partner, recorded as a balance adjustment.
             case balanceAdjustment
+            /// A transfer row of no amount with no partner: as a balance adjustment it would have nothing to adjust,
+            /// so it isn't imported.
+            case notImported
             /// A Debt Collection or Repayment with no open Loan or Debt of its wallet and amount, recorded unlinked.
             case unlinkedPayment
         }
 
-        /// The line of the file the row starts on; the header is line 1.
-        let line: Int
-        let day: CalendarDay
-        let categoryName: String
-        let amount: Money
-        let walletName: String
+        /// The row as the file lists it.
+        let row: MoneyLoverRow
         let outcome: Outcome
     }
 

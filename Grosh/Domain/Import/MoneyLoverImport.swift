@@ -4,24 +4,26 @@ import SwiftData
 /// Import from MoneyLover ("Replace all data"): a MoneyLover CSV export replaces every wallet, Card and transaction.
 /// The categories are kept.
 enum MoneyLoverImport {
-    /// Replaces the wallets, Cards and transactions in `context` with those of `csv`, a MoneyLover export, entered
-    /// at `now`:
+    /// Replaces the wallets, Cards and transactions in `context` with `rows`, a MoneyLover export as
+    /// ``MoneyLoverCSV/rows(in:)`` reads it, entered at `now`:
     ///
     /// - Each wallet is created once by name, with a $0 Starting balance on its first day.
     /// - Each row is filed under the category of its name; a name no category has becomes a new top-level category.
-    /// - A card hashtag in a note becomes the row's Card (``MoneyLoverCardTag``).
-    /// - Outgoing and Incoming transfer rows pair into transfers; one with no partner becomes a balance adjustment.
+    /// - A card hashtag in a note becomes the row's Card (``MoneyLoverCardTag``), where the app would offer that Card:
+    ///   not on a transfer row, and only in the Card's paying wallet. Elsewhere the hashtag stays in the note.
+    /// - Outgoing and Incoming transfer rows link into transfers. One with no partner becomes a balance adjustment,
+    ///   filed as Adjust Balance files it; one of no amount has nothing to adjust and isn't imported.
     /// - Each Debt Collection links to the earliest open Loan of its wallet and amount, each Repayment to a Debt.
     /// - Within a day, rows keep the file's order.
     ///
-    /// Saves. Throws ``MoneyLoverImportError`` without changing anything when the file can't be read: the whole file,
-    /// and the locked categories the import needs, are checked before anything is deleted. Should saving fail after
-    /// that, the old wallets, Cards and transactions are gone already and importing the file again recovers.
+    /// Saves once, at the end: the old data is deleted by the same save that adds the new. Throws without changing
+    /// anything when it can't finish, saving included, and ``MoneyLoverImportError/noTransactions`` for no rows.
+    /// Once saved, the old data can't be brought back.
     @discardableResult
     static func replaceAllData(
-        with csv: String, in context: ModelContext, now: Date = .now
+        with rows: [MoneyLoverRow], in context: ModelContext, now: Date = .now
     ) throws -> MoneyLoverImportSummary {
-        let rows = try MoneyLoverCSV.rows(in: csv)
+        guard !rows.isEmpty else { throw MoneyLoverImportError.noTransactions }
         var importer = try Importer(rows: rows, context: context, now: now)
         do {
             try removeAllData(in: context)
@@ -34,26 +36,37 @@ enum MoneyLoverImport {
         }
     }
 
-    /// Deletes every transaction, Card and wallet from the store. Categories stay. These are batch deletes: they take
-    /// effect right away rather than at the next save, which makes replacing ~6,000 transactions about five times
-    /// faster than deleting them one by one, but a rollback can't bring them back.
+    /// Deletes every transaction, Card and wallet. Categories stay. Doesn't save.
+    ///
+    /// One by one, rather than as batch deletes, which take effect in the store right away, where a rollback can't
+    /// undo them. Each category, Card and wallet lets go of its transactions first: left to update those lists one
+    /// deleted transaction at a time, saving ~6,000 deletes takes several seconds rather than a fraction of one.
     private static func removeAllData(in context: ModelContext) throws {
-        try context.delete(model: Transaction.self)
-        try context.delete(model: Card.self)
-        try context.delete(model: Wallet.self)
+        for category in try context.fetch(FetchDescriptor<Category>()) {
+            category.transactions = []
+        }
+        for card in try context.fetch(FetchDescriptor<Card>()) {
+            card.transactions = []
+            context.delete(card)
+        }
+        for wallet in try context.fetch(FetchDescriptor<Wallet>()) {
+            wallet.transactions = []
+            wallet.cards = []
+            context.delete(wallet)
+        }
+        for transaction in try context.fetch(FetchDescriptor<Transaction>()) {
+            context.delete(transaction)
+        }
     }
 }
 
-/// One run of ``MoneyLoverImport/replaceAllData(with:in:now:)`` over rows already read, into a store already
-/// emptied.
+/// One run of ``MoneyLoverImport/replaceAllData(with:in:now:)``, after the old data is deleted.
 private struct Importer {
     let rows: [MoneyLoverRow]
     let context: ModelContext
     let now: Date
-    /// The locked categories the import files under, fetched before anything is deleted.
-    let startingBalance: Category
-    let otherExpense: Category
-    let otherIncome: Category
+    /// What a transfer row with no partner is filed under as a balance adjustment, by the adjustment's reason type.
+    let adjustmentReasons: [CategoryType: Category]
 
     private var wallets: [String: Wallet] = [:]
     private var walletOrder: [String] = []
@@ -63,98 +76,114 @@ private struct Importer {
         self.rows = rows
         self.context = context
         self.now = now
-        startingBalance = try context.lockedCategory(.startingBalance)
-        otherExpense = try context.otherCategory(.expense)
-        otherIncome = try context.otherCategory(.income)
+        adjustmentReasons = try [CategoryType.income, .expense].reduce(into: [:]) { reasons, type in
+            reasons[type] = try BalanceAdjustmentDraft.defaultReason(for: type, in: context)
+        }
     }
 
-    /// Records every row, pairs the transfers, links the payments and says what was done. Doesn't save, except
-    /// that linking a payment does.
+    /// Records every row, links the transfers and the payments, and says what was done. Doesn't save.
     mutating func run() throws -> MoneyLoverImportSummary {
-        var categories = try CategoryLookup(context: context)
         for row in rows where wallets[row.walletName] == nil {
-            addWallet(firstSeenIn: row)
+            try addWallet(firstSeenIn: row)
         }
+        var categories = try CategoryFiler(context: context)
+        let filed = try rows.map { try categories.findOrAdd(named: $0.categoryName, for: $0.amount) }
+        let paid = try addCards(for: filed)
         // `imported[i]` is `rows[i]`.
-        var imported: [Transaction] = []
-        for (index, row) in rows.enumerated() {
-            let category = categories.category(named: row.categoryName, for: row.amount)
-            imported.append(record(row, at: index, filedUnder: category))
+        let imported = rows.indices.map { index in
+            record(rows[index], at: index, filedUnder: filed[index], paidWith: paid[index].card, note: paid[index].note)
         }
 
         var unmatched: [ObjectIdentifier: MoneyLoverImportSummary.UnmatchedRow.Outcome] = [:]
-        for unpaired in Self.linkTransfers(among: imported) {
-            unpaired.isBalanceAdjustment = true
-            unpaired.category = unpaired.amountCents < 0 ? otherExpense : otherIncome
-            unmatched[ObjectIdentifier(unpaired)] = .balanceAdjustment
+        for unlinked in Self.linkTransfers(among: imported) {
+            // A balance adjustment records a difference, so a row of no amount has nothing to adjust.
+            guard let type = BalanceAdjustmentDraft.reasonType(for: unlinked.amountCents) else {
+                unmatched[ObjectIdentifier(unlinked)] = .notImported
+                context.delete(unlinked)
+                continue
+            }
+            unlinked.isBalanceAdjustment = true
+            unlinked.category = adjustmentReasons[type]
+            unmatched[ObjectIdentifier(unlinked)] = .balanceAdjustment
         }
-        for unlinked in try Self.linkPayments(among: imported) {
+        let kept = zip(rows, imported).filter { unmatched[ObjectIdentifier($1)] != .notImported }
+        for unlinked in try Self.linkPayments(among: kept.map(\.1)) {
             unmatched[ObjectIdentifier(unlinked)] = .unlinkedPayment
         }
 
         return MoneyLoverImportSummary(
             wallets: walletOrder.map { name in
-                .init(name: name, transactionCount: rows.count { $0.walletName == name })
+                .init(name: name, transactionCount: kept.count { row, _ in row.walletName == name })
             },
             cardsCreated: cards.count,
             unmatchedRows: zip(rows, imported).compactMap { row, transaction in
-                unmatched[ObjectIdentifier(transaction)].map { outcome in
-                    .init(
-                        line: row.line, day: row.day, categoryName: row.categoryName, amount: row.amount,
-                        walletName: row.walletName, outcome: outcome
-                    )
-                }
+                unmatched[ObjectIdentifier(transaction)].map { .init(row: row, outcome: $0) }
             }
         )
     }
 
-    /// Creates the wallet `row` names, at the end of the order, with a $0 Starting balance on the earliest day any
-    /// row of it is dated, entered before every row.
-    private mutating func addWallet(firstSeenIn row: MoneyLoverRow) {
-        let wallet = Wallet(name: row.walletName, sortOrder: walletOrder.count)
-        context.insert(wallet)
-        wallets[row.walletName] = wallet
-        walletOrder.append(row.walletName)
-
+    /// Adds the wallet `row` names, at the end of the order, with a $0 Starting balance on the earliest day any row
+    /// of it is dated, entered before every row.
+    private mutating func addWallet(firstSeenIn row: MoneyLoverRow) throws {
+        var draft = WalletDraft()
+        draft.name = row.walletName
         let firstDay = rows.filter { $0.walletName == row.walletName }.map(\.day).min() ?? row.day
-        let starting = Transaction(amount: Money(cents: 0), day: firstDay, wallet: nil, category: nil)
-        starting.isExcludedFromReport = true
-        starting.createdAt = now.addingTimeInterval(-Double(rows.count + walletOrder.count))
-        context.insert(starting)
-        starting.wallet = wallet
-        starting.category = startingBalance
+        wallets[row.walletName] = try Wallet.insert(
+            draft, startingBalance: Money(cents: 0), on: firstDay,
+            enteredAt: now.addingTimeInterval(-Double(rows.count + walletOrder.count + 1)), in: context
+        )
+        walletOrder.append(row.walletName)
+    }
+
+    /// Works out which rows are paid with a Card, from the card hashtags in their notes, and adds those Cards in the
+    /// order ``MoneyLoverCardMapping/tags`` lists them, so every Card has rows. A row only gets a Card where the app
+    /// would offer one (``TransactionDraft/offersCard``, ``Card/pickerChoices(for:keeping:)``): never on a transfer
+    /// row, linked or not, and only in the Card's paying wallet. That is ``MoneyLoverCardMapping/payingWalletName``,
+    /// or when the file has no such wallet, the wallet of the first row the Card could be given on.
+    ///
+    /// Returns, for each row filed under `categories`, its Card and its note without that Card's hashtag; or no Card
+    /// and its note as it is, hashtag included.
+    private mutating func addCards(for categories: [Category]) throws -> [(card: Card?, note: String)] {
+        var payingWallets: [MoneyLoverCardTag: Wallet] = [:]
+        let tagged = rows.indices.map { index -> (tag: MoneyLoverCardTag, noteWithoutTag: String)? in
+            let row = rows[index]
+            guard !categories[index].isTransferHalf, let wallet = wallets[row.walletName],
+                  let tagged = MoneyLoverCardTag.extractFirst(from: row.note)
+            else { return nil }
+            let payingWallet = payingWallets[tagged.tag] ?? wallets[MoneyLoverCardMapping.payingWalletName] ?? wallet
+            payingWallets[tagged.tag] = payingWallet
+            return payingWallet == wallet ? tagged : nil
+        }
+        let used = Set(tagged.compactMap { $0?.tag })
+        for tag in MoneyLoverCardMapping.tags where used.contains(tag) {
+            cards[tag] = try Card.insert(
+                CardDraft(name: tag.cardName, kind: tag.kind, payingWallet: payingWallets[tag], color: tag.color),
+                in: context
+            )
+        }
+        return zip(rows, tagged).map { row, tagged in
+            tagged.map { (cards[$0.tag], $0.noteWithoutTag) } ?? (nil, row.note)
+        }
     }
 
     /// Records `row`, the `index`th of the file. The file lists a day's rows newest first, so each row is entered a
     /// second before the one above it and they keep the file's order within a day.
-    private mutating func record(_ row: MoneyLoverRow, at index: Int, filedUnder category: Category) -> Transaction {
-        let wallet = wallets[row.walletName]
-        let tagged = MoneyLoverCardTag.first(in: row.note)
-        let note = (tagged?.note ?? row.note).trimmingCharacters(in: .whitespacesAndNewlines)
-        let transaction = Transaction(amount: row.amount, day: row.day, wallet: nil, category: nil, note: note)
+    private func record(
+        _ row: MoneyLoverRow, at index: Int, filedUnder category: Category, paidWith card: Card?, note: String
+    ) -> Transaction {
+        let transaction = Transaction(
+            amount: row.amount, day: row.day, wallet: nil, category: nil,
+            note: note.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
         transaction.createdAt = now.addingTimeInterval(-Double(index))
         transaction.withName = row.withName
         transaction.eventName = row.eventName
         transaction.isExcludedFromReport = row.isExcludedFromReport
         context.insert(transaction)
-        transaction.wallet = wallet
+        transaction.wallet = wallets[row.walletName]
         transaction.category = category
-        transaction.card = tagged.map { card(for: $0.tag, firstUsedIn: wallet) }
+        transaction.card = card
         return transaction
-    }
-
-    /// The Card `tag` names, created the first time it is used: paid from Checking (Navy Federal), or from `wallet`
-    /// when the file has no such wallet.
-    private mutating func card(for tag: MoneyLoverCardTag, firstUsedIn wallet: Wallet?) -> Card {
-        if let card = cards[tag] { return card }
-        let card = Card(
-            name: tag.cardName, kind: tag.kind, payingWallet: nil, color: tag.color,
-            sortOrder: MoneyLoverCardTag.all.firstIndex(of: tag) ?? cards.count
-        )
-        context.insert(card)
-        card.payingWallet = wallets[MoneyLoverCardTag.payingWalletName] ?? wallet
-        cards[tag] = card
-        return card
     }
 
     /// Links the Outgoing and Incoming transfer rows among `imported` (in the file's order) into transfers: each
@@ -181,9 +210,9 @@ private struct Importer {
         return imported.filter { $0.category?.isTransferHalf == true && $0.linkID == nil }
     }
 
-    /// Links each Debt Collection among `imported` to the earliest Loan still open that has its wallet and amount
-    /// and is dated on or before it, and each Repayment to a Debt the same way (ADR-0003). Payments are taken oldest
-    /// first. Returns the payments left unlinked. Saves.
+    /// Links each Debt Collection among `imported` to the earliest Loan still open that it pays back in full (same
+    /// wallet and amount, dated on or before it: ``Transaction/isPaidBackInFull(by:)``), and each Repayment to a Debt
+    /// the same way (ADR-0003). Payments are taken oldest first. Returns the payments left unlinked. Doesn't save.
     private static func linkPayments(among imported: [Transaction]) throws -> [Transaction] {
         let oldestFirst = Array(imported.inListOrder().reversed())
         var open = oldestFirst.filter(\.isLoanOrDebt)
@@ -192,46 +221,38 @@ private struct Importer {
             guard let role = payment.category?.lockedRole, role == .debtCollection || role == .repayment else {
                 continue
             }
-            guard let index = open.firstIndex(where: { original in
-                original.loanOrDebtKind?.paymentRole == role && original.wallet == payment.wallet
-                    && original.amountCents == -payment.amountCents && original.dayRaw <= payment.dayRaw
-            }) else {
+            guard let index = open.firstIndex(where: { $0.isPaidBackInFull(by: payment) }) else {
                 unlinked.append(payment)
                 continue
             }
-            try open.remove(at: index).linkPayment(payment)
+            try open.remove(at: index).linkPaymentWithoutSaving(payment)
         }
         return unlinked
     }
 }
 
-/// The category each imported row is filed under, found by name ignoring case. A name no category has becomes a new
-/// top-level category, an Expense for money going out and an Income for money coming in.
-private struct CategoryLookup {
-    let context: ModelContext
+/// Files each imported row under the category of its name, found ignoring case, adding the category when none has
+/// the name: a new top-level category, an Expense for money going out and an Income for money coming in.
+private struct CategoryFiler {
+    let catalog: CategoryCatalog
     private var byName: [String: [Category]]
 
     init(context: ModelContext) throws {
-        self.context = context
+        catalog = CategoryCatalog(context: context)
         byName = Dictionary(grouping: try context.fetch(FetchDescriptor<Category>()), by: { Self.key($0.name) })
     }
 
     private static func key(_ name: String) -> String { name.lowercased() }
 
-    /// The category named `name` for a row of `amount`: when an Expense and an Income category share the name, the
-    /// one of the type the amount's sign gives.
-    mutating func category(named name: String, for amount: Money) -> Category {
+    /// The category named `name` for a row of `amount`, added if there is none: when an Expense and an Income
+    /// category share the name, the one of the type the amount's sign gives. Doesn't save.
+    mutating func findOrAdd(named name: String, for amount: Money) throws -> Category {
         let type: CategoryType = amount.cents < 0 ? .expense : .income
         let named = byName[Self.key(name), default: []]
         if let match = named.first(where: { $0.type == type }) ?? named.first {
             return match
         }
-        let topLevel = byName.values.joined().filter { $0.type == type && $0.parent == nil }
-        let category = Category(
-            name: name, type: type, symbolName: CategoryDraft().symbolName, color: CategoryDraft().color,
-            sortOrder: (topLevel.map(\.sortOrder).max() ?? -1) + 1
-        )
-        context.insert(category)
+        let category = try catalog.insert(CategoryDraft(name: name, type: type))
         byName[Self.key(name)] = [category]
         return category
     }

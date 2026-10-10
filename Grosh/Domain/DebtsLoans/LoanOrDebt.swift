@@ -154,10 +154,24 @@ extension Transaction {
     /// import, so it counts against this Loan or Debt and they show as each other's Related transactions. Only the
     /// links change. Saves.
     func linkPayment(_ payment: Transaction) throws {
+        try linkPaymentWithoutSaving(payment)
+        try modelContext?.save()
+    }
+
+    /// ``linkPayment(_:)`` without the save, for a caller that saves once after linking many, such as an import.
+    func linkPaymentWithoutSaving(_ payment: Transaction) throws {
         guard let kind = loanOrDebtKind else { throw DebtLoanRuleError.notALoanOrDebt }
         guard payment.category?.lockedRole == kind.paymentRole else { throw DebtLoanRuleError.paymentDoesNotMatch }
         payment.linkID = paymentLink()
-        try modelContext?.save()
+    }
+
+    /// Whether `payment` pays this Loan or Debt back in one go: a Debt Collection for a Loan or a Repayment for a
+    /// Debt, in its wallet, for its whole amount, and dated on or after it. How an import, which brings payments
+    /// without their links, finds the Loan or Debt to link one to.
+    func isPaidBackInFull(by payment: Transaction) -> Bool {
+        guard let kind = loanOrDebtKind else { return false }
+        return payment.category?.lockedRole == kind.paymentRole && payment.wallet == wallet
+            && payment.amountCents == -amountCents && payment.dayRaw >= dayRaw
     }
 
     /// The link this Loan or Debt shares with its payments, made the first time one is recorded.

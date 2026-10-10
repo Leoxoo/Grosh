@@ -24,7 +24,7 @@ struct MoneyLoverImportTests {
 
     @discardableResult
     private func importing(_ csv: String) throws -> MoneyLoverImportSummary {
-        try MoneyLoverImport.replaceAllData(with: csv, in: context)
+        try MoneyLoverImport.replaceAllData(with: MoneyLoverCSV.rows(in: csv), in: context)
     }
 
     private func wallet(_ name: String) throws -> Wallet {
@@ -158,6 +158,45 @@ struct MoneyLoverImportTests {
         #expect(try cards().map(\.payingWallet) == [try wallet("Cash")])
     }
 
+    @Test func aTransferRowGetsNoCardAndKeepsItsHashtagLinkedOrNot() throws {
+        try importing(export(
+            "1,10/05/2026,Outgoing transfer,-250,USD,Checking (Navy Federal),To savings #chase,,,✅,",
+            "2,10/05/2026,Incoming transfer,250,USD,Saving (Apple),To savings #chase,,,✅,",
+            "3,10/04/2026,Outgoing transfer,-30,USD,Checking (Navy Federal),Sent out #citi,,,✅,"
+        ))
+
+        let checking = try rows(in: "Checking (Navy Federal)")
+        #expect(checking.map(\.isBalanceAdjustment) == [false, true])
+        #expect(checking.allSatisfy { $0.card == nil })
+        #expect(checking.map(\.note) == ["To savings #chase", "Sent out #citi"])
+        #expect(try cards().isEmpty)
+    }
+
+    @Test func aRowOutsideItsCardsPayingWalletGetsNoCardAndKeepsItsHashtag() throws {
+        try importing(export(
+            "1,10/05/2026,Café,-3.00,USD,Cash,Coffee #chase,,,,",
+            "2,10/05/2026,Products,-20.00,USD,Checking (Navy Federal),Groceries #citi,,,,"
+        ))
+
+        let coffee = try #require(try rows(in: "Cash").first)
+        #expect(coffee.card == nil)
+        #expect(coffee.note == "Coffee #chase")
+        #expect(try cards().map(\.name) == ["Citi"])
+    }
+
+    @Test func withoutACheckingWalletACardIsOnlyGivenInTheWalletOfItsFirstRowThatCanHaveOne() throws {
+        try importing(export(
+            "1,10/06/2026,Outgoing transfer,-5,USD,Savings,Moved #paypal,,,✅,",
+            "2,10/05/2026,Café,-3.00,USD,Cash,Coffee #paypal,,,,",
+            "3,10/04/2026,Café,-4.00,USD,Savings,Tea #paypal,,,,"
+        ))
+
+        #expect(try cards().map(\.payingWallet) == [try wallet("Cash")])
+        #expect(try rows(in: "Cash").map { $0.card?.name } == ["PayPal"])
+        #expect(try rows(in: "Savings").allSatisfy { $0.card == nil })
+        #expect(try rows(in: "Savings").map(\.note) == ["Moved #paypal", "Tea #paypal"])
+    }
+
     // MARK: Transfers
 
     private func transferRows(in name: String) throws -> [Transaction] {
@@ -180,7 +219,7 @@ struct MoneyLoverImportTests {
         #expect(!outgoing.isBalanceAdjustment && !incoming.isBalanceAdjustment)
     }
 
-    @Test func transferRowsPairOneToOneOnlyOnTheSameDayInAnotherWallet() throws {
+    @Test func transferRowsLinkOneToOneOnlyOnTheSameDayInAnotherWallet() throws {
         try importing(export(
             "1,10/05/2026,Outgoing transfer,-100,USD,Checking,,,,,",
             "2,10/05/2026,Incoming transfer,100,USD,Checking,,,,,",
@@ -210,6 +249,18 @@ struct MoneyLoverImportTests {
         #expect(adjustments.map(\.amountCents) == [-30_00, 45_50])
         #expect(adjustments.map(\.isExcludedFromReport) == [true, false])
         #expect(adjustments.map(\.note) == ["Sent out", "Came in"])
+    }
+
+    @Test func aTransferRowOfNoAmountWithNoPartnerIsLeftOutForHavingNothingToAdjust() throws {
+        let summary = try importing(export(
+            "1,10/05/2026,Outgoing transfer,0,USD,Checking,Nothing moved,,,✅,",
+            "2,10/04/2026,Café,-3.00,USD,Checking,Coffee,,,,"
+        ))
+
+        #expect(try rows(in: "Checking").map(\.note) == ["Coffee"])
+        #expect(summary.wallets == [MoneyLoverImportSummary.WalletCount(name: "Checking", transactionCount: 1)])
+        #expect(summary.unmatchedRows.map(\.row.line) == [2])
+        #expect(summary.unmatchedRows.map(\.outcome) == [.notImported])
     }
 
     // MARK: Debts and loans
@@ -281,16 +332,9 @@ struct MoneyLoverImportTests {
             MoneyLoverImportSummary.WalletCount(name: "Cash", transactionCount: 3),
         ])
         #expect(summary.cardsCreated == 2)
-        #expect(summary.unmatchedRows == [
-            MoneyLoverImportSummary.UnmatchedRow(
-                line: 4, day: CalendarDay(year: 2026, month: 10, day: 4), categoryName: "Outgoing transfer",
-                amount: Money(cents: -40_00), walletName: "Checking (Navy Federal)", outcome: .balanceAdjustment
-            ),
-            MoneyLoverImportSummary.UnmatchedRow(
-                line: 6, day: CalendarDay(year: 2026, month: 10, day: 3), categoryName: "Debt Collection",
-                amount: Money(cents: 25_00), walletName: "Cash", outcome: .unlinkedPayment
-            ),
-        ])
+        #expect(summary.unmatchedRows.map(\.row.line) == [4, 6])
+        #expect(summary.unmatchedRows.map(\.row.categoryName) == ["Outgoing transfer", "Debt Collection"])
+        #expect(summary.unmatchedRows.map(\.outcome) == [.balanceAdjustment, .unlinkedPayment])
     }
 
     // MARK: Replacing all data
@@ -360,6 +404,37 @@ struct MoneyLoverImportTests {
         #expect(try context.fetchCount(FetchDescriptor<Wallet>()) == 2)
     }
 
+    /// The wallets the store itself holds each time the main context is about to save, read through a context of
+    /// its own so nothing pending shows.
+    @MainActor private final class StoreAtEachSave {
+        var wallets: [[String]] = []
+    }
+
+    @Test func theImportChangesTheStoreInOneSaveAtTheEnd() throws {
+        try addExistingData()
+        let saves = StoreAtEachSave()
+        let observer = NotificationCenter.default.addObserver(
+            forName: ModelContext.willSave, object: context, queue: nil
+        ) { [container] _ in
+            MainActor.assumeIsolated {
+                let store = ModelContext(container)
+                saves.wallets.append(((try? store.fetch(FetchDescriptor<Wallet>())) ?? []).map(\.name))
+            }
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        try importing(export(
+            "1,10/03/2026,Debt Collection,25,USD,Cash,,Sam,,✅,",
+            "2,10/02/2026,Debt Collection,10,USD,Cash,,Kim,,✅,",
+            "3,10/01/2026,Loan,-25,USD,Cash,,Sam,,✅,",
+            "4,09/30/2026,Loan,-10,USD,Cash,,Kim,,✅,"
+        ))
+
+        #expect(saves.wallets == [["Old wallet"]])
+        #expect(try context.fetch(FetchDescriptor<Wallet>()).map(\.name) == ["Cash"])
+        #expect(try debtsAndLoans().settled.count == 2)
+    }
+
     @Test func aFileThatCantBeImportedChangesNothing() throws {
         try addExistingData()
 
@@ -373,6 +448,31 @@ struct MoneyLoverImportTests {
         #expect(try context.fetch(FetchDescriptor<Wallet>()).map(\.name) == ["Old wallet"])
         #expect(try context.fetchCount(FetchDescriptor<Card>()) == 1)
         #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 2)
+    }
+
+    @Test func noRowsReplaceNothing() throws {
+        try addExistingData()
+
+        #expect(throws: MoneyLoverImportError.noTransactions) {
+            try MoneyLoverImport.replaceAllData(with: [], in: context)
+        }
+
+        #expect(try context.fetch(FetchDescriptor<Wallet>()).map(\.name) == ["Old wallet"])
+    }
+
+    @Test func aStoreMissingALockedCategoryIsRefusedWithAMessageNamingIt() throws {
+        try addExistingData()
+        context.delete(try context.lockedCategory(.otherIncome))
+        try context.save()
+
+        let error = #expect(throws: MissingLockedCategory.self) {
+            try importing(export("1,10/05/2026,Café,-10.91,USD,Checking,Coffee,,,,"))
+        }
+
+        #expect(
+            error?.localizedDescription == "Grosh can't do this without its “Other Income” category, which is missing."
+        )
+        #expect(try context.fetch(FetchDescriptor<Wallet>()).map(\.name) == ["Old wallet"])
     }
 
     @Test func withinADayRowsKeepTheFilesOrderAndWhatIsEnteredLaterGoesOnTop() throws {

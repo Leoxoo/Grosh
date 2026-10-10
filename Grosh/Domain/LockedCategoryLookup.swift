@@ -6,6 +6,27 @@ nonisolated struct MissingLockedCategory: Error, Equatable {
     let role: LockedRole
 }
 
+extension MissingLockedCategory: LocalizedError {
+    var errorDescription: String? {
+        String(localized: "Grosh can't do this without its “\(role.seededName)” category, which is missing.")
+    }
+}
+
+nonisolated extension LockedRole {
+    /// The name the category playing this role is seeded with (``DefaultCategories``). A locked category keeps it:
+    /// only its icon can change.
+    var seededName: String {
+        func named(in seeds: [CategorySeed]) -> String? {
+            for seed in seeds {
+                if seed.lockedRole == self { return seed.name }
+                if let name = named(in: seed.children) { return name }
+            }
+            return nil
+        }
+        return named(in: DefaultCategories.tree) ?? rawValue
+    }
+}
+
 extension ModelContext {
     /// The locked category that plays `role`, such as Starting balance or Outgoing transfer.
     func lockedCategory(_ role: LockedRole) throws -> Category {
