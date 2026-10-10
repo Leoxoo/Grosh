@@ -282,6 +282,29 @@ struct DebtLoanTests {
         #expect(try transactionCount() == 2)
     }
 
+    // MARK: The Card rule
+
+    @Test func whatForgivingALoanOrOverpayingADebtWritesOffNeedsNoCard() throws {
+        try Card.create(CardDraft(name: "Apple Card", kind: .credit, payingWallet: checking), in: context)
+        let loan = try lend(100_00)
+        var forgive = try ForgiveDraft(forgiving: loan, on: paidOn, in: context)
+        forgive.category = try store.category("Friends & Lover")
+        let forgiven = try Forgiveness.record(forgive, in: context).forgiven
+        let debt = try borrow(100_00)
+        var payment = try DebtPaymentDraft(settling: debt, on: paidOn, in: context)
+        payment.amount = Money(cents: 120_00)
+        let overpaid = try #require(try DebtPayment.record(payment, in: context).overpayment)
+        let coffee = store.spend(4_50, on: try store.category("Café"))
+
+        for writeOff in [forgiven, overpaid] {
+            #expect(writeOff.card == nil)
+            #expect(writeOff.cardRuleExemption == .debtWriteOff)
+            #expect(!TransactionDraft(editing: writeOff).requiresCard)
+        }
+        #expect(coffee.cardRuleExemption == nil)
+        #expect(TransactionDraft(editing: coffee).requiresCard)
+    }
+
     // MARK: The original never changes
 
     @Test func paymentsOverpaymentsAndForgivingNeverChangeTheOriginal() throws {

@@ -86,10 +86,10 @@ How much of a Loan or Debt has not yet been collected or repaid.
 _Avoid_: Balance (that word belongs to wallets)
 
 **Settled**:
-A Loan or Debt with nothing outstanding. Settling never changes the original transaction; anything paid beyond what was owed is ordinary income or expense.
+A Loan or Debt with nothing outstanding. Settling never changes the original transaction; anything paid beyond what was owed is ordinary income or expense, which never needs a Card.
 
 **Forgive**:
-Settling whatever is still outstanding on a Loan or Debt without any money moving, so the forgiven amount appears as ordinary expense or income instead.
+Settling whatever is still outstanding on a Loan or Debt without any money moving, so the forgiven amount appears as ordinary expense or income instead. It never needs a Card.
 
 **Reminder date**:
 The day a Loan or Debt is due. The user gets a notification that day, and the Home bell lists it from then until it is settled.

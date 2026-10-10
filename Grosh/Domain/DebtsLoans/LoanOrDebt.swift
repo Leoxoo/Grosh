@@ -93,6 +93,14 @@ extension Transaction {
     /// Whether this is a Loan or a Debt, which payments settle.
     var isLoanOrDebt: Bool { category?.isLoanOrDebt == true }
 
+    /// Whether this is the ordinary expense or income a Loan or Debt adds beside a payment (``LoanOrDebt/addLinked``):
+    /// what was paid above it, or the forgiven amount. It shares the Loan's or Debt's link, as no other expense or
+    /// income does (a transfer half is filed under a transfer category).
+    var isDebtWriteOff: Bool {
+        guard linkID != nil, let category, !category.isTransferHalf else { return false }
+        return category.type == .expense || category.type == .income
+    }
+
     /// For a Loan or Debt, how much has not yet been collected or repaid. Zero for any other transaction.
     func outstanding(in context: ModelContext) throws -> Money {
         try LoanOrDebt(self, in: context)?.outstanding ?? Money(cents: 0, currencyCode: amount.currencyCode)
