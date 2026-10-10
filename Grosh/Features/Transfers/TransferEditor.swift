@@ -69,5 +69,5 @@ private struct TransferForm: View {
 
 #Preview {
     TransferEditor()
-        .modelContainer(try! GroshStore.makeContainer(inMemory: true))
+        .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
 }

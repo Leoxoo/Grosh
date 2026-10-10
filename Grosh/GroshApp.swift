@@ -7,8 +7,7 @@ struct GroshApp: App {
 
     init() {
         do {
-            container = try GroshStore.makeContainer()
-            try CategorySeeder.seedIfNeeded(in: container.mainContext)
+            container = try GroshStore.makeSeededContainer()
         } catch {
             fatalError("Couldn't open the Grosh store: \(error)")
         }
