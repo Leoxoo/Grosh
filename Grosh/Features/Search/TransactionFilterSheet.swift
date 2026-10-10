@@ -150,13 +150,9 @@ private struct OptionalDayRow: View {
 
     var body: some View {
         Toggle(title, isOn: Binding(get: { day != nil }, set: { day = $0 ? .today : nil }))
-        if let day {
-            DatePicker(
-                title,
-                selection: Binding(get: { day.date() }, set: { self.day = CalendarDay($0) }),
-                displayedComponents: .date
-            )
-            .labelsHidden()
+        if let day = Binding($day) {
+            DayPicker(title: title, day: day)
+                .labelsHidden()
         }
     }
 }

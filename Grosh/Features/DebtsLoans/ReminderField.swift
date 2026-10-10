@@ -8,12 +8,8 @@ struct ReminderField: View {
 
     var body: some View {
         Toggle("Reminder", systemImage: "bell", isOn: isOn)
-        if let day {
-            DatePicker(
-                "Remind Me On",
-                selection: Binding(get: { day.date() }, set: { self.day = CalendarDay($0) }),
-                displayedComponents: .date
-            )
+        if let day = Binding($day) {
+            DayPicker(title: "Remind Me On", day: day)
         }
     }
 

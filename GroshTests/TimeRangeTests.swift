@@ -125,7 +125,7 @@ struct TimeRangeTests {
     // MARK: Custom
 
     @Test func aCustomRangeIsOnePeriodCoveringExactlyTheChosenDaysEvenPastToday() {
-        let chosen = TimeRange.custom(day(2026, 9, 15)...day(2026, 10, 31))
+        let chosen = TimeRange.custom(DayRange(first: day(2026, 9, 15), last: day(2026, 10, 31)))
 
         let strip = chosen.periods(from: day(2020, 7, 1), today: today, firstWeekday: monday)
 
@@ -133,12 +133,19 @@ struct TimeRangeTests {
         #expect(strip.map { $0.title(today: today, locale: unitedStates) } == ["09/15/2026 – 10/31/2026"])
     }
 
+    @Test func pickingACustomRangeStartsFromTheCurrentOneOrElseThisMonthSoFar() {
+        let chosen = DayRange(first: day(2026, 9, 15), last: day(2026, 10, 31))
+
+        #expect(TimeRange.custom(chosen).customRangeStart(today: today) == chosen)
+        #expect(TimeRange.week.customRangeStart(today: today) == DayRange(first: day(2026, 10, 1), last: today))
+    }
+
     // MARK: Projected balance
 
     @Test func onlyAPeriodReachingPastTodayEndsWithAProjectedBalance() {
         #expect(Period.future.isProjected(today: today))
-        #expect(Period.custom(day(2026, 10, 1)...day(2026, 10, 10)).isProjected(today: today))
-        #expect(!Period.custom(day(2026, 10, 1)...today).isProjected(today: today))
+        #expect(Period.custom(DayRange(first: day(2026, 10, 1), last: day(2026, 10, 10))).isProjected(today: today))
+        #expect(!Period.custom(DayRange(first: day(2026, 10, 1), last: today)).isProjected(today: today))
         #expect(!Period.all.isProjected(today: today))
         #expect(!TimeRange.year.period(containing: today).isProjected(today: today))
     }

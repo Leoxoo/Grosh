@@ -57,7 +57,7 @@ struct TransactionsMenu: View {
             }
         }
         .sheet(isPresented: $isPickingCustomRange) {
-            CustomRangeEditor(days: customRangeStart) { timeRange = .custom($0) }
+            CustomRangeEditor(days: timeRange.customRangeStart(today: .today)) { timeRange = .custom($0) }
         }
         .sheet(isPresented: $isTransferring) {
             TransferEditor(viewedWallet: viewedWallet)
@@ -79,30 +79,8 @@ struct TransactionsMenu: View {
         Binding(get: { grouping == .category }, set: { grouping = $0 ? .category : .day })
     }
 
-    /// The days the custom range editor starts with: the current custom range, or this month so far.
-    private var customRangeStart: ClosedRange<CalendarDay> {
-        if case .custom(let days) = timeRange { return days }
-        let today = CalendarDay.today
-        return CalendarMonth(today).firstDay...today
-    }
-
     /// The one wallet the tab is showing, or `nil` for the Total.
     private var viewedWallet: Wallet? {
         if case .wallet(let wallet) = walletSelection { wallet } else { nil }
-    }
-}
-
-extension TimeRange {
-    /// The range's name in the "…" menu.
-    var title: String {
-        switch self {
-        case .day: String(localized: "Day")
-        case .week: String(localized: "Week")
-        case .month: String(localized: "Month")
-        case .quarter: String(localized: "Quarter")
-        case .year: String(localized: "Year")
-        case .all: String(localized: "All")
-        case .custom: String(localized: "Custom")
-        }
     }
 }

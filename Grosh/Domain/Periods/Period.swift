@@ -17,7 +17,7 @@ nonisolated enum Period: Hashable, Sendable {
     /// Every transaction dated today or earlier.
     case all
     /// Exactly the days the user chose, which may reach past today.
-    case custom(ClosedRange<CalendarDay>)
+    case custom(DayRange)
     /// Every transaction dated after today.
     case future
 
@@ -41,7 +41,7 @@ nonisolated enum Period: Hashable, Sendable {
         case .all:
             return DayRange(first: nil, last: today)
         case .custom(let days):
-            return DayRange(first: days.lowerBound, last: days.upperBound)
+            return days
         case .future:
             return DayRange(first: today.adding(days: 1), last: nil)
         }
@@ -85,7 +85,10 @@ nonisolated enum Period: Hashable, Sendable {
         case .all:
             return String(localized: "All time")
         case .custom(let days):
-            return "\(days.lowerBound.numericTitle(locale)) – \(days.upperBound.numericTitle(locale))"
+            // A custom range is picked with both ends; an open one would show "…" for the missing end.
+            let first = days.first.map { $0.numericTitle(locale) } ?? "…"
+            let last = days.last.map { $0.numericTitle(locale) } ?? "…"
+            return "\(first) – \(last)"
         case .future:
             return String(localized: "Future")
         }
