@@ -19,6 +19,7 @@ struct RootView: View {
         }
         .tabViewStyle(.sidebarAdaptable)
         .presentsAddTransaction()
+        .syncsDebtReminders()
         #if os(iOS)
         // iPad opens on the sidebar too, not the floating tab bar; iPhone keeps its tab bar.
         .defaultAdaptableTabBarPlacement(.sidebar)

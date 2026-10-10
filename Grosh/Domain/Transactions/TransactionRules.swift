@@ -30,6 +30,7 @@ extension Transaction {
         note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
         withName = draft.withName.trimmingCharacters(in: .whitespacesAndNewlines)
         isExcludedFromReport = draft.isExcludedFromReport
+        reminderDay = draft.offersReminder ? draft.reminderDay : nil
     }
 }
 

@@ -15,12 +15,16 @@ struct AddTransactionTests {
         store = try CategoryFixture()
     }
 
-    /// A draft of `type` in Checking for `cents`, filed under `categoryName`.
+    /// A draft of `type` in Checking for `cents`, filed under `categoryName`. A Loan or Debt is with Pasha, since it
+    /// needs a With.
     private func draft(_ type: CategoryType, _ cents: Int, _ categoryName: String) throws -> TransactionDraft {
         var draft = TransactionDraft(type: type, day: today)
         draft.wallet = checking
         draft.amount = Money(cents: cents)
         draft.category = try store.category(categoryName, type)
+        if type == .debtLoan {
+            draft.withName = "Pasha"
+        }
         return draft
     }
 
@@ -98,6 +102,72 @@ struct AddTransactionTests {
 
         #expect(!entered.canSave)
         #expect(throws: TransactionRuleError.missingCategory) { try Transaction.create(entered, in: context) }
+    }
+
+    @Test(arguments: ["Loan", "Debt"])
+    func aLoanOrDebtNeedsAWith(categoryName: String) throws {
+        var entered = try draft(.debtLoan, 100_00, categoryName)
+        entered.withName = "  "
+
+        #expect(!entered.canSave)
+        #expect(throws: TransactionRuleError.missingWith) { try Transaction.create(entered, in: context) }
+
+        entered.withName = "Pasha"
+        #expect(try Transaction.create(entered, in: context).withName == "Pasha")
+    }
+
+    @Test func anExpenseNeedsNoWith() throws {
+        var entered = try draft(.expense, 1276, "Café")
+        entered.withName = ""
+
+        #expect(entered.canSave)
+    }
+
+    // MARK: Reminder
+
+    @Test(arguments: ["Loan", "Debt"])
+    func aLoanOrDebtKeepsItsReminderDate(categoryName: String) throws {
+        var entered = try draft(.debtLoan, 100_00, categoryName)
+        #expect(entered.offersReminder)
+        entered.reminderDay = CalendarDay(year: 2026, month: 11, day: 1)
+
+        let saved = try Transaction.create(entered, in: context)
+
+        #expect(saved.reminderDay == CalendarDay(year: 2026, month: 11, day: 1))
+        #expect(TransactionDraft(editing: saved).reminderDay == CalendarDay(year: 2026, month: 11, day: 1))
+    }
+
+    @Test func editingCanMoveOrClearTheReminder() throws {
+        var entered = try draft(.debtLoan, 100_00, "Loan")
+        entered.reminderDay = CalendarDay(year: 2026, month: 11, day: 1)
+        let loan = try Transaction.create(entered, in: context)
+
+        var editing = TransactionDraft(editing: loan)
+        editing.reminderDay = CalendarDay(year: 2026, month: 12, day: 1)
+        try loan.update(with: editing)
+        #expect(loan.reminderDay == CalendarDay(year: 2026, month: 12, day: 1))
+
+        editing.reminderDay = nil
+        try loan.update(with: editing)
+        #expect(loan.reminderDay == nil)
+    }
+
+    @Test func onlyALoanOrDebtKeepsAReminder() throws {
+        var entered = try draft(.debtLoan, 100_00, "Loan")
+        entered.reminderDay = CalendarDay(year: 2026, month: 11, day: 1)
+        entered.type = .expense
+        entered.category = try store.category("Café")
+
+        #expect(!entered.offersReminder)
+        #expect(try Transaction.create(entered, in: context).reminderDay == nil)
+    }
+
+    @Test func aDuplicateStartsWithoutTheReminder() throws {
+        var entered = try draft(.debtLoan, 100_00, "Loan")
+        entered.reminderDay = CalendarDay(year: 2026, month: 11, day: 1)
+        let loan = try Transaction.create(entered, in: context)
+
+        #expect(TransactionDraft(duplicating: loan, on: today).reminderDay == nil)
     }
 
     // MARK: Card rule

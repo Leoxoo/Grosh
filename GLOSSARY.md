@@ -91,6 +91,10 @@ A Loan or Debt with nothing outstanding. Settling never changes the original tra
 **Forgive**:
 Settling whatever is still outstanding on a Loan or Debt without any money moving, so the forgiven amount appears as ordinary expense or income instead.
 
+**Reminder date**:
+The day a Loan or Debt is due. The user gets a notification that day, and the Home bell lists it from then until it is settled.
+_Avoid_: Alarm, deadline
+
 **Transfer**:
 Money moved between two of the user's own wallets, shown as two linked transactions: an Outgoing transfer and an Incoming transfer. A transfer is never income or spending.
 _Avoid_: Move, payment

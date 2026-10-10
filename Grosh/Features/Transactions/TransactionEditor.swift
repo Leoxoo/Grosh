@@ -129,6 +129,9 @@ private struct TransactionForm: View {
                     }
                 }
                 Toggle("Exclude from report", isOn: $draft.isExcludedFromReport)
+                if draft.offersReminder {
+                    ReminderField(day: $draft.reminderDay)
+                }
                 LabeledContent {
                     Text("Coming soon")
                 } label: {
@@ -143,7 +146,9 @@ private struct TransactionForm: View {
                 .foregroundStyle(.tertiary)
             }
         } footer: {
-            if isShowingDetails {
+            if draft.requiresWith && draft.withName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text("A Loan or Debt needs a With: who you lent to or borrowed from.")
+            } else if isShowingDetails {
                 Text("A transaction excluded from report still counts in balances, just not in income and spending.")
             }
         }
