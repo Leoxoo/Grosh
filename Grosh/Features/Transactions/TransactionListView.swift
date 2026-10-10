@@ -28,14 +28,19 @@ struct TransactionListView: View {
 
     private var today: CalendarDay { .today }
 
+    /// The selected wallet's transactions, or the wallet filter's when one is set.
+    private var selected: [Transaction] {
+        filter.transactions(in: walletSelection, from: transactions)
+    }
+
     /// The periods the strip offers for `selected`, back to its first day with data.
     private func strip(for selected: [Transaction]) -> [Period] {
-        timeRange.periods(from: selected.map(\.dayRaw).min().map(CalendarDay.init(rawValue:)), today: today)
+        timeRange.periods(from: selected.firstDay, today: today)
     }
 
     var body: some View {
         let today = today
-        let selected = transactions.filter(walletSelection.includes)
+        let selected = selected
         let periods = strip(for: selected)
         let shownDays = period.days(today: today)
         let shown = filter.listed(from: transactions, selection: walletSelection, on: shownDays)
@@ -98,10 +103,13 @@ struct TransactionListView: View {
         .searchable(text: $filter.searchText, prompt: "Note, category or amount")
         .onChange(of: walletSelection) {
             // A wallet with a shorter history may not reach back to the period being shown.
-            showPeriodHoldingTodayUnlessOffered(by: strip(for: transactions.filter(walletSelection.includes)))
+            showPeriodHoldingTodayUnlessOffered(by: strip(for: selected))
+        }
+        .onChange(of: filter.wallet) {
+            showPeriodHoldingTodayUnlessOffered(by: strip(for: selected))
         }
         .onChange(of: timeRange) {
-            showPeriodHoldingTodayUnlessOffered(by: strip(for: transactions.filter(walletSelection.includes)))
+            showPeriodHoldingTodayUnlessOffered(by: strip(for: selected))
         }
         .navigationTitle(isSelecting ? selectionTitle : String(localized: "Transactions"))
         #if os(iOS)
