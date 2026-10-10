@@ -149,7 +149,7 @@ struct TransferTests {
 
     @Test func aHalfWhoseOtherHalfWasDeletedShowsOnlyItsOwnWallet() throws {
         let transfer = try Transfer.create(draft(250_00), in: context)
-        try transfer.outgoing.delete(.onlyThisOne, in: context)
+        try transfer.outgoing.delete(.onlySelected, in: context)
 
         let wallets = try transfer.incoming.transferWallets(in: context)
 
@@ -186,7 +186,7 @@ struct TransferTests {
 
     @Test func aHalfWhoseOtherHalfWasDeletedIsChangedWithoutAsking() throws {
         let transfer = try Transfer.create(draft(250_00), in: context)
-        try transfer.incoming.delete(.onlyThisOne, in: context)
+        try transfer.incoming.delete(.onlySelected, in: context)
         var edited = TransferHalfDraft(editing: transfer.outgoing)
         edited.amount = Money(cents: 255_00)
 
@@ -260,7 +260,7 @@ struct TransferTests {
     @Test func deletingAHalfAsksWhetherToDeleteBoth() throws {
         let transfer = try Transfer.create(draft(250_00), in: context)
 
-        #expect(try transfer.incoming.deleteScopes(in: context) == [.withRelated, .onlyThisOne])
+        #expect(try transfer.incoming.deleteScopes(in: context) == [.withRelated, .onlySelected])
         #expect(TransactionDeleteScope.withRelated.buttonTitle(relatedCount: 1) == "Delete Both")
     }
 
@@ -276,7 +276,7 @@ struct TransferTests {
     @Test func deletingOnlyThisOneKeepsTheOtherHalf() throws {
         let transfer = try Transfer.create(draft(250_00), in: context)
 
-        try transfer.outgoing.delete(.onlyThisOne, in: context)
+        try transfer.outgoing.delete(.onlySelected, in: context)
 
         #expect(checking.balance(asOf: today) == Money(cents: 1_000_00))
         #expect(savings.balance(asOf: today) == Money(cents: 250_00))

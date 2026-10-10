@@ -57,6 +57,11 @@ struct TransactionFilter: Equatable {
     /// Whether the filter narrows anything: search text or any filter set.
     var isOn: Bool { isSearching || hasFilters }
 
+    /// Resets every filter, leaving the search text.
+    mutating func clearFilters() {
+        self = TransactionFilter(searchText: searchText)
+    }
+
     /// The transactions the Transactions tab lists from `all`. Searching looks across all time and every wallet,
     /// archived ones included; otherwise the list holds the matching ones among ``transactions(in:from:)`` on `days`
     /// (the selected period).

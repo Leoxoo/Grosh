@@ -113,7 +113,7 @@ struct TransactionDetailTests {
         record("salary", 100_00, in: checking)
         let coffee = record("coffee", -4_50, in: checking)
 
-        try coffee.delete(.onlyThisOne, in: context)
+        try coffee.delete(.onlySelected, in: context)
 
         #expect(try notes() == ["salary"])
         #expect(checking.balance(asOf: today) == Money(cents: 100_00))
@@ -125,7 +125,7 @@ struct TransactionDetailTests {
         record("Pasha paid 60", 60_00, in: checking, link: loan)
         record("Pasha paid 40", 40_00, in: checking, link: loan)
 
-        try lent.delete(.onlyThisOne, in: context)
+        try lent.delete(.onlySelected, in: context)
 
         #expect(try notes() == ["Pasha paid 60", "Pasha paid 40"])
     }
@@ -146,7 +146,7 @@ struct TransactionDetailTests {
     @Test func aTransactionWithNothingRelatedIsDeletedOnItsOwn() throws {
         let coffee = record("coffee", -4_50, in: checking)
 
-        #expect(try coffee.deleteScopes(in: context) == [.onlyThisOne])
+        #expect(try coffee.deleteScopes(in: context) == [.onlySelected])
     }
 
     @Test func aTransactionWithRelatedTransactionsOffersToDeleteThemToo() throws {
@@ -154,6 +154,6 @@ struct TransactionDetailTests {
         let outgoing = record("to savings", -500_00, in: checking, link: transfer)
         record("from checking", 500_00, in: savings, link: transfer)
 
-        #expect(try outgoing.deleteScopes(in: context) == [.withRelated, .onlyThisOne])
+        #expect(try outgoing.deleteScopes(in: context) == [.withRelated, .onlySelected])
     }
 }

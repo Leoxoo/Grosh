@@ -218,6 +218,14 @@ struct TransactionFilterTests {
         #expect(notes(TransactionFilter(searchText: "coffee", card: amex), in: all) == ["coffee"])
     }
 
+    @Test func clearingTheFiltersKeepsTheSearchText() {
+        var filter = TransactionFilter(searchText: "coffee", card: card("Amex"), type: .expense, excludedOnly: true)
+
+        filter.clearFilters()
+
+        #expect(filter == TransactionFilter(searchText: "coffee"))
+    }
+
     @Test func aFilterIsOnWhenItHasSearchTextOrAnyFilterSet() {
         #expect(!TransactionFilter().isOn)
         #expect(!TransactionFilter(searchText: "  ").isOn)

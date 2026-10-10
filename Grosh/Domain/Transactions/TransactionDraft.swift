@@ -140,9 +140,7 @@ extension TransactionDraft {
             guard amount.cents >= paymentLock.paid.cents else { throw DebtLoanRuleError.amountBelowPaid }
         }
         guard card != nil || !requiresCard else { throw TransactionRuleError.missingCard }
-        guard !requiresWith || !withName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw TransactionRuleError.missingWith
-        }
+        guard !isMissingWith else { throw TransactionRuleError.missingWith }
     }
 
     /// Whether this is a Loan or Debt with payments, whose wallet, type and category can't change.
@@ -156,6 +154,11 @@ extension TransactionDraft {
     /// Whether the transaction must say who it is with: a Loan or a Debt.
     var requiresWith: Bool {
         category?.isLoanOrDebt == true
+    }
+
+    /// Whether a Loan or Debt still says nobody in With.
+    var isMissingWith: Bool {
+        requiresWith && withName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// The types the sheet offers, in order. A balance adjustment is only ever Expense or Income: its reason is a

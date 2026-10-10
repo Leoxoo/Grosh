@@ -38,9 +38,7 @@ struct FilterSummaryView: View {
                 .fontWeight(.semibold)
         }
         if filter.hasFilters {
-            Button("Clear Filters", systemImage: "xmark.circle") {
-                filter = TransactionFilter(searchText: filter.searchText)
-            }
+            Button("Clear Filters", systemImage: "xmark.circle") { filter.clearFilters() }
         }
     }
 }

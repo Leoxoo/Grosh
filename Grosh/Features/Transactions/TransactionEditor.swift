@@ -151,7 +151,7 @@ private struct TransactionForm: View {
                 .foregroundStyle(.tertiary)
             }
         } footer: {
-            if draft.requiresWith && draft.withName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if draft.isMissingWith {
                 Text("A Loan or Debt needs a With: who you lent to or borrowed from.")
             } else if isShowingDetails {
                 Text("A transaction excluded from report still counts in balances, just not in income and spending.")

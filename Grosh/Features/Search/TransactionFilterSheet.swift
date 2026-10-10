@@ -83,7 +83,7 @@ struct TransactionFilterSheet: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Clear") { filter = TransactionFilter(searchText: filter.searchText) }
+                    Button("Clear") { filter.clearFilters() }
                         .disabled(!filter.hasFilters)
                 }
                 ToolbarItem(placement: .confirmationAction) {
