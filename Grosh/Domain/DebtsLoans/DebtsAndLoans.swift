@@ -24,7 +24,7 @@ struct DebtsAndLoans {
         let items = all.compactMap { transaction in
             LoanOrDebt(transaction, among: linked[transaction.linkID] ?? [])
         }
-        open = items.filter { !$0.isSettled }.sorted(by: Self.isDue(before:_:))
+        open = items.filter { !$0.isSettled }.sorted { Self.isDue(before: $0, $1) }
         settled = items.filter(\.isSettled).sorted { $0.original.isListed(before: $1.original) }
     }
 

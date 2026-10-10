@@ -24,6 +24,11 @@ struct AccountView: View {
                     } label: {
                         Label("Cards", systemImage: "creditcard")
                     }
+                    NavigationLink {
+                        DebtsLoansView()
+                    } label: {
+                        Label("Debts & Loans", systemImage: "person.2")
+                    }
                 }
 
                 Section {

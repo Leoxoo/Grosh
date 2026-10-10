@@ -40,6 +40,7 @@ struct HomeView: View {
                 RecentTransactionsSection()
             }
             .navigationTitle("Home")
+            .dueRemindersBell()
             .addTransactionButton()
         }
     }
