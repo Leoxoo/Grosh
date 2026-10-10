@@ -30,13 +30,6 @@ struct MoneyLoverImportSummarySections: View {
             }
         } header: {
             Text("Unmatched rows")
-        } footer: {
-            if !summary.unmatchedRows.isEmpty {
-                Text("""
-                    A transfer row with no partner was recorded as a balance adjustment. A Debt Collection or \
-                    Repayment with no open Loan or Debt of its wallet and amount was recorded without a link.
-                    """)
-            }
         }
     }
 }
@@ -65,8 +58,8 @@ private struct UnmatchedRowView: View {
 private extension MoneyLoverImportSummary.UnmatchedRow.Outcome {
     var wording: String {
         switch self {
-        case .balanceAdjustment: String(localized: "Recorded as a balance adjustment")
-        case .unlinkedPayment: String(localized: "Not linked to a Loan or Debt")
+        case .balanceAdjustment: String(localized: "No partner: recorded as a balance adjustment")
+        case .unlinkedPayment: String(localized: "No open Loan or Debt of this amount: not linked")
         }
     }
 }

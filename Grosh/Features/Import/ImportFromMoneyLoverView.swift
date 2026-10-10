@@ -28,6 +28,9 @@ struct ImportFromMoneyLoverView: View {
             }
         }
         .navigationTitle("Import from MoneyLover")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
         .fileImporter(isPresented: $isPickingFile, allowedContentTypes: [.commaSeparatedText, .plainText]) { result in
             read(result)
         }
