@@ -1,7 +1,8 @@
 import SwiftData
 import SwiftUI
 
-/// Account → Cards: every Card in the order it was added. Tap to edit, swipe to archive.
+/// Account → Cards: every Card in the order it was added. Tap to see its transactions by statement period or month,
+/// swipe to archive.
 struct CardListView: View {
     @Query(filter: #Predicate<Card> { !$0.isArchived }, sort: Card.userOrder) private var cards: [Card]
     @Query(filter: #Predicate<Card> { $0.isArchived }, sort: Card.userOrder) private var archivedCards: [Card]
@@ -69,12 +70,11 @@ struct CardListView: View {
     }
 
     private func row(_ card: Card) -> some View {
-        Button {
-            editorMode = .edit(card)
+        NavigationLink {
+            CardTransactionsView(card: card)
         } label: {
             CardRow(card: card)
         }
-        .buttonStyle(.plain)
         .contextMenu {
             Button("Edit", systemImage: "pencil") { editorMode = .edit(card) }
             if card.isArchived {

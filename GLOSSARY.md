@@ -32,7 +32,7 @@ Debit (spends straight from its wallet, no statement) or Credit (has a statement
 The wallet a Card belongs to or is paid off from. A Card is only offered on that wallet's transactions.
 
 **Statement date**:
-The optional day a Credit card's statement closes. The span between two statement dates is a **statement period**.
+The optional day a Credit card's statement closes, or the month's last day when the month is shorter. A **statement period** runs from the day after one statement date through the next.
 
 ### Transactions
 
