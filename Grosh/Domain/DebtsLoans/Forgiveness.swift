@@ -17,11 +17,11 @@ struct ForgiveDraft {
         guard let loanOrDebt = try LoanOrDebt(original, in: context) else { throw DebtLoanRuleError.notALoanOrDebt }
         self.loanOrDebt = loanOrDebt
         self.day = day
-        self.category = try context.otherCategory(loanOrDebt.forgivenType)
+        self.category = try context.otherCategory(loanOrDebt.kind.forgivenType)
     }
 
     /// Expense for a forgiven Loan (the user gives the money up), Income for a forgiven Debt.
-    var forgivenType: CategoryType { loanOrDebt.forgivenType }
+    var forgivenType: CategoryType { loanOrDebt.kind.forgivenType }
 
     /// What is forgiven: everything still outstanding.
     var forgiven: Money { loanOrDebt.outstanding }
@@ -52,27 +52,19 @@ extension Forgiveness {
     /// it, without changing any balance. The original transaction keeps its amount and date. Saves.
     @discardableResult
     static func record(_ draft: ForgiveDraft, in context: ModelContext) throws -> Forgiveness {
-        guard let current = try LoanOrDebt(draft.loanOrDebt.original, in: context),
-              let paymentRole = current.paymentRole
-        else { throw DebtLoanRuleError.notALoanOrDebt }
-        try draft.validate(against: current)
-        guard let category = draft.category else { throw TransactionRuleError.missingCategory }
-        let cents = current.outstanding.cents * current.paymentSign
-        let forgiveness = Forgiveness(
-            payment: try current.addLinked(
-                cents, filedUnder: try context.lockedCategory(paymentRole),
-                on: draft.day, note: draft.note, isExcludedFromReport: true, in: context
-            ),
-            forgiven: try current.addLinked(
-                -cents, filedUnder: category, on: draft.day, note: draft.note, isExcludedFromReport: false, in: context
+        try draft.loanOrDebt.settle(in: context, check: draft.validate(against:)) { current, paymentCategory in
+            guard let category = draft.category else { throw TransactionRuleError.missingCategory }
+            let cents = current.outstanding.cents * current.kind.paymentSign
+            return Forgiveness(
+                payment: try current.addLinked(
+                    cents, filedUnder: paymentCategory,
+                    on: draft.day, note: draft.note, isExcludedFromReport: true, in: context
+                ),
+                forgiven: try current.addLinked(
+                    -cents, filedUnder: category, on: draft.day, note: draft.note, isExcludedFromReport: false,
+                    in: context
+                )
             )
-        )
-        try context.save()
-        return forgiveness
+        }
     }
-}
-
-extension LoanOrDebt {
-    /// Expense for a forgiven Loan, Income for a forgiven Debt: the opposite of an overpayment.
-    var forgivenType: CategoryType { isLoan ? .expense : .income }
 }

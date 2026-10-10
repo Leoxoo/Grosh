@@ -49,21 +49,6 @@ private extension DebtReminder {
     }
 }
 
-extension DebtReminder {
-    /// "Loan reminder" or "Debt reminder".
-    var title: String {
-        isLoan ? String(localized: "Loan reminder") : String(localized: "Debt reminder")
-    }
-
-    /// Who owes whom, and how much is outstanding.
-    var body: String {
-        let amount = outstanding.formatted()
-        return isLoan
-            ? String(localized: "\(withName) owes you \(amount).")
-            : String(localized: "You owe \(withName) \(amount).")
-    }
-}
-
 /// Keeps the pending Loan and Debt notifications in step with the store: whenever a reminder day, a payment or a
 /// settlement changes what should be pending, they are replaced. The first reminder asks to send notifications.
 private struct DebtReminderSync: ViewModifier {

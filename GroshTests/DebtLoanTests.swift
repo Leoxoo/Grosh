@@ -42,13 +42,22 @@ struct DebtLoanTests {
         return try DebtPayment.record(draft, in: context)
     }
 
+    /// What is still outstanding on `original`, a Loan or Debt, as every screen works it out.
+    private func outstanding(_ original: Transaction) throws -> Money {
+        try #require(try LoanOrDebt(original, in: context)).outstanding
+    }
+
+    private func isSettled(_ original: Transaction) throws -> Bool {
+        try #require(try LoanOrDebt(original, in: context)).isSettled
+    }
+
     // MARK: Outstanding
 
     @Test func aLoanWithNoPaymentsIsOutstandingInFull() throws {
         let loan = try lend(100_00)
 
-        #expect(try loan.outstanding(in: context) == Money(cents: 100_00))
-        #expect(try !loan.isSettled(in: context))
+        #expect(try outstanding(loan) == Money(cents: 100_00))
+        #expect(try !isSettled(loan))
     }
 
     // MARK: Record payment
@@ -58,8 +67,8 @@ struct DebtLoanTests {
 
         try pay(60_00, on: loan)
 
-        #expect(try loan.outstanding(in: context) == Money(cents: 40_00))
-        #expect(try !loan.isSettled(in: context))
+        #expect(try outstanding(loan) == Money(cents: 40_00))
+        #expect(try !isSettled(loan))
     }
 
     @Test func aPaymentOnALoanIsALinkedDebtCollectionExcludedFromReport() throws {
@@ -89,7 +98,7 @@ struct DebtLoanTests {
         #expect(repayment.withName == "Anna")
         #expect(repayment.isExcludedFromReport)
         #expect(try debt.related(in: context) == [repayment])
-        #expect(try debt.outstanding(in: context) == Money(cents: 75_00))
+        #expect(try outstanding(debt) == Money(cents: 75_00))
         #expect(checking.balance(asOf: paidOn) == Money(cents: 75_00))
     }
 
@@ -109,7 +118,7 @@ struct DebtLoanTests {
     @Test func paymentsAboveWhatIsOutstandingSettleTheLoanAndTheRestIsIncome() throws {
         let loan = try lend(100_00)
         try pay(60_00, on: loan)
-        #expect(try loan.outstanding(in: context) == Money(cents: 40_00))
+        #expect(try outstanding(loan) == Money(cents: 40_00))
 
         var draft = try DebtPaymentDraft(settling: loan, on: paidOn.adding(days: 7), in: context)
         draft.amount = Money(cents: 70_00)
@@ -126,8 +135,8 @@ struct DebtLoanTests {
         #expect(income.day == paidOn.adding(days: 7))
         #expect(income.withName == "Pasha")
         #expect(try loan.related(in: context).contains(income))
-        #expect(try loan.outstanding(in: context) == Money(cents: 0))
-        #expect(try loan.isSettled(in: context))
+        #expect(try outstanding(loan) == Money(cents: 0))
+        #expect(try isSettled(loan))
         #expect(checking.balance(asOf: paidOn.adding(days: 7)) == Money(cents: 30_00))
     }
 
@@ -144,7 +153,7 @@ struct DebtLoanTests {
         #expect(expense.amountCents == -20_00)
         #expect(expense.category == (try store.category("Gifts & Donations")))
         #expect(expense.countsInReport)
-        #expect(try debt.isSettled(in: context))
+        #expect(try isSettled(debt))
     }
 
     @Test(arguments: [(LockedRole.loan, LockedRole.otherIncome), (.debt, .otherExpense)])
@@ -232,7 +241,7 @@ struct DebtLoanTests {
         #expect(forgiveness.forgiven.day == forgivenOn)
         #expect(forgiveness.forgiven.withName == "Pasha")
         #expect(try Set(loan.related(in: context)).isSuperset(of: [forgiveness.payment, forgiveness.forgiven]))
-        #expect(try loan.isSettled(in: context))
+        #expect(try isSettled(loan))
         #expect(checking.balance(asOf: forgivenOn) == balanceBefore)
     }
 
@@ -249,7 +258,7 @@ struct DebtLoanTests {
         #expect(forgiveness.forgiven.category == (try store.category("Gifts", .income)))
         #expect(forgiveness.forgiven.amountCents == 100_00)
         #expect(forgiveness.forgiven.countsInReport)
-        #expect(try debt.isSettled(in: context))
+        #expect(try isSettled(debt))
         #expect(checking.balance(asOf: paidOn) == Money(cents: 100_00))
     }
 
@@ -357,7 +366,7 @@ struct DebtLoanTests {
         #expect(loan.withName == "Pavel")
         #expect(loan.note == "Rent help")
         #expect(loan.reminderDay == paidOn.adding(days: 30))
-        #expect(try loan.outstanding(in: context) == Money(cents: 90_00))
+        #expect(try outstanding(loan) == Money(cents: 90_00))
         #expect(try loan.related(in: context) == [collection])
         #expect(collection.amountCents == 60_00)
         #expect(collection.day == paidOn)
@@ -398,7 +407,7 @@ struct DebtLoanTests {
 
         editing.amount = Money(cents: 60_00)
         try loan.update(with: editing)
-        #expect(try loan.isSettled(in: context))
+        #expect(try isSettled(loan))
     }
 
     @Test func aLoanWithoutPaymentsIsEditedFreely() throws {
@@ -415,8 +424,8 @@ struct DebtLoanTests {
         let copy = try Transaction.create(TransactionDraft(duplicating: loan, on: paidOn), in: context)
 
         #expect(copy.linkID == nil)
-        #expect(try copy.outstanding(in: context) == Money(cents: 100_00))
-        #expect(try loan.outstanding(in: context) == Money(cents: 40_00))
+        #expect(try outstanding(copy) == Money(cents: 100_00))
+        #expect(try outstanding(loan) == Money(cents: 40_00))
     }
 
     // MARK: Linking a payment recorded elsewhere
@@ -433,11 +442,11 @@ struct DebtLoanTests {
     @Test func linkingADebtCollectionCountsItAgainstTheLoan() throws {
         let loan = try lend(100_00)
         let collection = try unlinkedPayment(.debtCollection, 100_00)
-        #expect(try loan.outstanding(in: context) == Money(cents: 100_00))
+        #expect(try outstanding(loan) == Money(cents: 100_00))
 
         try loan.linkPayment(collection)
 
-        #expect(try loan.isSettled(in: context))
+        #expect(try isSettled(loan))
         #expect(try loan.related(in: context) == [collection])
         #expect(loan.amountCents == -100_00)
     }
@@ -448,7 +457,7 @@ struct DebtLoanTests {
 
         #expect(throws: DebtLoanRuleError.paymentDoesNotMatch) { try loan.linkPayment(repayment) }
         #expect(repayment.linkID == nil)
-        #expect(try loan.outstanding(in: context) == Money(cents: 100_00))
+        #expect(try outstanding(loan) == Money(cents: 100_00))
     }
 
     // MARK: Debts & Loans

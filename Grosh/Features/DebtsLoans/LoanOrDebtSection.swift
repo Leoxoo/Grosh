@@ -20,14 +20,14 @@ struct LoanOrDebtSection: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        if let item = LoanOrDebt(transaction, among: debtLoanTransactions) {
+        if let loanOrDebt = LoanOrDebt(transaction, among: debtLoanTransactions) {
             Section {
                 LabeledContent("Outstanding") {
-                    Text(item.outstanding.formatted())
+                    Text(loanOrDebt.outstanding.formatted())
                         .monospacedDigit()
-                        .foregroundStyle(item.isSettled ? .secondary : .primary)
+                        .foregroundStyle(loanOrDebt.isSettled ? .secondary : .primary)
                 }
-                if item.isSettled {
+                if loanOrDebt.isSettled {
                     Label("Settled", systemImage: "checkmark.seal.fill")
                         .foregroundStyle(.green)
                 } else {
@@ -36,12 +36,10 @@ struct LoanOrDebtSection: View {
                     ReminderField(day: reminderDay)
                 }
             } header: {
-                Text(item.isLoan ? "Loan" : "Debt")
+                Text(loanOrDebt.kind.name)
             } footer: {
-                if !item.isSettled {
-                    Text(item.isLoan
-                        ? "Payments are recorded as Debt Collections. The Loan itself never changes."
-                        : "Payments are recorded as Repayments. The Debt itself never changes.")
+                if !loanOrDebt.isSettled {
+                    Text(loanOrDebt.kind.paymentsFooter)
                 }
             }
             .errorAlert("Couldn't Change Reminder", message: $errorMessage)

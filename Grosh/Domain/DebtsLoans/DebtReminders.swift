@@ -8,8 +8,8 @@ nonisolated struct DebtReminder: Hashable, Sendable {
     let day: CalendarDay
     let withName: String
     let outstanding: Money
-    /// A Loan (they owe the user) rather than a Debt (the user owes them).
-    let isLoan: Bool
+    /// A Loan (they owe the user) or a Debt (the user owes them).
+    let kind: LoanOrDebtKind
     /// When the notification arrives.
     var arrival = ReminderArrival.onItsDay
 
@@ -50,11 +50,11 @@ extension DebtsAndLoans {
     /// The notifications that should be pending: one for each open Loan or Debt whose reminder day is `today` or
     /// later, the soonest first. A settled one has none, and one whose day has passed is listed by the bell instead.
     func reminders(from today: CalendarDay) -> [DebtReminder] {
-        open.compactMap { item in
-            guard let day = item.original.reminderDay, day >= today else { return nil }
+        open.compactMap { loanOrDebt in
+            guard let day = loanOrDebt.original.reminderDay, day >= today else { return nil }
             return DebtReminder(
-                original: item.original.persistentModelID, day: day, withName: item.original.withName,
-                outstanding: item.outstanding, isLoan: item.isLoan
+                original: loanOrDebt.original.persistentModelID, day: day, withName: loanOrDebt.original.withName,
+                outstanding: loanOrDebt.outstanding, kind: loanOrDebt.kind
             )
         }
         .sorted { $0.day < $1.day }

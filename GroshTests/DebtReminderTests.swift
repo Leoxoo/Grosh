@@ -36,6 +36,11 @@ struct DebtReminderTests {
         try DebtPayment.record(draft, in: context)
     }
 
+    /// What is still outstanding on `original`, a Loan or Debt, as every screen works it out.
+    private func outstanding(_ original: Transaction) throws -> Money {
+        try #require(try LoanOrDebt(original, in: context)).outstanding
+    }
+
     // MARK: Due (the Home bell)
 
     @Test func openLoansAndDebtsRemindingTodayOrEarlierAreDueEarliestFirst() throws {
@@ -71,11 +76,11 @@ struct DebtReminderTests {
         #expect(reminders == [
             DebtReminder(
                 original: anna.persistentModelID, day: today, withName: "Anna", outstanding: Money(cents: 50_00),
-                isLoan: false
+                kind: .debt
             ),
             DebtReminder(
                 original: loan.persistentModelID, day: today.adding(days: 5), withName: "Pasha",
-                outstanding: Money(cents: 40_00), isLoan: true
+                outstanding: Money(cents: 40_00), kind: .loan
             ),
         ])
         #expect(reminders.allSatisfy { $0.arrival == .onItsDay })
@@ -109,7 +114,7 @@ struct DebtReminderTests {
             .replacePendingReminders([
                 DebtReminder(
                     original: loan.persistentModelID, day: today.adding(days: 5), withName: "Pasha",
-                    outstanding: Money(cents: 100_00), isLoan: true
+                    outstanding: Money(cents: 100_00), kind: .loan
                 ),
             ]),
         ])
@@ -168,7 +173,7 @@ struct DebtReminderTests {
 
         #expect(loan.reminderDay == today.adding(days: 30))
         #expect(loan.amountCents == -100_00)
-        #expect(try loan.outstanding(in: context) == Money(cents: 40_00))
+        #expect(try outstanding(loan) == Money(cents: 40_00))
     }
 
     @Test func onlyALoanOrDebtTakesAReminder() throws {

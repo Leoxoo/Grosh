@@ -21,11 +21,11 @@ struct DebtsAndLoans {
     init(_ transactions: some Sequence<Transaction>) {
         let all = Array(transactions)
         let linked = Dictionary(grouping: all.filter { $0.linkID != nil }, by: \.linkID)
-        let items = all.compactMap { transaction in
+        let loansAndDebts = all.compactMap { transaction in
             LoanOrDebt(transaction, among: linked[transaction.linkID] ?? [])
         }
-        open = items.filter { !$0.isSettled }.sorted { Self.isDue(before: $0, $1) }
-        settled = items.filter(\.isSettled).sorted { $0.original.isListed(before: $1.original) }
+        open = loansAndDebts.filter { !$0.isSettled }.sorted { Self.isDue(before: $0, $1) }
+        settled = loansAndDebts.filter(\.isSettled).sorted { $0.original.isListed(before: $1.original) }
     }
 
     /// Whether `first` comes before `second` among the open ones: a reminder day before none, an earlier reminder

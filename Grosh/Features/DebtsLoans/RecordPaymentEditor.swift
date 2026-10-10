@@ -7,25 +7,14 @@ struct RecordPaymentEditor: View {
     /// The Loan or Debt being paid.
     let original: Transaction
 
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
-
     var body: some View {
-        if let draft = try? DebtPaymentDraft(settling: original, on: .today, in: context) {
+        LoanOrDebtSheet(
+            unavailableTitle: "Can't Record Payment",
+            unavailableMessage: "Only a Loan or a Debt can be paid back."
+        ) { context in
+            try DebtPaymentDraft(settling: original, on: .today, in: context)
+        } form: { draft in
             RecordPaymentForm(startingDraft: draft)
-        } else {
-            NavigationStack {
-                ContentUnavailableView(
-                    "Can't Record Payment",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text("Only a Loan or a Debt can be paid back.")
-                )
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }
-                    }
-                }
-            }
         }
     }
 }
@@ -71,18 +60,16 @@ private struct RecordPaymentForm: View {
 
     private func paymentSection(_ fields: KeypadSheetFields) -> some View {
         Section {
-            LabeledContent(loanOrDebt.isLoan ? "Lent To" : "Borrowed From", value: loanOrDebt.original.withName)
+            LoanOrDebtWithRow(loanOrDebt: loanOrDebt)
             LabeledContent("Outstanding") {
                 Text(loanOrDebt.outstanding.formatted())
                     .monospacedDigit()
             }
-            fields.amountRow("Amount", currencyCode: currencyCode, tint: Money(cents: loanOrDebt.paymentSign).tint)
+            fields.amountRow("Amount", currencyCode: currencyCode, tint: Money(cents: loanOrDebt.kind.paymentSign).tint)
             DayStepper(title: "Date", day: $draft.day)
             fields.noteField($draft.note)
         } footer: {
-            Text(loanOrDebt.isLoan
-                ? "Recorded as a Debt Collection in the Loan's wallet, excluded from report. The Loan itself doesn't change."
-                : "Recorded as a Repayment from the Debt's wallet, excluded from report. The Debt itself doesn't change.")
+            Text(loanOrDebt.kind.recordPaymentFooter)
         }
     }
 
@@ -90,15 +77,15 @@ private struct RecordPaymentForm: View {
         Section {
             LabeledContent("Above Outstanding") {
                 AmountText(
-                    amount: Money(cents: draftToSave.overpaid.cents * loanOrDebt.paymentSign, currencyCode: currencyCode),
+                    amount: Money(
+                        cents: draftToSave.overpaid.cents * loanOrDebt.kind.paymentSign, currencyCode: currencyCode
+                    ),
                     showsPlusSign: true
                 )
             }
             CategoryPicker(title: "Category", type: draft.overpaymentType, selection: $draft.overpaymentCategory)
         } footer: {
-            Text(loanOrDebt.isLoan
-                ? "What's paid above the outstanding amount is recorded as income and counts in reports."
-                : "What's paid above the outstanding amount is recorded as an expense and counts in reports.")
+            Text(loanOrDebt.kind.overpaymentFooter)
         }
     }
 
