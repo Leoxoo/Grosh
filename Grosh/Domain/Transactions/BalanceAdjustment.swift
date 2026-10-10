@@ -76,7 +76,7 @@ struct BalanceAdjustmentDraft {
     /// The reason a balance adjustment of `type` is filed under unless another is picked: Other Income for money
     /// found, Other Expense for money missing.
     static func defaultReason(for type: CategoryType, in context: ModelContext) throws -> Category {
-        try context.lockedCategory(type == .income ? .otherIncome : .otherExpense)
+        try context.otherCategory(type)
     }
 
     /// The reason the adjustment is filed under: any category of ``reasonType``, the default reason unless the user

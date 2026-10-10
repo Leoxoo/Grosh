@@ -38,8 +38,8 @@ struct MultiDeleteTests {
         record("salary", 100_00, in: checking)
         let selection = [record("coffee", -4_50, in: checking), record("lunch", -12_00, in: checking)]
 
-        #expect(try selection.deleteScopes(in: context) == [.onlyThisOne])
-        try selection.delete(.onlyThisOne, in: context)
+        #expect(try selection.deleteScopes(in: context) == [.onlySelected])
+        try selection.delete(.onlySelected, in: context)
 
         #expect(try notes() == ["salary"])
         #expect(checking.balance(asOf: today) == Money(cents: 100_00))
@@ -53,7 +53,7 @@ struct MultiDeleteTests {
         ]
 
         #expect(try selection.related(in: context).isEmpty)
-        #expect(try selection.deleteScopes(in: context) == [.onlyThisOne])
+        #expect(try selection.deleteScopes(in: context) == [.onlySelected])
     }
 
     @Test func aSelectionHoldingOneHalfOfATransferAsksWhetherToDeleteTheOtherHalfToo() throws {
@@ -63,7 +63,7 @@ struct MultiDeleteTests {
         let selection = [outgoing, record("coffee", -4_50, in: checking)]
 
         #expect(try selection.related(in: context) == [incoming])
-        #expect(try selection.deleteScopes(in: context) == [.withRelated, .onlyThisOne])
+        #expect(try selection.deleteScopes(in: context) == [.withRelated, .onlySelected])
     }
 
     @Test func deletingWithRelatedAlsoDeletesTheLinkedTransactionsLeftOutOfTheSelection() throws {
@@ -85,7 +85,7 @@ struct MultiDeleteTests {
         record("from checking", 500_00, in: savings, link: transfer)
         let coffee = record("coffee", -4_50, in: checking)
 
-        try [outgoing, coffee].delete(.onlyThisOne, in: context)
+        try [outgoing, coffee].delete(.onlySelected, in: context)
 
         #expect(try notes() == ["from checking"])
     }
@@ -106,17 +106,17 @@ struct MultiDeleteTests {
     // MARK: What the user is asked
 
     @Test func aSelectionWithNothingRelatedIsConfirmedWithItsCount() {
-        #expect(TransactionDeleteScope.onlyThisOne.buttonTitle(selectedCount: 3, relatedCount: 0) == "Delete 3 Transactions")
+        #expect(TransactionDeleteScope.onlySelected.buttonTitle(selectedCount: 3, relatedCount: 0) == "Delete 3 Transactions")
     }
 
     @Test func aSelectionWithRelatedTransactionsOffersAllOfThemOrOnlyTheSelectedOnes() {
         #expect(TransactionDeleteScope.withRelated.buttonTitle(selectedCount: 3, relatedCount: 1) == "Delete All 4")
-        #expect(TransactionDeleteScope.onlyThisOne.buttonTitle(selectedCount: 3, relatedCount: 1) == "Only These 3")
+        #expect(TransactionDeleteScope.onlySelected.buttonTitle(selectedCount: 3, relatedCount: 1) == "Only These 3")
     }
 
     @Test func selectingOneTransactionAsksWhatDeletingItFromItsDetailAsks() {
         #expect(TransactionDeleteScope.withRelated.buttonTitle(selectedCount: 1, relatedCount: 1) == "Delete Both")
-        #expect(TransactionDeleteScope.onlyThisOne.buttonTitle(selectedCount: 1, relatedCount: 1) == "Only This One")
-        #expect(TransactionDeleteScope.onlyThisOne.buttonTitle(selectedCount: 1, relatedCount: 0) == "Delete Transaction")
+        #expect(TransactionDeleteScope.onlySelected.buttonTitle(selectedCount: 1, relatedCount: 1) == "Only This One")
+        #expect(TransactionDeleteScope.onlySelected.buttonTitle(selectedCount: 1, relatedCount: 0) == "Delete Transaction")
     }
 }

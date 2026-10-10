@@ -3,23 +3,24 @@ import SwiftUI
 /// Picks the first and last day of a custom time range for the Transactions tab.
 struct CustomRangeEditor: View {
     /// Called with the chosen days when the user taps Done.
-    let choose: (ClosedRange<CalendarDay>) -> Void
+    let choose: (DayRange) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var first: Date
-    @State private var last: Date
+    @State private var first: CalendarDay
+    @State private var last: CalendarDay
 
-    init(days: ClosedRange<CalendarDay>, choose: @escaping (ClosedRange<CalendarDay>) -> Void) {
+    /// Starts from `days`, or from today for an open end.
+    init(days: DayRange, choose: @escaping (DayRange) -> Void) {
         self.choose = choose
-        _first = State(initialValue: days.lowerBound.date())
-        _last = State(initialValue: days.upperBound.date())
+        _first = State(initialValue: days.first ?? .today)
+        _last = State(initialValue: days.last ?? .today)
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                DatePicker("From", selection: $first, displayedComponents: .date)
-                DatePicker("To", selection: $last, in: first..., displayedComponents: .date)
+                DayPicker(title: "From", day: $first)
+                DayPicker(title: "To", day: $last, earliest: first)
             }
             .navigationTitle("Custom Range")
             #if os(iOS)
@@ -43,9 +44,7 @@ struct CustomRangeEditor: View {
     }
 
     /// The chosen days, earliest first whichever order the two pickers were set in.
-    private var days: ClosedRange<CalendarDay> {
-        let from = CalendarDay(first)
-        let to = CalendarDay(last)
-        return min(from, to)...max(from, to)
+    private var days: DayRange {
+        DayRange(first: min(first, last), last: max(first, last))
     }
 }

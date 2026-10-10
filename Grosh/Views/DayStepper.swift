@@ -16,7 +16,7 @@ struct DayStepper: View {
                 }
                 .accessibilityLabel("Previous Day")
 
-                DatePicker(title, selection: date, displayedComponents: .date)
+                DayPicker(title: title, day: $day)
                     .labelsHidden()
 
                 Button {
@@ -29,9 +29,5 @@ struct DayStepper: View {
             }
             .buttonStyle(.borderless)
         }
-    }
-
-    private var date: Binding<Date> {
-        Binding(get: { day.date() }, set: { day = CalendarDay($0) })
     }
 }

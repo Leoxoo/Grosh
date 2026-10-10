@@ -10,7 +10,6 @@ struct TransactionSearchView: View {
 
     var body: some View {
         let results = filter.isOn ? transactions.matching(filter) : []
-        let days = TransactionDay.days(of: results)
 
         List {
             if !results.isEmpty {
@@ -19,17 +18,11 @@ struct TransactionSearchView: View {
                 }
             }
 
-            ForEach(days) { day in
-                Section {
-                    ForEach(day.transactions) { transaction in
-                        NavigationLink {
-                            TransactionDetailView(transaction: transaction)
-                        } label: {
-                            TransactionRow(transaction: transaction)
-                        }
-                    }
-                } header: {
-                    TransactionDayHeader(day: day)
+            TransactionDaySections(transactions: results) { transaction in
+                NavigationLink {
+                    TransactionDetailView(transaction: transaction)
+                } label: {
+                    TransactionRow(transaction: transaction)
                 }
             }
         }

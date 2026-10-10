@@ -6,7 +6,8 @@ struct TransactionFilter: Equatable {
     /// Finds the text in a transaction's note or its category's name, ignoring case and accents. A number also
     /// finds amounts: `973` finds $973.17.
     var searchText = ""
-    /// Only this wallet's transactions. Any wallet, archived ones included.
+    /// Only this wallet's transactions, in place of the wallet or Total the list is showing. Any wallet, archived
+    /// ones and those left out of the Total included.
     var wallet: Wallet?
     /// Only transactions filed under this category or, for a parent, under any of its subcategories.
     var category: Category?
@@ -56,11 +57,25 @@ struct TransactionFilter: Equatable {
     /// Whether the filter narrows anything: search text or any filter set.
     var isOn: Bool { isSearching || hasFilters }
 
+    /// Resets every filter, leaving the search text.
+    mutating func clearFilters() {
+        self = TransactionFilter(searchText: searchText)
+    }
+
     /// The transactions the Transactions tab lists from `all`. Searching looks across all time and every wallet,
-    /// archived ones included; otherwise the list holds `selection`'s transactions on `days` (the selected period).
+    /// archived ones included; otherwise the list holds the matching ones among ``transactions(in:from:)`` on `days`
+    /// (the selected period).
     func listed(from all: [Transaction], selection: WalletSelection, on days: DayRange) -> [Transaction] {
         if isSearching { return all.matching(self) }
-        return all.filter { selection.includes($0) && days.contains($0.day) }.matching(self)
+        return transactions(in: selection, from: all).filter { days.contains($0.day) }.matching(self)
+    }
+
+    /// The transactions the Transactions tab steps through period by period, before the period and the other filters
+    /// narrow them: the wallet filter's wallet when one is set (any wallet, archived or left out of the Total, in
+    /// place of `selection`), otherwise `selection`'s. The period strip reaches back to the first of them.
+    func transactions(in selection: WalletSelection, from all: [Transaction]) -> [Transaction] {
+        let selection = wallet.map(WalletSelection.wallet) ?? selection
+        return all.filter(selection.includes)
     }
 }
 
@@ -68,10 +83,5 @@ extension Sequence where Element == Transaction {
     /// The transactions that pass `filter`.
     func matching(_ filter: TransactionFilter) -> [Transaction] {
         self.filter(filter.matches)
-    }
-
-    /// What the transactions add up to, excluded from report or not: with a Card filter on, that Card's total.
-    var net: Money {
-        Money(cents: reduce(0) { $0 + $1.amountCents })
     }
 }

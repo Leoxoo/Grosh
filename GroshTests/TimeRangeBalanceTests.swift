@@ -79,7 +79,7 @@ struct TimeRangeBalanceTests {
     }
 
     @Test func aCustomRangeOpensTheDayBeforeItsFirstDayAndEndsOnItsLastDayEvenPastToday() {
-        let custom = TimeRange.custom(day(2026, 9, 30)...day(2026, 10, 10))
+        let custom = TimeRange.custom(DayRange(first: day(2026, 9, 30), last: day(2026, 10, 10)))
 
         let summary = summary(of: custom.period(containing: today))
 

@@ -11,15 +11,15 @@ struct DebtsLoansView: View {
         List {
             if !list.open.isEmpty {
                 Section("Open") {
-                    ForEach(list.open) { item in
-                        LoanOrDebtLink(item: item)
+                    ForEach(list.open) { loanOrDebt in
+                        LoanOrDebtLink(loanOrDebt: loanOrDebt)
                     }
                 }
             }
             if !list.settled.isEmpty {
                 Section("Settled") {
-                    ForEach(list.settled) { item in
-                        LoanOrDebtLink(item: item)
+                    ForEach(list.settled) { loanOrDebt in
+                        LoanOrDebtLink(loanOrDebt: loanOrDebt)
                     }
                 }
             }
@@ -39,13 +39,13 @@ struct DebtsLoansView: View {
 
 /// A Loan or Debt that opens its transaction detail.
 private struct LoanOrDebtLink: View {
-    let item: LoanOrDebt
+    let loanOrDebt: LoanOrDebt
 
     var body: some View {
         NavigationLink {
-            TransactionDetailView(transaction: item.original)
+            TransactionDetailView(transaction: loanOrDebt.original)
         } label: {
-            LoanOrDebtRow(item: item, today: .today)
+            LoanOrDebtRow(loanOrDebt: loanOrDebt, today: .today)
         }
     }
 }
@@ -53,19 +53,21 @@ private struct LoanOrDebtLink: View {
 /// A Loan or Debt as Debts & Loans and the Home bell list it: who it is with, when it was lent or borrowed, its due
 /// date, and what is outstanding (or that it is settled).
 struct LoanOrDebtRow: View {
-    let item: LoanOrDebt
+    let loanOrDebt: LoanOrDebt
     let today: CalendarDay
+
+    private var original: Transaction { loanOrDebt.original }
 
     var body: some View {
         HStack(spacing: 12) {
-            CategoryIcon(category: item.original.category)
+            CategoryIcon(category: original.category)
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.original.withName.isEmpty ? item.original.categoryName : item.original.withName)
+                Text(original.withName.isEmpty ? original.categoryName : original.withName)
                     .lineLimit(1)
-                Text(summary)
+                Text(loanOrDebt.kind.summary(lentOrBorrowedOn: original.day.date().formatted(date: .abbreviated, time: .omitted)))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                if !item.isSettled, let due = item.original.reminderDay {
+                if !loanOrDebt.isSettled, let due = original.reminderDay {
                     Text("\(Image(systemName: "bell")) Due \(due.date().formatted(date: .abbreviated, time: .omitted))")
                         .font(.caption)
                         .foregroundStyle(due <= today ? .red : .secondary)
@@ -73,30 +75,24 @@ struct LoanOrDebtRow: View {
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
-                if item.isSettled {
-                    Text(item.owed.formatted())
+                if loanOrDebt.isSettled {
+                    Text(loanOrDebt.owed.formatted())
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                     Text("Settled")
                         .font(.caption)
                         .foregroundStyle(.green)
                 } else {
-                    Text(item.outstanding.formatted())
+                    Text(loanOrDebt.outstanding.formatted())
                         .monospacedDigit()
-                        .foregroundStyle(item.isLoan ? .green : .red)
-                    Text("of \(item.owed.formatted())")
+                        .foregroundStyle(loanOrDebt.kind.outstandingColor)
+                    Text("of \(loanOrDebt.owed.formatted())")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
         }
         .accessibilityElement(children: .combine)
-    }
-
-    /// "Loan · May 27, 2026" or "Debt · May 27, 2026".
-    private var summary: String {
-        let day = item.original.day.date().formatted(date: .abbreviated, time: .omitted)
-        return item.isLoan ? String(localized: "Loan · \(day)") : String(localized: "Debt · \(day)")
     }
 }
 

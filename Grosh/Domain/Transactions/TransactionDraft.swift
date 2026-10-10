@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 /// What the Add Transaction sheet holds before it is saved. The amount is entered positive; the category
 /// sets the sign.
@@ -46,6 +47,19 @@ struct TransactionDraft {
     /// Set when editing a balance adjustment, which never needs a Card and is never a Loan or Debt. Saving keeps
     /// the transaction one.
     private(set) var isBalanceAdjustment = false
+    /// Set when editing a transaction the Card rule doesn't apply to (``requiresCard``).
+    private(set) var cardRuleExemption: CardRuleExemption?
+    /// Set when editing a Loan or Debt that has payments: what they hold in place.
+    private(set) var paymentLock: PaymentLock?
+
+    /// What the payments on a Loan or Debt hold in place while it is edited: the wallet and category (so the type)
+    /// they were recorded against, and an amount no lower than what has been paid.
+    struct PaymentLock {
+        let wallet: Wallet?
+        let category: Category?
+        /// What has been collected or repaid so far.
+        let paid: Money
+    }
 
     init(type: CategoryType, day: CalendarDay) {
         self.type = type
@@ -57,7 +71,12 @@ struct TransactionDraft {
         self.init(copying: transaction, day: transaction.day)
         eventName = transaction.eventName
         isBalanceAdjustment = transaction.isBalanceAdjustment
+        cardRuleExemption = transaction.cardRuleExemption
         reminderDay = transaction.reminderDay
+        if let context = transaction.modelContext,
+           let loanOrDebt = try? LoanOrDebt(transaction, in: context), !loanOrDebt.payments.isEmpty {
+            paymentLock = PaymentLock(wallet: transaction.wallet, category: transaction.category, paid: loanOrDebt.paid)
+        }
     }
 
     /// A new transaction like `transaction`, dated `today` ("Duplicate"). A Loan's or Debt's reminder belonged to
@@ -114,11 +133,18 @@ extension TransactionDraft {
         guard types.contains(type) || !isBalanceAdjustment else {
             throw BalanceAdjustmentRuleError.reasonDoesNotMatchDifference
         }
-        guard card != nil || !requiresCard else { throw TransactionRuleError.missingCard }
-        guard !requiresWith || !withName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw TransactionRuleError.missingWith
+        if let paymentLock {
+            guard wallet == paymentLock.wallet, category == paymentLock.category else {
+                throw DebtLoanRuleError.lockedByPayments
+            }
+            guard amount.cents >= paymentLock.paid.cents else { throw DebtLoanRuleError.amountBelowPaid }
         }
+        guard card != nil || !requiresCard else { throw TransactionRuleError.missingCard }
+        guard !isMissingWith else { throw TransactionRuleError.missingWith }
     }
+
+    /// Whether this is a Loan or Debt with payments, whose wallet, type and category can't change.
+    var isLockedByPayments: Bool { paymentLock != nil }
 
     /// Whether the transaction can carry a reminder date: only a Loan or a Debt, on the Debt/Loan tab.
     var offersReminder: Bool {
@@ -128,6 +154,11 @@ extension TransactionDraft {
     /// Whether the transaction must say who it is with: a Loan or a Debt.
     var requiresWith: Bool {
         category?.isLoanOrDebt == true
+    }
+
+    /// Whether a Loan or Debt still says nobody in With.
+    var isMissingWith: Bool {
+        requiresWith && withName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// The types the sheet offers, in order. A balance adjustment is only ever Expense or Income: its reason is a
@@ -141,12 +172,34 @@ extension TransactionDraft {
         category?.isTransferHalf != true
     }
 
-    /// Whether the transaction must name its Card: an expense in a wallet that has at least one (unarchived) Card,
-    /// unless it is a balance adjustment. The Card is optional on Income and Debt/Loan, and never offered on a
-    /// transfer.
+    /// The Card rule: whether the transaction must name its Card. An expense in a wallet that has at least one
+    /// (unarchived) Card must, unless it is exempt (``CardRuleExemption``). The Card is optional on Income and
+    /// Debt/Loan, and never offered on a transfer.
     var requiresCard: Bool {
-        type == .expense && !isBalanceAdjustment && offersCard && !Card.pickerChoices(for: wallet, keeping: nil).isEmpty
+        type == .expense && cardRuleExemption == nil && offersCard
+            && !Card.pickerChoices(for: wallet, keeping: nil).isEmpty
     }
+}
+
+/// Why an expense in a wallet with a Card needn't name one: it isn't card spending.
+nonisolated enum CardRuleExemption: Hashable, Sendable {
+    /// A balance adjustment: the difference between a wallet's recorded and real balance.
+    case balanceAdjustment
+    /// What a Loan or Debt writes off inside its own flow: the expense of forgiving a Loan, or what was repaid above
+    /// a Debt.
+    case debtWriteOff
+}
+
+extension Transaction {
+    /// Why the Card rule doesn't apply to this transaction, or `nil` when it does.
+    var cardRuleExemption: CardRuleExemption? {
+        if isBalanceAdjustment { return .balanceAdjustment }
+        if isDebtWriteOff { return .debtWriteOff }
+        return nil
+    }
+}
+
+extension TransactionDraft {
 
     /// Whether the amount adds to the wallet (`1`) or takes from it (`-1`): the category's ``Category/sign``, or
     /// before one is chosen, the type's. `0` while a Debt/Loan has neither Loan nor Debt picked.

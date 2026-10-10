@@ -115,9 +115,9 @@ extension TransactionDeleteScope {
     /// related transactions left out of them.
     func buttonTitle(selectedCount: Int = 1, relatedCount: Int) -> String {
         switch self {
-        case .onlyThisOne where selectedCount == 1:
+        case .onlySelected where selectedCount == 1:
             relatedCount > 0 ? String(localized: "Only This One") : String(localized: "Delete Transaction")
-        case .onlyThisOne:
+        case .onlySelected:
             relatedCount > 0
                 ? String(localized: "Only These \(selectedCount)")
                 : String(localized: "Delete \(selectedCount) Transactions")

@@ -102,6 +102,43 @@ struct TransactionFilterTests {
         #expect(notes(TransactionFilter(searchText: "fee", wallet: oldBank), in: all) == ["closing fee"])
     }
 
+    @Test func aWalletFilterListsAnArchivedOrLeftOutWalletInTheSelectedPeriodWithoutSearching() throws {
+        let oldBank = Wallet(name: "Old bank")
+        context.insert(oldBank)
+        let savings = Wallet(name: "Savings")
+        context.insert(savings)
+        savings.includeInTotal = false
+        let all = [
+            record(-3_00, "atm fee", on: day(9, 2)),
+            record(-9_00, "closing fee", on: day(9, 4), in: oldBank),
+            record(-8_00, "older fee", on: day(8, 4), in: oldBank),
+            record(50_00, "interest", on: day(9, 30), in: savings),
+        ]
+        try oldBank.archive()
+
+        #expect(TransactionFilter(wallet: oldBank).listed(from: all, selection: .total, on: month(9)).map(\.note)
+            == ["closing fee"])
+        #expect(TransactionFilter(wallet: savings).listed(from: all, selection: .wallet(checking), on: month(9))
+            .map(\.note) == ["interest"])
+    }
+
+    @Test func theStripReachesBackToTheFilteredWalletsFirstTransaction() throws {
+        let oldBank = Wallet(name: "Old bank")
+        context.insert(oldBank)
+        let all = [
+            record(-3_00, "atm fee", on: day(9, 2)),
+            record(-9_00, "closing fee", on: CalendarDay(year: 2025, month: 11, day: 4), in: oldBank),
+        ]
+        try oldBank.archive()
+
+        let filtered = TransactionFilter(wallet: oldBank).transactions(in: .total, from: all)
+        let strip = TimeRange.month.periods(from: filtered.firstDay, today: today)
+
+        #expect(filtered.map(\.note) == ["closing fee"])
+        #expect(strip.first == .month(CalendarMonth(year: 2025, month: 11)))
+        #expect(TransactionFilter().transactions(in: .total, from: all).map(\.note) == ["atm fee"])
+    }
+
     @Test func aTypeFilterListsOnlyTransactionsOfThatCategoryType() throws {
         let all = [
             record(-30_00, "dinner", under: try fixture.category("Restaurants")),
@@ -179,6 +216,14 @@ struct TransactionFilterTests {
         ]
 
         #expect(notes(TransactionFilter(searchText: "coffee", card: amex), in: all) == ["coffee"])
+    }
+
+    @Test func clearingTheFiltersKeepsTheSearchText() {
+        var filter = TransactionFilter(searchText: "coffee", card: card("Amex"), type: .expense, excludedOnly: true)
+
+        filter.clearFilters()
+
+        #expect(filter == TransactionFilter(searchText: "coffee"))
     }
 
     @Test func aFilterIsOnWhenItHasSearchTextOrAnyFilterSet() {

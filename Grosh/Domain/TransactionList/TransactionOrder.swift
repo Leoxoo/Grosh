@@ -30,4 +30,10 @@ extension Sequence where Element == Transaction {
     func inListOrder() -> [Transaction] {
         sorted { $0.isListed(before: $1) }
     }
+
+    /// The earliest day any of the transactions is dated, or `nil` when there are none: where a period strip of them
+    /// starts.
+    var firstDay: CalendarDay? {
+        map(\.dayRaw).min().map(CalendarDay.init(rawValue:))
+    }
 }

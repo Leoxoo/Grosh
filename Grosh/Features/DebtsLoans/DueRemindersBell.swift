@@ -38,11 +38,11 @@ private struct DueRemindersList: View {
         let today = CalendarDay.today
         let due = DebtsAndLoans(transactions).due(on: today)
         NavigationStack {
-            List(due) { item in
+            List(due) { loanOrDebt in
                 NavigationLink {
-                    TransactionDetailView(transaction: item.original)
+                    TransactionDetailView(transaction: loanOrDebt.original)
                 } label: {
-                    LoanOrDebtRow(item: item, today: today)
+                    LoanOrDebtRow(loanOrDebt: loanOrDebt, today: today)
                 }
             }
             .overlay {

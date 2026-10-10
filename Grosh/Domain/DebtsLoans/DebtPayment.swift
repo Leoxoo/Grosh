@@ -20,13 +20,11 @@ struct DebtPaymentDraft {
         self.loanOrDebt = loanOrDebt
         self.amount = loanOrDebt.outstanding
         self.day = day
-        self.overpaymentCategory = try context.lockedCategory(
-            loanOrDebt.overpaymentType == .income ? .otherIncome : .otherExpense
-        )
+        self.overpaymentCategory = try context.otherCategory(loanOrDebt.kind.overpaymentType)
     }
 
     /// Income for money collected beyond a Loan, Expense for money repaid beyond a Debt.
-    var overpaymentType: CategoryType { loanOrDebt.overpaymentType }
+    var overpaymentType: CategoryType { loanOrDebt.kind.overpaymentType }
 
     /// The part of the amount above what is outstanding.
     var overpaid: Money { loanOrDebt.split(amount).overpaid }
@@ -61,32 +59,26 @@ extension DebtPayment {
     /// Saves.
     @discardableResult
     static func record(_ draft: DebtPaymentDraft, in context: ModelContext) throws -> DebtPayment {
-        guard let current = try LoanOrDebt(draft.loanOrDebt.original, in: context),
-              let paymentRole = current.paymentRole
-        else { throw DebtLoanRuleError.notALoanOrDebt }
-        try draft.validate(against: current)
-        let split = current.split(draft.amount)
-        let payment = try current.addLinked(
-            split.owed.cents * current.paymentSign,
-            filedUnder: try context.lockedCategory(paymentRole),
-            on: draft.day, note: draft.note, isExcludedFromReport: true, in: context
-        )
-        var overpayment: Transaction?
-        if split.overpaid.cents > 0, let category = draft.overpaymentCategory {
-            overpayment = try current.addLinked(
-                split.overpaid.cents * current.paymentSign, filedUnder: category,
-                on: draft.day, note: draft.note, isExcludedFromReport: false, in: context
+        try draft.loanOrDebt.settle(in: context, check: draft.validate(against:)) { current, paymentCategory in
+            let sign = current.kind.paymentSign
+            let split = current.split(draft.amount)
+            let payment = try current.addLinked(
+                split.owed.cents * sign, filedUnder: paymentCategory,
+                on: draft.day, note: draft.note, isExcludedFromReport: true, in: context
             )
+            var overpayment: Transaction?
+            if split.overpaid.cents > 0, let category = draft.overpaymentCategory {
+                overpayment = try current.addLinked(
+                    split.overpaid.cents * sign, filedUnder: category,
+                    on: draft.day, note: draft.note, isExcludedFromReport: false, in: context
+                )
+            }
+            return DebtPayment(payment: payment, overpayment: overpayment)
         }
-        try context.save()
-        return DebtPayment(payment: payment, overpayment: overpayment)
     }
 }
 
 extension LoanOrDebt {
-    /// Income for money collected beyond a Loan, Expense for money repaid beyond a Debt.
-    var overpaymentType: CategoryType { isLoan ? .income : .expense }
-
     /// Splits a payment of `amount` into the part that was owed (up to what is outstanding) and the part above it.
     func split(_ amount: Money) -> (owed: Money, overpaid: Money) {
         let owed = min(amount.cents, outstanding.cents)

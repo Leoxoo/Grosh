@@ -42,13 +42,22 @@ struct DebtLoanTests {
         return try DebtPayment.record(draft, in: context)
     }
 
+    /// What is still outstanding on `original`, a Loan or Debt, as every screen works it out.
+    private func outstanding(_ original: Transaction) throws -> Money {
+        try #require(try LoanOrDebt(original, in: context)).outstanding
+    }
+
+    private func isSettled(_ original: Transaction) throws -> Bool {
+        try #require(try LoanOrDebt(original, in: context)).isSettled
+    }
+
     // MARK: Outstanding
 
     @Test func aLoanWithNoPaymentsIsOutstandingInFull() throws {
         let loan = try lend(100_00)
 
-        #expect(try loan.outstanding(in: context) == Money(cents: 100_00))
-        #expect(try !loan.isSettled(in: context))
+        #expect(try outstanding(loan) == Money(cents: 100_00))
+        #expect(try !isSettled(loan))
     }
 
     // MARK: Record payment
@@ -58,8 +67,8 @@ struct DebtLoanTests {
 
         try pay(60_00, on: loan)
 
-        #expect(try loan.outstanding(in: context) == Money(cents: 40_00))
-        #expect(try !loan.isSettled(in: context))
+        #expect(try outstanding(loan) == Money(cents: 40_00))
+        #expect(try !isSettled(loan))
     }
 
     @Test func aPaymentOnALoanIsALinkedDebtCollectionExcludedFromReport() throws {
@@ -89,7 +98,7 @@ struct DebtLoanTests {
         #expect(repayment.withName == "Anna")
         #expect(repayment.isExcludedFromReport)
         #expect(try debt.related(in: context) == [repayment])
-        #expect(try debt.outstanding(in: context) == Money(cents: 75_00))
+        #expect(try outstanding(debt) == Money(cents: 75_00))
         #expect(checking.balance(asOf: paidOn) == Money(cents: 75_00))
     }
 
@@ -109,7 +118,7 @@ struct DebtLoanTests {
     @Test func paymentsAboveWhatIsOutstandingSettleTheLoanAndTheRestIsIncome() throws {
         let loan = try lend(100_00)
         try pay(60_00, on: loan)
-        #expect(try loan.outstanding(in: context) == Money(cents: 40_00))
+        #expect(try outstanding(loan) == Money(cents: 40_00))
 
         var draft = try DebtPaymentDraft(settling: loan, on: paidOn.adding(days: 7), in: context)
         draft.amount = Money(cents: 70_00)
@@ -126,8 +135,8 @@ struct DebtLoanTests {
         #expect(income.day == paidOn.adding(days: 7))
         #expect(income.withName == "Pasha")
         #expect(try loan.related(in: context).contains(income))
-        #expect(try loan.outstanding(in: context) == Money(cents: 0))
-        #expect(try loan.isSettled(in: context))
+        #expect(try outstanding(loan) == Money(cents: 0))
+        #expect(try isSettled(loan))
         #expect(checking.balance(asOf: paidOn.adding(days: 7)) == Money(cents: 30_00))
     }
 
@@ -144,7 +153,7 @@ struct DebtLoanTests {
         #expect(expense.amountCents == -20_00)
         #expect(expense.category == (try store.category("Gifts & Donations")))
         #expect(expense.countsInReport)
-        #expect(try debt.isSettled(in: context))
+        #expect(try isSettled(debt))
     }
 
     @Test(arguments: [(LockedRole.loan, LockedRole.otherIncome), (.debt, .otherExpense)])
@@ -232,7 +241,7 @@ struct DebtLoanTests {
         #expect(forgiveness.forgiven.day == forgivenOn)
         #expect(forgiveness.forgiven.withName == "Pasha")
         #expect(try Set(loan.related(in: context)).isSuperset(of: [forgiveness.payment, forgiveness.forgiven]))
-        #expect(try loan.isSettled(in: context))
+        #expect(try isSettled(loan))
         #expect(checking.balance(asOf: forgivenOn) == balanceBefore)
     }
 
@@ -249,7 +258,7 @@ struct DebtLoanTests {
         #expect(forgiveness.forgiven.category == (try store.category("Gifts", .income)))
         #expect(forgiveness.forgiven.amountCents == 100_00)
         #expect(forgiveness.forgiven.countsInReport)
-        #expect(try debt.isSettled(in: context))
+        #expect(try isSettled(debt))
         #expect(checking.balance(asOf: paidOn) == Money(cents: 100_00))
     }
 
@@ -280,6 +289,29 @@ struct DebtLoanTests {
         draft.category = try context.lockedCategory(.otherExpense)
         #expect(throws: DebtLoanRuleError.alreadySettled) { try Forgiveness.record(draft, in: context) }
         #expect(try transactionCount() == 2)
+    }
+
+    // MARK: The Card rule
+
+    @Test func whatForgivingALoanOrOverpayingADebtWritesOffNeedsNoCard() throws {
+        try Card.create(CardDraft(name: "Apple Card", kind: .credit, payingWallet: checking), in: context)
+        let loan = try lend(100_00)
+        var forgive = try ForgiveDraft(forgiving: loan, on: paidOn, in: context)
+        forgive.category = try store.category("Friends & Lover")
+        let forgiven = try Forgiveness.record(forgive, in: context).forgiven
+        let debt = try borrow(100_00)
+        var payment = try DebtPaymentDraft(settling: debt, on: paidOn, in: context)
+        payment.amount = Money(cents: 120_00)
+        let overpaid = try #require(try DebtPayment.record(payment, in: context).overpayment)
+        let coffee = store.spend(4_50, on: try store.category("Café"))
+
+        for writeOff in [forgiven, overpaid] {
+            #expect(writeOff.card == nil)
+            #expect(writeOff.cardRuleExemption == .debtWriteOff)
+            #expect(!TransactionDraft(editing: writeOff).requiresCard)
+        }
+        #expect(coffee.cardRuleExemption == nil)
+        #expect(TransactionDraft(editing: coffee).requiresCard)
     }
 
     // MARK: The original never changes
@@ -314,6 +346,88 @@ struct DebtLoanTests {
         #expect(debt.day == lentOn)
     }
 
+    // MARK: Editing a Loan or Debt with payments
+
+    @Test func aLoanWithPaymentsCanStillBeEditedAndWhatIsOutstandingFollows() throws {
+        let loan = try lend(100_00)
+        let collection = try pay(60_00, on: loan).payment
+        #expect(loan.editFlow == .addSheet)
+
+        var editing = TransactionDraft(editing: loan)
+        editing.amount = Money(cents: 150_00)
+        editing.day = lentOn.adding(days: -2)
+        editing.withName = "Pavel"
+        editing.note = "Rent help"
+        editing.reminderDay = paidOn.adding(days: 30)
+        try loan.update(with: editing)
+
+        #expect(loan.amountCents == -150_00)
+        #expect(loan.day == lentOn.adding(days: -2))
+        #expect(loan.withName == "Pavel")
+        #expect(loan.note == "Rent help")
+        #expect(loan.reminderDay == paidOn.adding(days: 30))
+        #expect(try outstanding(loan) == Money(cents: 90_00))
+        #expect(try loan.related(in: context) == [collection])
+        #expect(collection.amountCents == 60_00)
+        #expect(collection.day == paidOn)
+    }
+
+    @Test func aLoanWithPaymentsKeepsItsWalletTypeAndCategory() throws {
+        let loan = try lend(100_00)
+        try pay(60_00, on: loan)
+        let savings = Wallet(name: "Savings")
+        context.insert(savings)
+        let editing = TransactionDraft(editing: loan)
+        #expect(editing.isLockedByPayments)
+
+        var otherWallet = editing
+        otherWallet.wallet = savings
+        var otherCategory = editing
+        otherCategory.category = try context.lockedCategory(.debt)
+        var otherType = editing
+        otherType.type = .expense
+        otherType.category = try store.category("Café")
+
+        #expect(throws: DebtLoanRuleError.lockedByPayments) { try loan.update(with: otherWallet) }
+        #expect(throws: DebtLoanRuleError.lockedByPayments) { try loan.update(with: otherCategory) }
+        #expect(throws: DebtLoanRuleError.lockedByPayments) { try loan.update(with: otherType) }
+        #expect(loan.wallet == checking)
+        #expect(loan.category == (try context.lockedCategory(.loan)))
+    }
+
+    @Test func aLoansAmountCantDropBelowWhatHasBeenPaid() throws {
+        let loan = try lend(100_00)
+        try pay(60_00, on: loan)
+        var editing = TransactionDraft(editing: loan)
+
+        editing.amount = Money(cents: 59_99)
+        #expect(!editing.canSave)
+        #expect(throws: DebtLoanRuleError.amountBelowPaid) { try loan.update(with: editing) }
+        #expect(loan.amountCents == -100_00)
+
+        editing.amount = Money(cents: 60_00)
+        try loan.update(with: editing)
+        #expect(try isSettled(loan))
+    }
+
+    @Test func aLoanWithoutPaymentsIsEditedFreely() throws {
+        let loan = try lend(100_00)
+
+        #expect(!TransactionDraft(editing: loan).isLockedByPayments)
+    }
+
+    @Test func aDuplicateOfALoanWithPaymentsStartsUnpaidAndUnlinked() throws {
+        let loan = try lend(100_00)
+        try pay(60_00, on: loan)
+        #expect(loan.canBeDuplicated)
+
+        let copy = try Transaction.create(TransactionDraft(duplicating: loan, on: paidOn), in: context)
+
+        #expect(copy.linkID == nil)
+        #expect(try outstanding(copy) == Money(cents: 100_00))
+        #expect(try outstanding(loan) == Money(cents: 40_00))
+    }
+
     // MARK: Linking a payment recorded elsewhere
 
     /// A Debt Collection that came in without a link, as an import brings them.
@@ -328,11 +442,11 @@ struct DebtLoanTests {
     @Test func linkingADebtCollectionCountsItAgainstTheLoan() throws {
         let loan = try lend(100_00)
         let collection = try unlinkedPayment(.debtCollection, 100_00)
-        #expect(try loan.outstanding(in: context) == Money(cents: 100_00))
+        #expect(try outstanding(loan) == Money(cents: 100_00))
 
         try loan.linkPayment(collection)
 
-        #expect(try loan.isSettled(in: context))
+        #expect(try isSettled(loan))
         #expect(try loan.related(in: context) == [collection])
         #expect(loan.amountCents == -100_00)
     }
@@ -343,7 +457,7 @@ struct DebtLoanTests {
 
         #expect(throws: DebtLoanRuleError.paymentDoesNotMatch) { try loan.linkPayment(repayment) }
         #expect(repayment.linkID == nil)
-        #expect(try loan.outstanding(in: context) == Money(cents: 100_00))
+        #expect(try outstanding(loan) == Money(cents: 100_00))
     }
 
     // MARK: Debts & Loans

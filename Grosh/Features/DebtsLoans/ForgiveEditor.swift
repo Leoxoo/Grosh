@@ -7,25 +7,14 @@ struct ForgiveEditor: View {
     /// The Loan or Debt being forgiven.
     let original: Transaction
 
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
-
     var body: some View {
-        if let draft = try? ForgiveDraft(forgiving: original, on: .today, in: context) {
+        LoanOrDebtSheet(
+            unavailableTitle: "Can't Forgive",
+            unavailableMessage: "Only a Loan or a Debt can be forgiven."
+        ) { context in
+            try ForgiveDraft(forgiving: original, on: .today, in: context)
+        } form: { draft in
             ForgiveForm(startingDraft: draft)
-        } else {
-            NavigationStack {
-                ContentUnavailableView(
-                    "Can't Forgive",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text("Only a Loan or a Debt can be forgiven.")
-                )
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }
-                    }
-                }
-            }
         }
     }
 }
@@ -48,7 +37,7 @@ private struct ForgiveForm: View {
         NavigationStack {
             Form {
                 Section {
-                    LabeledContent(loanOrDebt.isLoan ? "Lent To" : "Borrowed From", value: loanOrDebt.original.withName)
+                    LoanOrDebtWithRow(loanOrDebt: loanOrDebt)
                     LabeledContent("Forgiven") {
                         Text(draft.forgiven.formatted())
                             .monospacedDigit()
@@ -57,9 +46,7 @@ private struct ForgiveForm: View {
                     CategoryPicker(title: "Category", type: draft.forgivenType, selection: $draft.category)
                     TextField("Note", text: $draft.note, axis: .vertical)
                 } footer: {
-                    Text(loanOrDebt.isLoan
-                        ? "Settles the Loan with a Debt Collection and an expense of the same amount, so no balance changes. The expense counts in reports."
-                        : "Settles the Debt with a Repayment and an income of the same amount, so no balance changes. The income counts in reports.")
+                    Text(loanOrDebt.kind.forgiveFooter)
                 }
             }
             .formStyle(.grouped)

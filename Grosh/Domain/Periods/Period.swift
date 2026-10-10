@@ -17,7 +17,7 @@ nonisolated enum Period: Hashable, Sendable {
     /// Every transaction dated today or earlier.
     case all
     /// Exactly the days the user chose, which may reach past today.
-    case custom(ClosedRange<CalendarDay>)
+    case custom(DayRange)
     /// Every transaction dated after today.
     case future
 
@@ -41,7 +41,7 @@ nonisolated enum Period: Hashable, Sendable {
         case .all:
             return DayRange(first: nil, last: today)
         case .custom(let days):
-            return DayRange(first: days.lowerBound, last: days.upperBound)
+            return days
         case .future:
             return DayRange(first: today.adding(days: 1), last: nil)
         }
@@ -53,19 +53,20 @@ nonisolated enum Period: Hashable, Sendable {
         days(today: today).last.map { $0 > today } ?? true
     }
 
-    /// The period's name in the strip: "This month", "Last month", "08/2026", "Future".
-    func title(today: CalendarDay) -> String {
+    /// The period's name in the strip: "This month", "Last month", "08/2026", "Future". A day is written in numbers
+    /// in `locale`'s order, as `10/06/2026` in the US and `06/10/2026` in the UK; a month always as `08/2026`.
+    func title(today: CalendarDay, locale: Locale = .current) -> String {
         switch self {
         case .day(let day):
             if day == today { return String(localized: "Today") }
             if day == today.adding(days: -1) { return String(localized: "Yesterday") }
-            return day.numericTitle
+            return day.numericTitle(locale)
         case .week(let first):
             let last = first.adding(days: 6)
             if (first...last).contains(today) { return String(localized: "This week") }
             if (first...last).contains(today.adding(days: -7)) { return String(localized: "Last week") }
-            let start = first.year == last.year ? String(format: "%02d/%02d", first.day, first.month) : first.numericTitle
-            return "\(start) – \(last.numericTitle)"
+            let start = first.year == last.year ? first.numericTitle(locale, withYear: false) : first.numericTitle(locale)
+            return "\(start) – \(last.numericTitle(locale))"
         case .month(let month):
             let thisMonth = CalendarMonth(today)
             if month == thisMonth { return String(localized: "This month") }
@@ -84,7 +85,10 @@ nonisolated enum Period: Hashable, Sendable {
         case .all:
             return String(localized: "All time")
         case .custom(let days):
-            return "\(days.lowerBound.numericTitle) – \(days.upperBound.numericTitle)"
+            // A custom range is picked with both ends; an open one would show "…" for the missing end.
+            let first = days.first.map { $0.numericTitle(locale) } ?? "…"
+            let last = days.last.map { $0.numericTitle(locale) } ?? "…"
+            return "\(first) – \(last)"
         case .future:
             return String(localized: "Future")
         }
@@ -92,8 +96,12 @@ nonisolated enum Period: Hashable, Sendable {
 }
 
 private extension CalendarDay {
-    /// The day as the strip writes it: `09/10/2026`.
-    nonisolated var numericTitle: String {
-        String(format: "%02d/%02d/%d", day, month, year)
+    /// The day as the strip writes it: two-digit day and month in `locale`'s order and with its separators, then the
+    /// year unless `withYear` is false. `10/06/2026` in the US, `06/10/2026` in the UK.
+    nonisolated func numericTitle(_ locale: Locale, withYear: Bool = true) -> String {
+        let calendar = Calendar.utcGregorian
+        let style = Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone)
+            .month(.twoDigits).day(.twoDigits)
+        return date(in: calendar).formatted(withYear ? style.year() : style)
     }
 }

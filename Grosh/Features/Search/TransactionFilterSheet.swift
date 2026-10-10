@@ -1,51 +1,21 @@
-import SwiftData
 import SwiftUI
 
 /// The filters a transaction list can be narrowed by: wallet, category, Card, type, date range, amount range and
 /// excluded only. Every wallet, category and Card is offered, archived and hidden ones included, since their
-/// history stays searchable. Changes apply as they are made; Clear resets every filter but leaves the search text.
+/// history stays searchable; choosing a parent category includes its subcategories. Changes apply as they are made;
+/// Clear resets every filter but leaves the search text.
 struct TransactionFilterSheet: View {
     @Binding var filter: TransactionFilter
 
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: Wallet.userOrder) private var wallets: [Wallet]
-    @Query(sort: Card.userOrder) private var cards: [Card]
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Picker("Wallet", selection: $filter.wallet) {
-                        Text("Any").tag(Wallet?.none)
-                        ForEach(wallets) { wallet in
-                            Label(wallet.isArchived ? "\(wallet.name) (Archived)" : wallet.name, systemImage: wallet.symbolName)
-                                .tag(Optional(wallet))
-                        }
-                    }
-                    NavigationLink {
-                        FilterCategoryList(selection: $filter.category)
-                    } label: {
-                        LabeledContent("Category") {
-                            if let category = filter.category {
-                                CategoryLabel(category: category, indentsSubcategories: false)
-                                    .foregroundStyle(.primary)
-                            } else {
-                                Text("Any")
-                            }
-                        }
-                    }
-                    Picker("Card", selection: $filter.card) {
-                        Text("Any").tag(Card?.none)
-                        ForEach(cards) { card in
-                            Label {
-                                Text(card.isArchived ? "\(card.displayName) (Archived)" : card.displayName)
-                            } icon: {
-                                Image(systemName: Card.symbolName)
-                                    .foregroundStyle(card.color.color)
-                            }
-                            .tag(Optional(card))
-                        }
-                    }
+                    WalletPicker(title: "Wallet", everyWalletOr: "Any", selection: $filter.wallet)
+                    CategoryPicker(title: "Category", everyCategoryOr: "Any", selection: $filter.category)
+                    CardPicker(title: "Card", everyCardOr: "Any", selection: $filter.card)
                     Picker("Type", selection: $filter.type) {
                         Text("Any").tag(CategoryType?.none)
                         ForEach(CategoryType.segments, id: \.self) { type in
@@ -83,7 +53,7 @@ struct TransactionFilterSheet: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Clear") { filter = TransactionFilter(searchText: filter.searchText) }
+                    Button("Clear") { filter.clearFilters() }
                         .disabled(!filter.hasFilters)
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -94,55 +64,6 @@ struct TransactionFilterSheet: View {
     }
 }
 
-/// Every category in tree order, grouped by type, hidden and locked ones included. Choosing a parent includes its
-/// subcategories.
-private struct FilterCategoryList: View {
-    @Binding var selection: Category?
-
-    @Environment(\.dismiss) private var dismiss
-    @Query private var categories: [Category]
-
-    var body: some View {
-        List {
-            Section {
-                row(nil)
-            }
-            ForEach(CategoryType.allCases, id: \.self) { type in
-                let tree = CategoryCatalog.tree(of: type, from: categories)
-                if !tree.isEmpty {
-                    Section(type.title) {
-                        ForEach(tree) { row($0) }
-                    }
-                }
-            }
-        }
-        .navigationTitle("Category")
-    }
-
-    private func row(_ category: Category?) -> some View {
-        Button {
-            selection = category
-            dismiss()
-        } label: {
-            HStack {
-                if let category {
-                    CategoryLabel(category: category)
-                } else {
-                    Text("Any")
-                }
-                Spacer()
-                if category == selection {
-                    Image(systemName: "checkmark")
-                        .foregroundStyle(.tint)
-                }
-            }
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(category == selection ? .isSelected : [])
-    }
-}
-
 /// One end of the date range: off leaves that side open.
 private struct OptionalDayRow: View {
     let title: LocalizedStringKey
@@ -150,13 +71,9 @@ private struct OptionalDayRow: View {
 
     var body: some View {
         Toggle(title, isOn: Binding(get: { day != nil }, set: { day = $0 ? .today : nil }))
-        if let day {
-            DatePicker(
-                title,
-                selection: Binding(get: { day.date() }, set: { self.day = CalendarDay($0) }),
-                displayedComponents: .date
-            )
-            .labelsHidden()
+        if let day = Binding($day) {
+            DayPicker(title: title, day: day)
+                .labelsHidden()
         }
     }
 }
