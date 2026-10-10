@@ -80,7 +80,7 @@ struct MoneyLoverCSVTests {
 
         #expect(rows.map(\.cardName) == ["Chase", ""])
         #expect(rows.map(\.link) == ["1", ""])
-        #expect(rows.allSatisfy(\.isFromGroshExport))
+        #expect(rows.allSatisfy { $0.isFromGroshExport })
     }
 
     @Test func aMoneyLoverExportHasNoCardOrLinkedColumn() throws {

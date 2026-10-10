@@ -141,7 +141,7 @@ struct GroshCSVExportTests {
         let starting = (checking.transactions ?? []).filter { $0.category?.lockedRole == .startingBalance }
         #expect(starting.map(\.amountCents) == [1_000_00])
         #expect(starting.map(\.note) == ["Opened"])
-        #expect(starting.allSatisfy(\.isExcludedFromReport))
+        #expect(starting.allSatisfy { $0.isExcludedFromReport })
         #expect(checking.balance(asOf: today) == Money(cents: 996_50))
     }
 
