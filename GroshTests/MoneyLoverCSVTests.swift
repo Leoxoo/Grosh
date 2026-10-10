@@ -57,6 +57,21 @@ struct MoneyLoverCSVTests {
         #expect(rows.map(\.amount) == [Money(cents: -3_00), Money(cents: -8_20)])
     }
 
+    @Test func fieldsOtherThanTheNoteLoseTheSpacesAndLineBreaksAroundThem() throws {
+        let row = try onlyRow(of: export(
+            "1, 10/05/2026 ,\"Café\n\", -3.00 ,USD,\" Cash\n\",\" Lunch\n\",\" Sam\n\",\"Trip\n\",\" \n\","
+        ))
+
+        #expect(row.day == CalendarDay(year: 2026, month: 10, day: 5))
+        #expect(row.categoryName == "Café")
+        #expect(row.amount == Money(cents: -3_00))
+        #expect(row.walletName == "Cash")
+        #expect(row.withName == "Sam")
+        #expect(row.eventName == "Trip")
+        #expect(!row.isExcludedFromReport)
+        #expect(row.note == " Lunch\n")
+    }
+
     // MARK: Files that can't be imported
 
     @Test func aFileWithoutMoneyLoversColumnsIsRefused() {

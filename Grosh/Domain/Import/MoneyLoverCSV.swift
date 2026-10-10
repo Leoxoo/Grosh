@@ -62,7 +62,7 @@ nonisolated enum MoneyLoverCSV {
         let note: Int?, with: Int?, event: Int?, excluded: Int?
 
         init(header: [String]) throws {
-            let names = header.map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+            let names = header.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
             func index(_ name: String) -> Int? { names.firstIndex(of: name) }
             guard let date = index("date"), let category = index("category"), let amount = index("amount"),
                   let wallet = index("wallet")
@@ -78,16 +78,19 @@ nonisolated enum MoneyLoverCSV {
         }
 
         /// The row `fields` hold, or `nil` when its date, amount, category or wallet can't be read. Columns missing
-        /// at the end of the row are empty.
+        /// at the end of the row are empty. The note is kept as written; every other field loses the spaces and line
+        /// breaks around it.
         func row(from fields: [String], line: Int) -> MoneyLoverRow? {
-            func field(_ index: Int?) -> String {
+            func written(_ index: Int?) -> String {
                 guard let index, fields.indices.contains(index) else { return "" }
                 return fields[index]
             }
-            let categoryName = field(category).trimmingCharacters(in: .whitespaces)
-            let walletName = field(wallet).trimmingCharacters(in: .whitespaces)
-            guard let day = MoneyLoverCSV.day(from: field(date)),
-                  let amount = Money(decimalString: field(amount).trimmingCharacters(in: .whitespaces)),
+            func field(_ index: Int?) -> String {
+                written(index).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            let categoryName = field(category)
+            let walletName = field(wallet)
+            guard let day = MoneyLoverCSV.day(from: field(date)), let amount = Money(decimalString: field(amount)),
                   !categoryName.isEmpty, !walletName.isEmpty
             else { return nil }
             return MoneyLoverRow(
@@ -96,18 +99,17 @@ nonisolated enum MoneyLoverCSV {
                 categoryName: categoryName,
                 amount: amount,
                 walletName: walletName,
-                note: field(note),
-                withName: field(with).trimmingCharacters(in: .whitespaces),
-                eventName: field(event).trimmingCharacters(in: .whitespaces),
-                isExcludedFromReport: !field(excluded).trimmingCharacters(in: .whitespaces).isEmpty
+                note: written(note),
+                withName: field(with),
+                eventName: field(event),
+                isExcludedFromReport: !field(excluded).isEmpty
             )
         }
     }
 
     /// The day a MoneyLover date such as `01/31/2026` (month first) names, or `nil` for anything else.
     private static func day(from text: String) -> CalendarDay? {
-        guard let match = text.trimmingCharacters(in: .whitespaces)
-            .wholeMatch(of: #/([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})/#),
+        guard let match = text.wholeMatch(of: #/([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})/#),
             let month = Int(match.1), let day = Int(match.2), let year = Int(match.3),
             (1...12).contains(month),
             (1...CalendarMonth(year: year, month: month).dayCount).contains(day)
