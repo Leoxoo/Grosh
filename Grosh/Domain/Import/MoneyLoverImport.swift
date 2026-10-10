@@ -47,6 +47,7 @@ enum MoneyLoverImport {
                 return card
             }
 
+            var imported: [Transaction] = []
             for (index, row) in rows.enumerated() {
                 let wallet = wallets[row.walletName]
                 let tagged = MoneyLoverCardTag.first(in: row.note)
@@ -60,6 +61,12 @@ enum MoneyLoverImport {
                 transaction.wallet = wallet
                 transaction.category = categories.category(named: row.categoryName, for: row.amount)
                 transaction.card = tagged.map { card(for: $0.tag, firstUsedIn: wallet) }
+                imported.append(transaction)
+            }
+
+            for unpaired in linkTransfers(among: imported) {
+                unpaired.isBalanceAdjustment = true
+                unpaired.category = try context.otherCategory(unpaired.amountCents < 0 ? .expense : .income)
             }
             try context.save()
         } catch {
@@ -67,6 +74,30 @@ enum MoneyLoverImport {
             throw error
         }
         return MoneyLoverImportSummary()
+    }
+
+    /// Links the Outgoing and Incoming transfer rows among `imported` (in the file's order) into transfers: each
+    /// Outgoing transfer with the first Incoming transfer not yet taken that is dated the same day, in another
+    /// wallet, for the opposite amount. Returns the transfer rows left without a partner.
+    private static func linkTransfers(among imported: [Transaction]) -> [Transaction] {
+        struct Key: Hashable {
+            let day: Int
+            let cents: Int
+        }
+        var incoming = Dictionary(
+            grouping: imported.filter { $0.category?.lockedRole == .incomingTransfer },
+            by: { Key(day: $0.dayRaw, cents: $0.amountCents) }
+        )
+        for outgoing in imported where outgoing.category?.lockedRole == .outgoingTransfer {
+            let key = Key(day: outgoing.dayRaw, cents: -outgoing.amountCents)
+            guard let index = incoming[key]?.firstIndex(where: { $0.wallet != outgoing.wallet }),
+                  let partner = incoming[key]?.remove(at: index)
+            else { continue }
+            let link = UUID()
+            outgoing.linkID = link
+            partner.linkID = link
+        }
+        return imported.filter { $0.category?.isTransferHalf == true && $0.linkID == nil }
     }
 
     /// Deletes every transaction, Card and wallet. Categories stay. Doesn't save.

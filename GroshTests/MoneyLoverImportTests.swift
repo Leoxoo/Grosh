@@ -158,6 +158,60 @@ struct MoneyLoverImportTests {
         #expect(try cards().map(\.payingWallet) == [try wallet("Cash")])
     }
 
+    // MARK: Transfers
+
+    private func transferRows(in name: String) throws -> [Transaction] {
+        try rows(in: name).filter { $0.category?.isTransferHalf == true }
+    }
+
+    @Test func outgoingAndIncomingTransferRowsOnOneDayWithOppositeAmountsBecomeALinkedTransfer() throws {
+        try importing(export(
+            "1,10/05/2026,Incoming transfer,250,USD,Savings,To savings,,,✅,",
+            "2,10/05/2026,Outgoing transfer,-250,USD,Checking,To savings,,,✅,"
+        ))
+
+        let outgoing = try #require(try transferRows(in: "Checking").first)
+        let incoming = try #require(try transferRows(in: "Savings").first)
+        #expect(try outgoing.otherHalf(in: context) == incoming)
+        #expect(try incoming.otherHalf(in: context) == outgoing)
+        let wallets = try incoming.transferWallets(in: context)
+        #expect(wallets.from == (try wallet("Checking")))
+        #expect(wallets.to == (try wallet("Savings")))
+        #expect(!outgoing.isBalanceAdjustment && !incoming.isBalanceAdjustment)
+    }
+
+    @Test func transferRowsPairOneToOneOnlyOnTheSameDayInAnotherWallet() throws {
+        try importing(export(
+            "1,10/05/2026,Outgoing transfer,-100,USD,Checking,,,,,",
+            "2,10/05/2026,Incoming transfer,100,USD,Checking,,,,,",
+            "3,10/05/2026,Outgoing transfer,-100,USD,Checking,,,,,",
+            "4,10/05/2026,Incoming transfer,100,USD,Savings,,,,,",
+            "5,10/04/2026,Incoming transfer,100,USD,Savings,,,,,",
+            "6,10/03/2026,Outgoing transfer,-100,USD,Checking,,,,,",
+            "7,10/03/2026,Incoming transfer,99,USD,Savings,,,,,"
+        ))
+
+        let checking = try rows(in: "Checking")
+        let savings = try rows(in: "Savings")
+        #expect(try checking[0].otherHalf(in: context) == savings[0])
+        #expect(checking.filter { $0.linkID != nil }.count == 1)
+        #expect(savings.filter { $0.linkID != nil }.count == 1)
+    }
+
+    @Test func aTransferRowWithNoPartnerBecomesABalanceAdjustmentThatKeepsItsExcludedFlag() throws {
+        try importing(export(
+            "1,10/05/2026,Outgoing transfer,-30,USD,Checking,Sent out,,,✅,",
+            "2,10/04/2026,Incoming transfer,45.50,USD,Checking,Came in,,,,"
+        ))
+
+        let adjustments = try rows(in: "Checking")
+        #expect(adjustments.allSatisfy { $0.isBalanceAdjustment && $0.linkID == nil })
+        #expect(adjustments.map { $0.category?.lockedRole } == [.otherExpense, .otherIncome])
+        #expect(adjustments.map(\.amountCents) == [-30_00, 45_50])
+        #expect(adjustments.map(\.isExcludedFromReport) == [true, false])
+        #expect(adjustments.map(\.note) == ["Sent out", "Came in"])
+    }
+
     // MARK: Replacing all data
 
     /// Data the user had before importing: a wallet with a Card, an expense paid with it, and a category of their own.
