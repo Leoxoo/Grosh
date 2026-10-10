@@ -24,7 +24,7 @@ struct MoneyLoverImportTests {
 
     @discardableResult
     private func importing(_ csv: String) throws -> MoneyLoverImportSummary {
-        try MoneyLoverImport.replaceAllData(with: csv, in: context)
+        try MoneyLoverImport.replaceAllData(with: MoneyLoverCSV.rows(in: csv), in: context)
     }
 
     private func wallet(_ name: String) throws -> Wallet {
@@ -448,6 +448,16 @@ struct MoneyLoverImportTests {
         #expect(try context.fetch(FetchDescriptor<Wallet>()).map(\.name) == ["Old wallet"])
         #expect(try context.fetchCount(FetchDescriptor<Card>()) == 1)
         #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 2)
+    }
+
+    @Test func noRowsReplaceNothing() throws {
+        try addExistingData()
+
+        #expect(throws: MoneyLoverImportError.noTransactions) {
+            try MoneyLoverImport.replaceAllData(with: [], in: context)
+        }
+
+        #expect(try context.fetch(FetchDescriptor<Wallet>()).map(\.name) == ["Old wallet"])
     }
 
     @Test func aStoreMissingALockedCategoryIsRefusedWithAMessageNamingIt() throws {

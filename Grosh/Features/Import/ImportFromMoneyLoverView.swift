@@ -45,7 +45,7 @@ struct ImportFromMoneyLoverView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: { export in
-            Text("Every wallet, Card and transaction will be deleted and replaced with the \(export.rowCount) transactions in \(export.fileName). Categories are kept. This can't be undone.")
+            Text("Every wallet, Card and transaction will be deleted and replaced with the \(export.rows.count) transactions in \(export.fileName). Categories are kept. This can't be undone.")
         }
         .disabled(isImporting)
         .overlay {
@@ -67,8 +67,7 @@ struct ImportFromMoneyLoverView: View {
                 if isAccessing { url.stopAccessingSecurityScopedResource() }
             }
             let text = try String(contentsOf: url, encoding: .utf8)
-            let rows = try MoneyLoverCSV.rows(in: text)
-            picked = PickedExport(fileName: url.lastPathComponent, text: text, rowCount: rows.count)
+            picked = PickedExport(fileName: url.lastPathComponent, rows: try MoneyLoverCSV.rows(in: text))
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -80,7 +79,7 @@ struct ImportFromMoneyLoverView: View {
             // Lets "Importing…" appear before the import holds the main actor for a moment.
             try? await Task.sleep(for: .milliseconds(100))
             do {
-                summary = try MoneyLoverImport.replaceAllData(with: export.text, in: context)
+                summary = try MoneyLoverImport.replaceAllData(with: export.rows, in: context)
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -92,8 +91,7 @@ struct ImportFromMoneyLoverView: View {
 /// A MoneyLover export read from a file the user picked.
 private struct PickedExport {
     let fileName: String
-    let text: String
-    let rowCount: Int
+    let rows: [MoneyLoverRow]
 }
 
 #Preview {

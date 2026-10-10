@@ -4,8 +4,8 @@ import SwiftData
 /// Import from MoneyLover ("Replace all data"): a MoneyLover CSV export replaces every wallet, Card and transaction.
 /// The categories are kept.
 enum MoneyLoverImport {
-    /// Replaces the wallets, Cards and transactions in `context` with those of `csv`, a MoneyLover export, entered
-    /// at `now`:
+    /// Replaces the wallets, Cards and transactions in `context` with `rows`, a MoneyLover export as
+    /// ``MoneyLoverCSV/rows(in:)`` reads it, entered at `now`:
     ///
     /// - Each wallet is created once by name, with a $0 Starting balance on its first day.
     /// - Each row is filed under the category of its name; a name no category has becomes a new top-level category.
@@ -17,13 +17,13 @@ enum MoneyLoverImport {
     /// - Within a day, rows keep the file's order.
     ///
     /// Saves once, at the end: the old data is deleted by the same save that adds the new. Throws without changing
-    /// anything when it can't finish, saving included: ``MoneyLoverImportError`` for a file that can't be read, which
-    /// is checked whole before anything else is done. Once saved, the old data can't be brought back.
+    /// anything when it can't finish, saving included, and ``MoneyLoverImportError/noTransactions`` for no rows.
+    /// Once saved, the old data can't be brought back.
     @discardableResult
     static func replaceAllData(
-        with csv: String, in context: ModelContext, now: Date = .now
+        with rows: [MoneyLoverRow], in context: ModelContext, now: Date = .now
     ) throws -> MoneyLoverImportSummary {
-        let rows = try MoneyLoverCSV.rows(in: csv)
+        guard !rows.isEmpty else { throw MoneyLoverImportError.noTransactions }
         var importer = try Importer(rows: rows, context: context, now: now)
         do {
             try removeAllData(in: context)
@@ -51,8 +51,7 @@ enum MoneyLoverImport {
     }
 }
 
-/// One run of ``MoneyLoverImport/replaceAllData(with:in:now:)`` over rows already read, after the old data is
-/// deleted.
+/// One run of ``MoneyLoverImport/replaceAllData(with:in:now:)``, after the old data is deleted.
 private struct Importer {
     let rows: [MoneyLoverRow]
     let context: ModelContext
