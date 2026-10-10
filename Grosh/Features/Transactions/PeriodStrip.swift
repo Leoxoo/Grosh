@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The row of periods above the transaction list: `… 08/2026 · Last month · This month · Future`.
-/// It starts scrolled to the selected period.
+/// It starts scrolled to the selected period. Lazy, since a day strip holds every day back to the first with data.
 struct PeriodStrip: View {
     let periods: [Period]
     @Binding var selection: Period
@@ -10,7 +10,7 @@ struct PeriodStrip: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal) {
-                HStack(spacing: 20) {
+                LazyHStack(spacing: 20) {
                     ForEach(periods, id: \.self) { period in
                         tab(for: period)
                             .id(period)
@@ -19,6 +19,8 @@ struct PeriodStrip: View {
                 .padding(.horizontal)
             }
             .scrollIndicators(.hidden)
+            // A lazy stack would otherwise take all the height it is offered.
+            .fixedSize(horizontal: false, vertical: true)
             .defaultScrollAnchor(.trailing)
             .onAppear { proxy.scrollTo(selection, anchor: .center) }
             .onChange(of: selection) {

@@ -1,7 +1,8 @@
 import SwiftData
 import SwiftUI
 
-/// The Home tab: the Total, the user's wallets, and the coming-soon cards.
+/// The Home tab: the Total, the user's wallets, and the coming-soon cards. Its toolbar opens search and the bell
+/// of due Loan and Debt reminders.
 struct HomeView: View {
     /// Remembers across launches whether the Total is hidden.
     static let isTotalHiddenKey = "home.isTotalHidden"
@@ -40,6 +41,7 @@ struct HomeView: View {
                 RecentTransactionsSection()
             }
             .navigationTitle("Home")
+            .transactionSearchButton()
             .dueRemindersBell()
             .addTransactionButton()
         }
