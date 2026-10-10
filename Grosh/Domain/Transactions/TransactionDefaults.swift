@@ -15,6 +15,12 @@ enum TransactionDefaults {
         return draft
     }
 
+    /// The wallet an action started from a screen begins in: `viewed`, the wallet that screen shows, or else the
+    /// wallet a new transaction would suggest (the last-used one).
+    static func wallet(viewing viewed: Wallet?, in context: ModelContext) -> Wallet? {
+        viewed ?? lastUsedWallet(in: context)
+    }
+
     /// Whether a transaction of `type` starts excluded from report. Loan and Debt (the Debt/Loan tab) do.
     static func isExcludedFromReport(_ type: CategoryType) -> Bool {
         type == .debtLoan

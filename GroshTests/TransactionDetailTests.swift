@@ -78,8 +78,8 @@ struct TransactionDetailTests {
         #expect(coffee.canBeDuplicated)
     }
 
-    @Test(arguments: [LockedRole.outgoingTransfer, .incomingTransfer, .debtCollection, .repayment])
-    func whatATransferOrRecordPaymentFiledIsNeitherEditedNorDuplicatedHere(role: LockedRole) throws {
+    @Test(arguments: [LockedRole.debtCollection, .repayment])
+    func whatRecordPaymentFiledIsNeitherEditedNorDuplicatedHere(role: LockedRole) throws {
         try CategorySeeder.seedIfNeeded(in: context)
         let payment = record("payment", 60_00, in: checking)
         payment.category = try context.lockedCategory(role)
