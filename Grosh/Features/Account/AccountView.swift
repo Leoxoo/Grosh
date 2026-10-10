@@ -37,6 +37,11 @@ struct AccountView: View {
                     } label: {
                         Label("Import from MoneyLover", systemImage: "square.and.arrow.down")
                     }
+                    NavigationLink {
+                        ExportCSVView()
+                    } label: {
+                        Label("Export CSV", systemImage: "square.and.arrow.up")
+                    }
                 }
 
                 Section {

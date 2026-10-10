@@ -68,9 +68,7 @@ extension Wallet {
     ) throws -> Wallet {
         try draft.validate()
         let category = try context.lockedCategory(.startingBalance)
-        let wallet = Wallet(name: draft.trimmedName, sortOrder: try context.nextSortOrder(\Wallet.sortOrder))
-        context.insert(wallet)
-        wallet.apply(draft)
+        let wallet = try insertWithoutStartingBalance(draft, in: context)
 
         let starting = Transaction(amount: startingBalance, day: day, wallet: nil, category: nil)
         starting.isExcludedFromReport = true
@@ -78,6 +76,17 @@ extension Wallet {
         context.insert(starting)
         starting.wallet = wallet
         starting.category = category
+        return wallet
+    }
+
+    /// Adds a wallet at the end of the user's order with no Starting balance, for an import that brings the wallet's
+    /// Starting balance as one of its rows. Doesn't save.
+    @discardableResult
+    static func insertWithoutStartingBalance(_ draft: WalletDraft, in context: ModelContext) throws -> Wallet {
+        try draft.validate()
+        let wallet = Wallet(name: draft.trimmedName, sortOrder: try context.nextSortOrder(\Wallet.sortOrder))
+        context.insert(wallet)
+        wallet.apply(draft)
         return wallet
     }
 

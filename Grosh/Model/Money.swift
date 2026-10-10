@@ -28,3 +28,14 @@ nonisolated extension Money {
         self.init(cents: NSDecimalNumber(decimal: rounded).intValue, currencyCode: currencyCode)
     }
 }
+
+nonisolated extension Money {
+    /// The amount as a plain decimal number of exactly two decimals, such as `-74.91` or `1000.00`: what
+    /// ``init(decimalString:currencyCode:)`` reads back.
+    var decimalString: String {
+        let sign = cents < 0 ? "-" : ""
+        let magnitude = cents.magnitude
+        let hundredths = magnitude % 100
+        return "\(sign)\(magnitude / 100).\(hundredths < 10 ? "0" : "")\(hundredths)"
+    }
+}

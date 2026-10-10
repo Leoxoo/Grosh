@@ -72,6 +72,25 @@ struct MoneyLoverCSVTests {
         #expect(row.note == " Lunch\n")
     }
 
+    @Test func aGroshExportsCardAndLinkedColumnsAreRead() throws {
+        let rows = try MoneyLoverCSV.rows(in: ([Self.header + ",Card,Linked"] + [
+            "1,10/05/2026,Café,-3.00,USD,Cash,,,,,, Chase ,1",
+            "2,10/04/2026,Café,-3.00,USD,Cash,,,,,,,",
+        ]).joined(separator: "\r\n"))
+
+        #expect(rows.map(\.cardName) == ["Chase", ""])
+        #expect(rows.map(\.link) == ["1", ""])
+        #expect(rows.allSatisfy { $0.isFromGroshExport })
+    }
+
+    @Test func aMoneyLoverExportHasNoCardOrLinkedColumn() throws {
+        let row = try onlyRow(of: export("1,10/05/2026,Café,-3.00,USD,Cash,,,,,"))
+
+        #expect(row.cardName == nil)
+        #expect(row.link == nil)
+        #expect(!row.isFromGroshExport)
+    }
+
     // MARK: Files that can't be imported
 
     @Test func aFileWithoutMoneyLoversColumnsIsRefused() {
