@@ -38,9 +38,9 @@ extension MoneyLoverCardTag {
             guard let tag = all.first(where: { $0.tag == text }) else { continue }
             let before = note[..<match.range.lowerBound].trimmingSuffix(while: \.isSpaceOrTab)
             let after = note[match.range.upperBound...].trimmingPrefix(while: \.isSpaceOrTab)
-            let gap = before.isEmpty || after.isEmpty || before.last?.isNewline == true || after.first?.isNewline == true
-                ? "" : " "
-            return (tag, String(before) + gap + String(after))
+            let atLineEdge = before.isEmpty || after.isEmpty
+                || before.last?.isNewline == true || after.first?.isNewline == true
+            return (tag, String(before) + (atLineEdge ? "" : " ") + String(after))
         }
         return nil
     }

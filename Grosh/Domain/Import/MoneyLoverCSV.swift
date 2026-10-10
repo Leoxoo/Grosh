@@ -2,6 +2,8 @@ import Foundation
 
 /// One transaction as a MoneyLover CSV export lists it.
 nonisolated struct MoneyLoverRow: Equatable, Sendable {
+    /// The line of the file the row starts on; the header is line 1.
+    let line: Int
     let day: CalendarDay
     let categoryName: String
     /// Signed as MoneyLover shows it: negative takes money out of the wallet. Rounded to cents.
@@ -47,7 +49,7 @@ nonisolated enum MoneyLoverCSV {
         let columns = try Columns(header: records.removeFirst().fields)
         guard !records.isEmpty else { throw MoneyLoverImportError.noTransactions }
         return try records.map { record in
-            guard let row = columns.row(from: record.fields) else {
+            guard let row = columns.row(from: record.fields, line: record.line) else {
                 throw MoneyLoverImportError.unreadableRow(line: record.line)
             }
             return row
@@ -77,7 +79,7 @@ nonisolated enum MoneyLoverCSV {
 
         /// The row `fields` hold, or `nil` when its date, amount, category or wallet can't be read. Columns missing
         /// at the end of the row are empty.
-        func row(from fields: [String]) -> MoneyLoverRow? {
+        func row(from fields: [String], line: Int) -> MoneyLoverRow? {
             func field(_ index: Int?) -> String {
                 guard let index, fields.indices.contains(index) else { return "" }
                 return fields[index]
@@ -89,6 +91,7 @@ nonisolated enum MoneyLoverCSV {
                   !categoryName.isEmpty, !walletName.isEmpty
             else { return nil }
             return MoneyLoverRow(
+                line: line,
                 day: day,
                 categoryName: categoryName,
                 amount: amount,

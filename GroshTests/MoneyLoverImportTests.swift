@@ -263,6 +263,36 @@ struct MoneyLoverImportTests {
         #expect(debts.open == ["Checking 9/10 30000"])
     }
 
+    // MARK: Summary
+
+    @Test func theSummaryCountsEachWalletsRowsTheCardsCreatedAndTheUnmatchedRows() throws {
+        let summary = try importing(export(
+            "1,10/05/2026,Café,-3.00,USD,Checking (Navy Federal),Coffee #chase,,,,",
+            "2,10/05/2026,Products,-20.00,USD,Checking (Navy Federal),Groceries #citi,,,,",
+            "3,10/04/2026,Outgoing transfer,-40,USD,Checking (Navy Federal),,,,✅,",
+            "4,10/04/2026,Café,-2.50,USD,Cash,Tea #chase,,,,",
+            "5,10/03/2026,Debt Collection,25,USD,Cash,,Sam,,✅,",
+            "6,10/02/2026,Outgoing transfer,-60,USD,Checking (Navy Federal),,,,✅,",
+            "7,10/02/2026,Incoming transfer,60,USD,Cash,,,,✅,"
+        ))
+
+        #expect(summary.wallets == [
+            MoneyLoverImportSummary.WalletCount(name: "Checking (Navy Federal)", transactionCount: 4),
+            MoneyLoverImportSummary.WalletCount(name: "Cash", transactionCount: 3),
+        ])
+        #expect(summary.cardsCreated == 2)
+        #expect(summary.unmatchedRows == [
+            MoneyLoverImportSummary.UnmatchedRow(
+                line: 4, day: CalendarDay(year: 2026, month: 10, day: 4), categoryName: "Outgoing transfer",
+                amount: Money(cents: -40_00), walletName: "Checking (Navy Federal)", outcome: .balanceAdjustment
+            ),
+            MoneyLoverImportSummary.UnmatchedRow(
+                line: 6, day: CalendarDay(year: 2026, month: 10, day: 3), categoryName: "Debt Collection",
+                amount: Money(cents: 25_00), walletName: "Cash", outcome: .unlinkedPayment
+            ),
+        ])
+    }
+
     // MARK: Replacing all data
 
     /// Data the user had before importing: a wallet with a Card, an expense paid with it, and a category of their own.
@@ -304,6 +334,23 @@ struct MoneyLoverImportTests {
         #expect(try context.fetch(FetchDescriptor<Wallet>()).map(\.name) == ["Old wallet"])
         #expect(try context.fetchCount(FetchDescriptor<Card>()) == 1)
         #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 2)
+    }
+
+    @Test func withinADayRowsKeepTheFilesOrderAndWhatIsEnteredLaterGoesOnTop() throws {
+        try importing(export(
+            "1,10/05/2026,Café,-1.00,USD,Checking,First,,,,",
+            "2,10/05/2026,Café,-2.00,USD,Checking,Second,,,,",
+            "3,10/04/2026,Café,-3.00,USD,Checking,Older,,,,",
+            "4,10/05/2026,Café,-4.00,USD,Checking,Third,,,,"
+        ))
+        var later = TransactionDraft(type: .expense, day: CalendarDay(year: 2026, month: 10, day: 5))
+        later.wallet = try wallet("Checking")
+        later.amount = Money(cents: 5_00)
+        later.category = try context.otherCategory(.expense)
+        later.note = "Added later"
+        try Transaction.create(later, in: context)
+
+        #expect(try rows(in: "Checking").map(\.note) == ["Added later", "First", "Second", "Third", "Older"])
     }
 
     // MARK: Wallets
