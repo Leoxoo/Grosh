@@ -14,7 +14,9 @@ enum MoneyLoverImport {
     /// - Each Debt Collection links to the earliest open Loan of its wallet and amount, each Repayment to a Debt.
     /// - Within a day, rows keep the file's order.
     ///
-    /// Saves. Throws ``MoneyLoverImportError`` without changing anything when the file can't be read.
+    /// Saves. Throws ``MoneyLoverImportError`` without changing anything when the file can't be read: the whole file,
+    /// and the locked categories the import needs, are checked before anything is deleted. Should saving fail after
+    /// that, the old wallets, Cards and transactions are gone already and importing the file again recovers.
     @discardableResult
     static func replaceAllData(
         with csv: String, in context: ModelContext, now: Date = .now
@@ -32,7 +34,9 @@ enum MoneyLoverImport {
         }
     }
 
-    /// Deletes every transaction, Card and wallet. Categories stay. Doesn't save.
+    /// Deletes every transaction, Card and wallet from the store. Categories stay. These are batch deletes: they take
+    /// effect right away rather than at the next save, which makes replacing ~6,000 transactions about five times
+    /// faster than deleting them one by one, but a rollback can't bring them back.
     private static func removeAllData(in context: ModelContext) throws {
         try context.delete(model: Transaction.self)
         try context.delete(model: Card.self)
