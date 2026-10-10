@@ -51,6 +51,21 @@ extension Wallet {
         on day: CalendarDay,
         in context: ModelContext
     ) throws -> Wallet {
+        let wallet = try insert(draft, startingBalance: startingBalance, on: day, in: context)
+        try context.save()
+        return wallet
+    }
+
+    /// ``create(_:startingBalance:on:in:)`` without the save, for a caller that saves once after adding many, such
+    /// as an import. The Starting balance is entered at `enteredAt`, which orders it among its day's transactions.
+    @discardableResult
+    static func insert(
+        _ draft: WalletDraft,
+        startingBalance: Money,
+        on day: CalendarDay,
+        enteredAt: Date = .now,
+        in context: ModelContext
+    ) throws -> Wallet {
         try draft.validate()
         let category = try context.lockedCategory(.startingBalance)
         let wallet = Wallet(name: draft.trimmedName, sortOrder: try context.nextSortOrder(\Wallet.sortOrder))
@@ -59,10 +74,10 @@ extension Wallet {
 
         let starting = Transaction(amount: startingBalance, day: day, wallet: nil, category: nil)
         starting.isExcludedFromReport = true
+        starting.createdAt = enteredAt
         context.insert(starting)
         starting.wallet = wallet
         starting.category = category
-        try context.save()
         return wallet
     }
 

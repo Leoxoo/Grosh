@@ -90,14 +90,22 @@ extension CardDraft {
 }
 
 extension Card {
-    /// Adds a Card. Saves.
+    /// Adds a Card at the end of the user's order. Saves.
     @discardableResult
     static func create(_ draft: CardDraft, in context: ModelContext) throws -> Card {
         try draft.validate()
+        let card = try insert(draft, in: context)
+        try context.save()
+        return card
+    }
+
+    /// ``create(_:in:)`` without checking the draft against the Card rules or saving, for a caller that makes
+    /// its own drafts and saves once after adding many, such as an import.
+    @discardableResult
+    static func insert(_ draft: CardDraft, in context: ModelContext) throws -> Card {
         let card = Card(name: draft.name, kind: draft.kind, payingWallet: nil, sortOrder: try context.nextSortOrder(\Card.sortOrder))
         context.insert(card)
         card.apply(draft)
-        try context.save()
         return card
     }
 
