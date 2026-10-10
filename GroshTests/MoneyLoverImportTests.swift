@@ -251,6 +251,18 @@ struct MoneyLoverImportTests {
         #expect(adjustments.map(\.note) == ["Sent out", "Came in"])
     }
 
+    @Test func aTransferRowOfNoAmountWithNoPartnerIsLeftOutForHavingNothingToAdjust() throws {
+        let summary = try importing(export(
+            "1,10/05/2026,Outgoing transfer,0,USD,Checking,Nothing moved,,,✅,",
+            "2,10/04/2026,Café,-3.00,USD,Checking,Coffee,,,,"
+        ))
+
+        #expect(try rows(in: "Checking").map(\.note) == ["Coffee"])
+        #expect(summary.wallets == [MoneyLoverImportSummary.WalletCount(name: "Checking", transactionCount: 1)])
+        #expect(summary.unmatchedRows.map(\.line) == [2])
+        #expect(summary.unmatchedRows.map(\.outcome) == [.notImported])
+    }
+
     // MARK: Debts and loans
 
     /// Each Loan or Debt in the store as `wallet day amount`, open or settled.

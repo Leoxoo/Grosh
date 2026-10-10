@@ -11,7 +11,8 @@ enum MoneyLoverImport {
     /// - Each row is filed under the category of its name; a name no category has becomes a new top-level category.
     /// - A card hashtag in a note becomes the row's Card (``MoneyLoverCardTag``), where the app would offer that Card:
     ///   not on a transfer row, and only in the Card's paying wallet. Elsewhere the hashtag stays in the note.
-    /// - Outgoing and Incoming transfer rows pair into transfers; one with no partner becomes a balance adjustment.
+    /// - Outgoing and Incoming transfer rows link into transfers. One with no partner becomes a balance adjustment,
+    ///   filed as Adjust Balance files it; one of no amount has nothing to adjust and isn't imported.
     /// - Each Debt Collection links to the earliest open Loan of its wallet and amount, each Repayment to a Debt.
     /// - Within a day, rows keep the file's order.
     ///
@@ -53,8 +54,8 @@ private struct Importer {
     let now: Date
     /// The locked categories the import files under, fetched before anything is deleted.
     let startingBalance: Category
-    let otherExpense: Category
-    let otherIncome: Category
+    /// What a transfer row with no partner is filed under as a balance adjustment, by the adjustment's reason type.
+    let adjustmentReasons: [CategoryType: Category]
 
     private var wallets: [String: Wallet] = [:]
     private var walletOrder: [String] = []
@@ -65,8 +66,9 @@ private struct Importer {
         self.context = context
         self.now = now
         startingBalance = try context.lockedCategory(.startingBalance)
-        otherExpense = try context.otherCategory(.expense)
-        otherIncome = try context.otherCategory(.income)
+        adjustmentReasons = try [CategoryType.income, .expense].reduce(into: [:]) { reasons, type in
+            reasons[type] = try BalanceAdjustmentDraft.defaultReason(for: type, in: context)
+        }
     }
 
     /// Records every row, pairs the transfers, links the payments and says what was done. Doesn't save, except
@@ -85,17 +87,24 @@ private struct Importer {
 
         var unmatched: [ObjectIdentifier: MoneyLoverImportSummary.UnmatchedRow.Outcome] = [:]
         for unpaired in Self.linkTransfers(among: imported) {
+            // A balance adjustment records a difference, so a row of no amount has nothing to adjust.
+            guard let type = BalanceAdjustmentDraft.reasonType(for: unpaired.amountCents) else {
+                unmatched[ObjectIdentifier(unpaired)] = .notImported
+                context.delete(unpaired)
+                continue
+            }
             unpaired.isBalanceAdjustment = true
-            unpaired.category = unpaired.amountCents < 0 ? otherExpense : otherIncome
+            unpaired.category = adjustmentReasons[type]
             unmatched[ObjectIdentifier(unpaired)] = .balanceAdjustment
         }
-        for unlinked in try Self.linkPayments(among: imported) {
+        let kept = zip(rows, imported).filter { unmatched[ObjectIdentifier($1)] != .notImported }
+        for unlinked in try Self.linkPayments(among: kept.map(\.1)) {
             unmatched[ObjectIdentifier(unlinked)] = .unlinkedPayment
         }
 
         return MoneyLoverImportSummary(
             wallets: walletOrder.map { name in
-                .init(name: name, transactionCount: rows.count { $0.walletName == name })
+                .init(name: name, transactionCount: kept.count { row, _ in row.walletName == name })
             },
             cardsCreated: cards.count,
             unmatchedRows: zip(rows, imported).compactMap { row, transaction in

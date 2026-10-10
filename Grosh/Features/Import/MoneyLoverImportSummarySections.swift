@@ -59,6 +59,7 @@ private extension MoneyLoverImportSummary.UnmatchedRow.Outcome {
     var wording: String {
         switch self {
         case .balanceAdjustment: String(localized: "No partner: recorded as a balance adjustment")
+        case .notImported: String(localized: "No partner and no amount: not imported")
         case .unlinkedPayment: String(localized: "No open Loan or Debt of this amount: not linked")
         }
     }

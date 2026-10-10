@@ -14,6 +14,9 @@ nonisolated struct MoneyLoverImportSummary: Equatable, Sendable {
         enum Outcome: Equatable, Sendable {
             /// A transfer row with no partner, recorded as a balance adjustment.
             case balanceAdjustment
+            /// A transfer row of no amount with no partner: as a balance adjustment it would have nothing to adjust,
+            /// so it isn't imported.
+            case notImported
             /// A Debt Collection or Repayment with no open Loan or Debt of its wallet and amount, recorded unlinked.
             case unlinkedPayment
         }
