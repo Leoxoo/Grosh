@@ -3,7 +3,8 @@ import SwiftUI
 
 /// The Transactions tab's list: the wallet selector and its balance, the period strip, the period's Opening and
 /// Ending balances, then its transactions by day, newest first, or by category. The "…" menu picks the time range
-/// and the grouping, and selects transactions to delete.
+/// and the grouping, and selects transactions to delete. Search and the filters narrow what is listed: grouped,
+/// selected and summed are the matching transactions only.
 struct TransactionListView: View {
     /// The transaction whose detail is showing.
     @Binding var selectedTransaction: Transaction?
@@ -15,6 +16,8 @@ struct TransactionListView: View {
     @State private var period = Period.month(CalendarMonth(.today))
     /// Whether the period's transactions are grouped by day or by category, chosen in the "…" menu.
     @State private var grouping = TransactionGrouping.day
+    /// Search text and filters. Searching looks across all time and every wallet; filters narrow the period.
+    @State private var filter = TransactionFilter()
     /// Whether the list is choosing transactions to delete, and the ones chosen so far.
     @State private var isSelecting = false
     @State private var chosen = Set<Transaction>()
@@ -35,16 +38,24 @@ struct TransactionListView: View {
         let selected = transactions.filter(walletSelection.includes)
         let periods = strip(for: selected)
         let shownDays = period.days(today: today)
-        let shown = selected.filter { shownDays.contains($0.day) }
+        let shown = filter.listed(from: transactions, selection: walletSelection, on: shownDays)
 
         list {
             Section {
-                PeriodSummaryView(
-                    summary: PeriodSummary(of: selected, in: period, today: today), period: period, today: today
-                )
+                if filter.isOn {
+                    FilterSummaryView(filter: $filter, transactions: shown)
+                } else {
+                    PeriodSummaryView(
+                        summary: PeriodSummary(of: selected, in: period, today: today), period: period, today: today
+                    )
+                }
             }
 
-            if shown.isEmpty {
+            if shown.isEmpty && filter.isOn {
+                Section {
+                    NoMatchingTransactionsView(filter: filter)
+                }
+            } else if shown.isEmpty {
                 Section {
                     ContentUnavailableView(
                         "No Transactions",
@@ -82,7 +93,9 @@ struct TransactionListView: View {
             }
             .padding(.top, 8)
             .background(.bar)
+            .hiddenWhileSearching(filter)
         }
+        .searchable(text: $filter.searchText, prompt: "Note, category or amount")
         .onChange(of: walletSelection) {
             // A wallet with a shorter history may not reach back to the period being shown.
             showPeriodHoldingTodayUnlessOffered(by: strip(for: transactions.filter(walletSelection.includes)))
@@ -109,6 +122,9 @@ struct TransactionListView: View {
                         walletSelection: walletSelection, timeRange: $timeRange, grouping: $grouping,
                         startSelecting: startSelecting
                     )
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    TransactionFilterButton(filter: $filter)
                 }
             }
         }
@@ -175,7 +191,7 @@ struct TransactionListView: View {
 }
 
 /// A day's date and its net total in color.
-private struct TransactionDayHeader: View {
+struct TransactionDayHeader: View {
     let day: TransactionDay
 
     var body: some View {
