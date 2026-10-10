@@ -29,10 +29,10 @@ extension MoneyLoverCardTag {
     /// The wallet every imported Card is paid from, when the export has it.
     static let payingWalletName = "Checking (Navy Federal)"
 
-    /// The first card hashtag in `note`, ignoring case, and the note without it, its spaces tidied. A longer
-    /// hashtag (`#chasefreedom`) isn't `#chase`. Every other hashtag, another card's included, stays in the note.
-    /// `nil` for a note without a card hashtag.
-    static func first(in note: String) -> (tag: MoneyLoverCardTag, note: String)? {
+    /// Takes the first card hashtag, ignoring case, out of `note`: the tag, and the note without it, its spaces
+    /// tidied. A longer hashtag (`#chasefreedom`) isn't `#chase`. Every other hashtag, another card's included, stays
+    /// in the note. `nil` for a note without a card hashtag.
+    static func extractFirst(from note: String) -> (tag: MoneyLoverCardTag, noteWithoutTag: String)? {
         for match in note.matches(of: #/\#\w+/#) {
             let text = note[match.range].lowercased()
             guard let tag = all.first(where: { $0.tag == text }) else { continue }

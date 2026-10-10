@@ -78,8 +78,8 @@ private struct Importer {
         for row in rows where wallets[row.walletName] == nil {
             try addWallet(firstSeenIn: row)
         }
-        var categories = try CategoryLookup(context: context)
-        let filed = try rows.map { try categories.category(named: $0.categoryName, for: $0.amount) }
+        var categories = try CategoryFiler(context: context)
+        let filed = try rows.map { try categories.findOrAdd(named: $0.categoryName, for: $0.amount) }
         let paid = try addCards(for: filed)
         // `imported[i]` is `rows[i]`.
         let imported = rows.indices.map { index in
@@ -142,10 +142,10 @@ private struct Importer {
     /// and its note as it is, hashtag included.
     private mutating func addCards(for categories: [Category]) throws -> [(card: Card?, note: String)] {
         var payingWallets: [MoneyLoverCardTag: Wallet] = [:]
-        let tagged = rows.indices.map { index -> (tag: MoneyLoverCardTag, note: String)? in
+        let tagged = rows.indices.map { index -> (tag: MoneyLoverCardTag, noteWithoutTag: String)? in
             let row = rows[index]
             guard !categories[index].isTransferHalf, let wallet = wallets[row.walletName],
-                  let tagged = MoneyLoverCardTag.first(in: row.note)
+                  let tagged = MoneyLoverCardTag.extractFirst(from: row.note)
             else { return nil }
             let payingWallet = payingWallets[tagged.tag] ?? wallets[MoneyLoverCardTag.payingWalletName] ?? wallet
             payingWallets[tagged.tag] = payingWallet
@@ -157,7 +157,7 @@ private struct Importer {
             cards[tag] = try Card.insert(draft, in: context)
         }
         return zip(rows, tagged).map { row, tagged in
-            tagged.map { (cards[$0.tag], $0.note) } ?? (nil, row.note)
+            tagged.map { (cards[$0.tag], $0.noteWithoutTag) } ?? (nil, row.note)
         }
     }
 
@@ -229,9 +229,9 @@ private struct Importer {
     }
 }
 
-/// The category each imported row is filed under, found by name ignoring case. A name no category has becomes a new
-/// top-level category, an Expense for money going out and an Income for money coming in.
-private struct CategoryLookup {
+/// Files each imported row under the category of its name, found ignoring case, adding the category when none has
+/// the name: a new top-level category, an Expense for money going out and an Income for money coming in.
+private struct CategoryFiler {
     let catalog: CategoryCatalog
     private var byName: [String: [Category]]
 
@@ -242,9 +242,9 @@ private struct CategoryLookup {
 
     private static func key(_ name: String) -> String { name.lowercased() }
 
-    /// The category named `name` for a row of `amount`: when an Expense and an Income category share the name, the
-    /// one of the type the amount's sign gives.
-    mutating func category(named name: String, for amount: Money) throws -> Category {
+    /// The category named `name` for a row of `amount`, added if there is none: when an Expense and an Income
+    /// category share the name, the one of the type the amount's sign gives. Doesn't save.
+    mutating func findOrAdd(named name: String, for amount: Money) throws -> Category {
         let type: CategoryType = amount.cents < 0 ? .expense : .income
         let named = byName[Self.key(name), default: []]
         if let match = named.first(where: { $0.type == type }) ?? named.first {
