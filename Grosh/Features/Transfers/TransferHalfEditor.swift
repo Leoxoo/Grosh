@@ -5,10 +5,6 @@ import SwiftUI
 /// the amount or date changes, Save asks whether to update the other half too, or only this one (as when a fee
 /// was taken).
 struct TransferHalfEditor: View {
-    private enum Field: Hashable {
-        case amount, note
-    }
-
     let transaction: Transaction
 
     @Environment(\.dismiss) private var dismiss
@@ -16,10 +12,8 @@ struct TransferHalfEditor: View {
 
     @State private var draft: TransferHalfDraft
     @State private var entry: AmountEntry
-    @State private var isKeypadShown = true
     @State private var isAskingScope = false
     @State private var errorMessage: String?
-    @FocusState private var focus: Field?
 
     init(transaction: Transaction) {
         self.transaction = transaction
@@ -38,69 +32,32 @@ struct TransferHalfEditor: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    wallets
-                    AmountRow(
-                        title: "Amount",
-                        entry: $entry,
-                        currencyCode: currencyCode,
-                        tint: Money(cents: transaction.category?.sign ?? 0).tint
-                    ) {
-                        focus = .amount
-                        isKeypadShown.toggle()
-                    }
-                    .focused($focus, equals: .amount)
-                    DayStepper(title: "Date", day: $draft.day)
-                    TextField("Note", text: $draft.note, axis: .vertical)
-                        .focused($focus, equals: .note)
-                } footer: {
-                    Text("Changing the amount or date asks whether to change the other half of the transfer too.")
-                }
+        KeypadSheet(
+            title: Text(transaction.categoryName), entry: $entry, canSave: draftToSave.canSave, save: confirmSave
+        ) { fields in
+            Section {
+                wallets
+                fields.amountRow(
+                    "Amount", currencyCode: currencyCode, tint: Money(cents: transaction.category?.sign ?? 0).tint
+                )
+                DayStepper(title: "Date", day: $draft.day)
+                fields.noteField($draft.note)
+            } footer: {
+                Text("Changing the amount or date asks whether to change the other half of the transfer too.")
             }
-            .formStyle(.grouped)
-            .safeAreaInset(edge: .bottom) {
-                if isKeypadShown {
-                    AmountKeypad(entry: $entry)
-                        .background(.bar)
-                }
-            }
-            .navigationTitle(transaction.categoryName)
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: confirmSave)
-                        .disabled(!draftToSave.canSave)
-                }
-            }
-            .defaultFocus($focus, .amount)
-            .onChange(of: focus) {
-                if focus == .note {
-                    isKeypadShown = false
-                }
-            }
-            .confirmationDialog(
-                "Update the other half of the transfer too?",
-                isPresented: $isAskingScope,
-                titleVisibility: .visible
-            ) {
-                Button("Update Both") { save(.bothHalves) }
-                Button("Only This One") { save(.onlyThisOne) }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Only This One leaves the two halves different, as when a fee was taken.")
-            }
-            .errorAlert("Couldn't Save Transfer", message: $errorMessage)
         }
-        #if os(macOS)
-        .frame(minWidth: 420, idealWidth: 460, minHeight: 560, idealHeight: 640)
-        #endif
+        .confirmationDialog(
+            "Update the other half of the transfer too?",
+            isPresented: $isAskingScope,
+            titleVisibility: .visible
+        ) {
+            Button("Update Both") { save(.bothHalves) }
+            Button("Only This One") { save(.onlyThisOne) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Only This One leaves the two halves different, as when a fee was taken.")
+        }
+        .errorAlert("Couldn't Save Transfer", message: $errorMessage)
     }
 
     /// Where the money left and where it went: this half's wallet and, while it is there, the other half's.

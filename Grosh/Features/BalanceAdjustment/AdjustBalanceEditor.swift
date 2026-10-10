@@ -37,62 +37,31 @@ struct AdjustBalanceEditor: View {
 
 /// The form behind ``AdjustBalanceEditor``, holding the draft from the moment the sheet opens.
 private struct AdjustBalanceForm: View {
-    private enum Field: Hashable {
-        case amount, note
-    }
-
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
     @State private var draft: BalanceAdjustmentDraft
-    @State private var isKeypadShown = true
     @State private var errorMessage: String?
-    @FocusState private var focus: Field?
 
     init(startingDraft: BalanceAdjustmentDraft) {
         _draft = State(initialValue: startingDraft)
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                balanceSection
-                reasonSection
-            }
-            .formStyle(.grouped)
-            .safeAreaInset(edge: .bottom) {
-                if isKeypadShown {
-                    AmountKeypad(entry: $draft.realBalanceEntry)
-                        .background(.bar)
-                }
-            }
-            .navigationTitle("Adjust Balance")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
-                        .disabled(!draft.canSave)
-                }
-            }
-            .defaultFocus($focus, .amount)
-            .onChange(of: focus) {
-                if focus == .note {
-                    isKeypadShown = false
-                }
-            }
-            .errorAlert("Couldn't Adjust Balance", message: $errorMessage)
+        KeypadSheet(
+            title: Text("Adjust Balance"),
+            entry: $draft.realBalanceEntry,
+            canSave: draft.canSave,
+            save: save,
+            macHeight: (640, 720)
+        ) { fields in
+            balanceSection(fields)
+            reasonSection(fields)
         }
-        #if os(macOS)
-        .frame(minWidth: 420, idealWidth: 460, minHeight: 640, idealHeight: 720)
-        #endif
+        .errorAlert("Couldn't Adjust Balance", message: $errorMessage)
     }
 
-    private var balanceSection: some View {
+    private func balanceSection(_ fields: KeypadSheetFields) -> some View {
         Section {
             WalletPicker(title: "Wallet", selection: $draft.wallet)
             DayStepper(title: "Date", day: $draft.day)
@@ -101,16 +70,9 @@ private struct AdjustBalanceForm: View {
                     AmountText(amount: recorded)
                 }
             }
-            AmountRow(
-                title: "Real balance",
-                entry: $draft.realBalanceEntry,
-                currencyCode: draft.currencyCode,
-                tint: Money(cents: draft.realBalance?.cents ?? 0).tint
-            ) {
-                focus = .amount
-                isKeypadShown.toggle()
-            }
-            .focused($focus, equals: .amount)
+            fields.amountRow(
+                "Real balance", currencyCode: draft.currencyCode, tint: Money(cents: draft.realBalance?.cents ?? 0).tint
+            )
             ChangeSignButton(entry: $draft.realBalanceEntry)
         } footer: {
             if draft.wallet == nil {
@@ -121,7 +83,7 @@ private struct AdjustBalanceForm: View {
         }
     }
 
-    private var reasonSection: some View {
+    private func reasonSection(_ fields: KeypadSheetFields) -> some View {
         Section {
             LabeledContent("Difference") {
                 AmountText(amount: draft.difference ?? Money(cents: 0, currencyCode: draft.currencyCode), showsPlusSign: true)
@@ -129,8 +91,7 @@ private struct AdjustBalanceForm: View {
             if let reasonType = draft.reasonType {
                 CategoryPicker(title: "Reason", type: reasonType, selection: $draft.category)
             }
-            TextField("Note", text: $draft.note, axis: .vertical)
-                .focused($focus, equals: .note)
+            fields.noteField($draft.note)
             Toggle("Exclude from report", isOn: $draft.isExcludedFromReport)
         } footer: {
             if draft.reasonType == nil {
