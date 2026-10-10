@@ -53,6 +53,7 @@ struct ImportFromMoneyLoverView: View {
                 ProgressView("Importing…")
                     .padding()
                     .background(.regularMaterial, in: .rect(cornerRadius: 12))
+                    .transition(.opacity)
             }
         }
         .errorAlert("Couldn't Import", message: $errorMessage)
@@ -73,11 +74,13 @@ struct ImportFromMoneyLoverView: View {
         }
     }
 
+    /// Shows "Importing…", then imports `export` once it has finished appearing. The import holds the main actor
+    /// until it is done, so nothing new is drawn meanwhile: started any sooner, it would run before the progress is on
+    /// screen.
     private func replaceAllData(with export: PickedExport) {
-        isImporting = true
-        Task {
-            // Lets "Importing…" appear before the import holds the main actor for a moment.
-            try? await Task.sleep(for: .milliseconds(100))
+        withAnimation {
+            isImporting = true
+        } completion: {
             do {
                 summary = try MoneyLoverImport.replaceAllData(with: export.rows, in: context)
             } catch {
