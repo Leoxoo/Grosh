@@ -13,6 +13,8 @@ struct TransactionListView: View {
     /// more ranges to offer.
     @State private var timeRange = TimeRange.month
     @State private var period = Period.month(CalendarMonth(.today))
+    /// Search text and filters. Searching looks across all time and every wallet; filters narrow the period.
+    @State private var filter = TransactionFilter()
 
     private var today: CalendarDay { .today }
 
@@ -26,14 +28,23 @@ struct TransactionListView: View {
         let selected = transactions.filter(walletSelection.includes)
         let periods = strip(for: selected)
         let shownDays = period.days(today: today)
-        let days = TransactionDay.days(of: selected.filter { shownDays.contains($0.day) })
+        let listed = filter.listed(from: transactions, selection: walletSelection, on: shownDays)
+        let days = TransactionDay.days(of: listed)
 
         List(selection: $selectedTransaction) {
             Section {
-                PeriodSummaryView(summary: PeriodSummary(of: selected, in: period, today: today), period: period)
+                if filter.isOn {
+                    FilterSummaryView(filter: $filter, transactions: listed)
+                } else {
+                    PeriodSummaryView(summary: PeriodSummary(of: selected, in: period, today: today), period: period)
+                }
             }
 
-            if days.isEmpty {
+            if days.isEmpty && filter.isOn {
+                Section {
+                    NoMatchingTransactionsView(filter: filter)
+                }
+            } else if days.isEmpty {
                 Section {
                     ContentUnavailableView(
                         "No Transactions",
@@ -64,7 +75,9 @@ struct TransactionListView: View {
             }
             .padding(.top, 8)
             .background(.bar)
+            .hiddenWhileSearching(filter)
         }
+        .searchable(text: $filter.searchText, prompt: "Note, category or amount")
         .onChange(of: walletSelection) {
             // A wallet with a shorter history may not reach back to the period being shown.
             if !strip(for: transactions.filter(walletSelection.includes)).contains(period) {
@@ -79,13 +92,16 @@ struct TransactionListView: View {
             ToolbarItem(placement: .primaryAction) {
                 TransactionsMenu(walletSelection: walletSelection)
             }
+            ToolbarItem(placement: .primaryAction) {
+                TransactionFilterButton(filter: $filter)
+            }
         }
         .addTransactionButton()
     }
 }
 
 /// A day's date and its net total in color.
-private struct TransactionDayHeader: View {
+struct TransactionDayHeader: View {
     let day: TransactionDay
 
     var body: some View {
