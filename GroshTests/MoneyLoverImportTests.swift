@@ -49,6 +49,59 @@ struct MoneyLoverImportTests {
         #expect(try wallet("Checking").balance(asOf: today) == Money(cents: -10_91))
     }
 
+    @Test func withEventAndExcludeFromReportAreStored() throws {
+        try importing(export("1,10/05/2026,Restaurants,-42.00,USD,Checking,Dinner,Sam,Road trip,✅,"))
+
+        let dinner = try #require(try rows(in: "Checking").first)
+        #expect(dinner.withName == "Sam")
+        #expect(dinner.eventName == "Road trip")
+        #expect(dinner.isExcludedFromReport)
+    }
+
+    // MARK: Categories
+
+    @Test func aRowIsFiledUnderTheCategoryOfItsNameIgnoringCase() throws {
+        try importing(export(
+            "1,10/05/2026,café,-3.00,USD,Checking,,,,,",
+            "2,10/05/2026,PHONE BILL,-30.00,USD,Checking,,,,,"
+        ))
+
+        let filed = try rows(in: "Checking").map(\.category)
+        #expect(filed.map { $0?.name } == ["Café", "Phone Bill"])
+        #expect(filed.last??.parent?.name == "Bills & Utilities")
+    }
+
+    @Test func aNameUsedByAnExpenseAndAnIncomeCategoryPicksTheOneMatchingTheAmountsSign() throws {
+        let catalog = CategoryCatalog(context: context)
+        let spent = try catalog.add(CategoryDraft(name: "Refunds", type: .expense))
+        let received = try catalog.add(CategoryDraft(name: "Refunds", type: .income))
+
+        try importing(export(
+            "1,10/05/2026,Refunds,-3.00,USD,Checking,,,,,",
+            "2,10/05/2026,Refunds,8.00,USD,Checking,,,,,"
+        ))
+
+        #expect(try rows(in: "Checking").map(\.category) == [spent, received])
+    }
+
+    @Test func anUnknownCategoryBecomesATopLevelCategoryTypedByTheAmountsSign() throws {
+        let before = try context.fetchCount(FetchDescriptor<Grosh.Category>())
+
+        try importing(export(
+            "1,10/05/2026,Lottery,25.00,USD,Checking,,,,,",
+            "2,10/04/2026,Lottery,-2.00,USD,Checking,,,,,",
+            "3,10/03/2026,Garden,-12.00,USD,Checking,,,,,"
+        ))
+
+        let filed = try rows(in: "Checking").map(\.category)
+        let lottery = try #require(filed[0])
+        let garden = try #require(filed[2])
+        #expect(filed[1] == lottery)
+        #expect((lottery.name, lottery.type, lottery.parent) == ("Lottery", .income, nil))
+        #expect((garden.name, garden.type, garden.parent) == ("Garden", .expense, nil))
+        #expect(try context.fetchCount(FetchDescriptor<Grosh.Category>()) == before + 2)
+    }
+
     // MARK: Replacing all data
 
     /// Data the user had before importing: a wallet with a Card, an expense paid with it, and a category of their own.

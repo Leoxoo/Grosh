@@ -8,38 +8,48 @@ struct MoneyLoverImportSummary: Equatable {}
 /// The categories are kept.
 enum MoneyLoverImport {
     /// Replaces the wallets, Cards and transactions in `context` with those of `csv`, a MoneyLover export, entered
-    /// at `now`. Saves.
+    /// at `now`. Saves. Nothing changes when the file can't be imported.
     @discardableResult
     static func replaceAllData(
         with csv: String, in context: ModelContext, now: Date = .now
     ) throws -> MoneyLoverImportSummary {
         let rows = try MoneyLoverCSV.rows(in: csv)
-        let categories = try context.fetch(FetchDescriptor<Category>())
         let startingBalance = try context.lockedCategory(.startingBalance)
-        try removeAllData(in: context)
+        do {
+            try removeAllData(in: context)
+            var categories = try CategoryLookup(context: context)
 
-        var wallets: [String: Wallet] = [:]
-        for row in rows where wallets[row.walletName] == nil {
-            let wallet = Wallet(name: row.walletName, sortOrder: wallets.count)
-            context.insert(wallet)
-            wallets[row.walletName] = wallet
-            let firstDay = rows.filter { $0.walletName == row.walletName }.map(\.day).min() ?? row.day
-            let starting = Transaction(amount: Money(cents: 0), day: firstDay, wallet: nil, category: nil)
-            starting.isExcludedFromReport = true
-            starting.createdAt = now.addingTimeInterval(-Double(rows.count + 1))
-            context.insert(starting)
-            starting.wallet = wallet
-            starting.category = startingBalance
-        }
+            var wallets: [String: Wallet] = [:]
+            for row in rows where wallets[row.walletName] == nil {
+                let wallet = Wallet(name: row.walletName, sortOrder: wallets.count)
+                context.insert(wallet)
+                wallets[row.walletName] = wallet
+                let firstDay = rows.filter { $0.walletName == row.walletName }.map(\.day).min() ?? row.day
+                let starting = Transaction(amount: Money(cents: 0), day: firstDay, wallet: nil, category: nil)
+                starting.isExcludedFromReport = true
+                starting.createdAt = now.addingTimeInterval(-Double(rows.count + 1))
+                context.insert(starting)
+                starting.wallet = wallet
+                starting.category = startingBalance
+            }
 
-        for (index, row) in rows.enumerated() {
-            let transaction = Transaction(amount: row.amount, day: row.day, wallet: nil, category: nil, note: row.note)
-            transaction.createdAt = now.addingTimeInterval(-Double(index))
-            context.insert(transaction)
-            transaction.wallet = wallets[row.walletName]
-            transaction.category = categories.first { $0.name == row.categoryName }
+            for (index, row) in rows.enumerated() {
+                let transaction = Transaction(
+                    amount: row.amount, day: row.day, wallet: nil, category: nil, note: row.note
+                )
+                transaction.createdAt = now.addingTimeInterval(-Double(index))
+                transaction.withName = row.withName
+                transaction.eventName = row.eventName
+                transaction.isExcludedFromReport = row.isExcludedFromReport
+                context.insert(transaction)
+                transaction.wallet = wallets[row.walletName]
+                transaction.category = categories.category(named: row.categoryName, for: row.amount)
+            }
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
         }
-        try context.save()
         return MoneyLoverImportSummary()
     }
 
@@ -54,5 +64,37 @@ enum MoneyLoverImport {
         for wallet in try context.fetch(FetchDescriptor<Wallet>()) {
             context.delete(wallet)
         }
+    }
+}
+
+/// The category each imported row is filed under, found by name ignoring case. A name no category has becomes a new
+/// top-level category, an Expense for money going out and an Income for money coming in.
+private struct CategoryLookup {
+    let context: ModelContext
+    private var byName: [String: [Category]]
+
+    init(context: ModelContext) throws {
+        self.context = context
+        byName = Dictionary(grouping: try context.fetch(FetchDescriptor<Category>()), by: { Self.key($0.name) })
+    }
+
+    private static func key(_ name: String) -> String { name.lowercased() }
+
+    /// The category named `name` for a row of `amount`: when an Expense and an Income category share the name, the
+    /// one of the type the amount's sign gives.
+    mutating func category(named name: String, for amount: Money) -> Category {
+        let type: CategoryType = amount.cents < 0 ? .expense : .income
+        let named = byName[Self.key(name), default: []]
+        if let match = named.first(where: { $0.type == type }) ?? named.first {
+            return match
+        }
+        let topLevel = byName.values.joined().filter { $0.type == type && $0.parent == nil }
+        let category = Category(
+            name: name, type: type, symbolName: CategoryDraft().symbolName, color: CategoryDraft().color,
+            sortOrder: (topLevel.map(\.sortOrder).max() ?? -1) + 1
+        )
+        context.insert(category)
+        byName[Self.key(name)] = [category]
+        return category
     }
 }
