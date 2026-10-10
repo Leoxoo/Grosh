@@ -33,6 +33,14 @@ struct AccountView: View {
 
                 Section {
                     NavigationLink {
+                        ImportFromMoneyLoverView()
+                    } label: {
+                        Label("Import from MoneyLover", systemImage: "square.and.arrow.down")
+                    }
+                }
+
+                Section {
+                    NavigationLink {
                         CurrencyPickerView()
                     } label: {
                         LabeledContent {

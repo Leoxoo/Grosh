@@ -15,7 +15,7 @@ nonisolated struct Money: Hashable, Sendable {
     }
 }
 
-extension Money {
+nonisolated extension Money {
     /// Parses a plain decimal number such as `-74.910004`, rounding half away from zero to the nearest cent.
     /// No grouping separators or currency symbols are accepted.
     init?(decimalString text: String, currencyCode: String = defaultCurrencyCode) {
