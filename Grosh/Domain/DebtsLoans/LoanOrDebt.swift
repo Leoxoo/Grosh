@@ -165,6 +165,15 @@ extension Transaction {
         payment.linkID = paymentLink()
     }
 
+    /// Whether `payment` pays this Loan or Debt back in one go: a Debt Collection for a Loan or a Repayment for a
+    /// Debt, in its wallet, for its whole amount, and dated on or after it. How an import, which brings payments
+    /// without their links, finds the Loan or Debt to link one to.
+    func isPaidBackInFull(by payment: Transaction) -> Bool {
+        guard let kind = loanOrDebtKind else { return false }
+        return payment.category?.lockedRole == kind.paymentRole && payment.wallet == wallet
+            && payment.amountCents == -amountCents && payment.dayRaw >= dayRaw
+    }
+
     /// The link this Loan or Debt shares with its payments, made the first time one is recorded.
     fileprivate func paymentLink() -> UUID {
         if let linkID { return linkID }

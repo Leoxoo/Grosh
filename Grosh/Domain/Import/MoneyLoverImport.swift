@@ -199,9 +199,9 @@ private struct Importer {
         return imported.filter { $0.category?.isTransferHalf == true && $0.linkID == nil }
     }
 
-    /// Links each Debt Collection among `imported` to the earliest Loan still open that has its wallet and amount
-    /// and is dated on or before it, and each Repayment to a Debt the same way (ADR-0003). Payments are taken oldest
-    /// first. Returns the payments left unlinked. Doesn't save.
+    /// Links each Debt Collection among `imported` to the earliest Loan still open that it pays back in full (same
+    /// wallet and amount, dated on or before it: ``Transaction/isPaidBackInFull(by:)``), and each Repayment to a Debt
+    /// the same way (ADR-0003). Payments are taken oldest first. Returns the payments left unlinked. Doesn't save.
     private static func linkPayments(among imported: [Transaction]) throws -> [Transaction] {
         let oldestFirst = Array(imported.inListOrder().reversed())
         var open = oldestFirst.filter(\.isLoanOrDebt)
@@ -210,10 +210,7 @@ private struct Importer {
             guard let role = payment.category?.lockedRole, role == .debtCollection || role == .repayment else {
                 continue
             }
-            guard let index = open.firstIndex(where: { original in
-                original.loanOrDebtKind?.paymentRole == role && original.wallet == payment.wallet
-                    && original.amountCents == -payment.amountCents && original.dayRaw <= payment.dayRaw
-            }) else {
+            guard let index = open.firstIndex(where: { $0.isPaidBackInFull(by: payment) }) else {
                 unlinked.append(payment)
                 continue
             }
