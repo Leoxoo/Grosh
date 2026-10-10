@@ -319,6 +319,8 @@ struct MoneyLoverImportTests {
         #expect(try context.fetch(FetchDescriptor<Transaction>()).allSatisfy { $0.wallet?.name == "Checking" })
         #expect(try context.fetchCount(FetchDescriptor<Grosh.Category>()) == categoriesBefore)
         #expect(try CategoryCatalog(context: context).categories(of: .expense).contains { $0.name == "Hobbies" })
+        #expect(try context.otherCategory(.expense).transactions?.isEmpty == true)
+        #expect(try context.lockedCategory(.startingBalance).transactions?.map { $0.wallet?.name } == ["Checking"])
     }
 
     /// Every transaction in list order, described by what the user sees of it.

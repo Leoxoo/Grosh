@@ -34,15 +34,9 @@ enum MoneyLoverImport {
 
     /// Deletes every transaction, Card and wallet. Categories stay. Doesn't save.
     private static func removeAllData(in context: ModelContext) throws {
-        for transaction in try context.fetch(FetchDescriptor<Transaction>()) {
-            context.delete(transaction)
-        }
-        for card in try context.fetch(FetchDescriptor<Card>()) {
-            context.delete(card)
-        }
-        for wallet in try context.fetch(FetchDescriptor<Wallet>()) {
-            context.delete(wallet)
-        }
+        try context.delete(model: Transaction.self)
+        try context.delete(model: Card.self)
+        try context.delete(model: Wallet.self)
     }
 }
 
