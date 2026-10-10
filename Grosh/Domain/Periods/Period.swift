@@ -65,8 +65,7 @@ nonisolated enum Period: Hashable, Sendable {
             let last = first.adding(days: 6)
             if (first...last).contains(today) { return String(localized: "This week") }
             if (first...last).contains(today.adding(days: -7)) { return String(localized: "Last week") }
-            let start = first.year == last.year ? first.numericTitle(locale, withYear: false) : first.numericTitle(locale)
-            return "\(start) – \(last.numericTitle(locale))"
+            return first.numericTitle(through: last, locale: locale)
         case .month(let month):
             let thisMonth = CalendarMonth(today)
             if month == thisMonth { return String(localized: "This month") }
@@ -92,6 +91,15 @@ nonisolated enum Period: Hashable, Sendable {
         case .future:
             return String(localized: "Future")
         }
+    }
+}
+
+extension CalendarDay {
+    /// The days from this one through `last` as the strip writes a span: `09/21 – 09/27/2026`, naming the first
+    /// day's year too only when the two differ, as in `12/29/2025 – 01/04/2026`.
+    nonisolated func numericTitle(through last: CalendarDay, locale: Locale) -> String {
+        let start = year == last.year ? numericTitle(locale, withYear: false) : numericTitle(locale)
+        return "\(start) – \(last.numericTitle(locale))"
     }
 }
 

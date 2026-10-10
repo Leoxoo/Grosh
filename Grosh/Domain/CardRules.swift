@@ -176,8 +176,6 @@ extension Card {
     /// The day this Credit card's statement closes in the given month, or `nil` when it has no statement date.
     /// A statement date past the month's end (the 31st in April) falls on the month's last day.
     func statementClosingDay(year: Int, month: Int) -> CalendarDay? {
-        guard let statementDay else { return nil }
-        let daysInMonth = CalendarMonth(year: year, month: month).dayCount
-        return CalendarDay(year: year, month: month, day: min(statementDay, daysInMonth))
+        statementDay.map { CalendarMonth(year: year, month: month).statementClosingDay($0) }
     }
 }
