@@ -20,6 +20,8 @@ final class Transaction {
     var linkID: UUID?
     /// When the transaction was entered; orders transactions within a day.
     var createdAt: Date = Date.now
+    /// On a Loan or Debt, the ``CalendarDay`` (as `yyyymmdd`) the user is reminded of it: its due date.
+    var reminderDayRaw: Int?
 
     var wallet: Wallet?
     var category: Category?
@@ -46,5 +48,11 @@ final class Transaction {
     var day: CalendarDay {
         get { CalendarDay(rawValue: dayRaw) }
         set { dayRaw = newValue.rawValue }
+    }
+
+    /// On a Loan or Debt, the day the user is reminded of it (its due date), or `nil` for no reminder.
+    var reminderDay: CalendarDay? {
+        get { reminderDayRaw.map(CalendarDay.init(rawValue:)) }
+        set { reminderDayRaw = newValue?.rawValue }
     }
 }

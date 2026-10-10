@@ -39,6 +39,8 @@ struct TransactionDraft {
     /// The person the transaction involved.
     var withName = ""
     var isExcludedFromReport = false
+    /// The day a Loan or Debt reminds the user of it, or `nil` for no reminder. Only kept on the Debt/Loan tab.
+    var reminderDay: CalendarDay?
     /// The Event an imported transaction belongs to. Shown, never edited.
     private(set) var eventName = ""
     /// Set when editing a balance adjustment, which never needs a Card and is never a Loan or Debt. Saving keeps
@@ -55,9 +57,11 @@ struct TransactionDraft {
         self.init(copying: transaction, day: transaction.day)
         eventName = transaction.eventName
         isBalanceAdjustment = transaction.isBalanceAdjustment
+        reminderDay = transaction.reminderDay
     }
 
-    /// A new transaction like `transaction`, dated `today` ("Duplicate").
+    /// A new transaction like `transaction`, dated `today` ("Duplicate"). A Loan's or Debt's reminder belonged to
+    /// the original, so the copy starts without one.
     init(duplicating transaction: Transaction, on today: CalendarDay) {
         self.init(copying: transaction, day: today)
     }
@@ -82,6 +86,8 @@ nonisolated enum TransactionRuleError: Error, Equatable {
     case missingCategory
     /// An expense in a wallet that has a Card must say which Card paid for it.
     case missingCard
+    /// A Loan or Debt must say who it is with.
+    case missingWith
     /// Only a wallet's Starting balance is edited as one.
     case notAStartingBalance
 }
@@ -93,6 +99,7 @@ extension TransactionRuleError: LocalizedError {
         case .missingAmount: String(localized: "Enter an amount above zero.")
         case .missingCategory: String(localized: "Choose a category.")
         case .missingCard: String(localized: "Choose the Card this expense was paid with.")
+        case .missingWith: String(localized: "Enter who you lent to or borrowed from in With.")
         case .notAStartingBalance: String(localized: "Only a wallet's Starting balance can be edited here.")
         }
     }
@@ -108,6 +115,19 @@ extension TransactionDraft {
             throw BalanceAdjustmentRuleError.reasonDoesNotMatchDifference
         }
         guard card != nil || !requiresCard else { throw TransactionRuleError.missingCard }
+        guard !requiresWith || !withName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw TransactionRuleError.missingWith
+        }
+    }
+
+    /// Whether the transaction can carry a reminder date: only a Loan or a Debt, on the Debt/Loan tab.
+    var offersReminder: Bool {
+        type == .debtLoan
+    }
+
+    /// Whether the transaction must say who it is with: a Loan or a Debt.
+    var requiresWith: Bool {
+        category?.isLoanOrDebt == true
     }
 
     /// The types the sheet offers, in order. A balance adjustment is only ever Expense or Income: its reason is a
