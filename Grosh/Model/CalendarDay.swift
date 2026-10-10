@@ -23,7 +23,7 @@ nonisolated struct CalendarDay: Hashable, Sendable {
 
 extension CalendarDay {
     /// The day `date` falls on in `calendar` (the user's calendar and time zone by default).
-    init(_ date: Date, in calendar: Calendar = .current) {
+    nonisolated init(_ date: Date, in calendar: Calendar = .current) {
         let parts = calendar.dateComponents([.year, .month, .day], from: date)
         self.init(year: parts.year ?? 0, month: parts.month ?? 1, day: parts.day ?? 1)
     }
@@ -32,7 +32,7 @@ extension CalendarDay {
     static var today: CalendarDay { CalendarDay(Date.now) }
 
     /// The start of this day in `calendar`, for date pickers and other APIs that take a `Date`.
-    func date(in calendar: Calendar = .current) -> Date {
+    nonisolated func date(in calendar: Calendar = .current) -> Date {
         calendar.date(from: DateComponents(year: year, month: month, day: day)) ?? .distantPast
     }
 }

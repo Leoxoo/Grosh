@@ -4,6 +4,8 @@ import SwiftUI
 /// in color.
 struct TransactionRow: View {
     let transaction: Transaction
+    /// Shows the transaction's day, for lists not grouped by day.
+    var showsDay = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -11,6 +13,11 @@ struct TransactionRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(transaction.categoryName)
                     .lineLimit(1)
+                if showsDay {
+                    Text(transaction.day.date().formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).year()))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 if !transaction.note.isEmpty {
                     Text(transaction.note)
                         .font(.caption)

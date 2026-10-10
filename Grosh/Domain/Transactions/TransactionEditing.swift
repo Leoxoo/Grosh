@@ -12,11 +12,13 @@ nonisolated enum TransactionEditFlow: Hashable, Sendable {
 
 extension Transaction {
     /// How the detail edits this transaction, or `nil` when the flow that recorded it owns it: a Debt Collection
-    /// or Repayment from Record payment, and every other linked transaction. A Starting balance and a transfer
-    /// half have their own editors, since the Add sheet would re-sign their amount by type and never offers
-    /// their category.
+    /// or Repayment from Record payment, and every other linked transaction. A Loan or Debt stays with the Add
+    /// sheet once it has payments (which share its link), with its wallet and category locked
+    /// (``TransactionDraft/isLockedByPayments``). A Starting balance and a transfer half have their own editors,
+    /// since the Add sheet would re-sign their amount by type and never offers their category.
     var editFlow: TransactionEditFlow? {
         if category?.isTransferHalf == true { return .transferHalf }
+        if isLoanOrDebt { return .addSheet }
         guard linkID == nil else { return nil }
         switch category?.lockedRole {
         case .startingBalance: return .startingBalance

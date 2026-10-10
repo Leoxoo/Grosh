@@ -86,10 +86,14 @@ How much of a Loan or Debt has not yet been collected or repaid.
 _Avoid_: Balance (that word belongs to wallets)
 
 **Settled**:
-A Loan or Debt with nothing outstanding. Settling never changes the original transaction; anything paid beyond what was owed is ordinary income or expense.
+A Loan or Debt with nothing outstanding. Settling never changes the original transaction; anything paid beyond what was owed is ordinary income or expense, which never needs a Card.
 
 **Forgive**:
-Settling whatever is still outstanding on a Loan or Debt without any money moving, so the forgiven amount appears as ordinary expense or income instead.
+Settling whatever is still outstanding on a Loan or Debt without any money moving, so the forgiven amount appears as ordinary expense or income instead. It never needs a Card.
+
+**Reminder date**:
+The day a Loan or Debt is due. The user gets a notification that day, and the Home bell lists it from then until it is settled.
+_Avoid_: Alarm, deadline
 
 **Transfer**:
 Money moved between two of the user's own wallets, shown as two linked transactions: an Outgoing transfer and an Incoming transfer. A transfer is never income or spending.
@@ -111,6 +115,9 @@ _Avoid_: Hidden, ignored
 
 **Period**:
 The span of time the transaction list is showing: a month by default, or Future.
+
+**Time range**:
+How long each period of the transaction list is: a day, week, month (the default), quarter or year; all time; or a custom range of days. Only Future and a custom range reach past today.
 
 **Opening balance** / **Ending balance**:
 The balance at the start and at the end of a period.

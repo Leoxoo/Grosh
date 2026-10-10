@@ -12,7 +12,7 @@ extension Calendar {
 
 extension CalendarDay {
     /// The day `days` calendar days after this one (before it when negative), across month and year ends.
-    func adding(days: Int) -> CalendarDay {
+    nonisolated func adding(days: Int) -> CalendarDay {
         let calendar = Calendar.utcGregorian
         let start = date(in: calendar)
         let moved = calendar.date(byAdding: .day, value: days, to: start) ?? start

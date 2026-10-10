@@ -6,10 +6,16 @@ import SwiftUI
 struct RelatedTransactionsSection: View {
     let transaction: Transaction
 
-    @Environment(\.modelContext) private var context
+    /// Every transaction sharing the link, this one included, so one linked later shows straight away.
+    @Query private var linked: [Transaction]
+
+    init(transaction: Transaction) {
+        self.transaction = transaction
+        _linked = Query(transaction.linkedTransactions)
+    }
 
     var body: some View {
-        let related = (try? transaction.related(in: context)) ?? []
+        let related = transaction.related(among: linked)
         if !related.isEmpty {
             Section("Related transactions") {
                 ForEach(related) { other in

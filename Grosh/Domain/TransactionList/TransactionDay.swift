@@ -8,9 +8,7 @@ struct TransactionDay: Identifiable {
 
     /// What the day added to or took from the balance: every transaction counts, excluded from report or not,
     /// so the days of a period add up to its difference.
-    var net: Money {
-        Money(cents: transactions.reduce(0) { $0 + $1.amountCents })
-    }
+    var net: Money { transactions.net }
 }
 
 extension TransactionDay {

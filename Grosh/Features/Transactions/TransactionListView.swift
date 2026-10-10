@@ -2,38 +2,61 @@ import SwiftData
 import SwiftUI
 
 /// The Transactions tab's list: the wallet selector and its balance, the period strip, the period's Opening and
-/// Ending balances, then its transactions by day, newest first.
+/// Ending balances, then its transactions by day, newest first, or by category. The "…" menu picks the time range
+/// and the grouping, and selects transactions to delete. Search and the filters narrow what is listed: grouped,
+/// selected and summed are the matching transactions only.
 struct TransactionListView: View {
     /// The transaction whose detail is showing.
     @Binding var selectedTransaction: Transaction?
 
     @Query private var transactions: [Transaction]
     @State private var walletSelection = WalletSelection.total
-    /// How long each period in the strip is. Only a month for now; the "…" menu will choose it once it has
-    /// more ranges to offer.
+    /// How long each period in the strip is, chosen in the "…" menu.
     @State private var timeRange = TimeRange.month
     @State private var period = Period.month(CalendarMonth(.today))
+    /// Whether the period's transactions are grouped by day or by category, chosen in the "…" menu.
+    @State private var grouping = TransactionGrouping.day
+    /// Search text and filters. Searching looks across all time and every wallet; filters narrow the period.
+    @State private var filter = TransactionFilter()
+    /// Whether the list is choosing transactions to delete, and the ones chosen so far.
+    @State private var isSelecting = false
+    @State private var chosen = Set<Transaction>()
 
     private var today: CalendarDay { .today }
 
+    /// The selected wallet's transactions, or the wallet filter's when one is set.
+    private var selected: [Transaction] {
+        filter.transactions(in: walletSelection, from: transactions)
+    }
+
     /// The periods the strip offers for `selected`, back to its first day with data.
     private func strip(for selected: [Transaction]) -> [Period] {
-        timeRange.periods(from: selected.map(\.dayRaw).min().map(CalendarDay.init(rawValue:)), today: today)
+        timeRange.periods(from: selected.firstDay, today: today)
     }
 
     var body: some View {
         let today = today
-        let selected = transactions.filter(walletSelection.includes)
+        let selected = selected
         let periods = strip(for: selected)
         let shownDays = period.days(today: today)
-        let days = TransactionDay.days(of: selected.filter { shownDays.contains($0.day) })
+        let shown = filter.listed(from: transactions, selection: walletSelection, on: shownDays)
 
-        List(selection: $selectedTransaction) {
+        list {
             Section {
-                PeriodSummaryView(summary: PeriodSummary(of: selected, in: period, today: today), period: period)
+                if filter.isOn {
+                    FilterSummaryView(filter: $filter, transactions: shown)
+                } else {
+                    PeriodSummaryView(
+                        summary: PeriodSummary(of: selected, in: period, today: today), period: period, today: today
+                    )
+                }
             }
 
-            if days.isEmpty {
+            if shown.isEmpty && filter.isOn {
+                Section {
+                    NoMatchingTransactionsView(filter: filter)
+                }
+            } else if shown.isEmpty {
                 Section {
                     ContentUnavailableView(
                         "No Transactions",
@@ -45,15 +68,16 @@ struct TransactionListView: View {
                 }
             }
 
-            ForEach(days) { day in
-                Section {
-                    ForEach(day.transactions) { transaction in
-                        NavigationLink(value: transaction) {
-                            TransactionRow(transaction: transaction)
-                        }
+            switch grouping {
+            case .day:
+                TransactionDaySections(transactions: shown) { row($0) }
+            case .category:
+                ForEach(TransactionCategoryGroup.groups(of: shown)) { group in
+                    Section {
+                        ForEach(group.transactions) { row($0, showsDay: true) }
+                    } header: {
+                        TransactionCategoryHeader(group: group)
                     }
-                } header: {
-                    TransactionDayHeader(day: day)
                 }
             }
         }
@@ -64,35 +88,90 @@ struct TransactionListView: View {
             }
             .padding(.top, 8)
             .background(.bar)
+            .hiddenWhileSearching(filter)
         }
+        .searchable(text: $filter.searchText, prompt: "Note, category or amount")
         .onChange(of: walletSelection) {
             // A wallet with a shorter history may not reach back to the period being shown.
-            if !strip(for: transactions.filter(walletSelection.includes)).contains(period) {
-                period = .month(CalendarMonth(today))
-            }
+            showPeriodHoldingTodayUnlessOffered(by: strip(for: selected))
         }
-        .navigationTitle("Transactions")
+        .onChange(of: filter.wallet) {
+            showPeriodHoldingTodayUnlessOffered(by: strip(for: selected))
+        }
+        .onChange(of: timeRange) {
+            showPeriodHoldingTodayUnlessOffered(by: strip(for: selected))
+        }
+        .transactionSelectionMode(
+            isSelecting: $isSelecting, chosen: $chosen, title: String(localized: "Transactions")
+        )
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                TransactionsMenu(walletSelection: walletSelection)
+            if !isSelecting {
+                ToolbarItem(placement: .primaryAction) {
+                    TransactionsMenu(
+                        walletSelection: walletSelection, timeRange: $timeRange, grouping: $grouping,
+                        startSelecting: startSelecting
+                    )
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    TransactionFilterButton(filter: $filter)
+                }
             }
         }
         .addTransactionButton()
     }
+
+    /// The list, choosing several transactions while selecting and otherwise opening the one tapped.
+    @ViewBuilder
+    private func list(@ViewBuilder content: () -> some View) -> some View {
+        if isSelecting {
+            List(selection: $chosen, content: content)
+                #if os(iOS)
+                .environment(\.editMode, .constant(.active))
+                #endif
+        } else {
+            List(selection: $selectedTransaction, content: content)
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ transaction: Transaction, showsDay: Bool = false) -> some View {
+        if isSelecting {
+            TransactionRow(transaction: transaction, showsDay: showsDay)
+                .tag(transaction)
+        } else {
+            NavigationLink(value: transaction) {
+                TransactionRow(transaction: transaction, showsDay: showsDay)
+            }
+        }
+    }
+
+    /// Keeps the period being shown when the strip still offers it; otherwise shows the one holding today.
+    private func showPeriodHoldingTodayUnlessOffered(by strip: [Period]) {
+        if !strip.contains(period) {
+            period = timeRange.period(containing: today)
+        }
+    }
+
+    private func startSelecting() {
+        selectedTransaction = nil
+        chosen = []
+        isSelecting = true
+    }
 }
 
-/// A day's date and its net total in color.
-private struct TransactionDayHeader: View {
-    let day: TransactionDay
+/// A category's icon and name, and its total for the period in color.
+private struct TransactionCategoryHeader: View {
+    let group: TransactionCategoryGroup
 
     var body: some View {
-        HStack {
-            Text(day.day.date().formatted(.dateTime.weekday(.wide).day().month(.wide).year()))
+        HStack(spacing: 8) {
+            CategoryIcon(category: group.category, size: 20)
+            Text(group.category?.name ?? String(localized: "Uncategorized"))
             Spacer()
-            AmountText(amount: day.net, showsPlusSign: true)
+            AmountText(amount: group.total, showsPlusSign: true)
         }
         .textCase(nil)
     }

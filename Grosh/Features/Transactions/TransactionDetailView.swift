@@ -12,6 +12,8 @@ struct TransactionDetailView: View {
     /// The editor Edit opened, while it is open.
     @State private var editing: TransactionEditFlow?
     @State private var isDuplicating = false
+    /// What the Loan or Debt section opened, while it is open.
+    @State private var loanOrDebtAction: LoanOrDebtAction?
 
     var body: some View {
         Group {
@@ -35,6 +37,7 @@ struct TransactionDetailView: View {
         .sheet(isPresented: $isDuplicating) {
             TransactionEditor(mode: .duplicate(transaction))
         }
+        .loanOrDebtSheets(for: transaction, action: $loanOrDebtAction)
     }
 
     private var details: some View {
@@ -50,6 +53,8 @@ struct TransactionDetailView: View {
             }
 
             BalanceChangeSection(transaction: transaction)
+
+            LoanOrDebtSection(transaction: transaction, action: $loanOrDebtAction)
 
             Section {
                 fields
