@@ -121,7 +121,7 @@ private struct Importer {
         let firstDay = rows.filter { $0.walletName == row.walletName }.map(\.day).min() ?? row.day
         let starting = Transaction(amount: Money(cents: 0), day: firstDay, wallet: nil, category: nil)
         starting.isExcludedFromReport = true
-        starting.createdAt = now.addingTimeInterval(-Double(rows.count + 1))
+        starting.createdAt = now.addingTimeInterval(-Double(rows.count + walletOrder.count))
         context.insert(starting)
         starting.wallet = wallet
         starting.category = startingBalance

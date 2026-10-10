@@ -321,6 +321,43 @@ struct MoneyLoverImportTests {
         #expect(try CategoryCatalog(context: context).categories(of: .expense).contains { $0.name == "Hobbies" })
     }
 
+    /// Every transaction in list order, described by what the user sees of it.
+    private func everything() throws -> [String] {
+        try context.fetch(FetchDescriptor<Transaction>()).inListOrder().map { transaction in
+            let related = (try? transaction.related(in: context).map(\.amountCents)) ?? []
+            return [
+                transaction.wallet?.name ?? "", "\(transaction.dayRaw)", "\(transaction.amountCents)",
+                transaction.category?.name ?? "", transaction.note, transaction.card?.name ?? "",
+                transaction.withName, transaction.eventName, "\(transaction.isExcludedFromReport)",
+                "\(transaction.isBalanceAdjustment)", "\(related)",
+            ].joined(separator: "|")
+        }
+    }
+
+    @Test func importingTheSameFileAgainGivesTheSameResult() throws {
+        let file = export(
+            "1,10/05/2026,Lottery,25.00,USD,Checking (Navy Federal),Ticket #citi,,,,",
+            "2,10/05/2026,Café,-3.00,USD,Checking (Navy Federal),Coffee #chase,Sam,Trip,,",
+            "3,10/04/2026,Outgoing transfer,-40,USD,Checking (Navy Federal),,,,✅,",
+            "4,10/04/2026,Incoming transfer,40,USD,Cash,,,,✅,",
+            "5,10/03/2026,Incoming transfer,15,USD,Cash,,,,✅,",
+            "6,10/02/2026,Debt Collection,25,USD,Cash,,Sam,,✅,",
+            "7,10/01/2026,Loan,-25,USD,Cash,,Sam,,✅,",
+            "8,09/30/2026,Loan,-10,USD,Cash,,Kim,,✅,"
+        )
+        let firstSummary = try importing(file)
+        let firstResult = try everything()
+        let categories = try context.fetchCount(FetchDescriptor<Grosh.Category>())
+
+        let secondSummary = try importing(file)
+
+        #expect(secondSummary == firstSummary)
+        #expect(try everything() == firstResult)
+        #expect(try context.fetchCount(FetchDescriptor<Grosh.Category>()) == categories)
+        #expect(try context.fetch(FetchDescriptor<Card>()).map(\.name).sorted() == ["Chase", "Citi"])
+        #expect(try context.fetchCount(FetchDescriptor<Wallet>()) == 2)
+    }
+
     @Test func aFileThatCantBeImportedChangesNothing() throws {
         try addExistingData()
 
