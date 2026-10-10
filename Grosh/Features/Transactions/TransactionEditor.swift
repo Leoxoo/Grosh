@@ -85,6 +85,7 @@ private struct TransactionForm: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
+                .disabled(draft.isLockedByPayments)
             }
 
             mainSection(fields)
@@ -101,8 +102,10 @@ private struct TransactionForm: View {
     private func mainSection(_ fields: KeypadSheetFields) -> some View {
         Section {
             WalletPicker(title: "Wallet", selection: $draft.wallet)
+                .disabled(draft.isLockedByPayments)
             fields.amountRow("Amount", currencyCode: currencyCode, tint: Money(cents: draft.sign).tint)
             CategoryPicker(title: "Category", type: draft.type, selection: $draft.category)
+                .disabled(draft.isLockedByPayments)
             if draft.offersCard {
                 CardPicker(title: "Card", wallet: draft.wallet, selection: $draft.card)
             }
@@ -111,6 +114,8 @@ private struct TransactionForm: View {
         } footer: {
             if draft.wallet == nil {
                 Text("Add a wallet first, in Account → Wallets.")
+            } else if let paymentLock = draft.paymentLock {
+                Text("Its payments keep the wallet and category. The amount can't be less than the \(paymentLock.paid.formatted()) already paid back.")
             } else if draftToSave.requiresCard && draft.card == nil {
                 Text("Choose the Card this expense was paid with. Expenses need a Card when their wallet has one.")
             }

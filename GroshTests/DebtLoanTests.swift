@@ -314,6 +314,88 @@ struct DebtLoanTests {
         #expect(debt.day == lentOn)
     }
 
+    // MARK: Editing a Loan or Debt with payments
+
+    @Test func aLoanWithPaymentsCanStillBeEditedAndWhatIsOutstandingFollows() throws {
+        let loan = try lend(100_00)
+        let collection = try pay(60_00, on: loan).payment
+        #expect(loan.editFlow == .addSheet)
+
+        var editing = TransactionDraft(editing: loan)
+        editing.amount = Money(cents: 150_00)
+        editing.day = lentOn.adding(days: -2)
+        editing.withName = "Pavel"
+        editing.note = "Rent help"
+        editing.reminderDay = paidOn.adding(days: 30)
+        try loan.update(with: editing)
+
+        #expect(loan.amountCents == -150_00)
+        #expect(loan.day == lentOn.adding(days: -2))
+        #expect(loan.withName == "Pavel")
+        #expect(loan.note == "Rent help")
+        #expect(loan.reminderDay == paidOn.adding(days: 30))
+        #expect(try loan.outstanding(in: context) == Money(cents: 90_00))
+        #expect(try loan.related(in: context) == [collection])
+        #expect(collection.amountCents == 60_00)
+        #expect(collection.day == paidOn)
+    }
+
+    @Test func aLoanWithPaymentsKeepsItsWalletTypeAndCategory() throws {
+        let loan = try lend(100_00)
+        try pay(60_00, on: loan)
+        let savings = Wallet(name: "Savings")
+        context.insert(savings)
+        let editing = TransactionDraft(editing: loan)
+        #expect(editing.isLockedByPayments)
+
+        var otherWallet = editing
+        otherWallet.wallet = savings
+        var otherCategory = editing
+        otherCategory.category = try context.lockedCategory(.debt)
+        var otherType = editing
+        otherType.type = .expense
+        otherType.category = try store.category("Café")
+
+        #expect(throws: DebtLoanRuleError.lockedByPayments) { try loan.update(with: otherWallet) }
+        #expect(throws: DebtLoanRuleError.lockedByPayments) { try loan.update(with: otherCategory) }
+        #expect(throws: DebtLoanRuleError.lockedByPayments) { try loan.update(with: otherType) }
+        #expect(loan.wallet == checking)
+        #expect(loan.category == (try context.lockedCategory(.loan)))
+    }
+
+    @Test func aLoansAmountCantDropBelowWhatHasBeenPaid() throws {
+        let loan = try lend(100_00)
+        try pay(60_00, on: loan)
+        var editing = TransactionDraft(editing: loan)
+
+        editing.amount = Money(cents: 59_99)
+        #expect(!editing.canSave)
+        #expect(throws: DebtLoanRuleError.amountBelowPaid) { try loan.update(with: editing) }
+        #expect(loan.amountCents == -100_00)
+
+        editing.amount = Money(cents: 60_00)
+        try loan.update(with: editing)
+        #expect(try loan.isSettled(in: context))
+    }
+
+    @Test func aLoanWithoutPaymentsIsEditedFreely() throws {
+        let loan = try lend(100_00)
+
+        #expect(!TransactionDraft(editing: loan).isLockedByPayments)
+    }
+
+    @Test func aDuplicateOfALoanWithPaymentsStartsUnpaidAndUnlinked() throws {
+        let loan = try lend(100_00)
+        try pay(60_00, on: loan)
+        #expect(loan.canBeDuplicated)
+
+        let copy = try Transaction.create(TransactionDraft(duplicating: loan, on: paidOn), in: context)
+
+        #expect(copy.linkID == nil)
+        #expect(try copy.outstanding(in: context) == Money(cents: 100_00))
+        #expect(try loan.outstanding(in: context) == Money(cents: 40_00))
+    }
+
     // MARK: Linking a payment recorded elsewhere
 
     /// A Debt Collection that came in without a link, as an import brings them.

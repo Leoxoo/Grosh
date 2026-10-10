@@ -90,11 +90,21 @@ struct TransactionDetailTests {
 
     @Test func aLinkedTransactionIsNeitherEditedNorDuplicatedHere() throws {
         try CategorySeeder.seedIfNeeded(in: context)
-        let lent = record("lent to Pasha", -100_00, in: checking, link: UUID())
-        lent.category = try context.lockedCategory(.loan)
+        let forgiven = record("forgave Pasha", -40_00, in: checking, link: UUID())
+        forgiven.category = try context.lockedCategory(.otherExpense)
 
-        #expect(lent.editFlow == nil)
-        #expect(!lent.canBeDuplicated)
+        #expect(forgiven.editFlow == nil)
+        #expect(!forgiven.canBeDuplicated)
+    }
+
+    @Test(arguments: [LockedRole.loan, .debt])
+    func aLoanOrDebtWithPaymentsIsStillEditedAndDuplicatedInTheAddSheet(role: LockedRole) throws {
+        try CategorySeeder.seedIfNeeded(in: context)
+        let original = record("Pasha", -100_00, in: checking, link: UUID())
+        original.category = try context.lockedCategory(role)
+
+        #expect(original.editFlow == .addSheet)
+        #expect(original.canBeDuplicated)
     }
 
     // MARK: Deleting

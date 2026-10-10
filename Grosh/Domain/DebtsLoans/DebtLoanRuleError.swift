@@ -11,6 +11,10 @@ nonisolated enum DebtLoanRuleError: Error, Equatable {
     case categoryDoesNotMatch
     /// A Loan is paid with Debt Collections and a Debt with Repayments.
     case paymentDoesNotMatch
+    /// A Loan or Debt with payments keeps the wallet and category they were recorded against.
+    case lockedByPayments
+    /// A Loan or Debt can't be for less than what has been collected or repaid on it.
+    case amountBelowPaid
 }
 
 extension DebtLoanRuleError: LocalizedError {
@@ -24,6 +28,10 @@ extension DebtLoanRuleError: LocalizedError {
             String(localized: "Choose an Income category for money that comes in, or an Expense category for money that goes out.")
         case .paymentDoesNotMatch:
             String(localized: "A Loan is paid back with Debt Collections, and a Debt with Repayments.")
+        case .lockedByPayments:
+            String(localized: "Its payments keep this Loan or Debt in its wallet and category.")
+        case .amountBelowPaid:
+            String(localized: "The amount can't be less than what has already been paid back.")
         }
     }
 }
