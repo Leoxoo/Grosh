@@ -411,6 +411,37 @@ struct MoneyLoverImportTests {
         #expect(try context.fetchCount(FetchDescriptor<Wallet>()) == 2)
     }
 
+    /// The wallets the store itself holds each time the main context is about to save, read through a context of
+    /// its own so nothing pending shows.
+    @MainActor private final class StoreAtEachSave {
+        var wallets: [[String]] = []
+    }
+
+    @Test func theImportChangesTheStoreInOneSaveAtTheEnd() throws {
+        try addExistingData()
+        let saves = StoreAtEachSave()
+        let observer = NotificationCenter.default.addObserver(
+            forName: ModelContext.willSave, object: context, queue: nil
+        ) { [container] _ in
+            MainActor.assumeIsolated {
+                let store = ModelContext(container)
+                saves.wallets.append(((try? store.fetch(FetchDescriptor<Wallet>())) ?? []).map(\.name))
+            }
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        try importing(export(
+            "1,10/03/2026,Debt Collection,25,USD,Cash,,Sam,,✅,",
+            "2,10/02/2026,Debt Collection,10,USD,Cash,,Kim,,✅,",
+            "3,10/01/2026,Loan,-25,USD,Cash,,Sam,,✅,",
+            "4,09/30/2026,Loan,-10,USD,Cash,,Kim,,✅,"
+        ))
+
+        #expect(saves.wallets == [["Old wallet"]])
+        #expect(try context.fetch(FetchDescriptor<Wallet>()).map(\.name) == ["Cash"])
+        #expect(try debtsAndLoans().settled.count == 2)
+    }
+
     @Test func aFileThatCantBeImportedChangesNothing() throws {
         try addExistingData()
 

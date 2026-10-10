@@ -16,9 +16,9 @@ enum MoneyLoverImport {
     /// - Each Debt Collection links to the earliest open Loan of its wallet and amount, each Repayment to a Debt.
     /// - Within a day, rows keep the file's order.
     ///
-    /// Saves. Throws ``MoneyLoverImportError`` without changing anything when the file can't be read: the whole file,
-    /// and the locked categories the import needs, are checked before anything is deleted. Should saving fail after
-    /// that, the old wallets, Cards and transactions are gone already and importing the file again recovers.
+    /// Saves once, at the end: the old data is deleted by the same save that adds the new. Throws without changing
+    /// anything when it can't finish, saving included: ``MoneyLoverImportError`` for a file that can't be read, which
+    /// is checked whole before anything else is done. Once saved, the old data can't be brought back.
     @discardableResult
     static func replaceAllData(
         with csv: String, in context: ModelContext, now: Date = .now
@@ -36,18 +36,23 @@ enum MoneyLoverImport {
         }
     }
 
-    /// Deletes every transaction, Card and wallet from the store. Categories stay. These are batch deletes: they take
-    /// effect right away rather than at the next save, which makes replacing ~6,000 transactions about five times
-    /// faster than deleting them one by one, but a rollback can't bring them back.
+    /// Deletes every transaction, Card and wallet. Categories stay. Doesn't save. One by one, rather than as batch
+    /// deletes, which would be faster but take effect in the store right away, where a rollback can't undo them.
     private static func removeAllData(in context: ModelContext) throws {
-        try context.delete(model: Transaction.self)
-        try context.delete(model: Card.self)
-        try context.delete(model: Wallet.self)
+        for transaction in try context.fetch(FetchDescriptor<Transaction>()) {
+            context.delete(transaction)
+        }
+        for card in try context.fetch(FetchDescriptor<Card>()) {
+            context.delete(card)
+        }
+        for wallet in try context.fetch(FetchDescriptor<Wallet>()) {
+            context.delete(wallet)
+        }
     }
 }
 
-/// One run of ``MoneyLoverImport/replaceAllData(with:in:now:)`` over rows already read, into a store already
-/// emptied.
+/// One run of ``MoneyLoverImport/replaceAllData(with:in:now:)`` over rows already read, after the old data is
+/// deleted.
 private struct Importer {
     let rows: [MoneyLoverRow]
     let context: ModelContext
@@ -71,8 +76,7 @@ private struct Importer {
         }
     }
 
-    /// Records every row, pairs the transfers, links the payments and says what was done. Doesn't save, except
-    /// that linking a payment does.
+    /// Records every row, links the transfers and the payments, and says what was done. Doesn't save.
     mutating func run() throws -> MoneyLoverImportSummary {
         var categories = try CategoryLookup(context: context)
         for row in rows where wallets[row.walletName] == nil {
@@ -211,7 +215,7 @@ private struct Importer {
 
     /// Links each Debt Collection among `imported` to the earliest Loan still open that has its wallet and amount
     /// and is dated on or before it, and each Repayment to a Debt the same way (ADR-0003). Payments are taken oldest
-    /// first. Returns the payments left unlinked. Saves.
+    /// first. Returns the payments left unlinked. Doesn't save.
     private static func linkPayments(among imported: [Transaction]) throws -> [Transaction] {
         let oldestFirst = Array(imported.inListOrder().reversed())
         var open = oldestFirst.filter(\.isLoanOrDebt)
@@ -227,7 +231,7 @@ private struct Importer {
                 unlinked.append(payment)
                 continue
             }
-            try open.remove(at: index).linkPayment(payment)
+            try open.remove(at: index).linkPaymentWithoutSaving(payment)
         }
         return unlinked
     }

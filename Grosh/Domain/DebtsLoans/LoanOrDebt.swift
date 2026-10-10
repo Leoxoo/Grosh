@@ -154,10 +154,15 @@ extension Transaction {
     /// import, so it counts against this Loan or Debt and they show as each other's Related transactions. Only the
     /// links change. Saves.
     func linkPayment(_ payment: Transaction) throws {
+        try linkPaymentWithoutSaving(payment)
+        try modelContext?.save()
+    }
+
+    /// ``linkPayment(_:)`` without the save, for a caller that saves once after linking many, such as an import.
+    func linkPaymentWithoutSaving(_ payment: Transaction) throws {
         guard let kind = loanOrDebtKind else { throw DebtLoanRuleError.notALoanOrDebt }
         guard payment.category?.lockedRole == kind.paymentRole else { throw DebtLoanRuleError.paymentDoesNotMatch }
         payment.linkID = paymentLink()
-        try modelContext?.save()
     }
 
     /// The link this Loan or Debt shares with its payments, made the first time one is recorded.
