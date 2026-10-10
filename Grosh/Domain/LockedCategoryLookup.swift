@@ -15,4 +15,11 @@ extension ModelContext {
         guard let category = try fetch(descriptor).first else { throw MissingLockedCategory(role: role) }
         return category
     }
+
+    /// Other Income for money coming in (`type` Income), Other Expense for money going out: what the app files an
+    /// amount under until the user picks another category, such as a balance adjustment's reason, an overpayment or
+    /// a forgiven amount.
+    func otherCategory(_ type: CategoryType) throws -> Category {
+        try lockedCategory(type == .income ? .otherIncome : .otherExpense)
+    }
 }

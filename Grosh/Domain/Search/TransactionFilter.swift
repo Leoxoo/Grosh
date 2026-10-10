@@ -84,9 +84,4 @@ extension Sequence where Element == Transaction {
     func matching(_ filter: TransactionFilter) -> [Transaction] {
         self.filter(filter.matches)
     }
-
-    /// What the transactions add up to, excluded from report or not: with a Card filter on, that Card's total.
-    var net: Money {
-        Money(cents: reduce(0) { $0 + $1.amountCents })
-    }
 }

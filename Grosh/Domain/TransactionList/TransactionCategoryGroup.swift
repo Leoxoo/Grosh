@@ -11,9 +11,7 @@ struct TransactionCategoryGroup: Identifiable {
 
     /// What the category added to or took from the balance: every transaction counts, excluded from report or
     /// not, so the groups of a period add up to its difference.
-    var total: Money {
-        Money(cents: transactions.reduce(0) { $0 + $1.amountCents })
-    }
+    var total: Money { transactions.net }
 }
 
 extension TransactionCategoryGroup {

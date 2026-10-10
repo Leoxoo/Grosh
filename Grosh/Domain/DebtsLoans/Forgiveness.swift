@@ -17,7 +17,7 @@ struct ForgiveDraft {
         guard let loanOrDebt = try LoanOrDebt(original, in: context) else { throw DebtLoanRuleError.notALoanOrDebt }
         self.loanOrDebt = loanOrDebt
         self.day = day
-        self.category = try context.lockedCategory(loanOrDebt.forgivenType == .expense ? .otherExpense : .otherIncome)
+        self.category = try context.otherCategory(loanOrDebt.forgivenType)
     }
 
     /// Expense for a forgiven Loan (the user gives the money up), Income for a forgiven Debt.

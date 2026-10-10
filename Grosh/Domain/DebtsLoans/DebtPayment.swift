@@ -20,9 +20,7 @@ struct DebtPaymentDraft {
         self.loanOrDebt = loanOrDebt
         self.amount = loanOrDebt.outstanding
         self.day = day
-        self.overpaymentCategory = try context.lockedCategory(
-            loanOrDebt.overpaymentType == .income ? .otherIncome : .otherExpense
-        )
+        self.overpaymentCategory = try context.otherCategory(loanOrDebt.overpaymentType)
     }
 
     /// Income for money collected beyond a Loan, Expense for money repaid beyond a Debt.
