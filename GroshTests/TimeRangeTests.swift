@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Grosh
 
@@ -7,6 +8,7 @@ struct TimeRangeTests {
     /// A Friday.
     private let today = CalendarDay(year: 2026, month: 10, day: 9)
     private let monday = 2
+    private let unitedStates = Locale(identifier: "en_US")
 
     private func day(_ year: Int, _ month: Int, _ day: Int) -> CalendarDay {
         CalendarDay(year: year, month: month, day: day)
@@ -25,7 +27,15 @@ struct TimeRangeTests {
     @Test func theDayStripReadsOlderDaysThenYesterdayTodayAndFuture() {
         let strip = TimeRange.day.periods(from: day(2026, 10, 6), today: today, firstWeekday: monday)
 
-        #expect(strip.map { $0.title(today: today) } == ["06/10/2026", "07/10/2026", "Yesterday", "Today", "Future"])
+        #expect(strip.map { $0.title(today: today, locale: unitedStates) }
+            == ["10/06/2026", "10/07/2026", "Yesterday", "Today", "Future"])
+    }
+
+    @Test func aDayIsWrittenInTheOrderOfTheUsersLocale() {
+        let tuesday = Period.day(day(2026, 10, 6))
+
+        #expect(tuesday.title(today: today, locale: unitedStates) == "10/06/2026")
+        #expect(tuesday.title(today: today, locale: Locale(identifier: "en_GB")) == "06/10/2026")
     }
 
     // MARK: Week
@@ -52,13 +62,14 @@ struct TimeRangeTests {
     @Test func theWeekStripReadsOlderWeeksThenLastWeekThisWeekAndFuture() {
         let strip = TimeRange.week.periods(from: day(2026, 9, 23), today: today, firstWeekday: monday)
 
-        #expect(strip.map { $0.title(today: today) } == ["21/09 – 27/09/2026", "Last week", "This week", "Future"])
+        #expect(strip.map { $0.title(today: today, locale: unitedStates) }
+            == ["09/21 – 09/27/2026", "Last week", "This week", "Future"])
     }
 
     @Test func aWeekAcrossTheYearEndNamesBothYears() {
         let week = TimeRange.week.period(containing: day(2025, 12, 31), firstWeekday: monday)
 
-        #expect(week.title(today: today) == "29/12/2025 – 04/01/2026")
+        #expect(week.title(today: today, locale: unitedStates) == "12/29/2025 – 01/04/2026")
     }
 
     // MARK: Quarter
@@ -119,7 +130,7 @@ struct TimeRangeTests {
         let strip = chosen.periods(from: day(2020, 7, 1), today: today, firstWeekday: monday)
 
         #expect(strip.map { $0.days(today: today) } == [DayRange(first: day(2026, 9, 15), last: day(2026, 10, 31))])
-        #expect(strip.map { $0.title(today: today) } == ["15/09/2026 – 31/10/2026"])
+        #expect(strip.map { $0.title(today: today, locale: unitedStates) } == ["09/15/2026 – 10/31/2026"])
     }
 
     // MARK: Projected balance

@@ -7,6 +7,8 @@ struct PeriodStrip: View {
     @Binding var selection: Period
     let today: CalendarDay
 
+    @Environment(\.locale) private var locale
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal) {
@@ -34,7 +36,7 @@ struct PeriodStrip: View {
         return Button {
             selection = period
         } label: {
-            Text(period.title(today: today))
+            Text(period.title(today: today, locale: locale))
                 .font(.subheadline.weight(isSelected ? .semibold : .regular))
                 .foregroundStyle(isSelected ? .primary : .secondary)
                 .padding(.vertical, 8)
