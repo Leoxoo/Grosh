@@ -112,6 +112,9 @@ _Avoid_: Hidden, ignored
 **Period**:
 The span of time the transaction list is showing: a month by default, or Future.
 
+**Time range**:
+How long each period of the transaction list is: a day, week, month (the default), quarter or year; all time; or a custom range of days. Only Future and a custom range reach past today.
+
 **Opening balance** / **Ending balance**:
 The balance at the start and at the end of a period.
 
