@@ -201,5 +201,5 @@ private extension TransactionDraft {
 
 #Preview {
     TransactionEditor(mode: .add)
-        .modelContainer(try! GroshStore.makeContainer(inMemory: true))
+        .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
 }

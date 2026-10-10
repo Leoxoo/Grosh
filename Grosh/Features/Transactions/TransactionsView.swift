@@ -31,5 +31,5 @@ struct TransactionsView: View {
 
 #Preview {
     TransactionsView()
-        .modelContainer(try! GroshStore.makeContainer(inMemory: true))
+        .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
 }

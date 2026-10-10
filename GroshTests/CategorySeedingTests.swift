@@ -53,6 +53,14 @@ struct CategorySeedingTests {
         ])
     }
 
+    @Test func aSeededStoreHasEveryCategoryTheAppDependsOn() throws {
+        let seeded = try GroshStore.makeSeededContainer(inMemory: true)
+
+        for role in LockedRole.allCases {
+            #expect(try seeded.mainContext.lockedCategory(role).lockedRole == role)
+        }
+    }
+
     @Test func seedingAgainDoesNotDuplicateTheTree() throws {
         try CategorySeeder.seedIfNeeded(in: context)
         try CategorySeeder.seedIfNeeded(in: context)

@@ -13,4 +13,13 @@ enum GroshStore {
         )
         return try ModelContainer(for: schema, configurations: configuration)
     }
+
+    /// The store as the app opens it: ``makeContainer(inMemory:)`` with the default categories seeded into an empty
+    /// one (``CategorySeeder``). Previews open theirs in memory, so they start where a fresh install does, with the
+    /// locked categories the app depends on.
+    static func makeSeededContainer(inMemory: Bool = false) throws -> ModelContainer {
+        let container = try makeContainer(inMemory: inMemory)
+        try CategorySeeder.seedIfNeeded(in: container.mainContext)
+        return container
+    }
 }

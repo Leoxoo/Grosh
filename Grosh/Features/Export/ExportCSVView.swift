@@ -50,5 +50,5 @@ struct ExportCSVView: View {
     NavigationStack {
         ExportCSVView()
     }
-    .modelContainer(try! GroshStore.makeContainer(inMemory: true))
+    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
 }

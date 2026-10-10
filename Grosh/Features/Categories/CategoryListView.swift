@@ -150,10 +150,8 @@ struct CategoryListView: View {
 }
 
 #Preview {
-    let container = try! GroshStore.makeContainer(inMemory: true)
-    try! CategorySeeder.seedIfNeeded(in: container.mainContext)
-    return NavigationStack {
+    NavigationStack {
         CategoryListView()
     }
-    .modelContainer(container)
+    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
 }

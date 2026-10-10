@@ -104,5 +104,5 @@ extension LoanOrDebt: Identifiable {
     NavigationStack {
         DebtsLoansView()
     }
-    .modelContainer(try! GroshStore.makeContainer(inMemory: true))
+    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
 }

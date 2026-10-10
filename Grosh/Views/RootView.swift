@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 /// The app's top level: a tab bar on iPhone, a sidebar on iPad and Mac.
@@ -29,4 +30,5 @@ struct RootView: View {
 
 #Preview {
     RootView()
+        .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
 }

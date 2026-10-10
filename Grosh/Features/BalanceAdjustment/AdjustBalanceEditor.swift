@@ -114,5 +114,5 @@ private struct AdjustBalanceForm: View {
 
 #Preview {
     AdjustBalanceEditor()
-        .modelContainer(try! GroshStore.makeContainer(inMemory: true))
+        .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
 }
