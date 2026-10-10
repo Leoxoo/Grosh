@@ -457,6 +457,19 @@ struct MoneyLoverImportTests {
         #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 2)
     }
 
+    @Test func aStoreMissingALockedCategoryIsRefusedWithAMessageNamingIt() throws {
+        try addExistingData()
+        context.delete(try context.lockedCategory(.otherIncome))
+        try context.save()
+
+        let error = #expect(throws: MissingLockedCategory.self) {
+            try importing(export("1,10/05/2026,Café,-10.91,USD,Checking,Coffee,,,,"))
+        }
+
+        #expect(error?.localizedDescription == "Grosh can't do this without its “Other Income” category, which is missing.")
+        #expect(try context.fetch(FetchDescriptor<Wallet>()).map(\.name) == ["Old wallet"])
+    }
+
     @Test func withinADayRowsKeepTheFilesOrderAndWhatIsEnteredLaterGoesOnTop() throws {
         try importing(export(
             "1,10/05/2026,Café,-1.00,USD,Checking,First,,,,",
