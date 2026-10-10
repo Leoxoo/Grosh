@@ -219,7 +219,7 @@ struct MoneyLoverImportTests {
         #expect(!outgoing.isBalanceAdjustment && !incoming.isBalanceAdjustment)
     }
 
-    @Test func transferRowsPairOneToOneOnlyOnTheSameDayInAnotherWallet() throws {
+    @Test func transferRowsLinkOneToOneOnlyOnTheSameDayInAnotherWallet() throws {
         try importing(export(
             "1,10/05/2026,Outgoing transfer,-100,USD,Checking,,,,,",
             "2,10/05/2026,Incoming transfer,100,USD,Checking,,,,,",

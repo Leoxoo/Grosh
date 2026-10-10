@@ -90,16 +90,16 @@ private struct Importer {
         }
 
         var unmatched: [ObjectIdentifier: MoneyLoverImportSummary.UnmatchedRow.Outcome] = [:]
-        for unpaired in Self.linkTransfers(among: imported) {
+        for unlinked in Self.linkTransfers(among: imported) {
             // A balance adjustment records a difference, so a row of no amount has nothing to adjust.
-            guard let type = BalanceAdjustmentDraft.reasonType(for: unpaired.amountCents) else {
-                unmatched[ObjectIdentifier(unpaired)] = .notImported
-                context.delete(unpaired)
+            guard let type = BalanceAdjustmentDraft.reasonType(for: unlinked.amountCents) else {
+                unmatched[ObjectIdentifier(unlinked)] = .notImported
+                context.delete(unlinked)
                 continue
             }
-            unpaired.isBalanceAdjustment = true
-            unpaired.category = adjustmentReasons[type]
-            unmatched[ObjectIdentifier(unpaired)] = .balanceAdjustment
+            unlinked.isBalanceAdjustment = true
+            unlinked.category = adjustmentReasons[type]
+            unmatched[ObjectIdentifier(unlinked)] = .balanceAdjustment
         }
         let kept = zip(rows, imported).filter { unmatched[ObjectIdentifier($1)] != .notImported }
         for unlinked in try Self.linkPayments(among: kept.map(\.1)) {
