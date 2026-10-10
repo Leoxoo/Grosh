@@ -21,10 +21,6 @@ struct TransactionListView: View {
     /// Whether the list is choosing transactions to delete, and the ones chosen so far.
     @State private var isSelecting = false
     @State private var chosen = Set<Transaction>()
-    @State private var deletePrompt: TransactionDeletePrompt?
-    @State private var errorMessage: String?
-
-    @Environment(\.modelContext) private var context
 
     private var today: CalendarDay { .today }
 
@@ -74,17 +70,11 @@ struct TransactionListView: View {
 
             switch grouping {
             case .day:
-                ForEach(TransactionDay.days(of: shown)) { day in
-                    Section {
-                        rows(day.transactions)
-                    } header: {
-                        TransactionDayHeader(day: day)
-                    }
-                }
+                TransactionDaySections(transactions: shown) { row($0) }
             case .category:
                 ForEach(TransactionCategoryGroup.groups(of: shown)) { group in
                     Section {
-                        rows(group.transactions, showsDay: true)
+                        ForEach(group.transactions) { row($0, showsDay: true) }
                     } header: {
                         TransactionCategoryHeader(group: group)
                     }
@@ -111,20 +101,14 @@ struct TransactionListView: View {
         .onChange(of: timeRange) {
             showPeriodHoldingTodayUnlessOffered(by: strip(for: selected))
         }
-        .navigationTitle(isSelecting ? selectionTitle : String(localized: "Transactions"))
+        .transactionSelectionMode(
+            isSelecting: $isSelecting, chosen: $chosen, title: String(localized: "Transactions")
+        )
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
-            if isSelecting {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { stopSelecting() }
-                }
-                ToolbarItem(placement: .destructiveAction) {
-                    Button("Delete", systemImage: "trash", role: .destructive) { confirmDeletingChosen() }
-                        .disabled(chosen.isEmpty)
-                }
-            } else {
+            if !isSelecting {
                 ToolbarItem(placement: .primaryAction) {
                     TransactionsMenu(
                         walletSelection: walletSelection, timeRange: $timeRange, grouping: $grouping,
@@ -136,8 +120,6 @@ struct TransactionListView: View {
                 }
             }
         }
-        .transactionDeleteDialog($deletePrompt, didDelete: stopSelecting)
-        .errorAlert("Couldn't Delete Transactions", message: $errorMessage)
         .addTransactionButton()
     }
 
@@ -154,15 +136,14 @@ struct TransactionListView: View {
         }
     }
 
-    private func rows(_ transactions: [Transaction], showsDay: Bool = false) -> some View {
-        ForEach(transactions) { transaction in
-            if isSelecting {
+    @ViewBuilder
+    private func row(_ transaction: Transaction, showsDay: Bool = false) -> some View {
+        if isSelecting {
+            TransactionRow(transaction: transaction, showsDay: showsDay)
+                .tag(transaction)
+        } else {
+            NavigationLink(value: transaction) {
                 TransactionRow(transaction: transaction, showsDay: showsDay)
-                    .tag(transaction)
-            } else {
-                NavigationLink(value: transaction) {
-                    TransactionRow(transaction: transaction, showsDay: showsDay)
-                }
             }
         }
     }
@@ -174,41 +155,10 @@ struct TransactionListView: View {
         }
     }
 
-    private var selectionTitle: String {
-        chosen.isEmpty ? String(localized: "Select Transactions") : String(localized: "\(chosen.count) Selected")
-    }
-
     private func startSelecting() {
         selectedTransaction = nil
         chosen = []
         isSelecting = true
-    }
-
-    private func stopSelecting() {
-        isSelecting = false
-        chosen = []
-    }
-
-    private func confirmDeletingChosen() {
-        do {
-            deletePrompt = try TransactionDeletePrompt(for: Array(chosen).inListOrder(), in: context)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-}
-
-/// A day's date and its net total in color.
-struct TransactionDayHeader: View {
-    let day: TransactionDay
-
-    var body: some View {
-        HStack {
-            Text(day.day.date().formatted(.dateTime.weekday(.wide).day().month(.wide).year()))
-            Spacer()
-            AmountText(amount: day.net, showsPlusSign: true)
-        }
-        .textCase(nil)
     }
 }
 
