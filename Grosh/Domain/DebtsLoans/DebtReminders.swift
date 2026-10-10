@@ -3,18 +3,39 @@ import SwiftData
 
 /// A notification on the reminder day of an open Loan or Debt, saying who it is with and what is outstanding.
 nonisolated struct DebtReminder: Hashable, Sendable {
+    /// The Loan or Debt it reminds of.
+    let original: PersistentIdentifier
     let day: CalendarDay
     let withName: String
     let outstanding: Money
     /// A Loan (they owe the user) rather than a Debt (the user owes them).
     let isLoan: Bool
+    /// When the notification arrives.
+    var arrival = ReminderArrival.onItsDay
+
+    /// The hour of its day a reminder arrives at: 09:00.
+    static let hour = 9
+
+    /// Whether `other` reminds of the same Loan or Debt on the same day, whatever is outstanding by now.
+    func isSameReminder(as other: DebtReminder) -> Bool {
+        original == other.original && day == other.day
+    }
+}
+
+/// When a reminder's notification arrives.
+nonisolated enum ReminderArrival: Hashable, Sendable {
+    /// At ``DebtReminder/hour`` on the reminder day.
+    case onItsDay
+    /// As soon as it is scheduled: it was set for today once that hour had passed.
+    case rightAway
 }
 
 /// Where Loan and Debt reminders go: the system's local notifications in the app, a stand-in in tests.
 protocol ReminderScheduler {
     /// Asks the user to allow notifications, unless they already answered. Returns whether they are allowed.
     func requestPermission() async -> Bool
-    /// Makes `reminders` the pending Loan and Debt reminders, replacing every one scheduled before.
+    /// Makes `reminders` the pending Loan and Debt reminders, replacing every one scheduled before. Schedules
+    /// nothing while notifications aren't allowed.
     func replacePendingReminders(with reminders: [DebtReminder]) async
 }
 
@@ -32,16 +53,41 @@ extension DebtsAndLoans {
         open.compactMap { item in
             guard let day = item.original.reminderDay, day >= today else { return nil }
             return DebtReminder(
-                day: day, withName: item.original.withName, outstanding: item.outstanding,
-                isLoan: item.isLoan
+                original: item.original.persistentModelID, day: day, withName: item.original.withName,
+                outstanding: item.outstanding, isLoan: item.isLoan
             )
         }
         .sorted { $0.day < $1.day }
     }
 
-    /// Hands `scheduler` the ``reminders(from:)`` to keep pending, replacing those scheduled before.
-    func reschedule(from today: CalendarDay, using scheduler: some ReminderScheduler) async {
-        await scheduler.replacePendingReminders(with: reminders(from: today))
+    /// The notifications to keep pending at `now`: the ``reminders(from:)`` of that day, each arriving at 09:00 on
+    /// its day. Once 09:00 has passed, one for today arrives right away when it is new since `earlier` (what the
+    /// previous sync handed over), and is left out otherwise, since it has arrived already. Before the first sync of
+    /// a run (`earlier` is `nil`), every one for today counts as arrived.
+    func reminders(at now: Date, calendar: Calendar = .current, after earlier: [DebtReminder]?) -> [DebtReminder] {
+        let today = CalendarDay(now, in: calendar)
+        let hasPassedTheHour = calendar.component(.hour, from: now) >= DebtReminder.hour
+        return reminders(from: today).compactMap { reminder in
+            guard reminder.day == today, hasPassedTheHour else { return reminder }
+            guard let earlier, !earlier.contains(where: reminder.isSameReminder) else { return nil }
+            var rightAway = reminder
+            rightAway.arrival = .rightAway
+            return rightAway
+        }
+    }
+
+    /// Hands `scheduler` the ``reminders(at:calendar:after:)`` to keep pending, replacing those scheduled before.
+    /// When there is any, it first asks the user to allow notifications (the system asks only once), so the first
+    /// reminder is scheduled as soon as they allow it.
+    func reschedule(
+        at now: Date, calendar: Calendar = .current, after earlier: [DebtReminder]?,
+        using scheduler: some ReminderScheduler
+    ) async {
+        let reminders = reminders(at: now, calendar: calendar, after: earlier)
+        if !reminders.isEmpty {
+            _ = await scheduler.requestPermission()
+        }
+        await scheduler.replacePendingReminders(with: reminders)
     }
 }
 

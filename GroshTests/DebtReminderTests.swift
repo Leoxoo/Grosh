@@ -62,16 +62,23 @@ struct DebtReminderTests {
     @Test func eachOpenLoanOrDebtRemindingTodayOrLaterHasANotificationOnItsDay() throws {
         let loan = try record(.loan, 100_00, with: "Pasha", remindOn: today.adding(days: 5))
         try pay(60_00, on: loan)
-        try record(.debt, 50_00, with: "Anna", remindOn: today)
+        let anna = try record(.debt, 50_00, with: "Anna", remindOn: today)
         try record(.loan, 20_00, with: "Ivan", remindOn: today.adding(days: -1))
         try record(.loan, 30_00, with: "Olga", remindOn: nil)
 
         let reminders = try DebtsAndLoans(in: context).reminders(from: today)
 
         #expect(reminders == [
-            DebtReminder(day: today, withName: "Anna", outstanding: Money(cents: 50_00), isLoan: false),
-            DebtReminder(day: today.adding(days: 5), withName: "Pasha", outstanding: Money(cents: 40_00), isLoan: true),
+            DebtReminder(
+                original: anna.persistentModelID, day: today, withName: "Anna", outstanding: Money(cents: 50_00),
+                isLoan: false
+            ),
+            DebtReminder(
+                original: loan.persistentModelID, day: today.adding(days: 5), withName: "Pasha",
+                outstanding: Money(cents: 40_00), isLoan: true
+            ),
         ])
+        #expect(reminders.allSatisfy { $0.arrival == .onItsDay })
     }
 
     @Test func settlingALoanWithdrawsItsNotification() throws {
@@ -84,15 +91,71 @@ struct DebtReminderTests {
         #expect(try DebtsAndLoans(in: context).reminders(from: today).isEmpty)
     }
 
-    @Test func notificationsGoToTheSchedulerReplacingThosePendingBefore() async throws {
-        try record(.loan, 100_00, with: "Pasha", remindOn: today.adding(days: 5))
+    /// `hour`:00 on `today`, in UTC.
+    private func now(at hour: Int) -> Date {
+        Calendar.utcGregorian.date(from: DateComponents(year: 2026, month: 10, day: 9, hour: hour)) ?? .distantPast
+    }
+
+    @Test func theFirstReminderAsksToSendNotificationsThenIsScheduledOnceAllowed() async throws {
+        let loan = try record(.loan, 100_00, with: "Pasha", remindOn: today.adding(days: 5))
         let scheduler = RecordingReminderScheduler()
 
-        try await DebtsAndLoans(in: context).reschedule(from: today, using: scheduler)
+        try await DebtsAndLoans(in: context).reschedule(
+            at: now(at: 8), calendar: .utcGregorian, after: [], using: scheduler
+        )
 
-        #expect(scheduler.pending == [
-            DebtReminder(day: today.adding(days: 5), withName: "Pasha", outstanding: Money(cents: 100_00), isLoan: true),
+        #expect(scheduler.calls == [
+            .requestPermission,
+            .replacePendingReminders([
+                DebtReminder(
+                    original: loan.persistentModelID, day: today.adding(days: 5), withName: "Pasha",
+                    outstanding: Money(cents: 100_00), isLoan: true
+                ),
+            ]),
         ])
+    }
+
+    @Test func withNoReminderToSendNothingAsksToSendNotifications() async throws {
+        try record(.loan, 100_00, with: "Pasha", remindOn: nil)
+        let scheduler = RecordingReminderScheduler()
+
+        try await DebtsAndLoans(in: context).reschedule(
+            at: now(at: 8), calendar: .utcGregorian, after: [], using: scheduler
+        )
+
+        #expect(scheduler.calls == [.replacePendingReminders([])])
+    }
+
+    @Test func aReminderForTodayArrivesAtNineOrRightAwayWhenSetAfterNine() throws {
+        let loan = try record(.loan, 100_00, with: "Pasha", remindOn: today)
+        let list = try DebtsAndLoans(in: context)
+
+        let setBeforeNine = list.reminders(at: now(at: 8), calendar: .utcGregorian, after: [])
+        let setAfterNine = list.reminders(at: now(at: 14), calendar: .utcGregorian, after: [])
+
+        #expect(setBeforeNine.map(\.arrival) == [.onItsDay])
+        #expect(setAfterNine.map(\.arrival) == [.rightAway])
+        #expect(setAfterNine.map(\.original) == [loan.persistentModelID])
+    }
+
+    @Test func aReminderForTodayThatHasArrivedIsNotSentAgain() throws {
+        try record(.loan, 100_00, with: "Pasha", remindOn: today)
+        let list = try DebtsAndLoans(in: context)
+        let sentAtNine = list.reminders(from: today)
+
+        #expect(list.reminders(at: now(at: 14), calendar: .utcGregorian, after: sentAtNine).isEmpty)
+        // On launch nothing was handed over yet in this run, but a reminder from an earlier run has arrived.
+        #expect(list.reminders(at: now(at: 14), calendar: .utcGregorian, after: nil).isEmpty)
+    }
+
+    @Test func movingAReminderToTodayAfterNineSendsItRightAway() throws {
+        let loan = try record(.loan, 100_00, with: "Pasha", remindOn: today.adding(days: 7))
+        let beforeTheMove = try DebtsAndLoans(in: context).reminders(from: today)
+
+        try loan.setReminder(today)
+
+        let handed = try DebtsAndLoans(in: context).reminders(at: now(at: 14), calendar: .utcGregorian, after: beforeTheMove)
+        #expect(handed.map(\.arrival) == [.rightAway])
     }
 
     // MARK: Changing the reminder later
@@ -127,14 +190,23 @@ struct DebtReminderTests {
     }
 }
 
-/// Keeps the reminders it is handed instead of scheduling notifications.
+/// Records what it is asked, in order, instead of asking the user or scheduling notifications. Notifications are
+/// always allowed.
 @MainActor
 private final class RecordingReminderScheduler: ReminderScheduler {
-    private(set) var pending: [DebtReminder] = []
+    enum Call: Equatable {
+        case requestPermission
+        case replacePendingReminders([DebtReminder])
+    }
 
-    func requestPermission() async -> Bool { true }
+    private(set) var calls: [Call] = []
+
+    func requestPermission() async -> Bool {
+        calls.append(.requestPermission)
+        return true
+    }
 
     func replacePendingReminders(with reminders: [DebtReminder]) async {
-        pending = reminders
+        calls.append(.replacePendingReminders(reminders))
     }
 }
