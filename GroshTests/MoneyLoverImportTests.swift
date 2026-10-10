@@ -158,6 +158,45 @@ struct MoneyLoverImportTests {
         #expect(try cards().map(\.payingWallet) == [try wallet("Cash")])
     }
 
+    @Test func aTransferRowGetsNoCardAndKeepsItsHashtagLinkedOrNot() throws {
+        try importing(export(
+            "1,10/05/2026,Outgoing transfer,-250,USD,Checking (Navy Federal),To savings #chase,,,✅,",
+            "2,10/05/2026,Incoming transfer,250,USD,Saving (Apple),To savings #chase,,,✅,",
+            "3,10/04/2026,Outgoing transfer,-30,USD,Checking (Navy Federal),Sent out #citi,,,✅,"
+        ))
+
+        let checking = try rows(in: "Checking (Navy Federal)")
+        #expect(checking.map(\.isBalanceAdjustment) == [false, true])
+        #expect(checking.allSatisfy { $0.card == nil })
+        #expect(checking.map(\.note) == ["To savings #chase", "Sent out #citi"])
+        #expect(try cards().isEmpty)
+    }
+
+    @Test func aRowOutsideItsCardsPayingWalletGetsNoCardAndKeepsItsHashtag() throws {
+        try importing(export(
+            "1,10/05/2026,Café,-3.00,USD,Cash,Coffee #chase,,,,",
+            "2,10/05/2026,Products,-20.00,USD,Checking (Navy Federal),Groceries #citi,,,,"
+        ))
+
+        let coffee = try #require(try rows(in: "Cash").first)
+        #expect(coffee.card == nil)
+        #expect(coffee.note == "Coffee #chase")
+        #expect(try cards().map(\.name) == ["Citi"])
+    }
+
+    @Test func withoutACheckingWalletACardIsOnlyGivenInTheWalletOfItsFirstRowThatCanHaveOne() throws {
+        try importing(export(
+            "1,10/06/2026,Outgoing transfer,-5,USD,Savings,Moved #paypal,,,✅,",
+            "2,10/05/2026,Café,-3.00,USD,Cash,Coffee #paypal,,,,",
+            "3,10/04/2026,Café,-4.00,USD,Savings,Tea #paypal,,,,"
+        ))
+
+        #expect(try cards().map(\.payingWallet) == [try wallet("Cash")])
+        #expect(try rows(in: "Cash").map { $0.card?.name } == ["PayPal"])
+        #expect(try rows(in: "Savings").allSatisfy { $0.card == nil })
+        #expect(try rows(in: "Savings").map(\.note) == ["Moved #paypal", "Tea #paypal"])
+    }
+
     // MARK: Transfers
 
     private func transferRows(in name: String) throws -> [Transaction] {

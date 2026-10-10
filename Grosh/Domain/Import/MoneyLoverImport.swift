@@ -9,7 +9,8 @@ enum MoneyLoverImport {
     ///
     /// - Each wallet is created once by name, with a $0 Starting balance on its first day.
     /// - Each row is filed under the category of its name; a name no category has becomes a new top-level category.
-    /// - A card hashtag in a note becomes the row's Card (``MoneyLoverCardTag``).
+    /// - A card hashtag in a note becomes the row's Card (``MoneyLoverCardTag``), where the app would offer that Card:
+    ///   not on a transfer row, and only in the Card's paying wallet. Elsewhere the hashtag stays in the note.
     /// - Outgoing and Incoming transfer rows pair into transfers; one with no partner becomes a balance adjustment.
     /// - Each Debt Collection links to the earliest open Loan of its wallet and amount, each Repayment to a Debt.
     /// - Within a day, rows keep the file's order.
@@ -129,8 +130,8 @@ private struct Importer {
     /// second before the one above it and they keep the file's order within a day.
     private mutating func record(_ row: MoneyLoverRow, at index: Int, filedUnder category: Category) -> Transaction {
         let wallet = wallets[row.walletName]
-        let tagged = MoneyLoverCardTag.first(in: row.note)
-        let note = (tagged?.note ?? row.note).trimmingCharacters(in: .whitespacesAndNewlines)
+        let paid = paidWith(row, in: wallet, filedUnder: category)
+        let note = paid.note.trimmingCharacters(in: .whitespacesAndNewlines)
         let transaction = Transaction(amount: row.amount, day: row.day, wallet: nil, category: nil, note: note)
         transaction.createdAt = now.addingTimeInterval(-Double(index))
         transaction.withName = row.withName
@@ -139,20 +140,38 @@ private struct Importer {
         context.insert(transaction)
         transaction.wallet = wallet
         transaction.category = category
-        transaction.card = tagged.map { card(for: $0.tag, firstUsedIn: wallet) }
+        transaction.card = paid.card
         return transaction
     }
 
-    /// The Card `tag` names, created the first time it is used: paid from Checking (Navy Federal), or from `wallet`
-    /// when the file has no such wallet.
-    private mutating func card(for tag: MoneyLoverCardTag, firstUsedIn wallet: Wallet?) -> Card {
+    /// The Card `row` is paid with, and its note without that Card's hashtag. A row only gets a Card where the app
+    /// would offer one (``TransactionDraft/offersCard``, ``Card/pickerChoices(for:keeping:)``): never on a transfer
+    /// row, linked or not, and only in the Card's paying wallet. Elsewhere it gets no Card and its note stays as it
+    /// is, hashtag included.
+    private mutating func paidWith(
+        _ row: MoneyLoverRow, in wallet: Wallet?, filedUnder category: Category
+    ) -> (card: Card?, note: String) {
+        guard !category.isTransferHalf, let wallet, let tagged = MoneyLoverCardTag.first(in: row.note),
+              payingWallet(for: tagged.tag, firstOfferedIn: wallet) == wallet
+        else { return (nil, row.note) }
+        return (card(for: tagged.tag, paidFrom: wallet), tagged.note)
+    }
+
+    /// The wallet the Card `tag` names is paid from: Checking (Navy Federal), or when the file has no such wallet,
+    /// `wallet`, that of the first row the Card is offered on.
+    private func payingWallet(for tag: MoneyLoverCardTag, firstOfferedIn wallet: Wallet) -> Wallet {
+        wallets[MoneyLoverCardTag.payingWalletName] ?? cards[tag]?.payingWallet ?? wallet
+    }
+
+    /// The Card `tag` names, created the first time a row is paid with it, so every Card has rows.
+    private mutating func card(for tag: MoneyLoverCardTag, paidFrom wallet: Wallet) -> Card {
         if let card = cards[tag] { return card }
         let card = Card(
             name: tag.cardName, kind: tag.kind, payingWallet: nil, color: tag.color,
             sortOrder: MoneyLoverCardTag.all.firstIndex(of: tag) ?? cards.count
         )
         context.insert(card)
-        card.payingWallet = wallets[MoneyLoverCardTag.payingWalletName] ?? wallet
+        card.payingWallet = wallet
         cards[tag] = card
         return card
     }
