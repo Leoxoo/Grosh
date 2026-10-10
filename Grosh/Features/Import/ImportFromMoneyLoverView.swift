@@ -23,7 +23,7 @@ struct ImportFromMoneyLoverView: View {
                         isPickingFile = true
                     }
                 } footer: {
-                    Text("Replaces every wallet, Card and transaction with those in a MoneyLover CSV export. Your categories are kept.")
+                    Text("Replaces every wallet, Card and transaction with those in a MoneyLover CSV export, or restores a Grosh CSV export. Your categories are kept.")
                 }
             }
         }

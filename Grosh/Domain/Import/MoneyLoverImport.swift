@@ -16,6 +16,10 @@ enum MoneyLoverImport {
     /// - Each Debt Collection links to the earliest open Loan of its wallet and amount, each Repayment to a Debt.
     /// - Within a day, rows keep the file's order.
     ///
+    /// A Grosh export (``GroshCSVExport``) is restored as it was instead: each row gets the Card its `Card` column
+    /// names, its note stays as it is, rows sharing a `Linked` value are linked, and a wallet's Starting balance is the
+    /// file's own row rather than a $0 one. Nothing is left unmatched.
+    ///
     /// Saves once, at the end: the old data is deleted by the same save that adds the new. Throws without changing
     /// anything when it can't finish, saving included, and ``MoneyLoverImportError/noTransactions`` for no rows.
     /// Once saved, the old data can't be brought back.
@@ -83,11 +87,18 @@ private struct Importer {
 
     /// Records every row, links the transfers and the payments, and says what was done. Doesn't save.
     mutating func run() throws -> MoneyLoverImportSummary {
-        for row in rows where wallets[row.walletName] == nil {
-            try addWallet(firstSeenIn: row)
-        }
         var categories = try CategoryFiler(context: context)
         let filed = try rows.map { try categories.findOrAdd(named: $0.categoryName, for: $0.amount) }
+        let isGroshExport = rows.allSatisfy(\.isFromGroshExport)
+        for row in rows where wallets[row.walletName] == nil {
+            let hasStartingBalance = isGroshExport && rows.indices.contains { index in
+                rows[index].walletName == row.walletName && filed[index].lockedRole == .startingBalance
+            }
+            try addWallet(firstSeenIn: row, withStartingBalance: !hasStartingBalance)
+        }
+        if isGroshExport {
+            return try restore(filedUnder: filed)
+        }
         let paid = try addCards(for: filed)
         // `imported[i]` is `rows[i]`.
         let imported = rows.indices.map { index in
@@ -122,17 +133,83 @@ private struct Importer {
         )
     }
 
-    /// Adds the wallet `row` names, at the end of the order, with a $0 Starting balance on the earliest day any row
-    /// of it is dated, entered before every row.
-    private mutating func addWallet(firstSeenIn row: MoneyLoverRow) throws {
+    /// Adds the wallet `row` names, at the end of the order, and when `withStartingBalance`, a $0 Starting balance on
+    /// the earliest day any row of it is dated, entered before every row.
+    private mutating func addWallet(firstSeenIn row: MoneyLoverRow, withStartingBalance: Bool) throws {
         var draft = WalletDraft()
         draft.name = row.walletName
+        guard withStartingBalance else {
+            wallets[row.walletName] = try Wallet.insertWithoutStartingBalance(draft, in: context)
+            walletOrder.append(row.walletName)
+            return
+        }
         let firstDay = rows.filter { $0.walletName == row.walletName }.map(\.day).min() ?? row.day
         wallets[row.walletName] = try Wallet.insert(
             draft, startingBalance: Money(cents: 0), on: firstDay,
             enteredAt: now.addingTimeInterval(-Double(rows.count + walletOrder.count + 1)), in: context
         )
         walletOrder.append(row.walletName)
+    }
+
+    /// Records a Grosh export's rows as they were exported: each with the Card its `Card` column names and its note as
+    /// it is, linked to the rows that share its `Linked` value. Says what was done; the wallets' Starting balances,
+    /// which are rows of the file, aren't counted. Doesn't save.
+    private func restore(filedUnder categories: [Category]) throws -> MoneyLoverImportSummary {
+        let paid = try addNamedCards()
+        var links: [String: UUID] = [:]
+        for index in rows.indices {
+            let row = rows[index]
+            let transaction = record(
+                row, at: index, filedUnder: categories[index], paidWith: paid.cards[index], note: row.note
+            )
+            guard let link = row.link, !link.isEmpty else { continue }
+            let linkID = links[link] ?? UUID()
+            links[link] = linkID
+            transaction.linkID = linkID
+        }
+        return MoneyLoverImportSummary(
+            wallets: walletOrder.map { name in
+                .init(name: name, transactionCount: rows.indices.count { index in
+                    rows[index].walletName == name && categories[index].lockedRole != .startingBalance
+                })
+            },
+            cardsCreated: paid.created,
+            unmatchedRows: []
+        )
+    }
+
+    /// The Card each row of a Grosh export names in its `Card` column, `nil` for none, and how many Cards were added.
+    /// Each Card is added the first time the file names it in a wallet, paid from that wallet. A Card that
+    /// ``MoneyLoverCardMapping`` names gets its kind and color; any other is a blue Credit card.
+    private func addNamedCards() throws -> (cards: [Card?], created: Int) {
+        struct Key: Hashable {
+            let name: String
+            let walletName: String
+        }
+        var added: [Key: Card] = [:]
+        var cards: [Card?] = []
+        for row in rows {
+            guard let name = row.cardName, !name.isEmpty else {
+                cards.append(nil)
+                continue
+            }
+            let key = Key(name: name, walletName: row.walletName)
+            if let card = added[key] {
+                cards.append(card)
+                continue
+            }
+            let tag = MoneyLoverCardMapping.tags.first { $0.cardName.lowercased() == name.lowercased() }
+            let card = try Card.insert(
+                CardDraft(
+                    name: name, kind: tag?.kind ?? .credit, payingWallet: wallets[row.walletName],
+                    color: tag?.color ?? .blue
+                ),
+                in: context
+            )
+            added[key] = card
+            cards.append(card)
+        }
+        return (cards, added.count)
     }
 
     /// Works out which rows are paid with a Card, from the card hashtags in their notes, and adds those Cards in the

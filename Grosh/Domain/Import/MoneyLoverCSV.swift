@@ -13,6 +13,16 @@ nonisolated struct MoneyLoverRow: Equatable, Sendable {
     let withName: String
     let eventName: String
     let isExcludedFromReport: Bool
+    /// The name of the row's Card, from a Grosh export's `Card` column: empty for no Card, `nil` when the file has no
+    /// such column (``GroshCSVExport``).
+    var cardName: String? = nil
+    /// What links the row to the rows it is related to, from a Grosh export's `Linked` column: rows of one link share
+    /// it. Empty for an unlinked row, `nil` when the file has no such column (``GroshCSVExport``).
+    var link: String? = nil
+
+    /// Whether the row comes from a Grosh export, which names each row's Card and links rather than leaving the
+    /// import to work them out.
+    var isFromGroshExport: Bool { cardName != nil && link != nil }
 }
 
 /// Why a file can't be imported from MoneyLover. Nothing is replaced when it can't.
@@ -39,7 +49,8 @@ extension MoneyLoverImportError: LocalizedError {
 }
 
 /// Reads a MoneyLover CSV export: `Id, Date (MM/DD/YYYY), Category, Amount, Currency, Wallet, Note, With, Event,
-/// Exclude from report, Members`. Columns are found by their header, so their order doesn't matter.
+/// Exclude from report, Members`, and a Grosh export's `Card` and `Linked` columns (``GroshCSVExport``). Columns are
+/// found by their header, so their order doesn't matter.
 nonisolated enum MoneyLoverCSV {
     /// The export's rows, in the order the file lists them. Throws ``MoneyLoverImportError`` for a file that isn't
     /// a MoneyLover export or has a row that can't be read.
@@ -59,7 +70,7 @@ nonisolated enum MoneyLoverCSV {
     /// Where each column sits in a row, found by its header.
     private struct Columns {
         let date: Int, category: Int, amount: Int, wallet: Int
-        let note: Int?, with: Int?, event: Int?, excluded: Int?
+        let note: Int?, with: Int?, event: Int?, excluded: Int?, card: Int?, linked: Int?
 
         init(header: [String]) throws {
             let names = header.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
@@ -75,6 +86,8 @@ nonisolated enum MoneyLoverCSV {
             with = index("with")
             event = index("event")
             excluded = index("exclude from report")
+            card = index("card")
+            linked = index("linked")
         }
 
         /// The row `fields` hold, or `nil` when its date, amount, category or wallet can't be read. Columns missing
@@ -102,7 +115,9 @@ nonisolated enum MoneyLoverCSV {
                 note: written(note),
                 withName: field(with),
                 eventName: field(event),
-                isExcludedFromReport: !field(excluded).isEmpty
+                isExcludedFromReport: !field(excluded).isEmpty,
+                cardName: card.map { field($0) },
+                link: linked.map { field($0) }
             )
         }
     }
