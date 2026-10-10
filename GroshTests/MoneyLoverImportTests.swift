@@ -212,6 +212,57 @@ struct MoneyLoverImportTests {
         #expect(adjustments.map(\.note) == ["Sent out", "Came in"])
     }
 
+    // MARK: Debts and loans
+
+    /// Each Loan or Debt in the store as `wallet day amount`, open or settled.
+    private func debtsAndLoans() throws -> (open: Set<String>, settled: Set<String>) {
+        func describe(_ loanOrDebt: LoanOrDebt) -> String {
+            let original = loanOrDebt.original
+            return "\(original.wallet?.name ?? "") \(original.day.month)/\(original.day.day) \(original.amountCents)"
+        }
+        let all = try DebtsAndLoans(in: context)
+        return (Set(all.open.map(describe)), Set(all.settled.map(describe)))
+    }
+
+    @Test func eachDebtCollectionSettlesTheEarliestOpenLoanOfItsWalletAndAmount() throws {
+        try importing(export(
+            "1,09/25/2026,Debt Collection,50,USD,Cash,,Sam,,✅,",
+            "2,09/20/2026,Debt Collection,100,USD,Cash,,Sam,,✅,",
+            "3,09/10/2026,Loan,-100,USD,Cash,,Sam,,✅,",
+            "4,09/05/2026,Loan,-50,USD,Cash,,Alex,,✅,",
+            "5,09/02/2026,Loan,-100,USD,Checking,,Sam,,✅,",
+            "6,09/01/2026,Loan,-100,USD,Cash,,Kim,,✅,"
+        ))
+
+        let loans = try debtsAndLoans()
+        #expect(loans.settled == ["Cash 9/1 -10000", "Cash 9/5 -5000"])
+        #expect(loans.open == ["Cash 9/10 -10000", "Checking 9/2 -10000"])
+        let collection = try #require(try rows(in: "Cash").first { $0.amountCents == 100_00 })
+        #expect(try collection.related(in: context).map(\.day) == [CalendarDay(year: 2026, month: 9, day: 1)])
+    }
+
+    @Test func aDebtCollectionNeverSettlesALoanMadeAfterIt() throws {
+        try importing(export(
+            "1,09/20/2026,Loan,-100,USD,Cash,,Sam,,✅,",
+            "2,09/10/2026,Debt Collection,100,USD,Cash,,Sam,,✅,"
+        ))
+
+        #expect(try debtsAndLoans().open == ["Cash 9/20 -10000"])
+        #expect(try rows(in: "Cash").allSatisfy { $0.linkID == nil })
+    }
+
+    @Test func eachRepaymentSettlesTheEarliestOpenDebtOfItsWalletAndAmount() throws {
+        try importing(export(
+            "1,09/20/2026,Repayment,-300,USD,Checking,,Bank,,✅,",
+            "2,09/10/2026,Debt,300,USD,Checking,,Bank,,✅,",
+            "3,09/01/2026,Debt,300,USD,Checking,,Bank,,✅,"
+        ))
+
+        let debts = try debtsAndLoans()
+        #expect(debts.settled == ["Checking 9/1 30000"])
+        #expect(debts.open == ["Checking 9/10 30000"])
+    }
+
     // MARK: Replacing all data
 
     /// Data the user had before importing: a wallet with a Card, an expense paid with it, and a category of their own.

@@ -68,6 +68,7 @@ enum MoneyLoverImport {
                 unpaired.isBalanceAdjustment = true
                 unpaired.category = try context.otherCategory(unpaired.amountCents < 0 ? .expense : .income)
             }
+            try linkPayments(among: imported)
             try context.save()
         } catch {
             context.rollback()
@@ -98,6 +99,23 @@ enum MoneyLoverImport {
             partner.linkID = link
         }
         return imported.filter { $0.category?.isTransferHalf == true && $0.linkID == nil }
+    }
+
+    /// Links each Debt Collection among `imported` to the earliest Loan still open that has its wallet and amount
+    /// and is dated on or before it, and each Repayment to a Debt the same way (ADR-0003). Payments are taken oldest
+    /// first. Saves.
+    private static func linkPayments(among imported: [Transaction]) throws {
+        let oldestFirst = Array(imported.inListOrder().reversed())
+        var open = oldestFirst.filter(\.isLoanOrDebt)
+        for payment in oldestFirst {
+            guard let role = payment.category?.lockedRole, role == .debtCollection || role == .repayment,
+                  let index = open.firstIndex(where: { original in
+                      original.loanOrDebtKind?.paymentRole == role && original.wallet == payment.wallet
+                          && original.amountCents == -payment.amountCents && original.dayRaw <= payment.dayRaw
+                  })
+            else { continue }
+            try open.remove(at: index).linkPayment(payment)
+        }
     }
 
     /// Deletes every transaction, Card and wallet. Categories stay. Doesn't save.
