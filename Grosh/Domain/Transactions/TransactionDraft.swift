@@ -41,7 +41,8 @@ struct TransactionDraft {
     var isExcludedFromReport = false
     /// The Event an imported transaction belongs to. Shown, never edited.
     private(set) var eventName = ""
-    /// Set when editing a balance adjustment, which never needs a Card. Saving keeps the transaction one.
+    /// Set when editing a balance adjustment, which never needs a Card and is never a Loan or Debt. Saving keeps
+    /// the transaction one.
     private(set) var isBalanceAdjustment = false
 
     init(type: CategoryType, day: CalendarDay) {
@@ -103,7 +104,16 @@ extension TransactionDraft {
         guard wallet != nil else { throw TransactionRuleError.missingWallet }
         guard amount.cents > 0 else { throw TransactionRuleError.missingAmount }
         guard category != nil else { throw TransactionRuleError.missingCategory }
+        guard types.contains(type) || !isBalanceAdjustment else {
+            throw BalanceAdjustmentRuleError.reasonDoesNotMatchDifference
+        }
         guard card != nil || !requiresCard else { throw TransactionRuleError.missingCard }
+    }
+
+    /// The types the sheet offers, in order. A balance adjustment is only ever Expense or Income: its reason is a
+    /// category of the type its difference matches, never a Loan or Debt.
+    var types: [CategoryType] {
+        isBalanceAdjustment ? [.expense, .income] : CategoryType.segments
     }
 
     /// Whether the transaction can name a Card at all: every transaction but the two halves of a transfer.

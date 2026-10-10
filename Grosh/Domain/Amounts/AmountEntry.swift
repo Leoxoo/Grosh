@@ -181,6 +181,13 @@ nonisolated struct AmountEntry: Hashable, Sendable {
         isFinished = false
     }
 
+    /// Turns what the amount comes to into its negative, and back: a balance above zero becomes a debt of the same
+    /// size. A calculation is worked out first, and the next digit starts a new amount. An error stays an error.
+    mutating func changeSign() {
+        guard let cents else { return }
+        self = AmountEntry(cents: -cents)
+    }
+
     private mutating func startNumberIfFinished() {
         if isFinished {
             current = nil

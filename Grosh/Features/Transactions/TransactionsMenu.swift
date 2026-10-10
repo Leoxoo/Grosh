@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The Transactions tab's "…" menu: actions that start from the wallet the tab is showing.
 struct TransactionsMenu: View {
-    /// The wallet the tab is showing, for actions that start from it.
+    /// What the tab is showing: one wallet or the Total.
     let walletSelection: WalletSelection
 
     @State private var isTransferring = false
@@ -19,15 +19,15 @@ struct TransactionsMenu: View {
             }
         }
         .sheet(isPresented: $isTransferring) {
-            TransferEditor(viewedWallet: selectedWallet)
+            TransferEditor(viewedWallet: viewedWallet)
         }
         .sheet(isPresented: $isAdjustingBalance) {
-            AdjustBalanceEditor(wallet: selectedWallet)
+            AdjustBalanceEditor(viewedWallet: viewedWallet)
         }
     }
 
     /// The one wallet the tab is showing, or `nil` for the Total.
-    private var selectedWallet: Wallet? {
+    private var viewedWallet: Wallet? {
         if case .wallet(let wallet) = walletSelection { wallet } else { nil }
     }
 }

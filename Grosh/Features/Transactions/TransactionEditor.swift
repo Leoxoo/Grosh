@@ -39,10 +39,6 @@ struct TransactionEditor: View {
 
 /// The form behind ``TransactionEditor``, holding the draft from the moment the sheet opens.
 private struct TransactionForm: View {
-    private enum Field: Hashable {
-        case amount, note, withName
-    }
-
     let mode: TransactionEditor.Mode
 
     @Environment(\.dismiss) private var dismiss
@@ -50,10 +46,8 @@ private struct TransactionForm: View {
 
     @State private var draft: TransactionDraft
     @State private var entry: AmountEntry
-    @State private var isKeypadShown = true
     @State private var isShowingDetails: Bool
     @State private var errorMessage: String?
-    @FocusState private var focus: Field?
 
     init(mode: TransactionEditor.Mode, startingDraft: TransactionDraft) {
         self.mode = mode
@@ -76,73 +70,43 @@ private struct TransactionForm: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Picker("Type", selection: $draft.type) {
-                        ForEach(CategoryType.segments, id: \.self) { type in
-                            Text(type.title).tag(type)
-                        }
+        KeypadSheet(
+            title: isEditing ? Text("Edit Transaction") : Text("Add Transaction"),
+            entry: $entry,
+            canSave: draftToSave.canSave,
+            save: save,
+            macHeight: (640, 720)
+        ) { fields in
+            Section {
+                Picker("Type", selection: $draft.type) {
+                    ForEach(draft.types, id: \.self) { type in
+                        Text(type.title).tag(type)
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
 
-                mainSection
-                detailsSection
-            }
-            .formStyle(.grouped)
-            .safeAreaInset(edge: .bottom) {
-                if isKeypadShown {
-                    AmountKeypad(entry: $entry)
-                        .background(.bar)
-                }
-            }
-            .navigationTitle(isEditing ? "Edit Transaction" : "Add Transaction")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
-                        .disabled(!draftToSave.canSave)
-                }
-            }
-            .defaultFocus($focus, .amount)
-            .onChange(of: focus) {
-                if focus == .note || focus == .withName {
-                    isKeypadShown = false
-                }
-            }
-            .onChange(of: draft.type) {
-                if draft.type == .debtLoan {
-                    isShowingDetails = true
-                }
-            }
-            .errorAlert("Couldn't Save Transaction", message: $errorMessage)
+            mainSection(fields)
+            detailsSection(fields)
         }
-        #if os(macOS)
-        .frame(minWidth: 420, idealWidth: 460, minHeight: 640, idealHeight: 720)
-        #endif
+        .onChange(of: draft.type) {
+            if draft.type == .debtLoan {
+                isShowingDetails = true
+            }
+        }
+        .errorAlert("Couldn't Save Transaction", message: $errorMessage)
     }
 
-    private var mainSection: some View {
+    private func mainSection(_ fields: KeypadSheetFields) -> some View {
         Section {
             WalletPicker(title: "Wallet", selection: $draft.wallet)
-            AmountRow(title: "Amount", entry: $entry, currencyCode: currencyCode, tint: Money(cents: draft.sign).tint) {
-                focus = .amount
-                isKeypadShown.toggle()
-            }
-            .focused($focus, equals: .amount)
+            fields.amountRow("Amount", currencyCode: currencyCode, tint: Money(cents: draft.sign).tint)
             CategoryPicker(title: "Category", type: draft.type, selection: $draft.category)
             if draft.offersCard {
                 CardPicker(title: "Card", wallet: draft.wallet, selection: $draft.card)
             }
-            TextField("Note", text: $draft.note, axis: .vertical)
-                .focused($focus, equals: .note)
+            fields.noteField($draft.note)
             DayStepper(title: "Date", day: $draft.day)
         } footer: {
             if draft.wallet == nil {
@@ -153,15 +117,15 @@ private struct TransactionForm: View {
         }
     }
 
-    private var detailsSection: some View {
+    private func detailsSection(_ fields: KeypadSheetFields) -> some View {
         Section {
             DisclosureGroup("Add more details", isExpanded: $isShowingDetails) {
                 TextField("With", text: $draft.withName)
-                    .focused($focus, equals: .withName)
-                if focus == .withName {
+                    .focused(fields.focus, equals: .withName)
+                if fields.focus.wrappedValue == .withName {
                     WithNameSuggestions(typed: draft.withName) { name in
                         draft.withName = name
-                        focus = nil
+                        fields.focus.wrappedValue = nil
                     }
                 }
                 Toggle("Exclude from report", isOn: $draft.isExcludedFromReport)

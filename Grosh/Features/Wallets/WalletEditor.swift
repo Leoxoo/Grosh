@@ -99,7 +99,7 @@ struct WalletEditor: View {
             }
             .errorAlert("Couldn't Save Wallet", message: $errorMessage)
             .sheet(isPresented: $isAdjustingBalance) {
-                AdjustBalanceEditor(wallet: mode.editing)
+                AdjustBalanceEditor(viewedWallet: mode.editing)
             }
         }
     }
