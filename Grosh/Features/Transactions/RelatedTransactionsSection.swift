@@ -6,19 +6,16 @@ import SwiftUI
 struct RelatedTransactionsSection: View {
     let transaction: Transaction
 
-    /// Every transaction sharing the link, this one included. A query, so a transaction linked later (such as a
-    /// payment on a Loan, which leaves the Loan itself unchanged) shows straight away.
+    /// Every transaction sharing the link, this one included, so one linked later shows straight away.
     @Query private var linked: [Transaction]
 
     init(transaction: Transaction) {
         self.transaction = transaction
-        let link = transaction.linkID
-        _linked = Query(filter: link.map { link in #Predicate<Transaction> { $0.linkID == link } }
-            ?? #Predicate<Transaction> { _ in false })
+        _linked = Query(transaction.linkedTransactions)
     }
 
     var body: some View {
-        let related = linked.filter { $0 != transaction }.inListOrder()
+        let related = transaction.related(among: linked)
         if !related.isEmpty {
             Section("Related transactions") {
                 ForEach(related) { other in
