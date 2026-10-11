@@ -47,6 +47,16 @@ nonisolated struct CardPeriod: Hashable, Sendable {
     /// The days the period covers, both ends included.
     var days: DayRange { DayRange(first: firstDay, last: lastDay) }
 
+    /// How many days before a statement period its lead-in transactions reach back.
+    static let leadInDayCount = 2
+
+    /// The days of a statement period's lead-in transactions: the ``leadInDayCount`` days before its first day, which
+    /// are the last days of the previous statement. `nil` for a calendar month, which has none.
+    var leadInDays: DayRange? {
+        guard isStatement else { return nil }
+        return DayRange(first: firstDay.adding(days: -Self.leadInDayCount), last: firstDay.adding(days: -1))
+    }
+
     func contains(_ day: CalendarDay) -> Bool {
         firstDay <= day && day <= lastDay
     }
@@ -97,5 +107,13 @@ extension Card {
     /// excluded from report or not, as on the card's statement.
     func transactions(in period: CardPeriod) -> [Transaction] {
         (transactions ?? []).filter { period.contains($0.day) }
+    }
+
+    /// The lead-in transactions of `period`: those paid with this Card in the two days before a statement period
+    /// begins, since entries aren't always dated exactly as on the statement. They belong to the previous statement
+    /// and never count in this one's total unless the user adds one for the moment. None for a calendar month.
+    func leadInTransactions(in period: CardPeriod) -> [Transaction] {
+        guard let days = period.leadInDays else { return [] }
+        return (transactions ?? []).filter { days.contains($0.day) }
     }
 }
