@@ -95,6 +95,20 @@ struct TransactionDraft {
         self.init(copying: transaction, day: today)
     }
 
+    /// A new payment toward a Purchase: its wallet, category, Card and note, and its payment amount, dated `today`.
+    /// Saving attaches it to the Purchase.
+    init(paymentFor recurring: RecurringTransaction, on today: CalendarDay) {
+        self.init(type: recurring.category?.type ?? .expense, day: today)
+        wallet = recurring.wallet
+        amount = Money(
+            cents: abs(recurring.amountCents),
+            currencyCode: recurring.wallet?.currencyCode ?? Money.defaultCurrencyCode
+        )
+        category = recurring.category
+        card = recurring.card
+        note = recurring.note
+    }
+
     private init(copying transaction: Transaction, day: CalendarDay) {
         self.init(type: transaction.category?.type ?? .expense, day: day)
         wallet = transaction.wallet

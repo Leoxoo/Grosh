@@ -1,7 +1,8 @@
 import SwiftData
 import SwiftUI
 
-/// The Add Transaction sheet. It also edits a transaction, and opens pre-filled for Duplicate.
+/// The Add Transaction sheet. It also edits a transaction, and opens pre-filled for Duplicate or for a payment toward a
+/// Purchase.
 /// It makes no default-value decisions of its own: a new transaction starts from suggest-defaults
 /// (``TransactionDefaults``); Duplicate and Edit start from the transaction.
 struct TransactionEditor: View {
@@ -9,12 +10,15 @@ struct TransactionEditor: View {
         case add
         /// A new transaction pre-filled from this one, dated today.
         case duplicate(Transaction)
+        /// A new payment toward a Purchase, pre-filled from it and dated today. Saving attaches it to the Purchase.
+        case payment(RecurringTransaction)
         case edit(Transaction)
 
         var id: AnyHashable {
             switch self {
             case .add: "add"
             case .duplicate(let transaction): ["duplicate", transaction.persistentModelID] as [AnyHashable]
+            case .payment(let recurring): ["payment", recurring.persistentModelID] as [AnyHashable]
             case .edit(let transaction): ["edit", transaction.persistentModelID] as [AnyHashable]
             }
         }
@@ -32,6 +36,7 @@ struct TransactionEditor: View {
         switch mode {
         case .add: TransactionDefaults.suggest(on: .today, in: context)
         case .duplicate(let transaction): TransactionDraft(duplicating: transaction, on: .today)
+        case .payment(let recurring): TransactionDraft(paymentFor: recurring, on: .today)
         case .edit(let transaction): TransactionDraft(editing: transaction)
         }
     }
@@ -166,6 +171,9 @@ private struct TransactionForm: View {
             switch mode {
             case .add, .duplicate:
                 try Transaction.create(draftToSave, in: context)
+            case .payment(let recurring):
+                let transaction = try Transaction.create(draftToSave, in: context)
+                try recurring.attach(transaction, in: context)
             case .edit(let transaction):
                 try transaction.update(with: draftToSave)
             }

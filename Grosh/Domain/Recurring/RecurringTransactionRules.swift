@@ -35,6 +35,8 @@ struct RecurringDraft {
     var name = ""
     /// Entered positive; the category sets the sign.
     var amount = Money(cents: 0)
+    /// A Purchase's total price, or `nil` for none. A Kind change keeps it, as it keeps the icon.
+    var total: Money?
     /// Expense or Income. Switching it drops a category of the other type.
     var type: CategoryType = .expense {
         didSet {
@@ -54,7 +56,15 @@ struct RecurringDraft {
     var category: Category?
     var card: Card?
     /// The sort of Recurring transaction it is. A new one starts with its category's default Kind.
-    var kind: RecurringKind = .regular
+    var kind: RecurringKind = .regular {
+        didSet {
+            // A Purchase is paid off over time, so switching to one ends it after a number of payments,
+            // which the user can then change.
+            if kind == .purchase, oldValue != .purchase {
+                endKind = .afterCount
+            }
+        }
+    }
     /// Only a Bill's amount can vary: each transaction it makes then starts as an estimate, until the real amount is
     /// entered.
     var amountVaries = false
@@ -103,6 +113,9 @@ struct RecurringDraft {
             cents: recurring.amountCents,
             currencyCode: recurring.wallet?.currencyCode ?? Money.defaultCurrencyCode
         )
+        total = recurring.totalCents.map {
+            Money(cents: $0, currencyCode: recurring.wallet?.currencyCode ?? Money.defaultCurrencyCode)
+        }
         type = recurring.category?.type ?? .expense
         wallet = recurring.wallet
         category = recurring.category
@@ -300,6 +313,7 @@ extension RecurringTransaction {
     private func apply(_ draft: RecurringDraft) {
         name = draft.trimmedName
         amountCents = draft.amount.cents
+        totalCents = draft.total?.cents
         note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
         wallet = draft.wallet
         category = draft.category

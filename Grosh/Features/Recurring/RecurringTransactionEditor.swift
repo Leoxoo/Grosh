@@ -33,6 +33,8 @@ private struct RecurringForm: View {
 
     @State private var draft: RecurringDraft
     @State private var entry: AmountEntry
+    /// A Purchase's total price as the keypad shows it. Zero is no total.
+    @State private var totalEntry: AmountEntry
     @State private var errorMessage: String?
     /// The start-date prompt, offered when the saved schedule has occurrences that have already come due.
     @State private var pastPrompt: PastPrompt?
@@ -41,14 +43,20 @@ private struct RecurringForm: View {
         self.mode = mode
         _draft = State(initialValue: startingDraft)
         _entry = State(initialValue: AmountEntry(cents: startingDraft.amount.cents))
+        _totalEntry = State(initialValue: AmountEntry(cents: startingDraft.total?.cents ?? 0))
     }
 
     private var currencyCode: String { draft.wallet?.currencyCode ?? Money.defaultCurrencyCode }
 
-    /// The draft with the amount the keypad comes to.
+    /// The draft with the amounts the keypad comes to. A total of zero is no total.
     private var draftToSave: RecurringDraft {
         var result = draft
         result.amount = Money(cents: entry.cents ?? 0, currencyCode: currencyCode)
+        if let cents = totalEntry.cents, cents > 0 {
+            result.total = Money(cents: cents, currencyCode: currencyCode)
+        } else {
+            result.total = nil
+        }
         return result
     }
 
@@ -61,7 +69,8 @@ private struct RecurringForm: View {
         KeypadSheet(
             title: mode.isAdding ? Text("New Recurring Transaction") : Text("Edit Recurring Transaction"),
             entry: $entry,
-            canSave: draftToSave.canSave,
+            secondEntry: $totalEntry,
+            canSave: draftToSave.canSave && totalEntry.cents != nil,
             save: save,
             macHeight: (640, 720)
         ) { fields in
@@ -77,6 +86,9 @@ private struct RecurringForm: View {
             detailsSection(fields)
             if draft.kind == .bill {
                 estimateSection
+            }
+            if draft.kind == .purchase {
+                purchaseSection(fields)
             }
             repeatSection
             endSection
@@ -138,6 +150,15 @@ private struct RecurringForm: View {
         draft.remindAfterDays == 1
             ? String(localized: "Remind me 1 day later")
             : String(localized: "Remind me \(draft.remindAfterDays) days later")
+    }
+
+    /// A Purchase's optional total price. Payments attached to it count as paid toward it; the schedule doesn't change.
+    private func purchaseSection(_ fields: KeypadSheetFields) -> some View {
+        Section {
+            fields.secondAmountRow("Total price", currencyCode: currencyCode)
+        } footer: {
+            Text("Payments attached to it count as paid toward this total. Leave it at zero when there isn't one.")
+        }
     }
 
     private var repeatSection: some View {

@@ -3,8 +3,8 @@ import SwiftUI
 
 /// One Recurring transaction: what it is, when it next falls due, and the transactions it has made or the user has
 /// attached. A transaction opens in the normal editor. Link existing attaches one from any wallet, and Unlink detaches
-/// it without deleting it. Edit changes only what is still to come. Delete moves the schedule to Recently Deleted and
-/// keeps what it holds.
+/// it without deleting it. A Purchase shows its progress and adds a payment in the normal editor, prefilled from it.
+/// Edit changes only what is still to come. Delete moves the schedule to Recently Deleted and keeps what it holds.
 struct RecurringTransactionDetailView: View {
     let recurring: RecurringTransaction
 
@@ -12,6 +12,7 @@ struct RecurringTransactionDetailView: View {
     @Environment(\.modelContext) private var context
     @State private var isEditing = false
     @State private var editingTransaction: Transaction?
+    @State private var isAddingPayment = false
     @State private var isLinking = false
     @State private var isConfirmingDelete = false
     @State private var errorMessage: String?
@@ -63,6 +64,12 @@ struct RecurringTransactionDetailView: View {
                         Text("Ended")
                     }
                 }
+                if let progress = recurring.purchaseProgress {
+                    LabeledContent("Progress") {
+                        Text(progress.summary)
+                            .multilineTextAlignment(.trailing)
+                    }
+                }
                 if !recurring.note.isEmpty {
                     LabeledContent("Note") {
                         Text(recurring.note)
@@ -76,6 +83,12 @@ struct RecurringTransactionDetailView: View {
             }
 
             Section {
+                if recurring.kind == .purchase {
+                    Button("Add a payment", systemImage: "square.and.pencil") {
+                        isAddingPayment = true
+                    }
+                    .disabled(!recurring.isActive)
+                }
                 Button("Link existing", systemImage: "link") {
                     isLinking = true
                 }
@@ -122,6 +135,9 @@ struct RecurringTransactionDetailView: View {
         }
         .sheet(isPresented: $isLinking) {
             LinkExistingTransactionView(recurring: recurring)
+        }
+        .sheet(isPresented: $isAddingPayment) {
+            TransactionEditor(mode: .payment(recurring))
         }
         .confirmationDialog(
             "Delete this recurring transaction?",

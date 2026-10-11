@@ -95,6 +95,12 @@ struct RecurringTransactionRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                if let progress = recurring.purchaseProgress {
+                    Text(progress.summary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
             Spacer(minLength: 8)
             AmountText(amount: recurring.signedAmount)
