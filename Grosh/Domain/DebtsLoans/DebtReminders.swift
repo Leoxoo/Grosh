@@ -30,13 +30,17 @@ nonisolated enum ReminderArrival: Hashable, Sendable {
     case rightAway
 }
 
-/// Where Loan and Debt reminders go: the system's local notifications in the app, a stand-in in tests.
+/// Where Loan, Debt and Estimated-amount reminders go: the system's local notifications in the app, a stand-in in
+/// tests.
 protocol ReminderScheduler {
     /// Asks the user to allow notifications, unless they already answered. Returns whether they are allowed.
     func requestPermission() async -> Bool
     /// Makes `reminders` the pending Loan and Debt reminders, replacing every one scheduled before. Schedules
     /// nothing while notifications aren't allowed.
     func replacePendingReminders(with reminders: [DebtReminder]) async
+    /// Makes `reminders` the pending Estimated-amount reminders, replacing every one scheduled before. Schedules
+    /// nothing while notifications aren't allowed.
+    func replacePendingEstimateReminders(with reminders: [EstimateReminder]) async
 }
 
 extension DebtsAndLoans {

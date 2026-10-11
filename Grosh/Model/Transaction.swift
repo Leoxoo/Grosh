@@ -22,6 +22,11 @@ final class Transaction {
     var createdAt: Date = Date.now
     /// On a Loan or Debt, the ``CalendarDay`` (as `yyyymmdd`) the user is reminded of it: its due date.
     var reminderDayRaw: Int?
+    /// Set on a transaction a varying Bill made until its real amount is entered. Its amount is an estimate, the average
+    /// of recent transactions in its category. It counts in balances and reports like any transaction.
+    var isEstimated: Bool = false
+    /// On an Estimated transaction, the ``CalendarDay`` (as `yyyymmdd`) the user is reminded to enter its real amount.
+    var estimateReminderDayRaw: Int?
     /// On a forgiven Loan or Debt, what was forgiven in cents, above zero: what was outstanding when it was forgiven
     /// (ADR-0004). `nil` while it isn't forgiven.
     var forgivenCents: Int?
@@ -70,5 +75,11 @@ final class Transaction {
     var reminderDay: CalendarDay? {
         get { reminderDayRaw.map(CalendarDay.init(rawValue:)) }
         set { reminderDayRaw = newValue?.rawValue }
+    }
+
+    /// On an Estimated transaction, the day the user is reminded to enter its real amount, or `nil` for no reminder.
+    var estimateReminderDay: CalendarDay? {
+        get { estimateReminderDayRaw.map(CalendarDay.init(rawValue:)) }
+        set { estimateReminderDayRaw = newValue?.rawValue }
     }
 }

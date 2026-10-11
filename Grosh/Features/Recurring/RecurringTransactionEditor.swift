@@ -73,6 +73,9 @@ private struct RecurringForm: View {
             }
 
             detailsSection(fields)
+            if draft.kind == .bill {
+                estimateSection
+            }
             repeatSection
             endSection
         }
@@ -106,6 +109,27 @@ private struct RecurringForm: View {
         } footer: {
             Text("Each time it falls due, a transaction is made with this name, amount, wallet, category and Card.")
         }
+    }
+
+    /// A Bill's amount can vary: each transaction then starts as an estimate, and the user is reminded to enter the
+    /// real one.
+    private var estimateSection: some View {
+        Section {
+            Toggle("Amount varies", isOn: $draft.amountVaries)
+            if draft.amountVaries {
+                Stepper(value: $draft.remindAfterDays, in: 1...30) {
+                    Text(remindAfterText)
+                }
+            }
+        } footer: {
+            Text("Each transaction starts as an estimate, the average of recent transactions in its category, until you enter the real amount.")
+        }
+    }
+
+    private var remindAfterText: String {
+        draft.remindAfterDays == 1
+            ? String(localized: "Remind me 1 day later")
+            : String(localized: "Remind me \(draft.remindAfterDays) days later")
     }
 
     private var repeatSection: some View {
