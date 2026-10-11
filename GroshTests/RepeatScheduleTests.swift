@@ -109,4 +109,28 @@ struct RepeatScheduleTests {
 
         #expect(schedule.nextOccurrence(after: day(2026, 10, 6)) == day(2026, 10, 7))
     }
+
+    /// A custom repeat counts in its own unit: every 3 days, or every 2 years.
+    @Test func customRepeatsCountInTheirOwnUnit() {
+        let everyThreeDays = RepeatSchedule(start: day(2026, 10, 4), rule: RepeatRule(unit: .day, every: 3), end: .forever)
+        #expect(everyThreeDays.occurrences(after: nil, through: day(2026, 10, 10)) == [
+            day(2026, 10, 4), day(2026, 10, 7), day(2026, 10, 10),
+        ])
+
+        let everyTwoYears = RepeatSchedule(start: day(2026, 10, 4), rule: RepeatRule(unit: .year, every: 2), end: .forever)
+        #expect(everyTwoYears.occurrences(after: nil, through: day(2031, 1, 1)) == [
+            day(2026, 10, 4), day(2028, 10, 4), day(2030, 10, 4),
+        ])
+    }
+
+    /// The repeat as the form and the detail screen word it, in English: the day it falls on and when it ends.
+    @Test func theSummaryNamesTheRepeatDayAndEnd() {
+        let monthly = RepeatSchedule(
+            start: day(2026, 10, 4), rule: RepeatRule(unit: .month, every: 2), end: .until(day(2027, 12, 4))
+        )
+        #expect(monthly.summary == "Every 2 months on the 4th, until Dec 2027")
+
+        let once = RepeatSchedule(start: day(2026, 10, 1), rule: RepeatRule(unit: .week, every: 1), end: .afterCount(1))
+        #expect(once.summary == "Every week, once")
+    }
 }

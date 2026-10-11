@@ -14,7 +14,19 @@ struct RecurringTransactionDetailView: View {
     @State private var isConfirmingDelete = false
     @State private var errorMessage: String?
 
+    /// Whether the schedule was deleted from this screen. Nothing is read from it then, since a deleted model still on
+    /// screen can't be read.
+    private var isRemoved: Bool { recurring.isDeleted || recurring.modelContext == nil }
+
     var body: some View {
+        if isRemoved {
+            ContentUnavailableView("Recurring Transaction Deleted", systemImage: "trash")
+        } else {
+            details
+        }
+    }
+
+    private var details: some View {
         List {
             Section {
                 HStack(spacing: 12) {

@@ -194,4 +194,11 @@ struct RecurringTransactionTests {
         draft.wallet = nil
         #expect(throws: RecurringRuleError.missingWallet) { try draft.validate() }
     }
+
+    /// A schedule is not a transaction: saving one, with its past occurrences skipped, adds none to the transactions.
+    @Test func aScheduleIsNotATransaction() throws {
+        try RecurringTransaction.create(netflix(starting: day(2026, 9, 1)), today: today, in: context)
+
+        #expect(try context.fetch(FetchDescriptor<Transaction>()).isEmpty)
+    }
 }
