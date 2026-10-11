@@ -18,7 +18,7 @@ struct RecurringKindTests {
 
     /// A monthly membership from the 12th, paid from the fixture's wallet in `category`, starting as that category's
     /// default Kind, as the new-Recurring form pre-fills it.
-    private func membership(in category: Category) -> RecurringDraft {
+    private func membership(in category: Grosh.Category) -> RecurringDraft {
         var draft = RecurringDraft(startDay: CalendarDay(year: 2026, month: 10, day: 12))
         draft.name = "Gym"
         draft.amount = Money(cents: 2000)
