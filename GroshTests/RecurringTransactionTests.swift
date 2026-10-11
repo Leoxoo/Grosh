@@ -268,4 +268,92 @@ struct RecurringTransactionTests {
 
         #expect(try context.fetch(FetchDescriptor<Transaction>()).isEmpty)
     }
+
+    /// Add the Transaction makes one dated today and attaches it, and the occurrence still to come is made on its day.
+    @Test func addingATransactionNowMakesOneTodayAndSkipsNoOccurrence() throws {
+        let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 10, 12)), today: today, in: context)
+
+        try recurring.addTransactionNow(today: today, in: context)
+        #expect(recurring.attachedTransactions.map(\.day) == [today])
+        #expect(recurring.attachedTransactions.map(\.amountCents) == [-1599])
+
+        try RecurringTransaction.catchUp(through: day(2026, 10, 12), in: context)
+        #expect(recurring.attachedTransactions.map(\.day) == [day(2026, 10, 12), today])
+    }
+
+    @Test func aVaryingBillsTransactionAddedNowStartsEstimated() throws {
+        var draft = netflix(starting: day(2026, 10, 12))
+        draft.kind = .bill
+        draft.amountVaries = true
+        draft.remindAfterDays = 2
+        let recurring = try RecurringTransaction.create(draft, today: today, in: context)
+
+        try recurring.addTransactionNow(today: today, in: context)
+
+        let transaction = try #require(recurring.attachedTransactions.first)
+        #expect(transaction.isEstimated)
+        #expect(transaction.estimateReminderDay == day(2026, 10, 11))
+    }
+
+    @Test func addingATransactionNowToAPausedScheduleMakesNothing() throws {
+        let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 10, 12)), today: today, in: context)
+        store.wallet.isArchived = true
+
+        try recurring.addTransactionNow(today: today, in: context)
+
+        #expect(recurring.attachedTransactions.isEmpty)
+    }
+
+    /// Duplicate copies every field and the Kind's settings, and starts today with none of the transactions attached.
+    @Test func duplicatingCopiesEveryFieldButStartsTodayWithNoTransactions() throws {
+        var draft = netflix(starting: day(2026, 9, 1))
+        draft.kind = .subscription
+        draft.iconData = Data([1, 2, 3])
+        let original = try RecurringTransaction.create(draft, today: today, in: context)
+        try RecurringTransaction.catchUp(through: day(2026, 11, 1), in: context)
+        #expect(!original.attachedTransactions.isEmpty)
+
+        let copy = RecurringDraft(duplicating: original, on: today)
+        #expect(copy.startDay == today)
+        #expect(copy.name == "Netflix")
+        #expect(copy.amount.cents == 1599)
+        #expect(copy.wallet == store.wallet)
+        #expect(copy.category == original.category)
+        #expect(copy.note == "family plan")
+        #expect(copy.kind == .subscription)
+        #expect(copy.iconData == Data([1, 2, 3]))
+        #expect(copy.rule == original.schedule.rule)
+        #expect(copy.end == original.schedule.end)
+        #expect(copy.canSave)
+
+        let duplicate = try RecurringTransaction.create(copy, today: today, in: context)
+        #expect(duplicate.attachedTransactions.isEmpty)
+        #expect(duplicate.iconData == Data([1, 2, 3]))
+    }
+
+    @Test func aBillsVaryingAmountAndReminderAreCopied() throws {
+        var draft = netflix(starting: day(2026, 9, 1))
+        draft.kind = .bill
+        draft.amountVaries = true
+        draft.remindAfterDays = 5
+        let original = try RecurringTransaction.create(draft, today: today, in: context)
+
+        let copy = RecurringDraft(duplicating: original, on: today)
+
+        #expect(copy.amountVaries)
+        #expect(copy.remindAfterDays == 5)
+    }
+
+    /// A last day already past would leave nothing to repeat on, so the copy gets a year, as a new schedule does.
+    @Test func duplicatingAScheduleThatEndedLongAgoGivesTheCopyAYear() throws {
+        var draft = netflix(starting: day(2026, 1, 1))
+        draft.endKind = .until
+        draft.untilDay = day(2026, 3, 1)
+        let original = try RecurringTransaction.create(draft, today: today, in: context)
+
+        let copy = RecurringDraft(duplicating: original, on: today)
+
+        #expect(copy.untilDay == today.adding(days: 365))
+        #expect(copy.canSave)
+    }
 }

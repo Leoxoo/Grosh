@@ -138,4 +138,18 @@ struct PurchaseProgressTests {
         #expect(draft.type == .expense)
         #expect(draft.day == today)
     }
+
+    /// A copy keeps the total, which is the Purchase's price, but not the payments made toward the original.
+    @Test func duplicatingAPurchaseCopiesItsTotalButNotItsPayments() throws {
+        let recurring = try RecurringTransaction.create(laptop(total: 120_000), today: today, in: context)
+        try attachPayment(30_000, dated: day(2026, 9, 1), to: recurring)
+
+        let copy = RecurringDraft(duplicating: recurring, on: today)
+        #expect(copy.total?.cents == 120_000)
+        #expect(copy.kind == .purchase)
+
+        let duplicate = try RecurringTransaction.create(copy, today: today, in: context)
+        #expect(duplicate.totalCents == 120_000)
+        #expect(duplicate.purchaseProgress?.paid.cents == 0)
+    }
 }

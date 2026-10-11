@@ -136,6 +136,18 @@ struct RecurringDraft {
         }
     }
 
+    /// A new Recurring transaction like `recurring`, starting `today` ("Duplicate"). It copies every field and the Kind's
+    /// settings, the icon, Bill and Purchase settings included, but none of the transactions attached to it, so a
+    /// Purchase's progress starts over.
+    init(duplicating recurring: RecurringTransaction, on today: CalendarDay) {
+        self.init(editing: recurring)
+        startDay = today
+        // A last day already past can't end a schedule that starts today, so the copy gets a year, as a new one does.
+        if endKind == .until, untilDay < today {
+            untilDay = today.adding(days: 365)
+        }
+    }
+
     var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     /// The repeat the form has picked.
@@ -277,6 +289,15 @@ extension RecurringTransaction {
         for day in days {
             makeTransaction(on: day, history: history, in: context)
         }
+        try context.save()
+    }
+
+    /// Makes one transaction now, dated `today`, from the schedule's values, and attaches it. Unlike an occurrence it
+    /// consumes or skips nothing: the next occurrence still falls on its day. Nothing is made while the schedule is paused
+    /// or deleted. Saves.
+    func addTransactionNow(today: CalendarDay = .today, in context: ModelContext) throws {
+        guard isActive else { return }
+        makeTransaction(on: today, history: estimateHistory(in: context), in: context)
         try context.save()
     }
 
