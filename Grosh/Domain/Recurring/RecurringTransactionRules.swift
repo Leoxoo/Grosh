@@ -48,7 +48,7 @@ struct RecurringDraft {
     /// Changing it drops the Card, which is only offered on its paying wallet's transactions.
     var wallet: Wallet? {
         didSet {
-            if wallet != oldValue {
+            if wallet !== oldValue {
                 card = nil
             }
         }
@@ -173,7 +173,7 @@ struct RecurringDraft {
         guard wallet != nil else { throw RecurringRuleError.missingWallet }
         guard amount.cents > 0 else { throw RecurringRuleError.missingAmount }
         guard category != nil else { throw RecurringRuleError.missingCategory }
-        guard card == nil || card?.payingWallet == wallet else { throw RecurringRuleError.cardNotInWallet }
+        guard card == nil || card?.payingWallet === wallet else { throw RecurringRuleError.cardNotInWallet }
         switch end {
         case .forever:
             break

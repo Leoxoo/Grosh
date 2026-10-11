@@ -10,6 +10,16 @@ struct ScheduledOccurrence: Identifiable, Hashable {
 
     var id: Self { self }
 
+    /// Two occurrences are the same when they fall on the same day of the same schedule, which is compared by identity.
+    static func == (lhs: ScheduledOccurrence, rhs: ScheduledOccurrence) -> Bool {
+        lhs.recurring === rhs.recurring && lhs.day == rhs.day
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(ObjectIdentifier(recurring))
+        hasher.combine(day)
+    }
+
     /// What the occurrence will add to or take from its wallet, signed by its category.
     var amount: Money { recurring.signedAmount }
 
