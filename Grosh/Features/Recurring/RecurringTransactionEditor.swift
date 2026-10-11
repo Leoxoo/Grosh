@@ -81,6 +81,10 @@ private struct RecurringForm: View {
             if draft.name.isEmpty || draft.name == oldCategory?.name {
                 draft.name = newCategory?.name ?? ""
             }
+            // A new Recurring transaction starts as its category's default Kind, which the user can change.
+            if mode.isAdding, let newCategory {
+                draft.kind = newCategory.defaultKind
+            }
         }
         .errorAlert("Couldn't Save Recurring Transaction", message: $errorMessage)
     }
@@ -91,6 +95,11 @@ private struct RecurringForm: View {
             fields.amountRow("Amount", currencyCode: currencyCode, tint: amountTint)
             WalletPicker(title: "Wallet", selection: $draft.wallet)
             CategoryPicker(title: "Category", type: draft.type, selection: $draft.category)
+            Picker("Kind", selection: $draft.kind) {
+                ForEach(RecurringKind.allCases, id: \.self) { kind in
+                    Text(kind.title).tag(kind)
+                }
+            }
             CardPicker(title: "Card", wallet: draft.wallet, selection: $draft.card)
             fields.noteField($draft.note)
             DayStepper(title: "Starts", day: $draft.startDay)

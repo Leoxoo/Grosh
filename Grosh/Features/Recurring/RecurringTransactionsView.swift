@@ -1,20 +1,32 @@
 import SwiftData
 import SwiftUI
 
-/// Account → Recurring transactions: every schedule, in the order it was added. Tap one to see what it has made, and
-/// add one with the plus. A paused one, whose wallet is archived, shows muted. A deleted one waits in Recently Deleted.
+/// Account → Recurring transactions: every schedule, grouped by Kind and in the order it was added within each group.
+/// A paused one, whose wallet is archived, shows muted. A deleted one waits in Recently Deleted. A wallet filter in the
+/// toolbar narrows the list to one wallet's schedules. Tap one to see what it has made, and add one with the plus.
 struct RecurringTransactionsView: View {
     @Query(filter: #Predicate<RecurringTransaction> { $0.deletedAt == nil }, sort: \RecurringTransaction.createdAt)
     private var recurring: [RecurringTransaction]
+    @Query(Wallet.unarchived) private var wallets: [Wallet]
     @State private var editorMode: EditorMode<RecurringTransaction>?
+    /// The wallet the list is narrowed to, or `nil` for every wallet. Each time the tab opens it shows every wallet.
+    @State private var walletFilter: Wallet?
+
+    private var groups: [RecurringListing.KindGroup] {
+        RecurringListing.groups(of: recurring, wallet: walletFilter)
+    }
 
     var body: some View {
         List {
-            ForEach(recurring) { item in
-                NavigationLink {
-                    RecurringTransactionDetailView(recurring: item)
-                } label: {
-                    RecurringTransactionRow(recurring: item)
+            ForEach(groups) { group in
+                Section(group.kind.sectionTitle) {
+                    ForEach(group.items) { item in
+                        NavigationLink {
+                            RecurringTransactionDetailView(recurring: item)
+                        } label: {
+                            RecurringTransactionRow(recurring: item)
+                        }
+                    }
                 }
             }
         }
@@ -27,17 +39,40 @@ struct RecurringTransactionsView: View {
                 } actions: {
                     Button("Add Recurring Transaction") { editorMode = .add }
                 }
+            } else if groups.isEmpty, let walletFilter {
+                ContentUnavailableView {
+                    Label("No Recurring Transactions", systemImage: "repeat")
+                } description: {
+                    Text("None are paid from \(walletFilter.name).")
+                }
             }
         }
         .navigationTitle("Recurring transactions")
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                walletMenu
                 Button("Add Recurring Transaction", systemImage: "plus") { editorMode = .add }
             }
         }
         .sheet(item: $editorMode) { mode in
             RecurringTransactionEditor(mode: mode)
         }
+    }
+
+    /// Narrows the list to every wallet, or to one unarchived wallet.
+    private var walletMenu: some View {
+        Menu {
+            Picker("Wallet", selection: $walletFilter) {
+                Text("All wallets").tag(Wallet?.none)
+                ForEach(wallets) { wallet in
+                    Label(wallet.name, systemImage: wallet.symbolName).tag(Optional(wallet))
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Label("Wallet", systemImage: walletFilter == nil ? "wallet.bifold" : "wallet.bifold.fill")
+        }
+        .accessibilityValue(walletFilter?.name ?? String(localized: "All wallets"))
     }
 }
 

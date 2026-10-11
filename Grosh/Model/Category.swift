@@ -25,6 +25,8 @@ final class Category {
     var isHidden: Bool = false
     var lockedRoleRaw: String?
     var sortOrder: Int = 0
+    /// The ``RecurringKind`` the user set, or `nil` while the category has none of its own. See ``defaultKind``.
+    var ownKindRaw: String?
 
     var parent: Category?
 
@@ -48,7 +50,8 @@ final class Category {
         color: PaletteColor,
         lockedRole: LockedRole? = nil,
         parent: Category? = nil,
-        sortOrder: Int = 0
+        sortOrder: Int = 0,
+        ownKind: RecurringKind? = nil
     ) {
         self.name = name
         self.typeRaw = type.rawValue
@@ -57,6 +60,7 @@ final class Category {
         self.lockedRoleRaw = lockedRole?.rawValue
         self.parent = parent
         self.sortOrder = sortOrder
+        self.ownKind = ownKind
     }
 
     var type: CategoryType {
@@ -74,5 +78,16 @@ final class Category {
     var color: PaletteColor {
         get { PaletteColor(storedName: colorName) }
         set { colorName = newValue.rawValue }
+    }
+
+    var ownKind: RecurringKind? {
+        get { ownKindRaw.flatMap(RecurringKind.init(rawValue:)) }
+        set { ownKindRaw = newValue?.rawValue }
+    }
+
+    /// The Kind a Recurring transaction in this category starts as: its own, else its parent's, else Regular. So a
+    /// subcategory with no Kind of its own follows its parent when the parent's changes.
+    var defaultKind: RecurringKind {
+        ownKind ?? parent?.defaultKind ?? .regular
     }
 }

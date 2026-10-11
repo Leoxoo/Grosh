@@ -11,6 +11,7 @@ enum CategorySeeder {
     }
 
     private static func insert(_ seed: CategorySeed, parent: Category?, sortOrder: Int, into context: ModelContext) {
+        // A top-level category starts as Regular; a subcategory has no Kind of its own, so it follows its parent.
         let category = Category(
             name: seed.name,
             type: seed.type,
@@ -18,7 +19,8 @@ enum CategorySeeder {
             color: seed.color,
             lockedRole: seed.lockedRole,
             parent: parent,
-            sortOrder: sortOrder
+            sortOrder: sortOrder,
+            ownKind: parent == nil ? RecurringKind.regular : nil
         )
         context.insert(category)
         for (order, child) in seed.children.enumerated() {
