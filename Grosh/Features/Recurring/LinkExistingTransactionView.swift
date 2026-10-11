@@ -36,7 +36,9 @@ struct LinkExistingTransactionView: View {
                 }
             }
             .navigationTitle("Link Transaction")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
