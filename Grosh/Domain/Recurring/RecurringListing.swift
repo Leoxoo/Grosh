@@ -1,3 +1,5 @@
+import SwiftData
+
 /// What the Recurring tab lists, grouped by Kind: every Recurring transaction, or those paid from one wallet.
 enum RecurringListing {
     /// The Recurring transactions of one Kind, in the order the tab lists them.
