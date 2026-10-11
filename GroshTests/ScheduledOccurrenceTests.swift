@@ -25,7 +25,7 @@ struct ScheduledOccurrenceTests {
     private func makeSchedule(
         starting start: CalendarDay, preset: RepeatPreset = .monthly, wallet: Wallet? = nil
     ) throws -> RecurringTransaction {
-        let category = Category(name: "Subscriptions", type: .expense, symbolName: "repeat", color: .purple)
+        let category = Grosh.Category(name: "Subscriptions", type: .expense, symbolName: "repeat", color: .purple)
         context.insert(category)
         var draft = RecurringDraft(startDay: start)
         draft.name = "Netflix"
