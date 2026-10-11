@@ -2,9 +2,10 @@ import Foundation
 import SwiftData
 
 /// A Loan (money the user lent) or a Debt (money the user borrowed), with the payments recorded against it: the
-/// Debt Collections of a Loan, or the Repayments of a Debt (ADR-0003). The original transaction is never changed by
-/// a payment; what is still owed is worked out from the payments linked to it. This is the one place Outstanding is
-/// worked out: Debts & Loans, the detail, the Home bell and the reminders all read it from here.
+/// Debt Collections of a Loan, or the Repayments of a Debt (ADR-0003), and its Forgiven mark once forgiven (ADR-0004).
+/// The original transaction is never changed by a payment; what is still owed is worked out from the payments linked
+/// to it. This is the one place Outstanding is worked out: Debts & Loans, the detail, the Home bell and the reminders
+/// all read it from here.
 struct LoanOrDebt {
     /// The Loan or Debt transaction itself.
     let original: Transaction
@@ -39,32 +40,37 @@ struct LoanOrDebt {
         Money(cents: payments.reduce(0) { $0 + abs($1.amountCents) }, currencyCode: original.amount.currencyCode)
     }
 
-    /// How much has not yet been collected or repaid: the original minus its payments, never below zero.
+    /// The Forgiven mark, once the rest was forgiven.
+    var forgiveness: Forgiveness? { original.forgiveness }
+
+    /// How much has not yet been collected or repaid: the original minus its payments, never below zero. Nothing once
+    /// forgiven.
     var outstanding: Money {
-        Money(cents: max(0, owed.cents - paid.cents), currencyCode: original.amount.currencyCode)
+        let cents = original.isForgiven ? 0 : max(0, owed.cents - paid.cents)
+        return Money(cents: cents, currencyCode: original.amount.currencyCode)
     }
 
-    /// Nothing is outstanding.
+    /// Nothing is outstanding: paid in full, or forgiven.
     var isSettled: Bool { outstanding.cents == 0 }
 
     /// The one way something is recorded against a Loan or Debt, by Record payment or Forgive the rest: reads it again
     /// as it stands now (a payment may have been recorded since the sheet opened), lets `check` refuse, has `record`
-    /// add the linked transactions to it, given the category its payments are filed under, then saves.
+    /// add the payment or the Forgiven mark to it, then saves.
     func settle<Recorded>(
         in context: ModelContext,
         check: (_ current: LoanOrDebt) throws -> Void,
-        record: (_ current: LoanOrDebt, _ paymentCategory: Category) throws -> Recorded
+        record: (_ current: LoanOrDebt) throws -> Recorded
     ) throws -> Recorded {
         guard let current = try LoanOrDebt(original, in: context) else { throw DebtLoanRuleError.notALoanOrDebt }
         try check(current)
-        let recorded = try record(current, try context.lockedCategory(kind.paymentRole))
+        let recorded = try record(current)
         try context.save()
         return recorded
     }
 
-    /// Adds a transaction linked to the original, in its wallet and with its With: a payment, an overpayment, or
-    /// half of a forgive. The original only gains the link, the first time; its amount, date and every other
-    /// field stay as they are. Doesn't save.
+    /// Adds a transaction linked to the original, in its wallet and with its With: a payment or an overpayment. The
+    /// original only gains the link, the first time; its amount, date and every other field stay as they are.
+    /// Doesn't save.
     func addLinked(
         _ cents: Int, filedUnder category: Category, on day: CalendarDay, note: String,
         isExcludedFromReport: Bool, in context: ModelContext
@@ -143,8 +149,8 @@ extension Transaction {
     var loanOrDebtKind: LoanOrDebtKind? { LoanOrDebtKind(category?.lockedRole) }
 
     /// Whether this is the ordinary expense or income a Loan or Debt adds beside a payment (``LoanOrDebt/addLinked``):
-    /// what was paid above it, or the forgiven amount. It shares the Loan's or Debt's link, as no other expense or
-    /// income does (a transfer half is filed under a transfer category).
+    /// what was paid above it, or a forgiven amount recorded before forgiving became a mark (ADR-0004). It shares the
+    /// Loan's or Debt's link, as no other expense or income does (a transfer half is filed under a transfer category).
     var isDebtWriteOff: Bool {
         guard linkID != nil, let category, !category.isTransferHalf else { return false }
         return category.type == .expense || category.type == .income

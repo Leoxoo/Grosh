@@ -51,7 +51,7 @@ private struct LoanOrDebtLink: View {
 }
 
 /// A Loan or Debt as Debts & Loans and the Home bell list it: who it is with, when it was lent or borrowed, its due
-/// date, and what is outstanding (or that it is settled).
+/// date, and what is outstanding (or that it is settled or forgiven).
 struct LoanOrDebtRow: View {
     let loanOrDebt: LoanOrDebt
     let today: CalendarDay
@@ -75,7 +75,12 @@ struct LoanOrDebtRow: View {
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
-                if loanOrDebt.isSettled {
+                if loanOrDebt.forgiveness != nil {
+                    Text(loanOrDebt.owed.formatted())
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    ForgivenBadge()
+                } else if loanOrDebt.isSettled {
                     Text(loanOrDebt.owed.formatted())
                         .monospacedDigit()
                         .foregroundStyle(.secondary)

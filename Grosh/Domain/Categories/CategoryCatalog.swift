@@ -158,6 +158,9 @@ struct CategoryCatalog {
         for transaction in source.transactions ?? [] {
             transaction.category = target
         }
+        for forgiven in source.forgivenTransactions ?? [] {
+            forgiven.forgivenCategory = target
+        }
         var nextOrder = nextChildOrder(under: target)
         for child in Self.sorted(source.children ?? []) {
             child.parent = target
@@ -197,9 +200,12 @@ struct CategoryCatalog {
         guard !hasTransactions(category) else { throw CategoryRuleError.hasTransactions }
     }
 
-    /// Whether the category or any of its subcategories has transactions.
+    /// Whether the category or any of its subcategories has transactions, or an amount forgiven on a Loan or Debt
+    /// counts under it.
     func hasTransactions(_ category: Category) -> Bool {
-        ([category] + (category.children ?? [])).contains { !($0.transactions ?? []).isEmpty }
+        ([category] + (category.children ?? [])).contains {
+            !($0.transactions ?? []).isEmpty || !($0.forgivenTransactions ?? []).isEmpty
+        }
     }
 
     // MARK: Helpers

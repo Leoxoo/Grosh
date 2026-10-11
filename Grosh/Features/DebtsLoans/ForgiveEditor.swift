@@ -1,8 +1,9 @@
 import SwiftData
 import SwiftUI
 
-/// Forgive the rest: settles whatever is still outstanding on a Loan or Debt without any money moving. The forgiven
-/// amount is recorded as ordinary expense (Loan) or income (Debt) in a category the user picks.
+/// Forgive the rest: marks a Loan or Debt forgiven, settling whatever is still outstanding without any money moving or
+/// any transaction added. The forgiven amount counts in reports as expense (Loan) or income (Debt) under a category
+/// the user picks.
 struct ForgiveEditor: View {
     /// The Loan or Debt being forgiven.
     let original: Transaction

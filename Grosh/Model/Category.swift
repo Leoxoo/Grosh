@@ -34,6 +34,10 @@ final class Category {
     @Relationship(deleteRule: .nullify, inverse: \Transaction.category)
     var transactions: [Transaction]? = []
 
+    /// The forgiven Loans and Debts whose forgiven amount counts under this category in reports.
+    @Relationship(deleteRule: .nullify, inverse: \Transaction.forgivenCategory)
+    var forgivenTransactions: [Transaction]? = []
+
     init(
         name: String,
         type: CategoryType,

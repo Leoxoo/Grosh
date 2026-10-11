@@ -48,6 +48,7 @@ enum MoneyLoverImport {
     private static func removeAllData(in context: ModelContext) throws {
         for category in try context.fetch(FetchDescriptor<Category>()) {
             category.transactions = []
+            category.forgivenTransactions = []
         }
         for card in try context.fetch(FetchDescriptor<Card>()) {
             card.transactions = []

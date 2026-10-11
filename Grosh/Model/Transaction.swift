@@ -22,10 +22,18 @@ final class Transaction {
     var createdAt: Date = Date.now
     /// On a Loan or Debt, the ``CalendarDay`` (as `yyyymmdd`) the user is reminded of it: its due date.
     var reminderDayRaw: Int?
+    /// On a forgiven Loan or Debt, what was forgiven in cents, above zero: what was outstanding when it was forgiven
+    /// (ADR-0004). `nil` while it isn't forgiven.
+    var forgivenCents: Int?
+    /// On a forgiven Loan or Debt, the ``CalendarDay`` (as `yyyymmdd`) it was forgiven on.
+    var forgivenDayRaw: Int?
+    var forgivenNote: String = ""
 
     var wallet: Wallet?
     var category: Category?
     var card: Card?
+    /// On a forgiven Loan or Debt, the category the forgiven amount counts under in reports.
+    var forgivenCategory: Category?
 
     init(
         amount: Money,
