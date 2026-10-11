@@ -201,7 +201,7 @@ struct CategoryCatalog {
     }
 
     /// Whether the category or any of its subcategories has transactions, or an amount forgiven on a Loan or Debt
-    /// counts under it.
+    /// counts under it. Transactions in Recently Deleted count too, so they still have their category when restored.
     func hasTransactions(_ category: Category) -> Bool {
         ([category] + (category.children ?? [])).contains {
             !($0.transactions ?? []).isEmpty || !($0.forgivenTransactions ?? []).isEmpty

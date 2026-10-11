@@ -22,6 +22,8 @@ struct WalletEditor: View {
     @State private var startingDay = CalendarDay.today
     @State private var errorMessage: String?
     @State private var isAdjustingBalance = false
+    /// The wallet waiting for the user to confirm deleting it.
+    @State private var deleting: Wallet?
 
     init(mode: EditorMode<Wallet>) {
         self.mode = mode
@@ -84,6 +86,13 @@ struct WalletEditor: View {
                     } footer: {
                         Text("An archived wallet leaves the Total and the pickers but keeps its transactions.")
                     }
+
+                    Section {
+                        Button("Delete Wallet", systemImage: "trash", role: .destructive) { deleting = wallet }
+                            .foregroundStyle(.red)
+                    } footer: {
+                        Text("Deleting moves the wallet and all its transactions to Recently Deleted for \(RecentlyDeleted.keptDays) days.")
+                    }
                 }
             }
             .formStyle(.grouped)
@@ -98,6 +107,7 @@ struct WalletEditor: View {
                 }
             }
             .errorAlert("Couldn't Save Wallet", message: $errorMessage)
+            .walletDeleteDialog($deleting) { dismiss() }
             .sheet(isPresented: $isAdjustingBalance) {
                 AdjustBalanceEditor(viewedWallet: mode.editing)
             }

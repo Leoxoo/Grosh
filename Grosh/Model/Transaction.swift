@@ -28,6 +28,12 @@ final class Transaction {
     /// On a forgiven Loan or Debt, the ``CalendarDay`` (as `yyyymmdd`) it was forgiven on.
     var forgivenDayRaw: Int?
     var forgivenNote: String = ""
+    /// When the transaction was moved to Recently Deleted, or `nil` while it isn't there. A transaction in Recently
+    /// Deleted counts in no balance, list, search or report.
+    var deletedAt: Date?
+    /// Set on a transaction that went to Recently Deleted with its wallet, as part of that one item: it is restored
+    /// with the wallet, never on its own.
+    var deletedWithWallet: Bool = false
 
     var wallet: Wallet?
     var category: Category?

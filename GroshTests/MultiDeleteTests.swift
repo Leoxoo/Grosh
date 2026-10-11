@@ -31,7 +31,7 @@ struct MultiDeleteTests {
     }
 
     private func notes() throws -> Set<String> {
-        Set(try context.fetch(FetchDescriptor<Transaction>()).map(\.note))
+        Set(try context.fetch(Transaction.notDeleted).map(\.note))
     }
 
     @Test func aSelectionWithNothingRelatedIsSimplyDeleted() throws {

@@ -25,7 +25,7 @@ struct WalletPicker: View {
         self.title = title
         _selection = selection
         self.noneTitle = noneTitle
-        _wallets = Query(sort: Wallet.userOrder)
+        _wallets = Query(Wallet.notDeleted)
     }
 
     var body: some View {

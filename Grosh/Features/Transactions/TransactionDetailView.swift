@@ -17,7 +17,7 @@ struct TransactionDetailView: View {
 
     var body: some View {
         Group {
-            if transaction.isDeleted || transaction.modelContext == nil {
+            if transaction.isDeleted || transaction.modelContext == nil || transaction.isInRecentlyDeleted {
                 ContentUnavailableView("Transaction Deleted", systemImage: "trash")
             } else {
                 details

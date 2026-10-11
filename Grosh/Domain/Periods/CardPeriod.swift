@@ -99,14 +99,14 @@ extension Card {
     /// The periods ‹ › step through, oldest first: from the one holding the Card's first transaction through the one
     /// holding `today`, or its last transaction when that is dated later.
     func periods(today: CalendarDay) -> ClosedRange<CardPeriod> {
-        let days = (transactions ?? []).map(\.day)
+        let days = (transactions ?? []).notDeleted.map(\.day)
         return period(containing: min(days.min() ?? today, today))...period(containing: max(days.max() ?? today, today))
     }
 
     /// The transactions paid with this Card in `period`. Their `net` is the period's total: every one counts,
     /// excluded from report or not, as on the card's statement.
     func transactions(in period: CardPeriod) -> [Transaction] {
-        (transactions ?? []).filter { period.contains($0.day) }
+        (transactions ?? []).notDeleted.filter { period.contains($0.day) }
     }
 
     /// The lead-in transactions of `period`: those paid with this Card in the two days before a statement period
@@ -114,6 +114,6 @@ extension Card {
     /// and never count in this one's total unless the user adds one for the moment. None for a calendar month.
     func leadInTransactions(in period: CardPeriod) -> [Transaction] {
         guard let days = period.leadInDays else { return [] }
-        return (transactions ?? []).filter { days.contains($0.day) }
+        return (transactions ?? []).notDeleted.filter { days.contains($0.day) }
     }
 }

@@ -12,9 +12,11 @@ enum GroshCSVExport {
         "Members", "Card", "Linked",
     ]
 
-    /// Every transaction in `context`, in list order.
+    /// Every transaction in `context` outside Recently Deleted, in list order.
     static func csv(in context: ModelContext) throws -> String {
-        try csv(of: context.fetch(FetchDescriptor<Transaction>(sortBy: Transaction.listOrder)).inListOrder())
+        var descriptor = Transaction.notDeleted
+        descriptor.sortBy = Transaction.listOrder
+        return try csv(of: context.fetch(descriptor).inListOrder())
     }
 
     /// `transactions` in the order given, one row each, with MoneyLover's line endings. Rows are numbered from 1 in

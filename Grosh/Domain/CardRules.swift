@@ -171,7 +171,8 @@ extension Card {
         try context.save()
     }
 
-    /// Whether any transaction was paid with this Card, so it can only go away by merging.
+    /// Whether any transaction was paid with this Card, so it can only go away by merging. Transactions in Recently
+    /// Deleted count too, so they still have their Card when restored.
     var hasTransactions: Bool { !(transactions ?? []).isEmpty }
 
     /// Removes a Card that never paid for anything. A Card with transactions must be merged instead. Saves.

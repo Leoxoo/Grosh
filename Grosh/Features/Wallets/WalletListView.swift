@@ -1,12 +1,14 @@
 import SwiftData
 import SwiftUI
 
-/// Account → Wallets: every wallet in the user's order. Drag to reorder, tap to edit, swipe to archive.
+/// Account → Wallets: every wallet in the user's order. Drag to reorder, tap to edit, swipe to archive or delete.
 struct WalletListView: View {
     @Query(Wallet.unarchived) private var wallets: [Wallet]
-    @Query(filter: #Predicate<Wallet> { $0.isArchived }, sort: Wallet.userOrder) private var archivedWallets: [Wallet]
+    @Query(Wallet.archived) private var archivedWallets: [Wallet]
     @State private var editorMode: EditorMode<Wallet>?
     @State private var errorMessage: String?
+    /// The wallet waiting for the user to confirm deleting it.
+    @State private var deleting: Wallet?
 
     private var today: CalendarDay { .today }
 
@@ -21,12 +23,15 @@ struct WalletListView: View {
                     }
                     .buttonStyle(.plain)
                     .swipeActions {
+                        Button("Delete", systemImage: "trash") { deleting = wallet }
+                            .tint(.red)
                         Button("Archive", systemImage: "archivebox") { perform { try wallet.archive() } }
                             .tint(.orange)
                     }
                     .contextMenu {
                         Button("Edit", systemImage: "pencil") { editorMode = .edit(wallet) }
                         Button("Archive", systemImage: "archivebox") { perform { try wallet.archive() } }
+                        Button("Delete", systemImage: "trash", role: .destructive) { deleting = wallet }
                     }
                 }
                 .onMove { source, destination in
@@ -49,11 +54,14 @@ struct WalletListView: View {
                         }
                         .buttonStyle(.plain)
                         .swipeActions {
+                            Button("Delete", systemImage: "trash") { deleting = wallet }
+                                .tint(.red)
                             Button("Unarchive", systemImage: "tray.and.arrow.up") { perform { try wallet.unarchive() } }
                                 .tint(.green)
                         }
                         .contextMenu {
                             Button("Unarchive", systemImage: "tray.and.arrow.up") { perform { try wallet.unarchive() } }
+                            Button("Delete", systemImage: "trash", role: .destructive) { deleting = wallet }
                         }
                     }
                 } header: {
@@ -88,6 +96,7 @@ struct WalletListView: View {
         .sheet(item: $editorMode) { mode in
             WalletEditor(mode: mode)
         }
+        .walletDeleteDialog($deleting)
         .errorAlert("Couldn't Change Wallet", message: $errorMessage)
     }
 

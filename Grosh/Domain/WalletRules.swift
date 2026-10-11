@@ -5,9 +5,20 @@ extension Wallet {
     /// The order the user set by dragging. Every list and picker of wallets uses it.
     static let userOrder: [SortDescriptor<Wallet>] = [SortDescriptor(\.sortOrder), SortDescriptor(\.createdAt)]
 
-    /// Unarchived wallets in the user's order: what Home and every wallet picker show.
+    /// Unarchived wallets in the user's order: what Home and every wallet picker show. A wallet in Recently Deleted
+    /// is left out.
     static var unarchived: FetchDescriptor<Wallet> {
-        FetchDescriptor(predicate: #Predicate { !$0.isArchived }, sortBy: userOrder)
+        FetchDescriptor(predicate: #Predicate { !$0.isArchived && $0.deletedAt == nil }, sortBy: userOrder)
+    }
+
+    /// Archived wallets in the user's order, leaving out any in Recently Deleted.
+    static var archived: FetchDescriptor<Wallet> {
+        FetchDescriptor(predicate: #Predicate { $0.isArchived && $0.deletedAt == nil }, sortBy: userOrder)
+    }
+
+    /// Every wallet in the user's order, archived ones included, leaving out any in Recently Deleted.
+    static var notDeleted: FetchDescriptor<Wallet> {
+        FetchDescriptor(predicate: #Predicate { $0.deletedAt == nil }, sortBy: userOrder)
     }
 
     /// Applies a drag in `ordered` (a list in the user's order) by renumbering the wallets in their new order.
@@ -55,16 +66,16 @@ extension Wallet {
     }
 
     /// The wallet's balance on `today`: the sum of its transactions dated today or earlier.
-    /// Transactions dated after today belong to Future and don't count yet.
+    /// Transactions dated after today belong to Future and don't count yet, and those in Recently Deleted never do.
     func balance(asOf today: CalendarDay) -> Money {
-        let cents = (transactions ?? [])
+        let cents = (transactions ?? []).notDeleted
             .filter { $0.dayRaw <= today.rawValue }
             .reduce(0) { $0 + $1.amountCents }
         return Money(cents: cents, currencyCode: currencyCode)
     }
 
-    /// Whether the wallet counts toward the Total: unarchived and marked "Include in total".
-    var countsInTotal: Bool { !isArchived && includeInTotal }
+    /// Whether the wallet counts toward the Total: unarchived, marked "Include in total", and not in Recently Deleted.
+    var countsInTotal: Bool { !isArchived && includeInTotal && deletedAt == nil }
 
     /// The Total on `today`: the combined balance of every unarchived wallet marked "Include in total".
     static func total(of wallets: [Wallet], asOf today: CalendarDay) -> Money {

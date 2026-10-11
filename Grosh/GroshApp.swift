@@ -11,6 +11,8 @@ struct GroshApp: App {
         } catch {
             fatalError("Couldn't open the Grosh store: \(error)")
         }
+        // Items in Recently Deleted are removed for good once they have waited 30 days; nothing runs in the background.
+        try? RecentlyDeleted.purgeExpired(in: container.mainContext)
     }
 
     var body: some Scene {

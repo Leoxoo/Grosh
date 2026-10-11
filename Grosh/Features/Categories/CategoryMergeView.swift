@@ -26,7 +26,7 @@ struct CategoryMergeView: View {
 
     private func consequences(into target: Category?) -> String {
         let destination = target.map { "“\($0.name)”" } ?? String(localized: "the category you pick")
-        let transactions = source.transactions?.count ?? 0
+        let transactions = (source.transactions ?? []).notDeleted.count
         let subcategories = source.children?.count ?? 0
         var text = transactions == 1
             ? String(localized: "Its transaction moves to \(destination)")

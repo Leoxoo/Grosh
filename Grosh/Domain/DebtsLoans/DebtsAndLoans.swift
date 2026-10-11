@@ -10,11 +10,12 @@ struct DebtsAndLoans {
     /// Loans and Debts with nothing outstanding, the newest first.
     let settled: [LoanOrDebt]
 
-    /// Every transaction filed under a Debt/Loan category: the Loans and Debts and their payments. A list made from
-    /// them stays current, since a new payment or a change to a Loan or Debt changes what this fetches.
+    /// Every transaction filed under a Debt/Loan category, outside Recently Deleted: the Loans and Debts and their
+    /// payments. A list made from them stays current, since a new payment or a change to a Loan or Debt changes what
+    /// this fetches.
     static var transactions: FetchDescriptor<Transaction> {
         let debtLoan: String? = CategoryType.debtLoan.rawValue
-        return FetchDescriptor(predicate: #Predicate { $0.category?.typeRaw == debtLoan })
+        return FetchDescriptor(predicate: #Predicate { $0.category?.typeRaw == debtLoan && $0.deletedAt == nil })
     }
 
     /// The Loans and Debts among `transactions`, each with the payments among them that share its link.
