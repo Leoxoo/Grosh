@@ -105,6 +105,9 @@ private struct RecurringForm: View {
                     Text(kind.title).tag(kind)
                 }
             }
+            if draft.kind == .subscription {
+                SubscriptionIconField(iconData: $draft.iconData)
+            }
             CardPicker(title: "Card", wallet: draft.wallet, selection: $draft.card)
             fields.noteField($draft.note)
             DayStepper(title: "Starts", day: $draft.startDay)

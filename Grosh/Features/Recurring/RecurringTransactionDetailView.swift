@@ -32,7 +32,7 @@ struct RecurringTransactionDetailView: View {
         List {
             Section {
                 HStack(spacing: 12) {
-                    CategoryIcon(category: recurring.category, size: 44)
+                    CategoryIcon(category: recurring.category, subscriptionIcon: recurring.subscriptionIcon, size: 44)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(recurring.name)
                             .font(.title3.weight(.semibold))

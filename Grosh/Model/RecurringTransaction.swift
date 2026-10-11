@@ -36,6 +36,9 @@ final class RecurringTransaction {
     /// Set on a schedule that went to Recently Deleted with its wallet, as part of that one item: it is restored with
     /// the wallet, never on its own.
     var deletedWithWallet: Bool = false
+    /// A Subscription's cropped icon, as JPEG data (``SubscriptionIcon``). It is kept when the Kind changes, so changing
+    /// back shows it again, but only ``subscriptionIcon`` shows it. External storage keeps the image out of the row.
+    @Attribute(.externalStorage) var iconData: Data?
 
     var wallet: Wallet?
     var category: Category?
@@ -94,6 +97,12 @@ final class RecurringTransaction {
     var kind: RecurringKind {
         get { RecurringKind(rawValue: kindRaw) ?? .regular }
         set { kindRaw = newValue.rawValue }
+    }
+
+    /// The icon the Recurring transaction shows in place of its category's symbol: a Subscription's own, and none for any
+    /// other Kind.
+    var subscriptionIcon: Data? {
+        kind == .subscription ? iconData : nil
     }
 
     /// The last due day dealt with, or `nil` before any has been.

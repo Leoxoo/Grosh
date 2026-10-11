@@ -14,13 +14,19 @@ extension CategoryType {
     }
 }
 
-/// A category's icon on its colored circle; a question mark on gray for a transaction filed under none.
+/// A category's icon on its colored circle; a question mark on gray for a transaction filed under none. A Subscription
+/// shows its own cropped icon in place of the symbol, when it has one.
 struct CategoryIcon: View {
     let category: Category?
+    var subscriptionIcon: Data?
     var size: CGFloat = 32
 
     var body: some View {
-        SymbolCircle(symbolName: category?.symbolName ?? "questionmark", color: category?.color ?? .gray, size: size)
+        if let subscriptionIcon, let image = SubscriptionIcon.image(from: subscriptionIcon) {
+            SubscriptionIconImage(image: image, size: size)
+        } else {
+            SymbolCircle(symbolName: category?.symbolName ?? "questionmark", color: category?.color ?? .gray, size: size)
+        }
     }
 }
 

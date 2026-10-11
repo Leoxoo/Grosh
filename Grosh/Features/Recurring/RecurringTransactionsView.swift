@@ -76,13 +76,13 @@ struct RecurringTransactionsView: View {
     }
 }
 
-/// One Recurring transaction in the list: its category icon, name, wallet and next day, and its signed amount.
+/// One Recurring transaction in the list: its icon, name, wallet and next day, and its signed amount.
 struct RecurringTransactionRow: View {
     let recurring: RecurringTransaction
 
     var body: some View {
         HStack(spacing: 12) {
-            CategoryIcon(category: recurring.category)
+            CategoryIcon(category: recurring.category, subscriptionIcon: recurring.subscriptionIcon)
             VStack(alignment: .leading, spacing: 2) {
                 Text(recurring.name)
                     .lineLimit(1)

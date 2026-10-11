@@ -56,6 +56,8 @@ struct RecurringDraft {
     /// The sort of Recurring transaction it is. A new one starts with its category's default Kind.
     var kind: RecurringKind = .regular
     var note = ""
+    /// A Subscription's cropped icon, as JPEG data. It is kept while the Kind is something else, as on the model.
+    var iconData: Data?
     /// The first occurrence. It may be in the past.
     var startDay: CalendarDay {
         didSet {
@@ -102,6 +104,7 @@ struct RecurringDraft {
         card = recurring.card
         kind = recurring.kind
         note = recurring.note
+        iconData = recurring.iconData
         preset = RepeatPreset(rule: schedule.rule)
         customRule = schedule.rule
         monthlyDay = schedule.monthlyDay
@@ -280,6 +283,7 @@ extension RecurringTransaction {
         category = draft.category
         card = draft.card
         kind = draft.kind
+        iconData = draft.iconData
         schedule = draft.schedule
     }
 }
