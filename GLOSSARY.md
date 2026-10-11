@@ -86,10 +86,13 @@ How much of a Loan or Debt has not yet been collected or repaid.
 _Avoid_: Balance (that word belongs to wallets)
 
 **Settled**:
-A Loan or Debt with nothing outstanding. Settling never changes the original transaction; anything paid beyond what was owed is ordinary income or expense, which never needs a Card.
+A Loan or Debt with nothing outstanding, whether it was paid in full or forgiven. Settling never changes the original transaction; anything paid beyond what was owed is ordinary income or expense, which never needs a Card.
 
 **Forgive**:
-Settling whatever is still outstanding on a Loan or Debt without any money moving, so the forgiven amount appears as ordinary expense or income instead. It never needs a Card.
+Settling whatever is still outstanding on a Loan or Debt without any money moving and without adding any transaction. The Loan or Debt is marked **Forgiven** on the day, with an optional note, and can be un-forgiven. The forgiven amount counts in reports as income (a forgiven Debt) or expense (a forgiven Loan) on that day, and never changes any wallet's balance.
+
+**Forgiven**:
+The mark a forgiven Loan or Debt carries: how much was forgiven, and when. The Loan or Debt's detail tells the whole story, such as borrowed $250, repaid $200, forgiven $50.
 
 **Reminder date**:
 The day a Loan or Debt is due. The user gets a notification that day, and the Home bell lists it from then until it is settled.
@@ -111,6 +114,13 @@ _Avoid_: Correction, reconcile
 A flag that removes a transaction from income and spending statistics. It never removes the transaction from any balance.
 _Avoid_: Hidden, ignored
 
+**Recently Deleted**:
+Where deleted transactions and deleted wallets wait for 30 days before they are removed for good. A deleted wallet goes in with all its transactions as one item and is restored with them. Until then everything can be restored, and nothing in it counts in any balance or report.
+_Avoid_: Trash, recycle bin
+
+**Delete** / **Archive**:
+Archiving a wallet keeps it in place but out of the Total and the pickers. Deleting a wallet or a transaction moves it to Recently Deleted. A Card or category can only be deleted while it has no transactions; otherwise it is merged away or retired (a Card is archived, a category hidden).
+
 ### Time
 
 **Period**:
@@ -124,3 +134,6 @@ The balance at the start and at the end of a period.
 
 **Future**:
 The period holding every transaction dated after today.
+
+**Lead-in transactions**:
+On a Credit card's statement view, the transactions from the two days before the statement period begins, shown muted because they are not part of it. They never count in the statement total unless the user adds one for the moment they are looking.
