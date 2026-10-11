@@ -22,7 +22,7 @@ struct AttachedTransactionTests {
 
     /// A monthly Netflix of 15.99 starting on `start`, paid from the fixture's wallet.
     private func netflix(starting start: CalendarDay) throws -> RecurringTransaction {
-        let category = Category(name: "Subscriptions", type: .expense, symbolName: "repeat", color: .purple)
+        let category = Grosh.Category(name: "Subscriptions", type: .expense, symbolName: "repeat", color: .purple)
         context.insert(category)
         var draft = RecurringDraft(startDay: start)
         draft.name = "Netflix"
@@ -127,6 +127,23 @@ struct AttachedTransactionTests {
         #expect(free.isAttachable)
         #expect(!held.isAttachable)
         #expect(!deleted.isAttachable)
+    }
+
+    @Test func attachingRefusesATransactionInRecentlyDeletedOrHeldByAnotherSchedule() throws {
+        let recurring = try netflix(starting: day(2026, 10, 12))
+        let other = try netflix(starting: day(2026, 10, 12))
+        let deleted = entered(on: day(2026, 10, 1), cents: -500)
+        deleted.deletedAt = .now
+        let held = entered(on: day(2026, 10, 2), cents: -600)
+        try other.attach(held, in: context)
+
+        #expect(throws: AttachError.notAttachable) { try recurring.attach(deleted, in: context) }
+        #expect(throws: AttachError.notAttachable) { try recurring.attach(held, in: context) }
+
+        #expect(deleted.recurring == nil)
+        #expect(held.recurring == other)
+        #expect(recurring.attachedTransactions.isEmpty)
+        #expect(other.attachedTransactions == [held])
     }
 
     @Test func deletingTheScheduleLeavesItsAttachedTransactionsAsOrdinaryOnes() throws {
