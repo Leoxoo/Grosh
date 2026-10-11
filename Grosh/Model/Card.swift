@@ -28,6 +28,9 @@ final class Card {
     @Relationship(deleteRule: .nullify, inverse: \Transaction.card)
     var transactions: [Transaction]? = []
 
+    @Relationship(deleteRule: .nullify, inverse: \RecurringTransaction.card)
+    var recurringTransactions: [RecurringTransaction]? = []
+
     init(name: String, kind: CardKind, payingWallet: Wallet?, color: PaletteColor = .blue, sortOrder: Int = 0) {
         self.name = name
         self.kindRaw = kind.rawValue

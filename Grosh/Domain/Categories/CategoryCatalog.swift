@@ -161,6 +161,9 @@ struct CategoryCatalog {
         for forgiven in source.forgivenTransactions ?? [] {
             forgiven.forgivenCategory = target
         }
+        for recurring in source.recurringTransactions ?? [] {
+            recurring.category = target
+        }
         var nextOrder = nextChildOrder(under: target)
         for child in Self.sorted(source.children ?? []) {
             child.parent = target
@@ -201,10 +204,12 @@ struct CategoryCatalog {
     }
 
     /// Whether the category or any of its subcategories has transactions, or an amount forgiven on a Loan or Debt
-    /// counts under it. Transactions in Recently Deleted count too, so they still have their category when restored.
+    /// counts under it, or a Recurring transaction is set to use it. Transactions in Recently Deleted count too, so
+    /// they still have their category when restored.
     func hasTransactions(_ category: Category) -> Bool {
         ([category] + (category.children ?? [])).contains {
             !($0.transactions ?? []).isEmpty || !($0.forgivenTransactions ?? []).isEmpty
+                || !($0.recurringTransactions ?? []).isEmpty
         }
     }
 

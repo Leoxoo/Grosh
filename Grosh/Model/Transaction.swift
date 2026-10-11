@@ -38,6 +38,8 @@ final class Transaction {
     var wallet: Wallet?
     var category: Category?
     var card: Card?
+    /// The Recurring transaction that made this one, or that the user attached it to. `nil` for an ordinary one.
+    var recurring: RecurringTransaction?
     /// On a forgiven Loan or Debt, the category the forgiven amount counts under in reports.
     var forgivenCategory: Category?
 
