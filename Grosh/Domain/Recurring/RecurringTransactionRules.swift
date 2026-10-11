@@ -211,13 +211,11 @@ extension RecurringTransaction {
         schedule.nextOccurrence(after: handledThrough)
     }
 
-    /// The transactions this schedule made, newest first. Those in Recently Deleted are left out.
+    /// The transactions this schedule made or the user attached, newest first. Those in Recently Deleted are left out.
     var attachedTransactions: [Transaction] {
         (transactions ?? [])
             .filter { $0.deletedAt == nil }
-            .sorted { lhs, rhs in
-                lhs.dayRaw == rhs.dayRaw ? lhs.createdAt > rhs.createdAt : lhs.dayRaw > rhs.dayRaw
-            }
+            .sorted(by: Transaction.newestFirst)
     }
 
     /// Makes the transactions that have come due by `today`, for every Recurring transaction, and saves. The app runs
