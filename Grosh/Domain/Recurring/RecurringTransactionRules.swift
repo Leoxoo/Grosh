@@ -169,18 +169,22 @@ extension RecurringTransaction {
         try modelContext?.save()
     }
 
-    /// Removes the schedule, after making what has fallen due by `today` so no due day is lost. The transactions it
-    /// made stay as ordinary transactions. Saves.
-    func delete(today: CalendarDay = .today, in context: ModelContext) throws {
+    /// Moves the schedule to Recently Deleted, after making what has fallen due by `today` so no due day is lost. The
+    /// transactions it made stay as ordinary transactions: they lose their link to it. Saves.
+    func delete(today: CalendarDay = .today, at now: Date = .now, in context: ModelContext) throws {
         makeDueTransactions(through: today, in: context)
-        context.delete(self)
+        deletedAt = now
+        for transaction in transactions ?? [] {
+            transaction.recurring = nil
+        }
         try context.save()
     }
 
     /// Makes a transaction for each occurrence that has come due by `today` and hasn't been dealt with yet, then
-    /// marks them dealt with, so each occurrence is made once however often this runs.
+    /// marks them dealt with, so each occurrence is made once however often this runs. A schedule that is deleted or
+    /// paused makes none.
     func makeDueTransactions(through today: CalendarDay, in context: ModelContext) {
-        guard let wallet = self.wallet, let category = self.category else { return }
+        guard isActive, let wallet = self.wallet, let category = self.category else { return }
         let due = schedule.occurrences(after: handledThrough, through: today)
         for day in due {
             let transaction = Transaction(

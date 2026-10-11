@@ -26,6 +26,11 @@ final class RecurringTransaction {
     /// was saved. Occurrences up to and including it are never made again. `nil` before any has been dealt with.
     var handledThroughRaw: Int?
     var createdAt: Date = Date.now
+    /// When the schedule was moved to Recently Deleted, or `nil` while it isn't there. It makes nothing while it is.
+    var deletedAt: Date?
+    /// Set on a schedule that went to Recently Deleted with its wallet, as part of that one item: it is restored with
+    /// the wallet, never on its own.
+    var deletedWithWallet: Bool = false
 
     var wallet: Wallet?
     var category: Category?
@@ -91,4 +96,13 @@ final class RecurringTransaction {
             currencyCode: wallet?.currencyCode ?? Money.defaultCurrencyCode
         )
     }
+
+    /// Whether the schedule is in Recently Deleted, on its own or with its wallet.
+    var isInRecentlyDeleted: Bool { deletedAt != nil }
+
+    /// Whether its wallet is archived. A paused schedule makes nothing until the wallet is unarchived.
+    var isPaused: Bool { wallet?.isArchived == true }
+
+    /// Whether the schedule makes transactions and shows Scheduled rows: it is neither deleted nor paused.
+    var isActive: Bool { !isInRecentlyDeleted && !isPaused && wallet?.isInRecentlyDeleted != true }
 }

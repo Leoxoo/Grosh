@@ -84,14 +84,14 @@ struct WalletEditor: View {
                             }
                         }
                     } footer: {
-                        Text("An archived wallet leaves the Total and the pickers but keeps its transactions.")
+                        Text("An archived wallet leaves the Total and the pickers but keeps its transactions. Its Recurring transactions pause until it is unarchived.")
                     }
 
                     Section {
                         Button("Delete Wallet", systemImage: "trash", role: .destructive) { deleting = wallet }
                             .foregroundStyle(.red)
                     } footer: {
-                        Text("Deleting moves the wallet and all its transactions to Recently Deleted for \(RecentlyDeleted.keptDays) days.")
+                        Text("Deleting moves the wallet, its transactions and its Recurring transactions to Recently Deleted for \(RecentlyDeleted.keptDays) days.")
                     }
                 }
             }
