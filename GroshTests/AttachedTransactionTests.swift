@@ -129,6 +129,23 @@ struct AttachedTransactionTests {
         #expect(!deleted.isAttachable)
     }
 
+    @Test func attachingRefusesATransactionInRecentlyDeletedOrHeldByAnotherSchedule() throws {
+        let recurring = try netflix(starting: day(2026, 10, 12))
+        let other = try netflix(starting: day(2026, 10, 12))
+        let deleted = entered(on: day(2026, 10, 1), cents: -500)
+        deleted.deletedAt = .now
+        let held = entered(on: day(2026, 10, 2), cents: -600)
+        try other.attach(held, in: context)
+
+        #expect(throws: AttachError.notAttachable) { try recurring.attach(deleted, in: context) }
+        #expect(throws: AttachError.notAttachable) { try recurring.attach(held, in: context) }
+
+        #expect(deleted.recurring == nil)
+        #expect(held.recurring == other)
+        #expect(recurring.attachedTransactions.isEmpty)
+        #expect(other.attachedTransactions == [held])
+    }
+
     @Test func deletingTheScheduleLeavesItsAttachedTransactionsAsOrdinaryOnes() throws {
         let recurring = try netflix(starting: day(2026, 10, 12))
         let transaction = entered(on: day(2026, 10, 1), cents: -1599)
