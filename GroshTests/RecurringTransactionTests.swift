@@ -20,8 +20,8 @@ struct RecurringTransactionTests {
         CalendarDay(year: year, month: month, day: day)
     }
 
-    private func category(_ name: String, _ type: CategoryType) -> Category {
-        let category = Category(name: name, type: type, symbolName: "repeat", color: .purple)
+    private func category(_ name: String, _ type: CategoryType) -> Grosh.Category {
+        let category = Grosh.Category(name: name, type: type, symbolName: "repeat", color: .purple)
         context.insert(category)
         return category
     }
