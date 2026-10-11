@@ -9,7 +9,7 @@ struct TransactionRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            CategoryIcon(category: transaction.category)
+            CategoryIcon(category: transaction.category, subscriptionIcon: transaction.recurring?.subscriptionIcon)
             VStack(alignment: .leading, spacing: 2) {
                 Text(transaction.categoryName)
                     .lineLimit(1)

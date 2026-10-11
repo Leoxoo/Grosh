@@ -29,6 +29,9 @@ final class RecurringTransaction {
     /// was saved. Occurrences up to and including it are never made again. `nil` before any has been dealt with.
     var handledThroughRaw: Int?
     var createdAt: Date = Date.now
+    /// A Subscription's cropped icon, as JPEG data (``SubscriptionIcon``). It is kept when the Kind changes, so changing
+    /// back shows it again, but only ``subscriptionIcon`` shows it. External storage keeps the image out of the row.
+    @Attribute(.externalStorage) var iconData: Data?
 
     var wallet: Wallet?
     var category: Category?
@@ -85,6 +88,12 @@ final class RecurringTransaction {
     var kind: RecurringKind {
         get { RecurringKind(rawValue: kindRaw) ?? .regular }
         set { kindRaw = newValue.rawValue }
+    }
+
+    /// The icon the Recurring transaction shows in place of its category's symbol: a Subscription's own, and none for any
+    /// other Kind.
+    var subscriptionIcon: Data? {
+        kind == .subscription ? iconData : nil
     }
 
     /// The last due day dealt with, or `nil` before any has been.
