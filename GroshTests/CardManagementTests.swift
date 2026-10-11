@@ -213,7 +213,7 @@ struct CardManagementTests {
     @Test func aCardThatPaidForTransactionsKeepsItsPayingWallet() throws {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
         let nfcu = try addCard("NFCU")
-        try addExpense(12_76, paidWith: nfcu)
+        _ = try addExpense(12_76, paidWith: nfcu)
         var details = CardDraft(nfcu)
         details.payingWallet = savings
         details.name = "Navy Federal"
