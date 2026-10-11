@@ -5,7 +5,8 @@ import SwiftUI
 /// A wallet filter in the toolbar narrows the list to one wallet's schedules. Tap one to see what it has made, and add
 /// one with the plus.
 struct RecurringTransactionsView: View {
-    @Query(sort: \RecurringTransaction.createdAt) private var recurring: [RecurringTransaction]
+    @Query(filter: #Predicate<RecurringTransaction> { $0.deletedAt == nil }, sort: \RecurringTransaction.createdAt)
+    private var recurring: [RecurringTransaction]
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     @State private var editorMode: EditorMode<RecurringTransaction>?
     /// The wallet the list is narrowed to, or `nil` for every wallet. Each time the tab opens it shows every wallet.

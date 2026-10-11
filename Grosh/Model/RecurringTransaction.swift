@@ -29,6 +29,8 @@ final class RecurringTransaction {
     /// was saved. Occurrences up to and including it are never made again. `nil` before any has been dealt with.
     var handledThroughRaw: Int?
     var createdAt: Date = Date.now
+    /// When the schedule was moved to Recently Deleted, or `nil` while it isn't there. It makes nothing while it is.
+    var deletedAt: Date?
 
     var wallet: Wallet?
     var category: Category?
