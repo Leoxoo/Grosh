@@ -35,6 +35,8 @@ struct RecurringDraft {
     var name = ""
     /// Entered positive; the category sets the sign.
     var amount = Money(cents: 0)
+    /// A Purchase's total price, or `nil` for none. A Kind change keeps it, as it keeps the icon.
+    var total: Money?
     /// Expense or Income. Switching it drops a category of the other type.
     var type: CategoryType = .expense {
         didSet {
@@ -54,7 +56,15 @@ struct RecurringDraft {
     var category: Category?
     var card: Card?
     /// The sort of Recurring transaction it is. A new one starts with its category's default Kind.
-    var kind: RecurringKind = .regular
+    var kind: RecurringKind = .regular {
+        didSet {
+            // A Purchase is paid off over time, so switching to one ends it after a number of payments,
+            // which the user can then change.
+            if kind == .purchase, oldValue != .purchase {
+                endKind = .afterCount
+            }
+        }
+    }
     /// Only a Bill's amount can vary: each transaction it makes then starts as an estimate, until the real amount is
     /// entered.
     var amountVaries = false
@@ -103,6 +113,9 @@ struct RecurringDraft {
             cents: recurring.amountCents,
             currencyCode: recurring.wallet?.currencyCode ?? Money.defaultCurrencyCode
         )
+        total = recurring.totalCents.map {
+            Money(cents: $0, currencyCode: recurring.wallet?.currencyCode ?? Money.defaultCurrencyCode)
+        }
         type = recurring.category?.type ?? .expense
         wallet = recurring.wallet
         category = recurring.category
@@ -120,6 +133,18 @@ struct RecurringDraft {
         case .forever: break
         case .until(let last): untilDay = last
         case .afterCount(let count): occurrenceCount = count
+        }
+    }
+
+    /// A new Recurring transaction like `recurring`, starting `today` ("Duplicate"). It copies every field and the Kind's
+    /// settings, the icon, Bill and Purchase settings included, but none of the transactions attached to it, so a
+    /// Purchase's progress starts over.
+    init(duplicating recurring: RecurringTransaction, on today: CalendarDay) {
+        self.init(editing: recurring)
+        startDay = today
+        // A last day already past can't end a schedule that starts today, so the copy gets a year, as a new one does.
+        if endKind == .until, untilDay < today {
+            untilDay = today.adding(days: 365)
         }
     }
 
@@ -267,6 +292,15 @@ extension RecurringTransaction {
         try context.save()
     }
 
+    /// Makes one transaction now, dated `today`, from the schedule's values, and attaches it. Unlike an occurrence it
+    /// consumes or skips nothing: the next occurrence still falls on its day. Nothing is made while the schedule is paused
+    /// or deleted. Saves.
+    func addTransactionNow(today: CalendarDay = .today, in context: ModelContext) throws {
+        guard isActive else { return }
+        makeTransaction(on: today, history: estimateHistory(in: context), in: context)
+        try context.save()
+    }
+
     /// Marks the occurrences dated `today` or earlier as dealt with, without making them.
     func skipOccurrences(through today: CalendarDay) {
         if let last = schedule.occurrences(after: handledThrough, through: today).last {
@@ -300,6 +334,7 @@ extension RecurringTransaction {
     private func apply(_ draft: RecurringDraft) {
         name = draft.trimmedName
         amountCents = draft.amount.cents
+        totalCents = draft.total?.cents
         note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
         wallet = draft.wallet
         category = draft.category

@@ -1,10 +1,25 @@
 import SwiftData
 import SwiftUI
 
-/// The Add Recurring transaction sheet, which also edits one. A new one starts as an Expense in the last-used wallet,
-/// the way a new transaction does, and starts today.
+/// The Add Recurring transaction sheet. It also edits one, and opens pre-filled for Duplicate. A new one starts as an
+/// Expense in the last-used wallet, the way a new transaction does, and starts today.
 struct RecurringTransactionEditor: View {
-    let mode: EditorMode<RecurringTransaction>
+    enum Mode: Identifiable {
+        case add
+        /// A new Recurring transaction pre-filled from this one, starting today.
+        case duplicate(RecurringTransaction)
+        case edit(RecurringTransaction)
+
+        var id: AnyHashable {
+            switch self {
+            case .add: "add"
+            case .duplicate(let recurring): ["duplicate", recurring.persistentModelID] as [AnyHashable]
+            case .edit(let recurring): ["edit", recurring.persistentModelID] as [AnyHashable]
+            }
+        }
+    }
+
+    let mode: Mode
 
     @Environment(\.modelContext) private var context
 
@@ -18,6 +33,8 @@ struct RecurringTransactionEditor: View {
             var draft = RecurringDraft(startDay: .today)
             draft.wallet = TransactionDefaults.suggest(on: .today, in: context).wallet
             return draft
+        case .duplicate(let recurring):
+            return RecurringDraft(duplicating: recurring, on: .today)
         case .edit(let recurring):
             return RecurringDraft(editing: recurring)
         }
@@ -26,29 +43,47 @@ struct RecurringTransactionEditor: View {
 
 /// The form behind ``RecurringTransactionEditor``, holding the draft from the moment the sheet opens.
 private struct RecurringForm: View {
-    let mode: EditorMode<RecurringTransaction>
+    let mode: RecurringTransactionEditor.Mode
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
     @State private var draft: RecurringDraft
     @State private var entry: AmountEntry
+    /// A Purchase's total price as the keypad shows it. Zero is no total.
+    @State private var totalEntry: AmountEntry
     @State private var errorMessage: String?
     /// The start-date prompt, offered when the saved schedule has occurrences that have already come due.
     @State private var pastPrompt: PastPrompt?
 
-    init(mode: EditorMode<RecurringTransaction>, startingDraft: RecurringDraft) {
+    init(mode: RecurringTransactionEditor.Mode, startingDraft: RecurringDraft) {
         self.mode = mode
         _draft = State(initialValue: startingDraft)
         _entry = State(initialValue: AmountEntry(cents: startingDraft.amount.cents))
+        _totalEntry = State(initialValue: AmountEntry(cents: startingDraft.total?.cents ?? 0))
+    }
+
+    /// Whether the sheet saves a new Recurring transaction, which Add and Duplicate both do.
+    private var isNew: Bool {
+        if case .edit = mode { false } else { true }
+    }
+
+    /// The Recurring transaction being edited, or `nil` when it is new.
+    private var editing: RecurringTransaction? {
+        if case .edit(let recurring) = mode { recurring } else { nil }
     }
 
     private var currencyCode: String { draft.wallet?.currencyCode ?? Money.defaultCurrencyCode }
 
-    /// The draft with the amount the keypad comes to.
+    /// The draft with the amounts the keypad comes to. A total of zero is no total.
     private var draftToSave: RecurringDraft {
         var result = draft
         result.amount = Money(cents: entry.cents ?? 0, currencyCode: currencyCode)
+        if let cents = totalEntry.cents, cents > 0 {
+            result.total = Money(cents: cents, currencyCode: currencyCode)
+        } else {
+            result.total = nil
+        }
         return result
     }
 
@@ -59,9 +94,10 @@ private struct RecurringForm: View {
 
     var body: some View {
         KeypadSheet(
-            title: mode.isAdding ? Text("New Recurring Transaction") : Text("Edit Recurring Transaction"),
+            title: isNew ? Text("New Recurring Transaction") : Text("Edit Recurring Transaction"),
             entry: $entry,
-            canSave: draftToSave.canSave,
+            secondEntry: $totalEntry,
+            canSave: draftToSave.canSave && totalEntry.cents != nil,
             save: save,
             macHeight: (640, 720)
         ) { fields in
@@ -78,6 +114,9 @@ private struct RecurringForm: View {
             if draft.kind == .bill {
                 estimateSection
             }
+            if draft.kind == .purchase {
+                purchaseSection(fields)
+            }
             repeatSection
             endSection
         }
@@ -87,7 +126,7 @@ private struct RecurringForm: View {
                 draft.name = newCategory?.name ?? ""
             }
             // A new Recurring transaction starts as its category's default Kind, which the user can change.
-            if mode.isAdding, let newCategory {
+            if isNew, let newCategory {
                 draft.kind = newCategory.defaultKind
             }
         }
@@ -138,6 +177,15 @@ private struct RecurringForm: View {
         draft.remindAfterDays == 1
             ? String(localized: "Remind me 1 day later")
             : String(localized: "Remind me \(draft.remindAfterDays) days later")
+    }
+
+    /// A Purchase's optional total price. Payments attached to it count as paid toward it; the schedule doesn't change.
+    private func purchaseSection(_ fields: KeypadSheetFields) -> some View {
+        Section {
+            fields.secondAmountRow("Total price", currencyCode: currencyCode)
+        } footer: {
+            Text("Payments attached to it count as paid toward this total. Leave it at zero when there isn't one.")
+        }
     }
 
     private var repeatSection: some View {
@@ -197,10 +245,10 @@ private struct RecurringForm: View {
     private func save() {
         do {
             // A new schedule, or one whose start day has been moved, offers the occurrences that have already come due.
-            let startChanged = mode.editing.map { $0.schedule.start != draftToSave.startDay } ?? true
+            let startChanged = editing.map { $0.schedule.start != draftToSave.startDay } ?? true
             let saved: RecurringTransaction
             switch mode {
-            case .add:
+            case .add, .duplicate:
                 saved = try RecurringTransaction.create(draftToSave, in: context)
             case .edit(let recurring):
                 try recurring.update(with: draftToSave)

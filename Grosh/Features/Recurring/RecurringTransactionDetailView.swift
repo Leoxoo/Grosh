@@ -2,16 +2,20 @@ import SwiftData
 import SwiftUI
 
 /// One Recurring transaction: what it is, when it next falls due, and the transactions it has made or the user has
-/// attached. A transaction opens in the normal editor. Link existing attaches one from any wallet, and Unlink detaches
-/// it without deleting it. Edit changes only what is still to come. Delete moves the schedule to Recently Deleted and
-/// keeps what it holds.
+/// attached. A transaction opens in the normal editor. Add the Transaction makes one now, dated today, without touching
+/// the schedule. Link existing attaches one from any wallet, and Unlink detaches it without deleting it. A Purchase
+/// shows its progress and adds a payment in the normal editor, prefilled from it. Edit changes only what is still to
+/// come. Duplicate opens a copy to edit, starting today. Delete moves the schedule to Recently Deleted and keeps what
+/// it holds.
 struct RecurringTransactionDetailView: View {
     let recurring: RecurringTransaction
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @State private var isEditing = false
+    @State private var isDuplicating = false
     @State private var editingTransaction: Transaction?
+    @State private var isAddingPayment = false
     @State private var isLinking = false
     @State private var isConfirmingDelete = false
     @State private var errorMessage: String?
@@ -63,6 +67,12 @@ struct RecurringTransactionDetailView: View {
                         Text("Ended")
                     }
                 }
+                if let progress = recurring.purchaseProgress {
+                    LabeledContent("Progress") {
+                        Text(progress.summary)
+                            .multilineTextAlignment(.trailing)
+                    }
+                }
                 if !recurring.note.isEmpty {
                     LabeledContent("Note") {
                         Text(recurring.note)
@@ -76,6 +86,16 @@ struct RecurringTransactionDetailView: View {
             }
 
             Section {
+                Button("Add the Transaction", systemImage: "plus.circle") {
+                    addTransactionNow()
+                }
+                .disabled(!recurring.isActive)
+                if recurring.kind == .purchase {
+                    Button("Add a payment", systemImage: "square.and.pencil") {
+                        isAddingPayment = true
+                    }
+                    .disabled(!recurring.isActive)
+                }
                 Button("Link existing", systemImage: "link") {
                     isLinking = true
                 }
@@ -102,6 +122,12 @@ struct RecurringTransactionDetailView: View {
             }
 
             Section {
+                Button("Duplicate", systemImage: "doc.on.doc") {
+                    isDuplicating = true
+                }
+            }
+
+            Section {
                 Button("Delete Recurring Transaction", systemImage: "trash", role: .destructive) {
                     isConfirmingDelete = true
                 }
@@ -123,6 +149,12 @@ struct RecurringTransactionDetailView: View {
         .sheet(isPresented: $isLinking) {
             LinkExistingTransactionView(recurring: recurring)
         }
+        .sheet(isPresented: $isAddingPayment) {
+            TransactionEditor(mode: .payment(recurring))
+        }
+        .sheet(isPresented: $isDuplicating) {
+            RecurringTransactionEditor(mode: .duplicate(recurring))
+        }
         .confirmationDialog(
             "Delete this recurring transaction?",
             isPresented: $isConfirmingDelete,
@@ -134,6 +166,14 @@ struct RecurringTransactionDetailView: View {
             Text("It goes to Recently Deleted for \(RecentlyDeleted.keptDays) days. The transactions it made or that are attached stay in your wallets.")
         }
         .errorAlert("Couldn't Change Recurring Transaction", message: $errorMessage)
+    }
+
+    private func addTransactionNow() {
+        do {
+            try recurring.addTransactionNow(in: context)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func delete() {

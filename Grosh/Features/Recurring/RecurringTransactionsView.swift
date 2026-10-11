@@ -3,12 +3,13 @@ import SwiftUI
 
 /// Account → Recurring transactions: every schedule, grouped by Kind and in the order it was added within each group.
 /// A paused one, whose wallet is archived, shows muted. A deleted one waits in Recently Deleted. A wallet filter in the
-/// toolbar narrows the list to one wallet's schedules. Tap one to see what it has made, and add one with the plus.
+/// toolbar narrows the list to one wallet's schedules. Tap one to see what it has made, swipe one to duplicate it, and
+/// add one with the plus.
 struct RecurringTransactionsView: View {
     @Query(filter: #Predicate<RecurringTransaction> { $0.deletedAt == nil }, sort: \RecurringTransaction.createdAt)
     private var recurring: [RecurringTransaction]
     @Query(Wallet.unarchived) private var wallets: [Wallet]
-    @State private var editorMode: EditorMode<RecurringTransaction>?
+    @State private var editorMode: RecurringTransactionEditor.Mode?
     /// The wallet the list is narrowed to, or `nil` for every wallet. Each time the tab opens it shows every wallet.
     @State private var walletFilter: Wallet?
 
@@ -25,6 +26,11 @@ struct RecurringTransactionsView: View {
                             RecurringTransactionDetailView(recurring: item)
                         } label: {
                             RecurringTransactionRow(recurring: item)
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button("Duplicate", systemImage: "doc.on.doc") {
+                                editorMode = .duplicate(item)
+                            }
                         }
                     }
                 }
@@ -95,6 +101,12 @@ struct RecurringTransactionRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                if let progress = recurring.purchaseProgress {
+                    Text(progress.summary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
             Spacer(minLength: 8)
             AmountText(amount: recurring.signedAmount)

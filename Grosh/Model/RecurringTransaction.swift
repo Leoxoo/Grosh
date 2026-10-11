@@ -44,6 +44,9 @@ final class RecurringTransaction {
     /// A Subscription's cropped icon, as JPEG data (``SubscriptionIcon``). It is kept when the Kind changes, so changing
     /// back shows it again, but only ``subscriptionIcon`` shows it. External storage keeps the image out of the row.
     @Attribute(.externalStorage) var iconData: Data?
+    /// A Purchase's total price in cents, or `nil` when none was given. It is kept when the Kind changes, as the icon is,
+    /// but only ``purchaseProgress`` shows it.
+    var totalCents: Int?
 
     var wallet: Wallet?
     var category: Category?
