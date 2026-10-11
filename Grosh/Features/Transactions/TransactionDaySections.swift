@@ -19,16 +19,55 @@ struct TransactionDaySections<Row: View>: View {
     }
 }
 
-/// A day's date and its net total in color.
+/// A day's date with its day number big, the weekday and the month and year stacked small beside it, and the day's
+/// net total in color. At the largest text sizes the total moves under the date so neither is cut short.
 struct TransactionDayHeader: View {
     let day: TransactionDay
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
-        HStack {
-            Text(day.day.date().formatted(.dateTime.weekday(.wide).day().month(.wide).year()))
-            Spacer()
-            AmountText(amount: day.net, showsPlusSign: true)
+        let date = day.day.date()
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 4) {
+                    dateLabel(date)
+                    total
+                }
+            } else {
+                HStack(spacing: 8) {
+                    dateLabel(date)
+                    Spacer(minLength: 8)
+                    total
+                }
+            }
         }
         .textCase(nil)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(date.formatted(.dateTime.weekday(.wide).day().month(.wide).year()))
+        .accessibilityValue(day.net.signedFormatted())
+    }
+
+    private func dateLabel(_ date: Date) -> some View {
+        HStack(spacing: 8) {
+            Text(date.formatted(.dateTime.day()))
+                .font(.title.bold())
+                .monospacedDigit()
+                .foregroundStyle(.primary)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(date.formatted(.dateTime.weekday(.wide)))
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+                Text(date.formatted(.dateTime.month(.wide).year()))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+        }
+    }
+
+    private var total: some View {
+        AmountText(amount: day.net, showsPlusSign: true)
+            .font(.subheadline.weight(.semibold))
     }
 }
