@@ -116,6 +116,14 @@ private struct RecurringForm: View {
                     }
                 }
             }
+            if draft.rule.unit == .month {
+                // Each choice is written out in full, as the detail screen reads it.
+                Picker("On", selection: $draft.monthlyDay) {
+                    ForEach(MonthlyDay.offered(startingOn: draft.startDay), id: \.self) { option in
+                        Text(draft.rule.phrase + " " + option.phrase(startingOn: draft.startDay)).tag(option)
+                    }
+                }
+            }
         } footer: {
             Text(draft.schedule.summary)
         }

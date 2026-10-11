@@ -56,7 +56,7 @@ extension RepeatSchedule {
         var text = rule.phrase
         switch rule.unit {
         case .month:
-            text += " " + String(localized: "on the \(Self.ordinal(start.day))")
+            text += " " + monthlyDay.phrase(startingOn: start)
         case .year:
             text += " " + String(localized: "on \(start.date().formatted(.dateTime.month(.abbreviated).day()))")
         case .day, .week:
@@ -71,6 +71,27 @@ extension RepeatSchedule {
             text += ", " + (count == 1 ? String(localized: "once") : String(localized: "\(count) times"))
         }
         return text
+    }
+}
+
+extension MonthlyDay {
+    /// The day a monthly repeat names after "Every month": "on the 4th", "on the last Thursday", "on the last day".
+    func phrase(startingOn start: CalendarDay) -> String {
+        switch self {
+        case .sameDay:
+            return String(localized: "on the \(Self.ordinal(start.day))")
+        case .nthWeekday:
+            let weekday = start.date().formatted(.dateTime.weekday(.wide))
+            switch (start.day - 1) / 7 {
+            case 0: return String(localized: "on the first \(weekday)")
+            case 1: return String(localized: "on the second \(weekday)")
+            case 2: return String(localized: "on the third \(weekday)")
+            case 3: return String(localized: "on the fourth \(weekday)")
+            default: return String(localized: "on the last \(weekday)")
+            }
+        case .lastDay:
+            return String(localized: "on the last day")
+        }
     }
 
     /// A day of the month as an ordinal, such as "4th".

@@ -55,7 +55,16 @@ struct RecurringDraft {
     var card: Card?
     var note = ""
     /// The first occurrence. It may be in the past.
-    var startDay: CalendarDay
+    var startDay: CalendarDay {
+        didSet {
+            // The last day is offered only from the 28th on, so a start moved below it drops a last day already picked.
+            if !MonthlyDay.offered(startingOn: startDay).contains(monthlyDay) {
+                monthlyDay = .sameDay
+            }
+        }
+    }
+    /// Which day of the month a monthly repeat falls on. Only the monthly repeats use it.
+    var monthlyDay: MonthlyDay = .sameDay
     /// The repeat the form names. ``RepeatPreset/custom`` takes ``customRule``.
     var preset: RepeatPreset = .monthly {
         didSet {
@@ -92,6 +101,7 @@ struct RecurringDraft {
         note = recurring.note
         preset = RepeatPreset(rule: schedule.rule)
         customRule = schedule.rule
+        monthlyDay = schedule.monthlyDay
         endKind = schedule.end.kind
         switch schedule.end {
         case .forever: break
@@ -116,7 +126,7 @@ struct RecurringDraft {
 
     /// When the Recurring transaction falls due, as the form has it.
     var schedule: RepeatSchedule {
-        RepeatSchedule(start: startDay, rule: rule, end: end)
+        RepeatSchedule(start: startDay, rule: rule, end: end, monthlyDay: monthlyDay)
     }
 
     /// Checks the draft against the Recurring transaction rules before anything is saved.

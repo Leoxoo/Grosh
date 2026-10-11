@@ -16,6 +16,8 @@ final class RecurringTransaction {
     var repeatUnitRaw: String = RepeatUnit.month.rawValue
     /// How many units apart each occurrence falls.
     var repeatEvery: Int = 1
+    /// The ``MonthlyDay``'s raw value: which day of the month a monthly repeat falls on.
+    var monthlyDayRaw: String = MonthlyDay.sameDay.rawValue
     /// The ``RepeatEndKind``'s raw value, completed by ``untilDayRaw`` or ``occurrenceLimit`` where it needs them.
     var endKindRaw: String = RepeatEndKind.forever.rawValue
     /// The last day an occurrence may fall on, as `yyyymmdd`, for an end "until a date".
@@ -43,13 +45,15 @@ final class RecurringTransaction {
             RepeatSchedule(
                 start: CalendarDay(rawValue: startDayRaw),
                 rule: RepeatRule(unit: RepeatUnit(rawValue: repeatUnitRaw) ?? .month, every: repeatEvery),
-                end: end
+                end: end,
+                monthlyDay: MonthlyDay(rawValue: monthlyDayRaw) ?? .sameDay
             )
         }
         set {
             startDayRaw = newValue.start.rawValue
             repeatUnitRaw = newValue.rule.unit.rawValue
             repeatEvery = newValue.rule.every
+            monthlyDayRaw = newValue.monthlyDay.rawValue
             end = newValue.end
         }
     }
