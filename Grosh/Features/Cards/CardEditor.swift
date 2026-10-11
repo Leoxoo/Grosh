@@ -19,7 +19,7 @@ struct CardEditor: View {
 
     init(mode: EditorMode<Card>) {
         self.mode = mode
-        let draft = mode.editing.map(CardDraft.init) ?? CardDraft(name: "", kind: .credit, payingWallet: nil)
+        let draft = mode.editing.map { CardDraft($0) } ?? CardDraft(name: "", kind: .credit, payingWallet: nil)
         _draft = State(initialValue: draft)
         _hasStatementDate = State(initialValue: draft.statementDay != nil)
         _statementDay = State(initialValue: draft.statementDay ?? 1)
