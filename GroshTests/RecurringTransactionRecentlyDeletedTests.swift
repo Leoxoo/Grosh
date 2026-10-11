@@ -24,7 +24,7 @@ struct RecurringTransactionRecentlyDeletedTests {
 
     /// A monthly Netflix of 15.99 starting on October 12, paid from the fixture's wallet.
     private func netflix() throws -> RecurringTransaction {
-        let category = Category(name: "Subscriptions", type: .expense, symbolName: "repeat", color: .purple)
+        let category = Grosh.Category(name: "Subscriptions", type: .expense, symbolName: "repeat", color: .purple)
         context.insert(category)
         var draft = RecurringDraft(startDay: day(2026, 10, 12))
         draft.name = "Netflix"
