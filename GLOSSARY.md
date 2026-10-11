@@ -115,11 +115,40 @@ A flag that removes a transaction from income and spending statistics. It never 
 _Avoid_: Hidden, ignored
 
 **Recently Deleted**:
-Where deleted transactions and deleted wallets wait for 30 days before they are removed for good. A deleted wallet goes in with all its transactions as one item and is restored with them. Until then everything can be restored, and nothing in it counts in any balance or report.
+Where deleted transactions, Recurring transactions and wallets wait for 30 days before they are removed for good. A deleted wallet goes in with all its transactions and Recurring transactions as one item and is restored with them. Until then everything can be restored, and nothing in it counts in any balance or report.
 _Avoid_: Trash, recycle bin
 
 **Delete** / **Archive**:
-Archiving a wallet keeps it in place but out of the Total and the pickers. Deleting a wallet or a transaction moves it to Recently Deleted. A Card or category can only be deleted while it has no transactions; otherwise it is merged away or retired (a Card is archived, a category hidden).
+Archiving a wallet keeps it in place but out of the Total and the pickers, and pauses its Recurring transactions. Deleting a wallet, a transaction or a Recurring transaction moves it to Recently Deleted. A Card or category can only be deleted while it has no transactions; otherwise it is merged away or retired (a Card is archived, a category hidden).
+
+### Recurring transactions
+
+**Recurring transaction**:
+A schedule that makes a transaction on each of its due days: a name, an amount, a wallet, a category, a Kind, how often it repeats, and when it ends. It is not itself a transaction and counts in no balance or report.
+_Avoid_: Template, standing order, subscription (that is one Kind)
+
+**Kind**:
+What sort of Recurring transaction it is, kept apart from its category: Bill, Subscription, Purchase or Regular. Every category has a default Kind, Regular unless the user changes it. A subcategory follows its parent's default until the user sets its own, and then keeps it whatever the parent does later.
+_Avoid_: Type (that is Category type), section
+
+**Occurrence**:
+One due day of a Recurring transaction. An occurrence dated after today is **Scheduled** and shown in Future as a row that is not yet a transaction. On its day it becomes a transaction.
+
+**Bill**:
+A Kind for payments that are sure to happen but whose amount is not. A Bill can be marked "amount varies": its transactions start as an **Estimated** amount, the average of the category's recent transactions, and the user is reminded a few days later to enter the real one.
+
+**Estimated**:
+The mark on a transaction made by a varying Bill until the user confirms or edits its amount. It counts in balances and reports like any transaction.
+
+**Subscription**:
+A Kind for payments with no planned end. It can carry an optional icon, cropped by the user from a screenshot, used for it in place of the category symbol.
+
+**Purchase**:
+A Kind for something bought and paid off over time, with an optional total price and a progress of how much has been paid.
+
+**Attached transaction**:
+A transaction that belongs to a Recurring transaction, whether it made the transaction itself or the user attached an existing one. The Recurring transaction lists them all.
+_Avoid_: Linked (that is Linked transactions)
 
 ### Time
 
