@@ -97,6 +97,30 @@ struct RecentlyDeletedTests {
         #expect(try context.fetch(DebtsAndLoans.transactions).isEmpty)
     }
 
+    @Test func aLoansPaymentInTheBinStillKeepsItsWalletAndCategory() throws {
+        try CategorySeeder.seedIfNeeded(in: context)
+        var lend = TransactionDraft(type: .debtLoan, day: today)
+        lend.wallet = checking
+        lend.amount = Money(cents: 100_00)
+        lend.category = try context.lockedCategory(.loan)
+        lend.withName = "Pasha"
+        let loan = try Transaction.create(lend, in: context)
+        var payment = try DebtPaymentDraft(settling: loan, on: today, in: context)
+        payment.amount = Money(cents: 60_00)
+        let collection = try DebtPayment.record(payment, in: context).payment
+        try collection.delete(.onlySelected, in: context, at: deletedAt)
+
+        var editing = TransactionDraft(editing: loan)
+        #expect(editing.isLockedByPayments)
+        editing.wallet = savings
+        #expect(throws: DebtLoanRuleError.lockedByPayments) { try loan.update(with: editing) }
+
+        var smaller = TransactionDraft(editing: loan)
+        smaller.amount = Money(cents: 10_00)
+        try loan.update(with: smaller)
+        #expect(loan.amountCents == -10_00)
+    }
+
     // MARK: Deleting a wallet
 
     @Test func deletingAWalletMovesItAndAllItsTransactionsToTheBinAsOneItem() throws {
@@ -152,6 +176,22 @@ struct RecentlyDeletedTests {
         #expect(checking.balance(asOf: today) == Money(cents: 100_00))
         try coffee.restore()
         #expect(checking.balance(asOf: today) == Money(cents: 95_50))
+    }
+
+    @Test func aDeletedWalletsCardsWaitWithItAndGoWithItForGood() throws {
+        let chase = try Card.create(CardDraft(name: "Chase", kind: .credit, payingWallet: checking), in: context)
+        let coffee = record("coffee", -4_50, in: checking)
+        coffee.card = chase
+
+        try checking.delete(at: deletedAt)
+        #expect(chase.isPaidFromDeletedWallet)
+
+        try checking.restore()
+        #expect(!chase.isPaidFromDeletedWallet)
+
+        try checking.delete(at: deletedAt)
+        try checking.deleteForever(in: context)
+        #expect(try context.fetch(FetchDescriptor<Card>()).isEmpty)
     }
 
     // MARK: 30 days

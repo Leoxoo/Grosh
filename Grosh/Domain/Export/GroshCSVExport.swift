@@ -2,14 +2,14 @@ import Foundation
 import SwiftData
 
 /// Account → Export CSV: every transaction, written as a MoneyLover CSV export lists it, plus a `Card` column naming
-/// its Card and a `Linked` column that related rows share. Import from MoneyLover recognises the file by those two
-/// columns and restores it with "Replace all data" (``MoneyLoverImport``): exporting what it restored gives the same
-/// file again.
+/// its Card, a `Linked` column that related rows share, and on a forgiven Loan or Debt its Forgiven mark: the amount,
+/// date, category and note. Import from MoneyLover recognises the file by the `Card` and `Linked` columns and restores
+/// it with "Replace all data" (``MoneyLoverImport``): exporting what it restored gives the same file again.
 enum GroshCSVExport {
     /// MoneyLover's columns, then Grosh's own.
     static let header = [
         "Id", "Date", "Category", "Amount", "Currency", "Wallet", "Note", "With", "Event", "Exclude from report",
-        "Members", "Card", "Linked",
+        "Members", "Card", "Linked", "Forgiven", "Forgiven date", "Forgiven category", "Forgiven note",
     ]
 
     /// Every transaction in `context` outside Recently Deleted, in list order.
@@ -35,9 +35,10 @@ enum GroshCSVExport {
                 return number
             }
             let day = transaction.day
+            let forgiveness = transaction.forgiveness
             let row = [
                 String(lines.count),
-                String(format: "%02d/%02d/%04d", day.month, day.day, day.year),
+                date(day),
                 category.name,
                 Money(cents: transaction.amountCents).decimalString,
                 wallet.currencyCode,
@@ -49,10 +50,19 @@ enum GroshCSVExport {
                 "",
                 transaction.card?.name ?? "",
                 link.map { String($0) } ?? "",
+                forgiveness.map { Money(cents: $0.amount.cents).decimalString } ?? "",
+                forgiveness.map { date($0.day) } ?? "",
+                forgiveness?.category?.name ?? "",
+                forgiveness?.note ?? "",
             ]
             lines.append(row.map(field).joined(separator: ","))
         }
         return lines.map { $0 + "\r\n" }.joined()
+    }
+
+    /// `day` as MoneyLover writes a date: `10/05/2026`, month first.
+    private static func date(_ day: CalendarDay) -> String {
+        String(format: "%02d/%02d/%04d", day.month, day.day, day.year)
     }
 
     /// The name the file is shared under when exported on `day`, such as `Grosh 2026-10-10.csv`.

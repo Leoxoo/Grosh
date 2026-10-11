@@ -54,7 +54,7 @@ struct CardPicker: View {
     private var choices: [Card] {
         switch offered {
         case .paidFrom(let wallet): Card.pickerChoices(for: wallet, keeping: selection)
-        case .every: allCards
+        case .every: allCards.filter { !$0.isPaidFromDeletedWallet }
         }
     }
 }

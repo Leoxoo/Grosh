@@ -53,8 +53,9 @@ struct TransactionDraft {
     private(set) var paymentLock: PaymentLock?
 
     /// What the payments on a Loan or Debt, or its Forgiven mark, hold in place while it is edited: the wallet and
-    /// category (so the type) they were recorded against, and an amount no lower than what has been paid. A forgiven
-    /// one keeps its amount too, until it is un-forgiven.
+    /// category (so the type) they were recorded against, and an amount no lower than what has been paid. Payments in
+    /// Recently Deleted hold the wallet and category too, so they still fit when restored. A forgiven one keeps its
+    /// amount too, until it is un-forgiven.
     struct PaymentLock {
         let wallet: Wallet?
         let category: Category?
@@ -77,7 +78,7 @@ struct TransactionDraft {
         cardRuleExemption = transaction.cardRuleExemption
         reminderDay = transaction.reminderDay
         if let context = transaction.modelContext, let loanOrDebt = try? LoanOrDebt(transaction, in: context),
-           !loanOrDebt.payments.isEmpty || transaction.isForgiven {
+           !loanOrDebt.payments.isEmpty || transaction.isForgiven || transaction.hasPaymentsInRecentlyDeleted {
             paymentLock = PaymentLock(
                 wallet: transaction.wallet, category: transaction.category, paid: loanOrDebt.paid,
                 forgivenOwed: transaction.isForgiven ? loanOrDebt.owed : nil

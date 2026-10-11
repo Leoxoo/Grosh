@@ -69,7 +69,8 @@ struct RecentlyDeleted {
         try removeForGood(wallets: bin.wallets, transactions: bin.transactions, in: context)
     }
 
-    /// Removes `wallets`, each with every transaction in it, and `transactions` from the store. Saves.
+    /// Removes `wallets`, each with every transaction in it and the Cards paid from it that are left with none, and
+    /// `transactions` from the store. Saves.
     fileprivate static func removeForGood(
         wallets: [Wallet], transactions: [Transaction], in context: ModelContext
     ) throws {
@@ -82,6 +83,11 @@ struct RecentlyDeleted {
         for wallet in wallets {
             for transaction in wallet.transactions ?? [] {
                 remove(transaction)
+            }
+            // A Card is only offered on its paying wallet's transactions, so with the wallet gone it has no use left.
+            for card in wallet.cards ?? []
+            where (card.transactions ?? []).allSatisfy({ removed.contains($0.persistentModelID) }) {
+                context.delete(card)
             }
             context.delete(wallet)
         }
@@ -145,11 +151,18 @@ extension Wallet {
         try modelContext?.save()
     }
 
-    /// Delete Forever: removes the wallet in Recently Deleted and every transaction in it for good. Saves.
+    /// Delete Forever: removes the wallet in Recently Deleted and every transaction in it for good, with the Cards
+    /// paid from it. Saves.
     func deleteForever(in context: ModelContext) throws {
         guard isInRecentlyDeleted else { throw RecentlyDeletedError.notDeleted }
         try RecentlyDeleted.removeForGood(wallets: [self], transactions: [], in: context)
     }
+}
+
+extension Card {
+    /// Whether the Card's paying wallet is in Recently Deleted. The Card waits out of sight with it: it leaves the
+    /// Cards list and pickers, and comes back when the wallet is restored.
+    var isPaidFromDeletedWallet: Bool { payingWallet?.isInRecentlyDeleted == true }
 }
 
 extension Transaction {
@@ -175,6 +188,14 @@ extension Transaction {
         if let restoreBlocker { throw restoreBlocker }
         deletedAt = nil
         try modelContext?.save()
+    }
+
+    /// Whether a payment on this Loan or Debt waits in Recently Deleted. Restoring it brings it back against this
+    /// Loan or Debt, so until then the payment still holds its wallet and category in place.
+    var hasPaymentsInRecentlyDeleted: Bool {
+        guard let kind = loanOrDebtKind, let link = linkID, let context = modelContext else { return false }
+        let deleted = FetchDescriptor<Transaction>(predicate: #Predicate { $0.linkID == link && $0.deletedAt != nil })
+        return ((try? context.fetch(deleted)) ?? []).contains { $0.category?.lockedRole == kind.paymentRole }
     }
 
     /// Delete Forever: removes a transaction deleted on its own for good. Saves.
