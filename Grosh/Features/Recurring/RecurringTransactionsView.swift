@@ -9,6 +9,8 @@ struct RecurringTransactionsView: View {
     @Query(filter: #Predicate<RecurringTransaction> { $0.deletedAt == nil }, sort: \RecurringTransaction.createdAt)
     private var recurring: [RecurringTransaction]
     @Query(Wallet.unarchived) private var wallets: [Wallet]
+    /// Every transaction a varying Bill's estimate is averaged over, so each row shows the amount it will make.
+    @Query(Transaction.notDeleted) private var transactions: [Transaction]
     @State private var editorMode: RecurringTransactionEditor.Mode?
     /// The wallet the list is narrowed to, or `nil` for every wallet. Each time the tab opens it shows every wallet.
     @State private var walletFilter: Wallet?
@@ -25,7 +27,7 @@ struct RecurringTransactionsView: View {
                         NavigationLink {
                             RecurringTransactionDetailView(recurring: item)
                         } label: {
-                            RecurringTransactionRow(recurring: item)
+                            RecurringTransactionRow(recurring: item, history: transactions)
                         }
                         .swipeActions(edge: .trailing) {
                             Button("Duplicate", systemImage: "doc.on.doc") {
@@ -82,9 +84,12 @@ struct RecurringTransactionsView: View {
     }
 }
 
-/// One Recurring transaction in the list: its icon, name, wallet and next day, and its signed amount.
+/// One Recurring transaction in the list: its icon, name, wallet and next day, and its amount. A varying Bill shows its
+/// estimate while it has one, as the transactions it makes will.
 struct RecurringTransactionRow: View {
     let recurring: RecurringTransaction
+    /// The transactions a varying Bill's estimate is averaged over.
+    let history: [Transaction]
 
     var body: some View {
         HStack(spacing: 12) {
@@ -109,7 +114,7 @@ struct RecurringTransactionRow: View {
                 }
             }
             Spacer(minLength: 8)
-            AmountText(amount: recurring.signedAmount)
+            AmountText(amount: recurring.startingAmount(among: history))
         }
         .contentShape(Rectangle())
         .opacity(recurring.isPaused ? 0.5 : 1)

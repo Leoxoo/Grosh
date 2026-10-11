@@ -122,14 +122,6 @@ final class RecurringTransaction {
         set { handledThroughRaw = newValue?.rawValue }
     }
 
-    /// The amount each transaction it makes is for, signed by its category, in its wallet's currency.
-    var signedAmount: Money {
-        Money(
-            cents: amountCents * (category?.sign ?? -1),
-            currencyCode: wallet?.currencyCode ?? Money.defaultCurrencyCode
-        )
-    }
-
     /// Whether the schedule is in Recently Deleted, on its own or with its wallet.
     var isInRecentlyDeleted: Bool { deletedAt != nil }
 

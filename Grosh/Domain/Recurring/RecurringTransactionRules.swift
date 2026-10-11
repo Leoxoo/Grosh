@@ -5,7 +5,7 @@ import SwiftData
 nonisolated enum RecurringRuleError: Error, Equatable {
     case missingName
     case missingWallet
-    /// The amount must be above zero; the category sets the sign.
+    /// The amount must be above zero, unless a varying Bill has an estimate to start from. The category sets the sign.
     case missingAmount
     case missingCategory
     /// A Card is only offered on its paying wallet's transactions, so it must be paid from the wallet chosen.
@@ -87,6 +87,9 @@ struct RecurringDraft {
     var amountVaries = false
     /// For a varying Bill, how many days after an occurrence the user is reminded to enter its real amount.
     var remindAfterDays = 2
+    /// The average a varying Bill's transactions would start at, from its category's history. It stands in for an
+    /// amount left empty. The form sets it, and it is never saved.
+    var estimateCents: Int?
     var note = ""
     /// A Subscription's cropped icon, as JPEG data. It is kept while the Kind is something else, as on the model.
     var iconData: Data?
@@ -188,7 +191,9 @@ struct RecurringDraft {
     func validate() throws {
         guard !trimmedName.isEmpty else { throw RecurringRuleError.missingName }
         guard wallet != nil else { throw RecurringRuleError.missingWallet }
-        guard amount.cents > 0 else { throw RecurringRuleError.missingAmount }
+        // A varying Bill may leave its amount empty when there is an estimate to start its transactions from.
+        let startsFromEstimate = kind == .bill && amountVaries && estimateCents != nil
+        guard amount.cents > 0 || startsFromEstimate else { throw RecurringRuleError.missingAmount }
         guard category != nil else { throw RecurringRuleError.missingCategory }
         guard card == nil || card?.payingWallet === wallet else { throw RecurringRuleError.cardNotInWallet }
         switch end {
@@ -260,6 +265,23 @@ extension RecurringTransaction {
         }
     }
 
+    /// The estimate a varying Bill's transactions start at now: the average ``AmountEstimate`` gives over `history`
+    /// for its category and wallet currency. `nil` for other Kinds, and when there is nothing to average. Making a
+    /// transaction and showing the schedule both use it, so what the rows show is what gets made.
+    func estimateCents(among history: [Transaction]) -> Int? {
+        guard estimatesAmount, let category = self.category, let wallet = self.wallet else { return nil }
+        return AmountEstimate.cents(among: history, for: category, currencyCode: wallet.currencyCode)
+    }
+
+    /// What each transaction it makes now is for, signed by its category: the estimate when there is one, otherwise the
+    /// typed amount. Rows show this, so a varying Bill shows the amount its transactions will hold.
+    func startingAmount(among history: [Transaction]) -> Money {
+        Money(
+            cents: (estimateCents(among: history) ?? amountCents) * (category?.sign ?? -1),
+            currencyCode: wallet?.currencyCode ?? Money.defaultCurrencyCode
+        )
+    }
+
     /// The transactions a varying Bill's estimate is averaged over, read once per run. Other Kinds read nothing.
     private func estimateHistory(in context: ModelContext) -> [Transaction] {
         estimatesAmount ? ((try? context.fetch(FetchDescriptor<Transaction>())) ?? []) : []
@@ -271,9 +293,7 @@ extension RecurringTransaction {
     @discardableResult
     func makeTransaction(on day: CalendarDay, history: [Transaction], in context: ModelContext) -> Transaction? {
         guard let wallet = self.wallet, let category = self.category else { return nil }
-        let estimate = estimatesAmount
-            ? AmountEstimate.cents(among: history, for: category, currencyCode: wallet.currencyCode)
-            : nil
+        let estimate = estimateCents(among: history)
         let transaction = Transaction(
             amount: Money(cents: (estimate ?? amountCents) * category.sign, currencyCode: wallet.currencyCode),
             day: day,

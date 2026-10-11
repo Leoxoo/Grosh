@@ -47,6 +47,8 @@ private struct RecurringForm: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    /// Every transaction, which a varying Bill's estimate is averaged over.
+    @Query private var transactions: [Transaction]
 
     @State private var draft: RecurringDraft
     @State private var entry: AmountEntry
@@ -75,10 +77,17 @@ private struct RecurringForm: View {
 
     private var currencyCode: String { draft.wallet?.currencyCode ?? Money.defaultCurrencyCode }
 
+    /// The estimate a varying Bill starts at: the average of its category's history, or `nil` when there is none.
+    private var estimateCents: Int? {
+        guard draft.kind == .bill, draft.amountVaries, let category = draft.category else { return nil }
+        return AmountEstimate.cents(among: transactions, for: category, currencyCode: currencyCode)
+    }
+
     /// The draft with the amounts the keypad comes to. A total of zero is no total.
     private var draftToSave: RecurringDraft {
         var result = draft
         result.amount = Money(cents: entry.cents ?? 0, currencyCode: currencyCode)
+        result.estimateCents = estimateCents
         if let cents = totalEntry.cents, cents > 0 {
             result.total = Money(cents: cents, currencyCode: currencyCode)
         } else {
@@ -159,18 +168,24 @@ private struct RecurringForm: View {
     }
 
     /// A Bill's amount can vary: each transaction then starts as an estimate, and the user is reminded to enter the
-    /// real one.
+    /// real one. The amount above can be left empty when there is an estimate to start from.
     private var estimateSection: some View {
         Section {
             Toggle("Amount varies", isOn: $draft.amountVaries)
             if draft.amountVaries {
+                LabeledContent("Estimate", value: estimateText)
                 Stepper(value: $draft.remindAfterDays, in: 1...30) {
                     Text(remindAfterText)
                 }
             }
         } footer: {
-            Text("Each transaction starts as an estimate, the average of recent transactions in its category, until you enter the real amount.")
+            Text("Each transaction starts as an estimate, the average of recent transactions in its category, until you enter the real amount. The amount above is used only when the category has no history yet.")
         }
+    }
+
+    private var estimateText: String {
+        guard let cents = estimateCents else { return String(localized: "None yet") }
+        return Money(cents: cents, currencyCode: currencyCode).formatted()
     }
 
     private var remindAfterText: String {

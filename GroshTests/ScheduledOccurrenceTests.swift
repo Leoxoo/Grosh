@@ -94,8 +94,40 @@ struct ScheduledOccurrenceTests {
         let electricity = try RecurringTransaction.create(draft, today: today, in: context)
         let netflix = try makeSchedule(starting: day(2026, 10, 12))
 
-        #expect(ScheduledOccurrence(recurring: electricity, day: day(2026, 10, 12)).isEstimated)
-        #expect(!ScheduledOccurrence(recurring: netflix, day: day(2026, 10, 12)).isEstimated)
+        let electricityRow = ScheduledOccurrence(
+            recurring: electricity, day: day(2026, 10, 12), amount: electricity.startingAmount(among: [])
+        )
+        let netflixRow = ScheduledOccurrence(
+            recurring: netflix, day: day(2026, 10, 12), amount: netflix.startingAmount(among: [])
+        )
+        #expect(electricityRow.isEstimated)
+        #expect(!netflixRow.isEstimated)
+    }
+
+    @Test func aVaryingBillsScheduledRowsShowItsEstimateInPlaceOfItsAmount() throws {
+        let water = Grosh.Category(name: "Water", type: .expense, symbolName: "bolt", color: .purple)
+        context.insert(water)
+        for _ in 0..<2 {
+            context.insert(Transaction(
+                amount: Money(cents: -50_00), day: day(2026, 9, 1), wallet: store.wallet, category: water
+            ))
+        }
+        try context.save()
+        let history = try context.fetch(FetchDescriptor<Transaction>())
+        var draft = RecurringDraft(startDay: day(2026, 10, 12))
+        draft.name = "Water"
+        draft.amount = Money(cents: 0)
+        draft.wallet = store.wallet
+        draft.category = water
+        draft.kind = .bill
+        draft.amountVaries = true
+        draft.estimateCents = AmountEstimate.cents(among: history, for: water, currencyCode: store.wallet.currencyCode)
+        let bill = try RecurringTransaction.create(draft, today: today, in: context)
+
+        let rows = [bill].scheduledOccurrences(selection: .total, today: today, history: history)
+
+        #expect(!rows.isEmpty)
+        #expect(rows.allSatisfy { $0.amount.cents == -5_000 && $0.isEstimated })
     }
 
     @Test func theTotalListsOnlyTheWalletsCountedInIt() throws {
@@ -106,8 +138,8 @@ struct ScheduledOccurrenceTests {
         let kept = try makeSchedule(starting: day(2026, 10, 12), preset: .weekly, wallet: savings)
         let schedules = [checking, kept]
 
-        let total = schedules.scheduledOccurrences(selection: .total, today: today)
-        let inSavings = schedules.scheduledOccurrences(selection: .wallet(savings), today: today)
+        let total = schedules.scheduledOccurrences(selection: .total, today: today, history: [])
+        let inSavings = schedules.scheduledOccurrences(selection: .wallet(savings), today: today, history: [])
 
         #expect(total.count == 12)
         #expect(total.allSatisfy { $0.recurring == checking })
@@ -119,7 +151,7 @@ struct ScheduledOccurrenceTests {
         let daily = try makeSchedule(starting: day(2026, 10, 12), preset: .daily)
         let weekly = try makeSchedule(starting: day(2026, 10, 12), preset: .weekly)
 
-        let days = [daily, weekly].scheduledOccurrences(selection: .total, today: today).map(\.day)
+        let days = [daily, weekly].scheduledOccurrences(selection: .total, today: today, history: []).map(\.day)
 
         #expect(days.first == day(2026, 12, 28))
         #expect(days == days.sorted(by: >))
@@ -127,7 +159,7 @@ struct ScheduledOccurrenceTests {
 
     @Test func aDayListsItsTransactionsThenItsScheduledRowsAndTotalsOnlyTheTransactions() throws {
         let netflix = try makeSchedule(starting: day(2026, 10, 20))
-        let rows = [netflix].scheduledOccurrences(selection: .total, today: today)
+        let rows = [netflix].scheduledOccurrences(selection: .total, today: today, history: [])
         let lunch = Transaction(
             amount: Money(cents: -5_00), day: day(2026, 10, 20), wallet: store.wallet, category: nil
         )
