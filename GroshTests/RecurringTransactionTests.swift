@@ -195,6 +195,73 @@ struct RecurringTransactionTests {
         #expect(throws: RecurringRuleError.missingWallet) { try draft.validate() }
     }
 
+    /// The monthly day is saved with the schedule, comes back into the form when it is edited, and makes its
+    /// transactions on the day it names.
+    @Test func aMonthlyDayIsSavedWithTheRepeat() throws {
+        var draft = netflix(starting: day(2026, 10, 29))
+        draft.monthlyDay = .nthWeekday
+        let recurring = try RecurringTransaction.create(draft, today: today, in: context)
+
+        #expect(recurring.schedule.monthlyDay == .nthWeekday)
+        #expect(RecurringDraft(editing: recurring).monthlyDay == .nthWeekday)
+
+        try RecurringTransaction.catchUp(through: day(2026, 11, 26), in: context)
+        #expect(recurring.attachedTransactions.map(\.day) == [day(2026, 11, 26), day(2026, 10, 29)])
+    }
+
+    /// The last day is offered only from the 28th, so moving the start below it drops a last day already picked.
+    @Test func movingTheStartBelowTheTwentyEighthDropsTheLastDay() {
+        var draft = netflix(starting: day(2026, 1, 28))
+        draft.monthlyDay = .lastDay
+
+        draft.startDay = day(2026, 1, 15)
+
+        #expect(draft.monthlyDay == .sameDay)
+    }
+
+    /// Saved on October 9 with a monthly schedule from September 1: the start-date prompt offers September 1 and
+    /// October 1, the occurrences from the start through today.
+    @Test func thePromptOffersThePastOccurrencesWithoutATransaction() throws {
+        let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 9, 1)), today: today, in: context)
+        #expect(recurring.unenteredOccurrences(through: today) == [day(2026, 9, 1), day(2026, 10, 1)])
+
+        try recurring.makeTransactions(on: [day(2026, 9, 1)], in: context)
+        #expect(recurring.unenteredOccurrences(through: today) == [day(2026, 10, 1)])
+    }
+
+    @Test func aTransactionInRecentlyDeletedStillCountsAsEntered() throws {
+        let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 9, 1)), today: today, in: context)
+        try recurring.makeTransactions(on: [day(2026, 9, 1)], in: context)
+        let made = try #require(recurring.transactions?.first)
+        made.deletedAt = .now
+
+        #expect(recurring.unenteredOccurrences(through: today) == [day(2026, 10, 1)])
+    }
+
+    @Test func aFutureStartOffersNoPastOccurrences() throws {
+        let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 10, 12)), today: today, in: context)
+
+        #expect(recurring.unenteredOccurrences(through: today).isEmpty)
+    }
+
+    @Test func aStartTodayOffersTodayOnly() throws {
+        let recurring = try RecurringTransaction.create(netflix(starting: today), today: today, in: context)
+
+        #expect(recurring.unenteredOccurrences(through: today) == [today])
+    }
+
+    /// Only the days picked are made; picking none makes none.
+    @Test func confirmingMakesOnlyThePickedOccurrences() throws {
+        let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 9, 1)), today: today, in: context)
+
+        try recurring.makeTransactions(on: [], in: context)
+        #expect(recurring.attachedTransactions.isEmpty)
+
+        try recurring.makeTransactions(on: [day(2026, 10, 1)], in: context)
+        #expect(recurring.attachedTransactions.map(\.day) == [day(2026, 10, 1)])
+        #expect(recurring.attachedTransactions.map(\.amountCents) == [-1599])
+    }
+
     /// A schedule is not a transaction: saving one, with its past occurrences skipped, adds none to the transactions.
     @Test func aScheduleIsNotATransaction() throws {
         try RecurringTransaction.create(netflix(starting: day(2026, 9, 1)), today: today, in: context)

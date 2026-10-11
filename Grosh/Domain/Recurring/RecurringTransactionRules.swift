@@ -57,7 +57,16 @@ struct RecurringDraft {
     var kind: RecurringKind = .regular
     var note = ""
     /// The first occurrence. It may be in the past.
-    var startDay: CalendarDay
+    var startDay: CalendarDay {
+        didSet {
+            // The last day is offered only from the 28th on, so a start moved below it drops a last day already picked.
+            if !MonthlyDay.offered(startingOn: startDay).contains(monthlyDay) {
+                monthlyDay = .sameDay
+            }
+        }
+    }
+    /// Which day of the month a monthly repeat falls on. Only the monthly repeats use it.
+    var monthlyDay: MonthlyDay = .sameDay
     /// The repeat the form names. ``RepeatPreset/custom`` takes ``customRule``.
     var preset: RepeatPreset = .monthly {
         didSet {
@@ -95,6 +104,7 @@ struct RecurringDraft {
         note = recurring.note
         preset = RepeatPreset(rule: schedule.rule)
         customRule = schedule.rule
+        monthlyDay = schedule.monthlyDay
         endKind = schedule.end.kind
         switch schedule.end {
         case .forever: break
@@ -119,7 +129,7 @@ struct RecurringDraft {
 
     /// When the Recurring transaction falls due, as the form has it.
     var schedule: RepeatSchedule {
-        RepeatSchedule(start: startDay, rule: rule, end: end)
+        RepeatSchedule(start: startDay, rule: rule, end: end, monthlyDay: monthlyDay)
     }
 
     /// Checks the draft against the Recurring transaction rules before anything is saved.
@@ -144,8 +154,8 @@ struct RecurringDraft {
 }
 
 extension RecurringTransaction {
-    /// Adds a Recurring transaction and saves it. Occurrences dated `today` or earlier are not made: the schedule
-    /// starts from today on, as saving a past start date can't yet pick the ones to make. Saves.
+    /// Adds a Recurring transaction and saves it. Occurrences dated `today` or earlier are not made here: they are
+    /// dealt with as the editor's start-date prompt picks them, see ``unenteredOccurrences(through:)``. Saves.
     @discardableResult
     static func create(
         _ draft: RecurringDraft, today: CalendarDay = .today, in context: ModelContext
@@ -187,23 +197,49 @@ extension RecurringTransaction {
     /// marks them dealt with, so each occurrence is made once however often this runs. A schedule that is deleted or
     /// paused makes none.
     func makeDueTransactions(through today: CalendarDay, in context: ModelContext) {
-        guard isActive, let wallet = self.wallet, let category = self.category else { return }
+        guard isActive, wallet != nil, category != nil else { return }
         let due = schedule.occurrences(after: handledThrough, through: today)
         for day in due {
-            let transaction = Transaction(
-                amount: Money(cents: amountCents * category.sign, currencyCode: wallet.currencyCode),
-                day: day,
-                wallet: wallet,
-                category: category,
-                card: card,
-                note: note
-            )
-            transaction.recurring = self
-            context.insert(transaction)
+            makeTransaction(on: day, in: context)
         }
         if let last = due.last {
             handledThrough = last
         }
+    }
+
+    /// Makes the transaction for the occurrence on `day`, attached to this schedule, and inserts it. Nothing is made
+    /// without a wallet and a category, which the schedule can lose when they are deleted.
+    @discardableResult
+    func makeTransaction(on day: CalendarDay, in context: ModelContext) -> Transaction? {
+        guard let wallet = self.wallet, let category = self.category else { return nil }
+        let transaction = Transaction(
+            amount: Money(cents: amountCents * category.sign, currencyCode: wallet.currencyCode),
+            day: day,
+            wallet: wallet,
+            category: category,
+            card: card,
+            note: note
+        )
+        transaction.recurring = self
+        context.insert(transaction)
+        return transaction
+    }
+
+    /// The occurrences from the start day through `today` that have no transaction yet, in order: what the start-date
+    /// prompt offers. Any transaction of this schedule counts, Recently Deleted ones included, so a restored one never
+    /// doubles up with a day offered again.
+    func unenteredOccurrences(through today: CalendarDay) -> [CalendarDay] {
+        let entered = Set((transactions ?? []).map(\.dayRaw))
+        return schedule.occurrences(after: nil, through: today).filter { !entered.contains($0.rawValue) }
+    }
+
+    /// Makes a transaction on each of `days`, the occurrences the user picked from the start-date prompt, and saves.
+    /// Nothing is made for an empty list.
+    func makeTransactions(on days: [CalendarDay], in context: ModelContext) throws {
+        for day in days {
+            makeTransaction(on: day, in: context)
+        }
+        try context.save()
     }
 
     /// Marks the occurrences dated `today` or earlier as dealt with, without making them.
