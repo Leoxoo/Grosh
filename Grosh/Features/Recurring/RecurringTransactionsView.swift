@@ -1,19 +1,23 @@
 import SwiftData
 import SwiftUI
 
-/// Account → Recurring transactions: every schedule, in the order it was added. Tap one to see what it has made, and
-/// add one with the plus.
+/// Account → Recurring transactions: every schedule, grouped by Kind and in the order it was added within each group.
+/// Tap one to see what it has made, and add one with the plus.
 struct RecurringTransactionsView: View {
     @Query(sort: \RecurringTransaction.createdAt) private var recurring: [RecurringTransaction]
     @State private var editorMode: EditorMode<RecurringTransaction>?
 
     var body: some View {
         List {
-            ForEach(recurring) { item in
-                NavigationLink {
-                    RecurringTransactionDetailView(recurring: item)
-                } label: {
-                    RecurringTransactionRow(recurring: item)
+            ForEach(RecurringListing.groups(of: recurring)) { group in
+                Section(group.kind.sectionTitle) {
+                    ForEach(group.items) { item in
+                        NavigationLink {
+                            RecurringTransactionDetailView(recurring: item)
+                        } label: {
+                            RecurringTransactionRow(recurring: item)
+                        }
+                    }
                 }
             }
         }

@@ -85,6 +85,9 @@ struct CategoryEditor: View {
         NavigationStack {
             Form {
                 detailsSection
+                if !isLocked {
+                    kindSection
+                }
                 iconSection
                 colorSection
                 if let editing, !editing.isLocked {
@@ -159,6 +162,30 @@ struct CategoryEditor: View {
                 Text("A category with subcategories stays at the top level.")
             }
         }
+    }
+
+    private var kindSection: some View {
+        Section {
+            Picker("Kind", selection: kindChoice) {
+                if let parent = draft.parent {
+                    Text("Same as \(parent.name) (\(parent.defaultKind.title))").tag(RecurringKind?.none)
+                }
+                ForEach(RecurringKind.allCases, id: \.self) { kind in
+                    Text(kind.title).tag(Optional(kind))
+                }
+            }
+        } footer: {
+            Text("New Recurring transactions in this category start as this Kind. Existing ones keep theirs.")
+        }
+    }
+
+    /// The Kind the picker shows. A top-level category with none of its own is Regular; a subcategory with none follows
+    /// its parent, which its first choice names.
+    private var kindChoice: Binding<RecurringKind?> {
+        Binding(
+            get: { draft.ownKind ?? (draft.parent == nil ? RecurringKind.regular : nil) },
+            set: { draft.ownKind = $0 }
+        )
     }
 
     private var iconSection: some View {

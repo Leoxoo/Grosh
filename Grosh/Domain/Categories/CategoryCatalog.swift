@@ -52,7 +52,8 @@ struct CategoryCatalog {
             symbolName: draft.symbolName,
             color: draft.color,
             parent: draft.parent,
-            sortOrder: try nextOrder(of: draft.type, under: draft.parent)
+            sortOrder: try nextOrder(of: draft.type, under: draft.parent),
+            ownKind: draft.ownKind
         )
         context.insert(category)
         return category
@@ -79,6 +80,7 @@ struct CategoryCatalog {
         category.name = name
         category.symbolName = draft.symbolName
         category.color = draft.color
+        category.ownKind = draft.ownKind
         if isRetyped || draft.parent != category.parent {
             category.sortOrder = try nextOrder(of: draft.type, under: draft.parent)
             category.parent = draft.parent

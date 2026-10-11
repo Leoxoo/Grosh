@@ -53,6 +53,8 @@ struct RecurringDraft {
     }
     var category: Category?
     var card: Card?
+    /// The sort of Recurring transaction it is. A new one starts with its category's default Kind.
+    var kind: RecurringKind = .regular
     var note = ""
     /// The first occurrence. It may be in the past.
     var startDay: CalendarDay
@@ -89,6 +91,7 @@ struct RecurringDraft {
         wallet = recurring.wallet
         category = recurring.category
         card = recurring.card
+        kind = recurring.kind
         note = recurring.note
         preset = RepeatPreset(rule: schedule.rule)
         customRule = schedule.rule
@@ -238,6 +241,7 @@ extension RecurringTransaction {
         wallet = draft.wallet
         category = draft.category
         card = draft.card
+        kind = draft.kind
         schedule = draft.schedule
     }
 }

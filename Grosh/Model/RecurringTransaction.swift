@@ -10,6 +10,9 @@ final class RecurringTransaction {
     /// or takes from its wallet.
     var amountCents: Int = 0
     var note: String = ""
+    /// The ``RecurringKind``'s raw value. A schedule starts with its category's default Kind and keeps it, whatever
+    /// that default later becomes.
+    var kindRaw: String = RecurringKind.regular.rawValue
     /// The first occurrence's ``CalendarDay`` as `yyyymmdd`.
     var startDayRaw: Int = 0
     /// The ``RepeatUnit``'s raw value.
@@ -76,6 +79,12 @@ final class RecurringTransaction {
                 occurrenceLimit = nil
             }
         }
+    }
+
+    /// What sort of Recurring transaction it is, which the Recurring tab groups it by.
+    var kind: RecurringKind {
+        get { RecurringKind(rawValue: kindRaw) ?? .regular }
+        set { kindRaw = newValue.rawValue }
     }
 
     /// The last due day dealt with, or `nil` before any has been.
