@@ -185,7 +185,7 @@ extension Transaction {
     /// comes after it. `nil` for any other transaction.
     var balanceChange: (recorded: Money, actual: Money)? {
         guard isBalanceAdjustment, let wallet else { return nil }
-        let recordedCents = (wallet.transactions ?? [])
+        let recordedCents = (wallet.transactions ?? []).notDeleted
             .filter { $0 != self && isListed(before: $0) }
             .reduce(0) { $0 + $1.amountCents }
         return (

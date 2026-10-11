@@ -64,10 +64,38 @@ extension LoanOrDebtKind {
     var forgiveFooter: LocalizedStringKey {
         switch self {
         case .loan:
-            "Settles the Loan with a Debt Collection and an expense of the same amount, so no balance changes. The expense counts in reports."
+            "Marks the Loan forgiven without adding any transaction, so no balance changes. The forgiven amount counts in reports as an expense on this date."
         case .debt:
-            "Settles the Debt with a Repayment and an income of the same amount, so no balance changes. The income counts in reports."
+            "Marks the Debt forgiven without adding any transaction, so no balance changes. The forgiven amount counts in reports as income on this date."
         }
+    }
+
+    /// The detail's Loan or Debt section, once forgiven.
+    var forgivenFooter: LocalizedStringKey {
+        switch self {
+        case .loan: "The forgiven amount counts in reports as an expense. Un-forgive makes it outstanding again."
+        case .debt: "The forgiven amount counts in reports as income. Un-forgive makes it outstanding again."
+        }
+    }
+
+    /// The story of a Loan or Debt at a glance: "Lent $50 · Collected $30 · Forgiven $20", or "Borrowed $250 ·
+    /// Repaid $200 · Forgiven $50 · Kept $50". Payments and the forgiven part are left out while there are none.
+    func story(owed: Money, paid: Money, forgiven: Money?) -> String {
+        var parts: [String] = []
+        switch self {
+        case .loan:
+            parts.append(String(localized: "Lent \(owed.formatted())"))
+            if paid.cents > 0 { parts.append(String(localized: "Collected \(paid.formatted())")) }
+            if let forgiven { parts.append(String(localized: "Forgiven \(forgiven.formatted())")) }
+        case .debt:
+            parts.append(String(localized: "Borrowed \(owed.formatted())"))
+            if paid.cents > 0 { parts.append(String(localized: "Repaid \(paid.formatted())")) }
+            if let forgiven {
+                parts.append(String(localized: "Forgiven \(forgiven.formatted())"))
+                parts.append(String(localized: "Kept \(forgiven.formatted())"))
+            }
+        }
+        return parts.joined(separator: " · ")
     }
 }
 

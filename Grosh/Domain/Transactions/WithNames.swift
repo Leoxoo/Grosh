@@ -7,7 +7,7 @@ extension Transaction {
     static func withNames(matching text: String, limit: Int = 5, in context: ModelContext) throws -> [String] {
         let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let descriptor = FetchDescriptor<Transaction>(
-            predicate: #Predicate { $0.withName != "" },
+            predicate: #Predicate { $0.withName != "" && $0.deletedAt == nil },
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
         var seen = Set<String>()

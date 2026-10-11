@@ -25,7 +25,7 @@ struct CardMergeView: View {
 
     private func consequences(into target: Card?) -> String {
         let destination = target.map { "“\($0.name)”" } ?? String(localized: "the Card you pick")
-        let transactions = source.transactions?.count ?? 0
+        let transactions = (source.transactions ?? []).notDeleted.count
         let text = transactions == 1
             ? String(localized: "Its transaction moves to \(destination)")
             : String(localized: "Its \(transactions) transactions move to \(destination)")

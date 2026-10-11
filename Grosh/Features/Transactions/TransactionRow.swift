@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// One transaction as every list shows it: category icon and name, note, Card badge, wallet icon, and the amount
-/// in color.
+/// One transaction as every list shows it: category icon and name, note, Forgiven and Card badges, wallet icon, and
+/// the amount in color. A forgiven Loan or Debt keeps its true amount.
 struct TransactionRow: View {
     let transaction: Transaction
     /// Shows the transaction's day, for lists not grouped by day.
@@ -29,6 +29,9 @@ struct TransactionRow: View {
             VStack(alignment: .trailing, spacing: 4) {
                 AmountText(amount: transaction.amount)
                 HStack(spacing: 6) {
+                    if transaction.isForgiven {
+                        ForgivenBadge()
+                    }
                     if let card = transaction.card {
                         CardBadge(card: card)
                     }
@@ -59,6 +62,20 @@ struct CardBadge: View {
             .padding(.vertical, 2)
             .foregroundStyle(card.color.color)
             .background(card.color.color.opacity(0.15), in: Capsule())
+    }
+}
+
+/// A small capsule saying a Loan or Debt was forgiven.
+struct ForgivenBadge: View {
+    var body: some View {
+        Label("Forgiven", systemImage: "hand.raised.fill")
+            .labelStyle(.titleAndIcon)
+            .font(.caption2.weight(.medium))
+            .lineLimit(1)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .foregroundStyle(.green)
+            .background(Color.green.opacity(0.15), in: Capsule())
     }
 }
 

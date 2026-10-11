@@ -114,6 +114,8 @@ private struct TransactionForm: View {
         } footer: {
             if draft.wallet == nil {
                 Text("Add a wallet first, in Account → Wallets.")
+            } else if draft.paymentLock?.forgivenOwed != nil {
+                Text("It's forgiven, so it keeps its amount, wallet and category until it's un-forgiven.")
             } else if let paymentLock = draft.paymentLock {
                 Text("Its payments keep the wallet and category. The amount can't be less than the \(paymentLock.paid.formatted()) already paid back.")
             } else if draftToSave.requiresCard && draft.card == nil {

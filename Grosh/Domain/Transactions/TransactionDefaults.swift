@@ -31,7 +31,9 @@ enum TransactionDefaults {
     private static func lastUsedWallet(in context: ModelContext) -> Wallet? {
         let system = CategoryType.system.rawValue
         var lastEntered = FetchDescriptor<Transaction>(
-            predicate: #Predicate { $0.wallet?.isArchived == false && $0.category?.typeRaw != system },
+            predicate: #Predicate {
+                $0.wallet?.isArchived == false && $0.category?.typeRaw != system && $0.deletedAt == nil
+            },
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
         lastEntered.fetchLimit = 1

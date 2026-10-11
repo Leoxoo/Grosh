@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 
 /// What goes when the user deletes transactions that have related transactions.
@@ -16,10 +17,10 @@ extension Transaction {
         try [self].deleteScopes(in: context)
     }
 
-    /// Deletes this transaction, and its related transactions too for `.withRelated`. Saves, so every balance
-    /// stops counting it straight away.
-    func delete(_ scope: TransactionDeleteScope, in context: ModelContext) throws {
-        try [self].delete(scope, in: context)
+    /// Moves this transaction to Recently Deleted, and its related transactions too for `.withRelated`. Saves, so
+    /// every balance stops counting it straight away.
+    func delete(_ scope: TransactionDeleteScope, in context: ModelContext, at now: Date = .now) throws {
+        try [self].delete(scope, in: context, at: now)
     }
 }
 
@@ -45,16 +46,14 @@ extension Collection where Element == Transaction {
         try related(in: context).isEmpty ? [.onlySelected] : [.withRelated, .onlySelected]
     }
 
-    /// The one way transactions are deleted, one from its detail screen or several selected in the list. Saves,
-    /// so every balance stops counting them straight away.
-    func delete(_ scope: TransactionDeleteScope, in context: ModelContext) throws {
-        if scope == .withRelated {
-            for transaction in try related(in: context) {
-                context.delete(transaction)
-            }
-        }
-        for transaction in self {
-            context.delete(transaction)
+    /// The one way transactions are deleted, one from its detail screen or several selected in the list: each moves
+    /// to Recently Deleted on its own, where it waits 30 days to be restored. Saves, so every balance stops counting
+    /// them straight away.
+    func delete(_ scope: TransactionDeleteScope, in context: ModelContext, at now: Date = .now) throws {
+        let deleting = try scope == .withRelated ? related(in: context) + Array(self) : Array(self)
+        for transaction in deleting {
+            transaction.deletedAt = now
+            transaction.deletedWithWallet = false
         }
         try context.save()
     }

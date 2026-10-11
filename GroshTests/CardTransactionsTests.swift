@@ -111,6 +111,53 @@ struct CardTransactionsTests {
         #expect(shown.net == Money(cents: -42_76))
     }
 
+    // MARK: Lead-in transactions
+
+    @Test func aStatementPeriodLeadsInWithTheTwoDaysBeforeItBegins() throws {
+        let chase = try addCard("Chase", statementDay: 15)
+
+        #expect(chase.period(containing: today).leadInDays == DayRange(first: day(9, 14), last: day(9, 15)))
+    }
+
+    @Test func aCalendarMonthHasNoLeadIn() throws {
+        let debit = try addCard("Navy Federal Debit", kind: .debit)
+        let petal = try addCard("Petal")
+        try record(-20_00, on: day(9, 30), paidWith: debit)
+        try record(-20_00, on: day(9, 30), paidWith: petal)
+
+        #expect(debit.period(containing: today).leadInDays == nil)
+        #expect(debit.leadInTransactions(in: debit.period(containing: today)).isEmpty)
+        #expect(petal.leadInTransactions(in: petal.period(containing: today)).isEmpty)
+    }
+
+    @Test func leadInTransactionsAreThisCardsFromTheTwoDaysBeforeAndStayOnThePreviousStatement() throws {
+        let chase = try addCard("Chase", statementDay: 15)
+        let amex = try addCard("Amex", statementDay: 15)
+        try record(-1_00, on: day(9, 13), paidWith: chase)
+        let fourteenth = try record(-20_00, on: day(9, 14), paidWith: chase)
+        let fifteenth = try record(-30_00, on: day(9, 15), paidWith: chase)
+        let first = try record(-12_76, on: day(9, 16), paidWith: chase)
+        try record(-50_00, on: day(9, 15), paidWith: amex)
+        let current = chase.period(containing: today)
+
+        #expect(Set(chase.leadInTransactions(in: current)) == [fourteenth, fifteenth])
+        #expect(Set(chase.transactions(in: current.adding(-1))).isSuperset(of: [fourteenth, fifteenth]))
+        #expect(chase.transactions(in: current) == [first])
+    }
+
+    @Test func leadInTransactionsNeverCountInTheStatementTotalUnlessAdded() throws {
+        let chase = try addCard("Chase", statementDay: 15)
+        let leadIn = try record(-20_00, on: day(9, 15), paidWith: chase)
+        try record(-30_00, on: day(9, 14), paidWith: chase)
+        try record(-12_76, on: day(9, 16), paidWith: chase)
+        let current = chase.period(containing: today)
+        let shown = chase.transactions(in: current)
+
+        #expect(shown.net == Money(cents: -12_76))
+        let added = chase.leadInTransactions(in: current).filter { $0 == leadIn }
+        #expect((shown + added).net == Money(cents: -32_76))
+    }
+
     // MARK: How far ‹ › step
 
     @Test func withoutTransactionsThereIsOnlyTheCurrentPeriod() throws {

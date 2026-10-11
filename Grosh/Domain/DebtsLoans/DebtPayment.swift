@@ -59,7 +59,8 @@ extension DebtPayment {
     /// Saves.
     @discardableResult
     static func record(_ draft: DebtPaymentDraft, in context: ModelContext) throws -> DebtPayment {
-        try draft.loanOrDebt.settle(in: context, check: draft.validate(against:)) { current, paymentCategory in
+        try draft.loanOrDebt.settle(in: context, check: draft.validate(against:)) { current in
+            let paymentCategory = try context.lockedCategory(current.kind.paymentRole)
             let sign = current.kind.paymentSign
             let split = current.split(draft.amount)
             let payment = try current.addLinked(

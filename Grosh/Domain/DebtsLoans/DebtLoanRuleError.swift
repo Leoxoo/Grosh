@@ -15,6 +15,10 @@ nonisolated enum DebtLoanRuleError: Error, Equatable {
     case lockedByPayments
     /// A Loan or Debt can't be for less than what has been collected or repaid on it.
     case amountBelowPaid
+    /// Only a forgiven Loan or Debt can be un-forgiven.
+    case notForgiven
+    /// A forgiven Loan or Debt keeps its amount, wallet and category until it is un-forgiven.
+    case lockedByForgiveness
 }
 
 extension DebtLoanRuleError: LocalizedError {
@@ -32,6 +36,10 @@ extension DebtLoanRuleError: LocalizedError {
             String(localized: "Its payments keep this Loan or Debt in its wallet and category.")
         case .amountBelowPaid:
             String(localized: "The amount can't be less than what has already been paid back.")
+        case .notForgiven:
+            String(localized: "This Loan or Debt isn't forgiven.")
+        case .lockedByForgiveness:
+            String(localized: "Un-forgive this Loan or Debt before changing its amount, wallet or category.")
         }
     }
 }

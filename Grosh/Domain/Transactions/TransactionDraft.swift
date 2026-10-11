@@ -49,16 +49,20 @@ struct TransactionDraft {
     private(set) var isBalanceAdjustment = false
     /// Set when editing a transaction the Card rule doesn't apply to (``requiresCard``).
     private(set) var cardRuleExemption: CardRuleExemption?
-    /// Set when editing a Loan or Debt that has payments: what they hold in place.
+    /// Set when editing a Loan or Debt that has payments or was forgiven: what they hold in place.
     private(set) var paymentLock: PaymentLock?
 
-    /// What the payments on a Loan or Debt hold in place while it is edited: the wallet and category (so the type)
-    /// they were recorded against, and an amount no lower than what has been paid.
+    /// What the payments on a Loan or Debt, or its Forgiven mark, hold in place while it is edited: the wallet and
+    /// category (so the type) they were recorded against, and an amount no lower than what has been paid. Payments in
+    /// Recently Deleted hold the wallet and category too, so they still fit when restored. A forgiven one keeps its
+    /// amount too, until it is un-forgiven.
     struct PaymentLock {
         let wallet: Wallet?
         let category: Category?
-        /// What has been collected or repaid so far.
+        /// What has been collected or repaid so far, payments in Recently Deleted included.
         let paid: Money
+        /// The amount a forgiven Loan or Debt keeps until it is un-forgiven, or `nil` when it isn't forgiven.
+        var forgivenOwed: Money?
     }
 
     init(type: CategoryType, day: CalendarDay) {
@@ -73,9 +77,15 @@ struct TransactionDraft {
         isBalanceAdjustment = transaction.isBalanceAdjustment
         cardRuleExemption = transaction.cardRuleExemption
         reminderDay = transaction.reminderDay
-        if let context = transaction.modelContext,
-           let loanOrDebt = try? LoanOrDebt(transaction, in: context), !loanOrDebt.payments.isEmpty {
-            paymentLock = PaymentLock(wallet: transaction.wallet, category: transaction.category, paid: loanOrDebt.paid)
+        let deletedPayments = transaction.paymentsInRecentlyDeleted
+        if let context = transaction.modelContext, let loanOrDebt = try? LoanOrDebt(transaction, in: context),
+           !loanOrDebt.payments.isEmpty || transaction.isForgiven || !deletedPayments.isEmpty {
+            let deletedCents = deletedPayments.reduce(0) { $0 + abs($1.amountCents) }
+            paymentLock = PaymentLock(
+                wallet: transaction.wallet, category: transaction.category,
+                paid: Money(cents: loanOrDebt.paid.cents + deletedCents, currencyCode: loanOrDebt.paid.currencyCode),
+                forgivenOwed: transaction.isForgiven ? loanOrDebt.owed : nil
+            )
         }
     }
 
@@ -133,7 +143,10 @@ extension TransactionDraft {
         guard types.contains(type) || !isBalanceAdjustment else {
             throw BalanceAdjustmentRuleError.reasonDoesNotMatchDifference
         }
-        if let paymentLock {
+        if let paymentLock, let forgivenOwed = paymentLock.forgivenOwed {
+            guard wallet == paymentLock.wallet, category == paymentLock.category, amount.cents == forgivenOwed.cents
+            else { throw DebtLoanRuleError.lockedByForgiveness }
+        } else if let paymentLock {
             guard wallet == paymentLock.wallet, category == paymentLock.category else {
                 throw DebtLoanRuleError.lockedByPayments
             }
@@ -143,7 +156,7 @@ extension TransactionDraft {
         guard !isMissingWith else { throw TransactionRuleError.missingWith }
     }
 
-    /// Whether this is a Loan or Debt with payments, whose wallet, type and category can't change.
+    /// Whether this is a Loan or Debt with payments or forgiven, whose wallet, type and category can't change.
     var isLockedByPayments: Bool { paymentLock != nil }
 
     /// Whether the transaction can carry a reminder date: only a Loan or a Debt, on the Debt/Loan tab.
@@ -185,8 +198,8 @@ extension TransactionDraft {
 nonisolated enum CardRuleExemption: Hashable, Sendable {
     /// A balance adjustment: the difference between a wallet's recorded and real balance.
     case balanceAdjustment
-    /// What a Loan or Debt writes off inside its own flow: the expense of forgiving a Loan, or what was repaid above
-    /// a Debt.
+    /// What a Loan or Debt writes off inside its own flow: what was repaid above a Debt, or the expense of forgiving a
+    /// Loan recorded before forgiving became a mark (ADR-0004).
     case debtWriteOff
 }
 

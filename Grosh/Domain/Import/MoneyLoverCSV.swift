@@ -19,6 +19,19 @@ nonisolated struct MoneyLoverRow: Equatable, Sendable {
     /// What links the row to the rows it is related to, from a Grosh export's `Linked` column: rows of one link share
     /// it. Empty for an unlinked row, `nil` when the file has no such column (``GroshCSVExport``).
     var link: String? = nil
+    /// A forgiven Loan's or Debt's Forgiven mark, from a Grosh export's `Forgiven` columns: `nil` for none, or when
+    /// the file has no such columns.
+    var forgiven: Forgiven? = nil
+
+    /// The Forgiven mark of a Loan or Debt in a Grosh export (ADR-0004).
+    nonisolated struct Forgiven: Equatable, Sendable {
+        /// What was forgiven, above zero.
+        let amount: Money
+        let day: CalendarDay
+        /// The category the forgiven amount counts under; empty when the file names none.
+        let categoryName: String
+        let note: String
+    }
 
     /// Whether the row comes from a Grosh export, which names each row's Card and links rather than leaving the
     /// import to work them out.
@@ -49,8 +62,8 @@ extension MoneyLoverImportError: LocalizedError {
 }
 
 /// Reads a MoneyLover CSV export: `Id, Date (MM/DD/YYYY), Category, Amount, Currency, Wallet, Note, With, Event,
-/// Exclude from report, Members`, and a Grosh export's `Card` and `Linked` columns (``GroshCSVExport``). Columns are
-/// found by their header, so their order doesn't matter.
+/// Exclude from report, Members`, and a Grosh export's `Card`, `Linked` and `Forgiven` columns (``GroshCSVExport``).
+/// Columns are found by their header, so their order doesn't matter.
 nonisolated enum MoneyLoverCSV {
     /// The export's rows, in the order the file lists them. Throws ``MoneyLoverImportError`` for a file that isn't
     /// a MoneyLover export or has a row that can't be read.
@@ -71,6 +84,7 @@ nonisolated enum MoneyLoverCSV {
     private struct Columns {
         let date: Int, category: Int, amount: Int, wallet: Int
         let note: Int?, with: Int?, event: Int?, excluded: Int?, card: Int?, linked: Int?
+        let forgiven: Int?, forgivenDate: Int?, forgivenCategory: Int?, forgivenNote: Int?
 
         init(header: [String]) throws {
             let names = header.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
@@ -88,11 +102,15 @@ nonisolated enum MoneyLoverCSV {
             excluded = index("exclude from report")
             card = index("card")
             linked = index("linked")
+            forgiven = index("forgiven")
+            forgivenDate = index("forgiven date")
+            forgivenCategory = index("forgiven category")
+            forgivenNote = index("forgiven note")
         }
 
-        /// The row `fields` hold, or `nil` when its date, amount, category or wallet can't be read. Columns missing
-        /// at the end of the row are empty. The note is kept as written; every other field loses the spaces and line
-        /// breaks around it.
+        /// The row `fields` hold, or `nil` when its date, amount, category or wallet (or a Forgiven mark's amount or
+        /// date) can't be read. Columns missing at the end of the row are empty. The notes are kept as written; every
+        /// other field loses the spaces and line breaks around it.
         func row(from fields: [String], line: Int) -> MoneyLoverRow? {
             func written(_ index: Int?) -> String {
                 guard let index, fields.indices.contains(index) else { return "" }
@@ -106,6 +124,16 @@ nonisolated enum MoneyLoverCSV {
             guard let day = MoneyLoverCSV.day(from: field(date)), let amount = Money(decimalString: field(amount)),
                   !categoryName.isEmpty, !walletName.isEmpty
             else { return nil }
+            var forgivenMark: MoneyLoverRow.Forgiven?
+            if !field(forgiven).isEmpty {
+                guard let forgivenAmount = Money(decimalString: field(forgiven)),
+                      let forgivenDay = MoneyLoverCSV.day(from: field(forgivenDate))
+                else { return nil }
+                forgivenMark = MoneyLoverRow.Forgiven(
+                    amount: forgivenAmount, day: forgivenDay, categoryName: field(forgivenCategory),
+                    note: written(forgivenNote)
+                )
+            }
             return MoneyLoverRow(
                 line: line,
                 day: day,
@@ -117,7 +145,8 @@ nonisolated enum MoneyLoverCSV {
                 eventName: field(event),
                 isExcludedFromReport: !field(excluded).isEmpty,
                 cardName: card.map { field($0) },
-                link: linked.map { field($0) }
+                link: linked.map { field($0) },
+                forgiven: forgivenMark
             )
         }
     }

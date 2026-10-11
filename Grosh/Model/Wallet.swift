@@ -12,6 +12,8 @@ final class Wallet {
     var isArchived: Bool = false
     var sortOrder: Int = 0
     var createdAt: Date = Date.now
+    /// When the wallet was moved to Recently Deleted, with its transactions, or `nil` while it isn't there.
+    var deletedAt: Date?
 
     @Relationship(inverse: \Transaction.wallet)
     var transactions: [Transaction]? = []

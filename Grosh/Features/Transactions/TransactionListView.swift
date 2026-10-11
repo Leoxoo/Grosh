@@ -9,7 +9,7 @@ struct TransactionListView: View {
     /// The transaction whose detail is showing.
     @Binding var selectedTransaction: Transaction?
 
-    @Query private var transactions: [Transaction]
+    @Query(Transaction.notDeleted) private var transactions: [Transaction]
     @State private var walletSelection = WalletSelection.total
     /// How long each period in the strip is, chosen in the "…" menu.
     @State private var timeRange = TimeRange.month

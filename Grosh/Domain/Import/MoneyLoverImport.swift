@@ -48,6 +48,7 @@ enum MoneyLoverImport {
     private static func removeAllData(in context: ModelContext) throws {
         for category in try context.fetch(FetchDescriptor<Category>()) {
             category.transactions = []
+            category.forgivenTransactions = []
         }
         for card in try context.fetch(FetchDescriptor<Card>()) {
             card.transactions = []
@@ -97,7 +98,7 @@ private struct Importer {
             try addWallet(firstSeenIn: row, withStartingBalance: !hasStartingBalance)
         }
         if isGroshExport {
-            return try restore(filedUnder: filed)
+            return try restore(filedUnder: filed, categories: &categories)
         }
         let paid = try addCards(for: filed)
         // `imported[i]` is `rows[i]`.
@@ -152,9 +153,12 @@ private struct Importer {
     }
 
     /// Records a Grosh export's rows as they were exported: each with the Card its `Card` column names and its note as
-    /// it is, linked to the rows that share its `Linked` value. Says what was done; the wallets' Starting balances,
-    /// which are rows of the file, aren't counted. Doesn't save.
-    private func restore(filedUnder categories: [Category]) throws -> MoneyLoverImportSummary {
+    /// it is, linked to the rows that share its `Linked` value, and a Loan or Debt with the Forgiven mark its
+    /// `Forgiven` columns hold (its category found among `filer`'s, or added). Says what was done; the wallets'
+    /// Starting balances, which are rows of the file, aren't counted. Doesn't save.
+    private func restore(
+        filedUnder categories: [Category], categories filer: inout CategoryFiler
+    ) throws -> MoneyLoverImportSummary {
         let paid = try addNamedCards()
         var links: [String: UUID] = [:]
         for index in rows.indices {
@@ -162,6 +166,9 @@ private struct Importer {
             let transaction = record(
                 row, at: index, filedUnder: categories[index], paidWith: paid.cards[index], note: row.note
             )
+            if let forgiven = row.forgiven, let kind = transaction.loanOrDebtKind {
+                try markForgiven(transaction, as: forgiven, kind: kind, categories: &filer)
+            }
             guard let link = row.link, !link.isEmpty else { continue }
             let linkID = links[link] ?? UUID()
             links[link] = linkID
@@ -176,6 +183,24 @@ private struct Importer {
             cardsCreated: paid.created,
             unmatchedRows: []
         )
+    }
+
+    /// Marks `transaction`, a Loan or Debt, forgiven as a Grosh export's `Forgiven` columns say, under the category
+    /// they name for the forgiven amount (an Expense for a Loan, an Income for a Debt), or Other Expense or Other
+    /// Income when they name none or only a category of another type. Doesn't save.
+    private func markForgiven(
+        _ transaction: Transaction, as forgiven: MoneyLoverRow.Forgiven, kind: LoanOrDebtKind,
+        categories filer: inout CategoryFiler
+    ) throws {
+        let sign = kind.forgivenType == .expense ? -1 : 1
+        let named = try forgiven.categoryName.isEmpty
+            ? nil : filer.findOrAdd(named: forgiven.categoryName, for: Money(cents: sign))
+        let category = try named.flatMap { $0.type == kind.forgivenType ? $0 : nil }
+            ?? context.otherCategory(kind.forgivenType)
+        transaction.forgivenCents = forgiven.amount.cents
+        transaction.forgivenDay = forgiven.day
+        transaction.forgivenNote = forgiven.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        transaction.forgivenCategory = category
     }
 
     /// The Card each row of a Grosh export names in its `Card` column, `nil` for none, and how many Cards were added.

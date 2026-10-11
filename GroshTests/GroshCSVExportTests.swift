@@ -54,11 +54,11 @@ struct GroshCSVExportTests {
         ))
 
         #expect(try exported() == groshExport(
-            "1,10/06/2026,Outgoing transfer,-250.00,USD,Checking (Navy Federal),To savings,,,1,,,1",
-            "2,10/06/2026,Incoming transfer,250.00,USD,Savings,To savings,,,1,,,1",
-            "3,10/06/2026,Starting balance,0.00,USD,Savings,,,,1,,,",
-            "4,10/05/2026,Café,-3.50,USD,Checking (Navy Federal),\"Coffee, large\",Sam,Road trip,,,Chase,",
-            "5,10/05/2026,Starting balance,0.00,USD,Checking (Navy Federal),,,,1,,,"
+            "1,10/06/2026,Outgoing transfer,-250.00,USD,Checking (Navy Federal),To savings,,,1,,,1,,,,",
+            "2,10/06/2026,Incoming transfer,250.00,USD,Savings,To savings,,,1,,,1,,,,",
+            "3,10/06/2026,Starting balance,0.00,USD,Savings,,,,1,,,,,,,",
+            "4,10/05/2026,Café,-3.50,USD,Checking (Navy Federal),\"Coffee, large\",Sam,Road trip,,,Chase,,,,,",
+            "5,10/05/2026,Starting balance,0.00,USD,Checking (Navy Federal),,,,1,,,,,,,"
         ))
     }
 
@@ -114,12 +114,12 @@ struct GroshCSVExportTests {
 
     @Test func aGroshExportIsRestoredAsItWasExported() throws {
         let export = groshExport(
-            "1,10/06/2026,Outgoing transfer,-250.00,USD,Checking,To savings,,,1,,,1",
-            "2,10/06/2026,Incoming transfer,250.00,USD,Savings,To savings,,,1,,,1",
-            "3,10/06/2026,Starting balance,500.00,USD,Savings,,,,1,,,",
-            "4,10/05/2026,Café,-3.50,USD,Checking,\"Coffee, large\",Sam,Road trip,,,Chase,",
-            "5,10/05/2026,Café,-2.00,USD,Checking,#chase espresso,,,,,,",
-            "6,10/05/2026,Starting balance,1000.00,USD,Checking,,,,1,,,"
+            "1,10/06/2026,Outgoing transfer,-250.00,USD,Checking,To savings,,,1,,,1,,,,",
+            "2,10/06/2026,Incoming transfer,250.00,USD,Savings,To savings,,,1,,,1,,,,",
+            "3,10/06/2026,Starting balance,500.00,USD,Savings,,,,1,,,,,,,",
+            "4,10/05/2026,Café,-3.50,USD,Checking,\"Coffee, large\",Sam,Road trip,,,Chase,,,,,",
+            "5,10/05/2026,Café,-2.00,USD,Checking,#chase espresso,,,,,,,,,,",
+            "6,10/05/2026,Starting balance,1000.00,USD,Checking,,,,1,,,,,,,"
         )
 
         let summary = try importing(export)
@@ -129,6 +129,26 @@ struct GroshCSVExportTests {
         #expect(summary.wallets.map(\.transactionCount) == [3, 1])
         #expect(summary.cardsCreated == 1)
         #expect(summary.unmatchedRows.isEmpty)
+    }
+
+    @Test func aForgivenLoanKeepsItsForgivenMarkThroughExportAndRestore() throws {
+        let export = groshExport(
+            "1,10/08/2026,Debt Collection,30.00,USD,Cash,,Sam,,1,,,1,,,,",
+            "2,10/05/2026,Loan,-50.00,USD,Cash,,Sam,,1,,,1,20.00,10/09/2026,Friends & Lover,\"Birthday, late\"",
+            "3,10/05/2026,Starting balance,100.00,USD,Cash,,,,1,,,,,,,"
+        )
+
+        try importing(export)
+
+        #expect(try exported() == export)
+        let loan = try #require(try context.fetch(DebtsAndLoans.transactions).first { $0.isLoanOrDebt })
+        let forgiveness = try #require(loan.forgiveness)
+        #expect(forgiveness.amount == Money(cents: 20_00))
+        #expect(forgiveness.day == CalendarDay(year: 2026, month: 10, day: 9))
+        #expect(forgiveness.category?.name == "Friends & Lover")
+        #expect(forgiveness.category?.type == .expense)
+        #expect(forgiveness.note == "Birthday, late")
+        #expect(try #require(try LoanOrDebt(loan, in: context)).isSettled)
     }
 
     @Test func aWalletsStartingBalanceIsTheFilesOwnRow() throws {
