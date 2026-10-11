@@ -34,6 +34,8 @@ private struct RecurringForm: View {
     @State private var draft: RecurringDraft
     @State private var entry: AmountEntry
     @State private var errorMessage: String?
+    /// The start-date prompt, offered when the saved schedule has occurrences that have already come due.
+    @State private var pastPrompt: PastPrompt?
 
     init(mode: EditorMode<RecurringTransaction>, startingDraft: RecurringDraft) {
         self.mode = mode
@@ -83,6 +85,9 @@ private struct RecurringForm: View {
             }
         }
         .errorAlert("Couldn't Save Recurring Transaction", message: $errorMessage)
+        .sheet(item: $pastPrompt, onDismiss: { dismiss() }) { prompt in
+            PastOccurrencesView(recurring: prompt.recurring, days: prompt.days)
+        }
     }
 
     private func detailsSection(_ fields: KeypadSheetFields) -> some View {
@@ -155,17 +160,33 @@ private struct RecurringForm: View {
 
     private func save() {
         do {
+            // A new schedule, or one whose start day has been moved, offers the occurrences that have already come due.
+            let startChanged = mode.editing.map { $0.schedule.start != draftToSave.startDay } ?? true
+            let saved: RecurringTransaction
             switch mode {
             case .add:
-                try RecurringTransaction.create(draftToSave, in: context)
+                saved = try RecurringTransaction.create(draftToSave, in: context)
             case .edit(let recurring):
                 try recurring.update(with: draftToSave)
+                saved = recurring
             }
-            dismiss()
+            let unentered = saved.unenteredOccurrences(through: .today)
+            if startChanged && !unentered.isEmpty {
+                pastPrompt = PastPrompt(recurring: saved, days: unentered)
+            } else {
+                dismiss()
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
     }
+}
+
+/// The start-date prompt for a Recurring transaction the editor has just saved, and the days it offers.
+private struct PastPrompt: Identifiable {
+    let id = UUID()
+    let recurring: RecurringTransaction
+    let days: [CalendarDay]
 }
 
 #Preview {
