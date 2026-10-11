@@ -81,6 +81,23 @@ struct ScheduledOccurrenceTests {
         #expect(recurring.scheduledDays(today: today).isEmpty)
     }
 
+    @Test func aBillWhoseAmountVariesHasEstimatedScheduledRowsAndOtherKindsDoNot() throws {
+        let utilities = Grosh.Category(name: "Utilities", type: .expense, symbolName: "bolt", color: .purple)
+        context.insert(utilities)
+        var draft = RecurringDraft(startDay: day(2026, 10, 12))
+        draft.name = "Electricity"
+        draft.amount = Money(cents: 2_500)
+        draft.wallet = store.wallet
+        draft.category = utilities
+        draft.kind = .bill
+        draft.amountVaries = true
+        let electricity = try RecurringTransaction.create(draft, today: today, in: context)
+        let netflix = try makeSchedule(starting: day(2026, 10, 12))
+
+        #expect(ScheduledOccurrence(recurring: electricity, day: day(2026, 10, 12)).isEstimated)
+        #expect(!ScheduledOccurrence(recurring: netflix, day: day(2026, 10, 12)).isEstimated)
+    }
+
     @Test func theTotalListsOnlyTheWalletsCountedInIt() throws {
         let savings = Wallet(name: "Savings")
         savings.includeInTotal = false

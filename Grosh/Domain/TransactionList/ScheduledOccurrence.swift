@@ -12,6 +12,10 @@ struct ScheduledOccurrence: Identifiable, Hashable {
 
     /// What the occurrence will add to or take from its wallet, signed by its category.
     var amount: Money { recurring.signedAmount }
+
+    /// Whether the transaction the occurrence makes starts Estimated: a Bill whose amount varies. Its row carries the
+    /// Estimated mark too.
+    var isEstimated: Bool { recurring.estimatesAmount }
 }
 
 extension RecurringTransaction {

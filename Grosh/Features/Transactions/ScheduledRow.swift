@@ -27,11 +27,16 @@ struct ScheduledRow: View {
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 4) {
                 AmountText(amount: occurrence.amount)
-                if let wallet = occurrence.recurring.wallet {
-                    Image(systemName: wallet.symbolName)
-                        .font(.caption)
-                        .foregroundStyle(wallet.color.color)
-                        .accessibilityLabel(wallet.name)
+                HStack(spacing: 6) {
+                    if occurrence.isEstimated {
+                        EstimatedBadge()
+                    }
+                    if let wallet = occurrence.recurring.wallet {
+                        Image(systemName: wallet.symbolName)
+                            .font(.caption)
+                            .foregroundStyle(wallet.color.color)
+                            .accessibilityLabel(wallet.name)
+                    }
                 }
             }
         }
