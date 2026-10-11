@@ -21,6 +21,9 @@ final class Wallet {
     @Relationship(deleteRule: .nullify, inverse: \Card.payingWallet)
     var cards: [Card]? = []
 
+    @Relationship(deleteRule: .nullify, inverse: \RecurringTransaction.wallet)
+    var recurringTransactions: [RecurringTransaction]? = []
+
     init(name: String, symbolName: String = "wallet.bifold.fill", color: PaletteColor = .green, sortOrder: Int = 0) {
         self.name = name
         self.symbolName = symbolName

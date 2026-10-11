@@ -5,7 +5,6 @@ enum ComingSoon: CaseIterable {
     case budgets
     case reportThisMonth
     case topSpending
-    case recurringTransactions
 
     /// The coming-soon cards on Home, in the order they appear.
     static let homeCards: [ComingSoon] = [.reportThisMonth, .topSpending]
@@ -15,7 +14,6 @@ enum ComingSoon: CaseIterable {
         case .budgets: String(localized: "Budgets")
         case .reportThisMonth: String(localized: "Report this month")
         case .topSpending: String(localized: "Top spending")
-        case .recurringTransactions: String(localized: "Recurring transactions")
         }
     }
 
@@ -25,7 +23,6 @@ enum ComingSoon: CaseIterable {
         case .budgets: "chart.pie"
         case .reportThisMonth: "chart.bar.xaxis"
         case .topSpending: "list.number"
-        case .recurringTransactions: "repeat"
         }
     }
 
@@ -38,8 +35,6 @@ enum ComingSoon: CaseIterable {
             String(localized: "A chart of this month's income and spending will appear here.")
         case .topSpending:
             String(localized: "Your biggest spending categories this month will appear here.")
-        case .recurringTransactions:
-            String(localized: "Bills and income that repeat will be added for you on their dates.")
         }
     }
 }

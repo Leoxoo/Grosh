@@ -18,10 +18,12 @@ struct GroshApp: App {
         WindowGroup {
             RootView()
                 .onChange(of: scenePhase, initial: true) { _, phase in
-                    // Items in Recently Deleted that have waited 30 days are removed for good whenever the app opens
-                    // or comes back to the foreground; nothing runs in the background.
+                    // Items in Recently Deleted that have waited 30 days are removed for good, and Recurring transactions
+                    // make the days that came due while the app was closed, whenever the app opens or comes back to the
+                    // foreground; nothing runs in the background.
                     if phase == .active {
                         try? RecentlyDeleted.purgeExpired(in: container.mainContext)
+                        try? RecurringTransaction.catchUp(in: container.mainContext)
                     }
                 }
         }

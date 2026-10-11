@@ -8,9 +8,8 @@ struct ComingSoonTests {
         #expect(ComingSoon.homeCards.map(\.title) == ["Report this month", "Top spending"])
     }
 
-    @Test func budgetsAndRecurringTransactionsAreNamedAsInTheSpec() {
+    @Test func budgetsIsNamedAsInTheSpec() {
         #expect(ComingSoon.budgets.title == "Budgets")
-        #expect(ComingSoon.recurringTransactions.title == "Recurring transactions")
     }
 
     /// A misspelled SF Symbol name renders as a blank gap, which wouldn't look deliberate.

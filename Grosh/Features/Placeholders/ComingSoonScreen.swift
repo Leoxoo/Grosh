@@ -16,6 +16,6 @@ struct ComingSoonScreen: View {
 
 #Preview {
     NavigationStack {
-        ComingSoonScreen(placeholder: .recurringTransactions)
+        ComingSoonScreen(placeholder: .budgets)
     }
 }
