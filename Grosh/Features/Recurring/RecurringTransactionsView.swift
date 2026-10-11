@@ -2,9 +2,10 @@ import SwiftData
 import SwiftUI
 
 /// Account → Recurring transactions: every schedule, in the order it was added. Tap one to see what it has made, and
-/// add one with the plus.
+/// add one with the plus. A paused one, whose wallet is archived, shows muted. A deleted one waits in Recently Deleted.
 struct RecurringTransactionsView: View {
-    @Query(sort: \RecurringTransaction.createdAt) private var recurring: [RecurringTransaction]
+    @Query(filter: #Predicate<RecurringTransaction> { $0.deletedAt == nil }, sort: \RecurringTransaction.createdAt)
+    private var recurring: [RecurringTransaction]
     @State private var editorMode: EditorMode<RecurringTransaction>?
 
     var body: some View {
@@ -59,12 +60,17 @@ struct RecurringTransactionRow: View {
             AmountText(amount: recurring.signedAmount)
         }
         .contentShape(Rectangle())
+        .opacity(recurring.isPaused ? 0.5 : 1)
         .accessibilityElement(children: .combine)
     }
 
-    /// The wallet and the next day it falls due, such as "Checking · Next Nov 4, 2026".
+    /// The wallet and the next day it falls due, such as "Checking · Next Nov 4, 2026", or "Paused" while its wallet
+    /// is archived.
     private var detail: String {
         let wallet = recurring.wallet?.name ?? String(localized: "No wallet")
+        if recurring.isPaused {
+            return String(localized: "\(wallet) · Paused")
+        }
         guard let next = recurring.nextDueDay else {
             return String(localized: "\(wallet) · Ended")
         }

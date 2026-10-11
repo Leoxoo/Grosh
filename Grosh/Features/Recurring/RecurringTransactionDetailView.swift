@@ -3,8 +3,8 @@ import SwiftUI
 
 /// One Recurring transaction: what it is, when it next falls due, and the transactions it has made or the user has
 /// attached. A transaction opens in the normal editor. Link existing attaches one from any wallet, and Unlink detaches
-/// it without deleting it. Edit changes only what is still to come. Delete removes the schedule and keeps what it
-/// holds.
+/// it without deleting it. Edit changes only what is still to come. Delete moves the schedule to Recently Deleted and
+/// keeps what it holds.
 struct RecurringTransactionDetailView: View {
     let recurring: RecurringTransaction
 
@@ -55,7 +55,9 @@ struct RecurringTransactionDetailView: View {
                         .multilineTextAlignment(.trailing)
                 }
                 LabeledContent("Next") {
-                    if let next = recurring.nextDueDay {
+                    if recurring.isPaused {
+                        Text("Paused")
+                    } else if let next = recurring.nextDueDay {
                         Text(next.date(), style: .date)
                     } else {
                         Text("Ended")
@@ -66,6 +68,10 @@ struct RecurringTransactionDetailView: View {
                         Text(recurring.note)
                             .multilineTextAlignment(.trailing)
                     }
+                }
+            } footer: {
+                if recurring.isPaused {
+                    Text("Its wallet is archived, so it makes nothing until the wallet is unarchived.")
                 }
             }
 
@@ -125,7 +131,7 @@ struct RecurringTransactionDetailView: View {
             Button("Delete Recurring Transaction", role: .destructive) { delete() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The transactions it made or that are attached stay in your wallets.")
+            Text("It goes to Recently Deleted for \(RecentlyDeleted.keptDays) days. The transactions it made or that are attached stay in your wallets.")
         }
         .errorAlert("Couldn't Change Recurring Transaction", message: $errorMessage)
     }
