@@ -4,6 +4,7 @@ import SwiftUI
 @main
 struct GroshApp: App {
     private let container: ModelContainer
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         do {
@@ -11,13 +12,18 @@ struct GroshApp: App {
         } catch {
             fatalError("Couldn't open the Grosh store: \(error)")
         }
-        // Items in Recently Deleted are removed for good once they have waited 30 days; nothing runs in the background.
-        try? RecentlyDeleted.purgeExpired(in: container.mainContext)
     }
 
     var body: some Scene {
         WindowGroup {
             RootView()
+                .onChange(of: scenePhase, initial: true) { _, phase in
+                    // Items in Recently Deleted that have waited 30 days are removed for good whenever the app opens
+                    // or comes back to the foreground; nothing runs in the background.
+                    if phase == .active {
+                        try? RecentlyDeleted.purgeExpired(in: container.mainContext)
+                    }
+                }
         }
         .modelContainer(container)
         .commands {

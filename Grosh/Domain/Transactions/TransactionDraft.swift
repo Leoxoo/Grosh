@@ -59,7 +59,7 @@ struct TransactionDraft {
     struct PaymentLock {
         let wallet: Wallet?
         let category: Category?
-        /// What has been collected or repaid so far.
+        /// What has been collected or repaid so far, payments in Recently Deleted included.
         let paid: Money
         /// The amount a forgiven Loan or Debt keeps until it is un-forgiven, or `nil` when it isn't forgiven.
         var forgivenOwed: Money?
@@ -77,10 +77,13 @@ struct TransactionDraft {
         isBalanceAdjustment = transaction.isBalanceAdjustment
         cardRuleExemption = transaction.cardRuleExemption
         reminderDay = transaction.reminderDay
+        let deletedPayments = transaction.paymentsInRecentlyDeleted
         if let context = transaction.modelContext, let loanOrDebt = try? LoanOrDebt(transaction, in: context),
-           !loanOrDebt.payments.isEmpty || transaction.isForgiven || transaction.hasPaymentsInRecentlyDeleted {
+           !loanOrDebt.payments.isEmpty || transaction.isForgiven || !deletedPayments.isEmpty {
+            let deletedCents = deletedPayments.reduce(0) { $0 + abs($1.amountCents) }
             paymentLock = PaymentLock(
-                wallet: transaction.wallet, category: transaction.category, paid: loanOrDebt.paid,
+                wallet: transaction.wallet, category: transaction.category,
+                paid: Money(cents: loanOrDebt.paid.cents + deletedCents, currencyCode: loanOrDebt.paid.currencyCode),
                 forgivenOwed: transaction.isForgiven ? loanOrDebt.owed : nil
             )
         }

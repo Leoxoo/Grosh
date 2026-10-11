@@ -20,12 +20,13 @@ struct RecentlyDeletedView: View {
             if !bin.wallets.isEmpty {
                 Section {
                     ForEach(bin.wallets) { wallet in
+                        let deletedWithIt = wallet.transactionsDeletedWithIt
                         DisclosureGroup {
-                            ForEach(wallet.transactionsDeletedWithIt) { transaction in
+                            ForEach(deletedWithIt) { transaction in
                                 TransactionRow(transaction: transaction, showsDay: true)
                             }
                         } label: {
-                            DeletedWalletRow(wallet: wallet, now: now)
+                            DeletedWalletRow(wallet: wallet, transactionCount: deletedWithIt.count, now: now)
                                 .swipeActions(edge: .trailing) {
                                     Button("Delete Forever", systemImage: "trash", role: .destructive) {
                                         pendingRemoval = .wallet(wallet)
@@ -176,6 +177,8 @@ private enum PendingRemoval {
 /// A deleted wallet: its icon and name, how many transactions went with it, and the days it has left.
 private struct DeletedWalletRow: View {
     let wallet: Wallet
+    /// How many transactions were deleted with it.
+    let transactionCount: Int
     let now: Date
 
     var body: some View {
@@ -184,7 +187,7 @@ private struct DeletedWalletRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(wallet.name)
                     .lineLimit(1)
-                Text(transactionCount)
+                Text(transactionSummary)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -194,11 +197,10 @@ private struct DeletedWalletRow: View {
         .accessibilityElement(children: .combine)
     }
 
-    private var transactionCount: String {
-        let count = wallet.transactionsDeletedWithIt.count
-        return count == 1
+    private var transactionSummary: String {
+        transactionCount == 1
             ? String(localized: "1 transaction")
-            : String(localized: "\(count) transactions")
+            : String(localized: "\(transactionCount) transactions")
     }
 }
 

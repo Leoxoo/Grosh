@@ -61,13 +61,14 @@ struct Forgiveness {
 extension Forgiveness {
     /// Marks the draft's Loan or Debt forgiven on its day: whatever is still outstanding, under the draft's category
     /// and with its note. Nothing is outstanding after, so it counts as settled. No transaction is added and no
-    /// balance changes. Saves.
+    /// balance changes. Forgiving again what became outstanding after a payment was deleted adds it to what was
+    /// forgiven, now dated and filed as this draft says. Saves.
     @discardableResult
     static func record(_ draft: ForgiveDraft, in context: ModelContext) throws -> Forgiveness {
         try draft.loanOrDebt.settle(in: context, check: draft.validate(against:)) { current in
             guard let category = draft.category else { throw TransactionRuleError.missingCategory }
             let original = current.original
-            original.forgivenCents = current.outstanding.cents
+            original.forgivenCents = (original.forgivenCents ?? 0) + current.outstanding.cents
             original.forgivenDay = draft.day
             original.forgivenNote = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
             original.forgivenCategory = category

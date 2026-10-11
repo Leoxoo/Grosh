@@ -107,6 +107,8 @@ nonisolated enum RecentlyDeletedError: Error, Equatable {
     case walletIsDeleted
     /// A transaction deleted with its wallet is restored or removed with it.
     case deletedWithWallet
+    /// A payment whose Loan or Debt was forgiven since it was deleted would be counted twice: un-forgive it first.
+    case loanOrDebtIsForgiven
 }
 
 extension RecentlyDeletedError: LocalizedError {
@@ -115,6 +117,7 @@ extension RecentlyDeletedError: LocalizedError {
         case .notDeleted: String(localized: "It isn't in Recently Deleted.")
         case .walletIsDeleted: String(localized: "Its wallet is in Recently Deleted. Restore the wallet first.")
         case .deletedWithWallet: String(localized: "It was deleted with its wallet. Restore or delete the wallet instead.")
+        case .loanOrDebtIsForgiven: String(localized: "Its Loan or Debt was forgiven since. Un-forgive it first.")
         }
     }
 }
@@ -174,28 +177,40 @@ extension Transaction {
     /// Whether the transaction is in Recently Deleted.
     var isInRecentlyDeleted: Bool { deletedAt != nil }
 
-    /// Why this transaction in Recently Deleted can't be restored or removed on its own, or `nil` when it can.
+    /// Why this transaction in Recently Deleted can't be restored on its own, or `nil` when it can.
     var restoreBlocker: RecentlyDeletedError? {
         guard isInRecentlyDeleted else { return .notDeleted }
         if deletedWithWallet { return .deletedWithWallet }
         if wallet?.isInRecentlyDeleted == true { return .walletIsDeleted }
+        if paysForgivenLoanOrDebt { return .loanOrDebtIsForgiven }
         return nil
     }
 
+    /// Whether this is a Debt Collection or Repayment linked to a Loan or Debt that is forgiven.
+    private var paysForgivenLoanOrDebt: Bool {
+        let role = category?.lockedRole
+        guard role == .debtCollection || role == .repayment, let link = linkID, let context = modelContext else {
+            return false
+        }
+        let linked = FetchDescriptor<Transaction>(predicate: #Predicate { $0.linkID == link && $0.deletedAt == nil })
+        return ((try? context.fetch(linked)) ?? []).contains { $0.isForgiven && $0.loanOrDebtKind?.paymentRole == role }
+    }
+
     /// Brings a transaction deleted on its own back from Recently Deleted, linked as before. One deleted with its
-    /// wallet comes back only with the wallet, and one whose wallet is in the bin waits for the wallet. Saves.
+    /// wallet comes back only with the wallet, one whose wallet is in the bin waits for the wallet, and a payment
+    /// whose Loan or Debt was forgiven since waits for it to be un-forgiven. Saves.
     func restore() throws {
         if let restoreBlocker { throw restoreBlocker }
         deletedAt = nil
         try modelContext?.save()
     }
 
-    /// Whether a payment on this Loan or Debt waits in Recently Deleted. Restoring it brings it back against this
-    /// Loan or Debt, so until then the payment still holds its wallet and category in place.
-    var hasPaymentsInRecentlyDeleted: Bool {
-        guard let kind = loanOrDebtKind, let link = linkID, let context = modelContext else { return false }
+    /// The payments on this Loan or Debt waiting in Recently Deleted. Restoring one brings it back against this Loan
+    /// or Debt, so until then they still hold its wallet, category and lowest amount in place.
+    var paymentsInRecentlyDeleted: [Transaction] {
+        guard let kind = loanOrDebtKind, let link = linkID, let context = modelContext else { return [] }
         let deleted = FetchDescriptor<Transaction>(predicate: #Predicate { $0.linkID == link && $0.deletedAt != nil })
-        return ((try? context.fetch(deleted)) ?? []).contains { $0.category?.lockedRole == kind.paymentRole }
+        return ((try? context.fetch(deleted)) ?? []).filter { $0.category?.lockedRole == kind.paymentRole }
     }
 
     /// Delete Forever: removes a transaction deleted on its own for good. Saves.

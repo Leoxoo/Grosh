@@ -43,11 +43,12 @@ struct LoanOrDebt {
     /// The Forgiven mark, once the rest was forgiven.
     var forgiveness: Forgiveness? { original.forgiveness }
 
-    /// How much has not yet been collected or repaid: the original minus its payments, never below zero. Nothing once
-    /// forgiven.
+    /// How much has not yet been collected, repaid or forgiven: the original minus its payments and what was forgiven,
+    /// never below zero. Nothing once the rest was forgiven, unless a payment was deleted since: that part is
+    /// outstanding again.
     var outstanding: Money {
-        let cents = original.isForgiven ? 0 : max(0, owed.cents - paid.cents)
-        return Money(cents: cents, currencyCode: original.amount.currencyCode)
+        let forgiven = original.forgivenCents ?? 0
+        return Money(cents: max(0, owed.cents - paid.cents - forgiven), currencyCode: original.amount.currencyCode)
     }
 
     /// Nothing is outstanding: paid in full, or forgiven.

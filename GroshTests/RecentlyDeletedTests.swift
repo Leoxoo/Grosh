@@ -117,8 +117,30 @@ struct RecentlyDeletedTests {
 
         var smaller = TransactionDraft(editing: loan)
         smaller.amount = Money(cents: 10_00)
-        try loan.update(with: smaller)
-        #expect(loan.amountCents == -10_00)
+        #expect(throws: DebtLoanRuleError.amountBelowPaid) { try loan.update(with: smaller) }
+        #expect(loan.amountCents == -100_00)
+    }
+
+    @Test func aPaymentCantBeRestoredOntoALoanForgivenSinceItWasDeleted() throws {
+        try CategorySeeder.seedIfNeeded(in: context)
+        var lend = TransactionDraft(type: .debtLoan, day: today)
+        lend.wallet = checking
+        lend.amount = Money(cents: 100_00)
+        lend.category = try context.lockedCategory(.loan)
+        lend.withName = "Pasha"
+        let loan = try Transaction.create(lend, in: context)
+        var payment = try DebtPaymentDraft(settling: loan, on: today, in: context)
+        payment.amount = Money(cents: 60_00)
+        let collection = try DebtPayment.record(payment, in: context).payment
+        try collection.delete(.onlySelected, in: context, at: deletedAt)
+        try Forgiveness.record(try ForgiveDraft(forgiving: loan, on: today, in: context), in: context)
+
+        #expect(collection.restoreBlocker == .loanOrDebtIsForgiven)
+        #expect(throws: RecentlyDeletedError.loanOrDebtIsForgiven) { try collection.restore() }
+
+        try loan.unforgive()
+        try collection.restore()
+        #expect(try #require(try LoanOrDebt(loan, in: context)).outstanding == Money(cents: 40_00))
     }
 
     // MARK: Deleting a wallet

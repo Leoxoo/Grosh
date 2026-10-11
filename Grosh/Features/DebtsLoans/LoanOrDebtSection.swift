@@ -37,13 +37,14 @@ struct LoanOrDebtSection: View {
                 if let forgiveness = loanOrDebt.forgiveness {
                     ForgivenRows(forgiveness: forgiveness)
                     Button("Un-forgive", systemImage: "arrow.uturn.backward") { unforgive() }
-                } else if loanOrDebt.isSettled {
-                    Label("Settled", systemImage: "checkmark.seal.fill")
-                        .foregroundStyle(.green)
-                } else {
+                }
+                if !loanOrDebt.isSettled {
                     Button("Record Payment", systemImage: "plus.circle") { action = .recordPayment }
                     Button("Forgive the Rest", systemImage: "hand.raised") { action = .forgive }
                     ReminderField(day: reminderDay)
+                } else if loanOrDebt.forgiveness == nil {
+                    Label("Settled", systemImage: "checkmark.seal.fill")
+                        .foregroundStyle(.green)
                 }
             } header: {
                 Text(loanOrDebt.kind.name)

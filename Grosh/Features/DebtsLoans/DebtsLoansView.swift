@@ -75,7 +75,7 @@ struct LoanOrDebtRow: View {
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
-                if loanOrDebt.forgiveness != nil {
+                if loanOrDebt.isSettled, loanOrDebt.forgiveness != nil {
                     Text(loanOrDebt.owed.formatted())
                         .monospacedDigit()
                         .foregroundStyle(.secondary)

@@ -296,6 +296,25 @@ struct DebtLoanTests {
         #expect(try isSettled(loan))
     }
 
+    @Test func deletingAPaymentOnAForgivenLoanMakesThatPartOutstandingAgain() throws {
+        let loan = try lend(100_00)
+        let collection = try pay(60_00, on: loan).payment
+        var draft = try ForgiveDraft(forgiving: loan, on: paidOn, in: context)
+        draft.category = try context.lockedCategory(.otherExpense)
+        try Forgiveness.record(draft, in: context)
+
+        try collection.delete(.onlySelected, in: context)
+
+        #expect(try outstanding(loan) == Money(cents: 60_00))
+        #expect(loan.forgiveness?.amount == Money(cents: 40_00))
+
+        var again = try ForgiveDraft(forgiving: loan, on: paidOn.adding(days: 1), in: context)
+        again.category = try context.lockedCategory(.otherExpense)
+        try Forgiveness.record(again, in: context)
+        #expect(try isSettled(loan))
+        #expect(loan.forgiveness?.amount == Money(cents: 100_00))
+    }
+
     @Test(arguments: [(LockedRole.loan, LockedRole.otherExpense), (.debt, .otherIncome)])
     func whatIsForgivenIsOtherExpenseOrOtherIncomeUnlessAnotherCategoryIsPicked(
         role: LockedRole, expected: LockedRole

@@ -187,15 +187,16 @@ private struct Importer {
 
     /// Marks `transaction`, a Loan or Debt, forgiven as a Grosh export's `Forgiven` columns say, under the category
     /// they name for the forgiven amount (an Expense for a Loan, an Income for a Debt), or Other Expense or Other
-    /// Income when they name none. Doesn't save.
+    /// Income when they name none or only a category of another type. Doesn't save.
     private func markForgiven(
         _ transaction: Transaction, as forgiven: MoneyLoverRow.Forgiven, kind: LoanOrDebtKind,
         categories filer: inout CategoryFiler
     ) throws {
         let sign = kind.forgivenType == .expense ? -1 : 1
-        let category = try forgiven.categoryName.isEmpty
-            ? context.otherCategory(kind.forgivenType)
-            : filer.findOrAdd(named: forgiven.categoryName, for: Money(cents: sign))
+        let named = try forgiven.categoryName.isEmpty
+            ? nil : filer.findOrAdd(named: forgiven.categoryName, for: Money(cents: sign))
+        let category = try named.flatMap { $0.type == kind.forgivenType ? $0 : nil }
+            ?? context.otherCategory(kind.forgivenType)
         transaction.forgivenCents = forgiven.amount.cents
         transaction.forgivenDay = forgiven.day
         transaction.forgivenNote = forgiven.note.trimmingCharacters(in: .whitespacesAndNewlines)
