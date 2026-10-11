@@ -1,0 +1,42 @@
+import Foundation
+
+/// A Scheduled row: an occurrence of a Recurring transaction that is still to come, which Future lists beside its
+/// transactions (ADR-0005). It is computed from the schedule and never stored. It is not a Transaction, so it counts in
+/// no balance, Total, report or search result.
+struct ScheduledOccurrence: Identifiable, Hashable {
+    let recurring: RecurringTransaction
+    /// The due day, after today.
+    let day: CalendarDay
+
+    var id: Self { self }
+
+    /// What the occurrence will add to or take from its wallet, signed by its category.
+    var amount: Money { recurring.signedAmount }
+}
+
+extension RecurringTransaction {
+    /// The days Future lists this schedule's Scheduled rows on, as seen from `today`: the next twelve after today that
+    /// haven't been dealt with, and none beyond a year ahead. A schedule whose wallet is archived or in Recently
+    /// Deleted lists none.
+    // TODO(#39): a schedule paused or deleted in its own right should list none too, once #39 adds that state here.
+    func scheduledDays(today: CalendarDay) -> [CalendarDay] {
+        guard let wallet, !wallet.isArchived, wallet.deletedAt == nil else { return [] }
+        // Occurrences up to `handledThrough` are transactions already, or were skipped when the schedule was saved.
+        let dealtWith = handledThrough.map { max($0, today) } ?? today
+        return Array(schedule.occurrences(after: dealtWith, through: today.adding(days: 365)).prefix(12))
+    }
+}
+
+extension Sequence where Element == RecurringTransaction {
+    /// The Scheduled rows Future lists on `today` for the schedules paid from `selection`'s wallets: newest day first
+    /// and, within a day, the most recently added schedule first, as the transactions on a day are listed.
+    func scheduledOccurrences(selection: WalletSelection, today: CalendarDay) -> [ScheduledOccurrence] {
+        filter { selection.includesWallet($0.wallet) }
+            .flatMap { recurring in
+                recurring.scheduledDays(today: today).map { ScheduledOccurrence(recurring: recurring, day: $0) }
+            }
+            .sorted { lhs, rhs in
+                lhs.day == rhs.day ? lhs.recurring.createdAt > rhs.recurring.createdAt : lhs.day > rhs.day
+            }
+    }
+}

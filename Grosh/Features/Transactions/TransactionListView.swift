@@ -2,14 +2,16 @@ import SwiftData
 import SwiftUI
 
 /// The Transactions tab's list: the wallet selector and its balance, the period strip, the period's Opening and
-/// Ending balances, then its transactions by day, newest first, or by category. The "…" menu picks the time range
-/// and the grouping, and selects transactions to delete. Search and the filters narrow what is listed: grouped,
-/// selected and summed are the matching transactions only.
+/// Ending balances, then its transactions by day, newest first, or by category. Future also lists the Scheduled rows
+/// of Recurring transactions still to come, by day. The "…" menu picks the time range and the grouping, and selects
+/// transactions to delete. Search and the filters narrow what is listed: grouped, selected and summed are the
+/// matching transactions only.
 struct TransactionListView: View {
     /// The transaction whose detail is showing.
     @Binding var selectedTransaction: Transaction?
 
     @Query(Transaction.notDeleted) private var transactions: [Transaction]
+    @Query private var recurringTransactions: [RecurringTransaction]
     @State private var walletSelection = WalletSelection.total
     /// How long each period in the strip is, chosen in the "…" menu.
     @State private var timeRange = TimeRange.month
@@ -40,6 +42,10 @@ struct TransactionListView: View {
         let periods = strip(for: selected)
         let shownDays = period.days(today: today)
         let shown = filter.listed(from: transactions, selection: walletSelection, on: shownDays)
+        // Future's Scheduled rows are listed by day, and only while nothing is searched, filtered or being selected.
+        let scheduled: [ScheduledOccurrence] = period == .future && grouping == .day && !filter.isOn && !isSelecting
+            ? recurringTransactions.scheduledOccurrences(selection: walletSelection, today: today)
+            : []
 
         list {
             Section {
@@ -56,7 +62,7 @@ struct TransactionListView: View {
                 Section {
                     NoMatchingTransactionsView(filter: filter)
                 }
-            } else if shown.isEmpty {
+            } else if shown.isEmpty && scheduled.isEmpty {
                 Section {
                     ContentUnavailableView(
                         "No Transactions",
@@ -70,7 +76,7 @@ struct TransactionListView: View {
 
             switch grouping {
             case .day:
-                TransactionDaySections(transactions: shown) { row($0) }
+                TransactionDaySections(transactions: shown, scheduled: scheduled) { row($0) }
             case .category:
                 ForEach(TransactionCategoryGroup.groups(of: shown)) { group in
                     Section {
