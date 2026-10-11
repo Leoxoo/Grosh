@@ -5,7 +5,7 @@ import SwiftData
 nonisolated enum RecurringRuleError: Error, Equatable {
     case missingName
     case missingWallet
-    /// The amount must be above zero; the category sets the sign.
+    /// The amount must be above zero, unless a varying Bill has an estimate to start from. The category sets the sign.
     case missingAmount
     case missingCategory
     /// A Card is only offered on its paying wallet's transactions, so it must be paid from the wallet chosen.
@@ -87,6 +87,9 @@ struct RecurringDraft {
     var amountVaries = false
     /// For a varying Bill, how many days after an occurrence the user is reminded to enter its real amount.
     var remindAfterDays = 2
+    /// The average a varying Bill's transactions would start at, from its category's history. It stands in for an
+    /// amount left empty. The form sets it, and it is never saved.
+    var estimateCents: Int?
     var note = ""
     /// A Subscription's cropped icon, as JPEG data. It is kept while the Kind is something else, as on the model.
     var iconData: Data?
@@ -188,7 +191,9 @@ struct RecurringDraft {
     func validate() throws {
         guard !trimmedName.isEmpty else { throw RecurringRuleError.missingName }
         guard wallet != nil else { throw RecurringRuleError.missingWallet }
-        guard amount.cents > 0 else { throw RecurringRuleError.missingAmount }
+        // A varying Bill may leave its amount empty when there is an estimate to start its transactions from.
+        let startsFromEstimate = kind == .bill && amountVaries && estimateCents != nil
+        guard amount.cents > 0 || startsFromEstimate else { throw RecurringRuleError.missingAmount }
         guard category != nil else { throw RecurringRuleError.missingCategory }
         guard card == nil || card?.payingWallet === wallet else { throw RecurringRuleError.cardNotInWallet }
         switch end {
