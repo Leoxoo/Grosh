@@ -295,13 +295,44 @@ struct RecurringTransactionTests {
         #expect(transaction.estimateReminderDay == day(2026, 10, 11))
     }
 
-    @Test func addingATransactionNowToAPausedScheduleMakesNothing() throws {
+    @Test func addingATransactionNowToAPausedScheduleIsRefused() throws {
         let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 10, 12)), today: today, in: context)
         store.wallet.isArchived = true
 
-        try recurring.addTransactionNow(today: today, in: context)
-
+        #expect(throws: AddTransactionNowError.inactive) {
+            try recurring.addTransactionNow(today: today, in: context)
+        }
         #expect(recurring.attachedTransactions.isEmpty)
+    }
+
+    /// A schedule without a wallet or a category has nothing to make a transaction with, so Add refuses.
+    @Test func addingATransactionNowNeedsAWalletAndACategory() throws {
+        let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 10, 12)), today: today, in: context)
+
+        recurring.category = nil
+        #expect(!recurring.canAddTransactionNow)
+        #expect(throws: AddTransactionNowError.incomplete) {
+            try recurring.addTransactionNow(today: today, in: context)
+        }
+
+        recurring.category = category("Subscriptions", .expense)
+        recurring.wallet = nil
+        #expect(!recurring.canAddTransactionNow)
+        #expect(throws: AddTransactionNowError.incomplete) {
+            try recurring.addTransactionNow(today: today, in: context)
+        }
+        #expect(recurring.attachedTransactions.isEmpty)
+    }
+
+    /// Add the Transaction consumes or skips no occurrence, as the issue asks, so a schedule due that day still
+    /// makes its own payment, and the day shows two. Whether it should count once is open.
+    @Test func addingOnADueDayLeavesThatDaysOccurrenceToBeMade() throws {
+        let recurring = try RecurringTransaction.create(netflix(starting: today), today: day(2026, 10, 8), in: context)
+
+        try recurring.addTransactionNow(today: today, in: context)
+        try RecurringTransaction.catchUp(through: today, in: context)
+
+        #expect(recurring.attachedTransactions.map(\.day) == [today, today])
     }
 
     /// Duplicate copies every field and the Kind's settings, and starts today with none of the transactions attached.

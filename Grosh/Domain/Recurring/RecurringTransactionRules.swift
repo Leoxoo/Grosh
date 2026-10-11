@@ -30,6 +30,23 @@ extension RecurringRuleError: LocalizedError {
     }
 }
 
+/// Why a Recurring transaction can't make one now, with Add the Transaction.
+nonisolated enum AddTransactionNowError: Error, Equatable {
+    /// A paused or deleted schedule makes nothing.
+    case inactive
+    /// A transaction needs a wallet and a category, which the schedule can lose when they are deleted.
+    case incomplete
+}
+
+extension AddTransactionNowError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .inactive: String(localized: "A paused or deleted recurring transaction can't add a transaction.")
+        case .incomplete: String(localized: "Choose a wallet and a category in Edit first.")
+        }
+    }
+}
+
 /// The editable fields of a Recurring transaction, as its form holds them before the rules check and save them.
 struct RecurringDraft {
     var name = ""
@@ -292,11 +309,16 @@ extension RecurringTransaction {
         try context.save()
     }
 
+    /// Whether Add the Transaction can make one now: the schedule is neither paused nor deleted, and has a wallet and a
+    /// category to make it with.
+    var canAddTransactionNow: Bool { isActive && wallet != nil && category != nil }
+
     /// Makes one transaction now, dated `today`, from the schedule's values, and attaches it. Unlike an occurrence it
-    /// consumes or skips nothing: the next occurrence still falls on its day. Nothing is made while the schedule is paused
-    /// or deleted. Saves.
+    /// consumes or skips nothing: the next occurrence still falls on its day. Throws rather than saving nothing when the
+    /// schedule is paused or deleted, or has no wallet or category. Saves.
     func addTransactionNow(today: CalendarDay = .today, in context: ModelContext) throws {
-        guard isActive else { return }
+        guard isActive else { throw AddTransactionNowError.inactive }
+        guard wallet != nil, category != nil else { throw AddTransactionNowError.incomplete }
         makeTransaction(on: today, history: estimateHistory(in: context), in: context)
         try context.save()
     }
