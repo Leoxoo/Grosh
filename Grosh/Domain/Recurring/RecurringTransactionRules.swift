@@ -55,6 +55,11 @@ struct RecurringDraft {
     var card: Card?
     /// The sort of Recurring transaction it is. A new one starts with its category's default Kind.
     var kind: RecurringKind = .regular
+    /// Only a Bill's amount can vary: each transaction it makes then starts as an estimate, until the real amount is
+    /// entered.
+    var amountVaries = false
+    /// For a varying Bill, how many days after an occurrence the user is reminded to enter its real amount.
+    var remindAfterDays = 2
     var note = ""
     /// A Subscription's cropped icon, as JPEG data. It is kept while the Kind is something else, as on the model.
     var iconData: Data?
@@ -103,6 +108,8 @@ struct RecurringDraft {
         category = recurring.category
         card = recurring.card
         kind = recurring.kind
+        amountVaries = recurring.amountVaries
+        remindAfterDays = recurring.remindAfterDays
         note = recurring.note
         iconData = recurring.iconData
         preset = RepeatPreset(rule: schedule.rule)
@@ -202,21 +209,31 @@ extension RecurringTransaction {
     func makeDueTransactions(through today: CalendarDay, in context: ModelContext) {
         guard isActive, wallet != nil, category != nil else { return }
         let due = schedule.occurrences(after: handledThrough, through: today)
+        let history = estimateHistory(in: context)
         for day in due {
-            makeTransaction(on: day, in: context)
+            makeTransaction(on: day, history: history, in: context)
         }
         if let last = due.last {
             handledThrough = last
         }
     }
 
-    /// Makes the transaction for the occurrence on `day`, attached to this schedule, and inserts it. Nothing is made
-    /// without a wallet and a category, which the schedule can lose when they are deleted.
+    /// The transactions a varying Bill's estimate is averaged over, read once per run. Other Kinds read nothing.
+    private func estimateHistory(in context: ModelContext) -> [Transaction] {
+        estimatesAmount ? ((try? context.fetch(FetchDescriptor<Transaction>())) ?? []) : []
+    }
+
+    /// Makes the transaction for the occurrence on `day`, attached to this schedule, and inserts it. A Bill whose amount
+    /// varies starts Estimated, at the average of `history`. Nothing is made without a wallet and a category, which the
+    /// schedule can lose when they are deleted.
     @discardableResult
-    func makeTransaction(on day: CalendarDay, in context: ModelContext) -> Transaction? {
+    func makeTransaction(on day: CalendarDay, history: [Transaction], in context: ModelContext) -> Transaction? {
         guard let wallet = self.wallet, let category = self.category else { return nil }
+        let estimate = estimatesAmount
+            ? AmountEstimate.cents(among: history, for: category, currencyCode: wallet.currencyCode)
+            : nil
         let transaction = Transaction(
-            amount: Money(cents: amountCents * category.sign, currencyCode: wallet.currencyCode),
+            amount: Money(cents: (estimate ?? amountCents) * category.sign, currencyCode: wallet.currencyCode),
             day: day,
             wallet: wallet,
             category: category,
@@ -224,6 +241,10 @@ extension RecurringTransaction {
             note: note
         )
         transaction.recurring = self
+        if estimatesAmount {
+            transaction.isEstimated = true
+            transaction.estimateReminderDay = day.adding(days: remindAfterDays)
+        }
         context.insert(transaction)
         return transaction
     }
@@ -239,8 +260,9 @@ extension RecurringTransaction {
     /// Makes a transaction on each of `days`, the occurrences the user picked from the start-date prompt, and saves.
     /// Nothing is made for an empty list.
     func makeTransactions(on days: [CalendarDay], in context: ModelContext) throws {
+        let history = estimateHistory(in: context)
         for day in days {
-            makeTransaction(on: day, in: context)
+            makeTransaction(on: day, history: history, in: context)
         }
         try context.save()
     }
@@ -284,6 +306,8 @@ extension RecurringTransaction {
         card = draft.card
         kind = draft.kind
         iconData = draft.iconData
+        amountVaries = draft.amountVaries
+        remindAfterDays = draft.remindAfterDays
         schedule = draft.schedule
     }
 }

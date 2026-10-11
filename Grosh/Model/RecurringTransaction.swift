@@ -13,6 +13,11 @@ final class RecurringTransaction {
     /// The ``RecurringKind``'s raw value. A schedule starts with its category's default Kind and keeps it, whatever
     /// that default later becomes.
     var kindRaw: String = RecurringKind.regular.rawValue
+    /// Whether a Bill's amount varies: each transaction it makes starts as an estimate, until the user enters the real
+    /// amount. Only a Bill's does, see ``estimatesAmount``.
+    var amountVaries: Bool = false
+    /// For a varying Bill, how many days after an occurrence the user is reminded to enter its real amount.
+    var remindAfterDays: Int = 2
     /// The first occurrence's ``CalendarDay`` as `yyyymmdd`.
     var startDayRaw: Int = 0
     /// The ``RepeatUnit``'s raw value.
@@ -104,6 +109,9 @@ final class RecurringTransaction {
     var subscriptionIcon: Data? {
         kind == .subscription ? iconData : nil
     }
+
+    /// Whether each transaction it makes starts Estimated: a Bill whose amount varies.
+    var estimatesAmount: Bool { kind == .bill && amountVaries }
 
     /// The last due day dealt with, or `nil` before any has been.
     var handledThrough: CalendarDay? {

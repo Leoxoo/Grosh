@@ -202,6 +202,7 @@ private final class RecordingReminderScheduler: ReminderScheduler {
     enum Call: Equatable {
         case requestPermission
         case replacePendingReminders([DebtReminder])
+        case replacePendingEstimateReminders([EstimateReminder])
     }
 
     private(set) var calls: [Call] = []
@@ -213,5 +214,9 @@ private final class RecordingReminderScheduler: ReminderScheduler {
 
     func replacePendingReminders(with reminders: [DebtReminder]) async {
         calls.append(.replacePendingReminders(reminders))
+    }
+
+    func replacePendingEstimateReminders(with reminders: [EstimateReminder]) async {
+        calls.append(.replacePendingEstimateReminders(reminders))
     }
 }

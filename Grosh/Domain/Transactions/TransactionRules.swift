@@ -17,7 +17,12 @@ extension Transaction {
     /// breaks a transaction rule.
     func update(with draft: TransactionDraft) throws {
         try draft.validate()
+        // Editing the amount confirms an Estimated transaction. Only the amount's size counts, not its direction.
+        let amountChanged = abs(amountCents) != draft.amount.cents
         apply(draft)
+        if amountChanged {
+            clearEstimate()
+        }
         try modelContext?.save()
     }
 

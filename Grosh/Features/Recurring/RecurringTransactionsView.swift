@@ -84,8 +84,13 @@ struct RecurringTransactionRow: View {
         HStack(spacing: 12) {
             CategoryIcon(category: recurring.category, subscriptionIcon: recurring.subscriptionIcon)
             VStack(alignment: .leading, spacing: 2) {
-                Text(recurring.name)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(recurring.name)
+                        .lineLimit(1)
+                    if recurring.estimatesAmount {
+                        EstimatedBadge()
+                    }
+                }
                 Text(detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)

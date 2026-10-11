@@ -12,6 +12,7 @@ struct TransactionDetailView: View {
     /// The editor Edit opened, while it is open.
     @State private var editing: TransactionEditFlow?
     @State private var isDuplicating = false
+    @State private var isEnteringAmount = false
     /// What the Loan or Debt section opened, while it is open.
     @State private var loanOrDebtAction: LoanOrDebtAction?
 
@@ -37,6 +38,9 @@ struct TransactionDetailView: View {
         .sheet(isPresented: $isDuplicating) {
             TransactionEditor(mode: .duplicate(transaction))
         }
+        .sheet(isPresented: $isEnteringAmount) {
+            EstimatedAmountEditor(transaction: transaction)
+        }
         .loanOrDebtSheets(for: transaction, action: $loanOrDebtAction)
     }
 
@@ -49,6 +53,16 @@ struct TransactionDetailView: View {
             if transaction.isExcludedFromReport {
                 Section {
                     ExcludedFromReportBanner()
+                }
+            }
+
+            if transaction.isEstimated {
+                Section {
+                    Button("Enter Amount", systemImage: "checkmark.circle") {
+                        isEnteringAmount = true
+                    }
+                } footer: {
+                    Text("This amount is the average of recent transactions in its category. Enter the real amount to confirm it.")
                 }
             }
 
