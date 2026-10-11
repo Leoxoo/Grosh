@@ -2,28 +2,39 @@ import SwiftData
 import SwiftUI
 
 /// Picks an existing transaction to attach to a Recurring transaction: any transaction in any wallet, outside Recently
-/// Deleted and not held by another Recurring transaction, newest first. Tapping one attaches it and closes the picker.
+/// Deleted and not held by another Recurring transaction, newest first. The filters open on the schedule's wallet and
+/// category, and the user can change or clear them. Tapping one attaches it and closes the picker.
 struct LinkExistingTransactionView: View {
     let recurring: RecurringTransaction
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query(Transaction.notDeleted) private var transactions: [Transaction]
+    @State private var filter: TransactionFilter
     @State private var errorMessage: String?
 
+    init(recurring: RecurringTransaction) {
+        self.recurring = recurring
+        _filter = State(initialValue: recurring.linkPickerFilter)
+    }
+
     private var candidates: [Transaction] {
-        transactions.filter(\.isAttachable).sorted(by: Transaction.newestFirst)
+        transactions.filter(\.isAttachable).matching(filter).sorted(by: Transaction.newestFirst)
     }
 
     var body: some View {
         NavigationStack {
             Group {
                 if candidates.isEmpty {
-                    ContentUnavailableView(
-                        "No Transactions to Link",
-                        systemImage: "tray",
-                        description: Text("Transactions that aren't attached to a Recurring transaction appear here.")
-                    )
+                    if filter.isOn {
+                        NoMatchingTransactionsView(filter: filter)
+                    } else {
+                        ContentUnavailableView(
+                            "No Transactions to Link",
+                            systemImage: "tray",
+                            description: Text("Transactions that no Recurring transaction holds appear here.")
+                        )
+                    }
                 } else {
                     List(candidates) { transaction in
                         Button {
@@ -39,9 +50,13 @@ struct LinkExistingTransactionView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            .searchable(text: $filter.searchText, prompt: "Note, category or amount")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    TransactionFilterButton(filter: $filter)
                 }
             }
             .errorAlert("Couldn't Link Transaction", message: $errorMessage)
