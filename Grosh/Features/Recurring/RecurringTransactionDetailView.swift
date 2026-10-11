@@ -1,9 +1,10 @@
 import SwiftData
 import SwiftUI
 
-/// One Recurring transaction: what it is, when it next falls due, and the transactions it has made. A transaction
-/// opens in the normal editor. Edit changes only what is still to come. Delete removes the schedule and keeps what
-/// it made.
+/// One Recurring transaction: what it is, when it next falls due, and the transactions it has made or the user has
+/// attached. A transaction opens in the normal editor. Link existing attaches one from any wallet, and Unlink detaches
+/// it without deleting it. Edit changes only what is still to come. Delete removes the schedule and keeps what it
+/// holds.
 struct RecurringTransactionDetailView: View {
     let recurring: RecurringTransaction
 
@@ -11,6 +12,7 @@ struct RecurringTransactionDetailView: View {
     @Environment(\.modelContext) private var context
     @State private var isEditing = false
     @State private var editingTransaction: Transaction?
+    @State private var isLinking = false
     @State private var isConfirmingDelete = false
     @State private var errorMessage: String?
 
@@ -68,6 +70,9 @@ struct RecurringTransactionDetailView: View {
             }
 
             Section {
+                Button("Link existing", systemImage: "link") {
+                    isLinking = true
+                }
                 ForEach(recurring.attachedTransactions) { transaction in
                     Button {
                         editingTransaction = transaction
@@ -75,6 +80,12 @@ struct RecurringTransactionDetailView: View {
                         TransactionRow(transaction: transaction, showsDay: true)
                     }
                     .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing) {
+                        Button("Unlink") { unlink(transaction) }
+                    }
+                    .contextMenu {
+                        Button("Unlink") { unlink(transaction) }
+                    }
                 }
             } header: {
                 Text("Transactions")
@@ -103,6 +114,9 @@ struct RecurringTransactionDetailView: View {
         .sheet(item: $editingTransaction) { transaction in
             TransactionEditor(mode: .edit(transaction))
         }
+        .sheet(isPresented: $isLinking) {
+            LinkExistingTransactionView(recurring: recurring)
+        }
         .confirmationDialog(
             "Delete this recurring transaction?",
             isPresented: $isConfirmingDelete,
@@ -111,15 +125,23 @@ struct RecurringTransactionDetailView: View {
             Button("Delete Recurring Transaction", role: .destructive) { delete() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The transactions it made stay in your wallets.")
+            Text("The transactions it made or that are attached stay in your wallets.")
         }
-        .errorAlert("Couldn't Delete Recurring Transaction", message: $errorMessage)
+        .errorAlert("Couldn't Change Recurring Transaction", message: $errorMessage)
     }
 
     private func delete() {
         do {
             try recurring.delete(in: context)
             dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func unlink(_ transaction: Transaction) {
+        do {
+            try recurring.unlink(transaction, in: context)
         } catch {
             errorMessage = error.localizedDescription
         }
