@@ -89,7 +89,7 @@ struct RecurringTransactionDetailView: View {
                 Button("Add the Transaction", systemImage: "plus.circle") {
                     addTransactionNow()
                 }
-                .disabled(!recurring.isActive)
+                .disabled(!recurring.canAddTransactionNow)
                 if recurring.kind == .purchase {
                     Button("Add a payment", systemImage: "square.and.pencil") {
                         isAddingPayment = true
