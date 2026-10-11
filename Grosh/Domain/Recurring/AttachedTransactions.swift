@@ -41,4 +41,10 @@ extension RecurringTransaction {
         transaction.recurring = nil
         try context.save()
     }
+
+    /// The filter the Link Transaction picker opens with: the schedule's wallet and category, so the list starts
+    /// narrowed to what it usually pays for. Its Card is left out, so transactions paid another way still show.
+    var linkPickerFilter: TransactionFilter {
+        TransactionFilter(wallet: wallet, category: category)
+    }
 }

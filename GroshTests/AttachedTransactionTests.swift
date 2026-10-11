@@ -39,6 +39,15 @@ struct AttachedTransactionTests {
         return transaction
     }
 
+    /// A 4.99 spend on October 1 in `wallet`, filed under `category` and paid with `card` when one is given.
+    private func spent(on category: Grosh.Category?, in wallet: Wallet, card: Card? = nil) -> Transaction {
+        let transaction = Transaction(
+            amount: Money(cents: -499), day: day(2026, 10, 1), wallet: wallet, category: category, card: card
+        )
+        context.insert(transaction)
+        return transaction
+    }
+
     @Test func anAttachedTransactionIsListedAlongsideTheOnesTheScheduleMadeNewestFirst() throws {
         let recurring = try netflix(starting: day(2026, 10, 12))
         try RecurringTransaction.catchUp(through: day(2026, 10, 12), in: context)
@@ -144,6 +153,42 @@ struct AttachedTransactionTests {
         #expect(held.recurring == other)
         #expect(recurring.attachedTransactions.isEmpty)
         #expect(other.attachedTransactions == [held])
+    }
+
+    @Test func thePickerOpensNarrowedToTheSchedulesWalletAndCategoryButNotItsCard() throws {
+        let apps = Grosh.Category(name: "Apps", type: .expense, symbolName: "app", color: .purple)
+        let groceries = Grosh.Category(name: "Groceries", type: .expense, symbolName: "cart", color: .purple)
+        let chase = Card(name: "Chase", kind: .credit, payingWallet: store.wallet)
+        let savings = Wallet(name: "Savings")
+        context.insert(apps)
+        context.insert(groceries)
+        context.insert(chase)
+        context.insert(savings)
+        var draft = RecurringDraft(startDay: day(2026, 10, 12))
+        draft.name = "App subscription"
+        draft.amount = Money(cents: 499)
+        draft.wallet = store.wallet
+        draft.category = apps
+        draft.card = chase
+        let recurring = try RecurringTransaction.create(draft, today: today, in: context)
+
+        let filter = recurring.linkPickerFilter
+        #expect(filter.wallet?.persistentModelID == store.wallet.persistentModelID)
+        #expect(filter.category?.persistentModelID == apps.persistentModelID)
+        #expect(filter.card == nil)
+
+        let plain = spent(on: apps, in: store.wallet)
+        let paidWithChase = spent(on: apps, in: store.wallet, card: chase)
+        let otherCategory = spent(on: groceries, in: store.wallet)
+        let otherWallet = spent(on: apps, in: savings)
+        let transactions = [plain, paidWithChase, otherCategory, otherWallet]
+
+        let listed = transactions.matching(filter).map(\.persistentModelID)
+        #expect(listed == [plain, paidWithChase].map(\.persistentModelID))
+
+        var cleared = filter
+        cleared.clearFilters()
+        #expect(transactions.matching(cleared).count == 4)
     }
 
     @Test func deletingTheScheduleLeavesItsAttachedTransactionsAsOrdinaryOnes() throws {
