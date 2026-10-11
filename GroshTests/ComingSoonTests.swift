@@ -1,4 +1,8 @@
+#if os(macOS)
 import AppKit
+#else
+import UIKit
+#endif
 import Testing
 @testable import Grosh
 
@@ -15,6 +19,10 @@ struct ComingSoonTests {
     /// A misspelled SF Symbol name renders as a blank gap, which wouldn't look deliberate.
     @Test(arguments: ComingSoon.allCases)
     func everyPlaceholderShowsARealSymbol(_ placeholder: ComingSoon) {
+        #if os(macOS)
         #expect(NSImage(systemSymbolName: placeholder.systemImage, accessibilityDescription: nil) != nil)
+        #else
+        #expect(UIImage(systemName: placeholder.systemImage) != nil)
+        #endif
     }
 }
