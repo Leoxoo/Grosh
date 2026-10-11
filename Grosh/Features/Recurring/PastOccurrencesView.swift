@@ -2,7 +2,8 @@ import SwiftData
 import SwiftUI
 
 /// The start-date prompt: the occurrences from a schedule's start day through today, each with a plus to pick it.
-/// Picking makes nothing until Save, and Save makes only the picked days. A day left out is never made.
+/// Picking makes nothing until Save, and Save makes only the picked days. With none picked, Save makes nothing and
+/// closes, and the schedule stays as it was saved. A day left out is never made.
 struct PastOccurrencesView: View {
     let recurring: RecurringTransaction
     /// The days offered, in order.
@@ -46,7 +47,6 @@ struct PastOccurrencesView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save", action: save)
-                        .disabled(selected.isEmpty)
                 }
             }
         }

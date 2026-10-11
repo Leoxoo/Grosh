@@ -262,6 +262,17 @@ struct RecurringTransactionTests {
         #expect(recurring.attachedTransactions.map(\.amountCents) == [-1599])
     }
 
+    /// Saving the prompt with nothing picked makes no transaction, and the schedule stays saved as it was.
+    @Test func savingWithNothingPickedMakesNothingAndKeepsTheSchedule() throws {
+        let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 9, 1)), today: today, in: context)
+
+        try recurring.makeTransactions(on: [], in: context)
+
+        #expect(recurring.attachedTransactions.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Transaction>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<RecurringTransaction>()).map(\.name) == ["Netflix"])
+    }
+
     /// A schedule is not a transaction: saving one, with its past occurrences skipped, adds none to the transactions.
     @Test func aScheduleIsNotATransaction() throws {
         try RecurringTransaction.create(netflix(starting: day(2026, 9, 1)), today: today, in: context)
