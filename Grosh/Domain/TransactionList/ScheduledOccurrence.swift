@@ -16,11 +16,10 @@ struct ScheduledOccurrence: Identifiable, Hashable {
 
 extension RecurringTransaction {
     /// The days Future lists this schedule's Scheduled rows on, as seen from `today`: the next twelve after today that
-    /// haven't been dealt with, and none beyond a year ahead. A schedule whose wallet is archived or in Recently
-    /// Deleted lists none.
-    // TODO(#39): a schedule paused or deleted in its own right should list none too, once #39 adds that state here.
+    /// haven't been dealt with, and none beyond a year ahead. A schedule that isn't active lists none: one in Recently
+    /// Deleted, one paused by an archived wallet, or one whose wallet is in Recently Deleted.
     func scheduledDays(today: CalendarDay) -> [CalendarDay] {
-        guard let wallet, !wallet.isArchived, wallet.deletedAt == nil else { return [] }
+        guard isActive, let wallet, !wallet.isArchived, wallet.deletedAt == nil else { return [] }
         // Occurrences up to `handledThrough` are transactions already, or were skipped when the schedule was saved.
         let dealtWith = handledThrough.map { max($0, today) } ?? today
         return Array(schedule.occurrences(after: dealtWith, through: today.adding(days: 365)).prefix(12))

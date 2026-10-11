@@ -73,6 +73,14 @@ struct ScheduledOccurrenceTests {
         #expect(recurring.scheduledDays(today: today).isEmpty)
     }
 
+    @Test func aScheduleInRecentlyDeletedListsNoScheduledRows() throws {
+        let recurring = try makeSchedule(starting: day(2026, 10, 12), preset: .daily)
+        #expect(recurring.scheduledDays(today: today).count == 12)
+
+        try recurring.delete(today: today, in: context)
+        #expect(recurring.scheduledDays(today: today).isEmpty)
+    }
+
     @Test func theTotalListsOnlyTheWalletsCountedInIt() throws {
         let savings = Wallet(name: "Savings")
         savings.includeInTotal = false
