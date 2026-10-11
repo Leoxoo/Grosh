@@ -6,9 +6,14 @@ enum WalletSelection: Hashable {
     /// Whether `transaction` belongs to the selection. The Total holds the transactions of unarchived wallets
     /// marked "Include in total", the same wallets its balance adds up.
     func includes(_ transaction: Transaction) -> Bool {
+        includesWallet(transaction.wallet)
+    }
+
+    /// Whether a transaction or Scheduled row paid from `wallet` belongs to the selection.
+    func includesWallet(_ wallet: Wallet?) -> Bool {
         switch self {
-        case .total: transaction.wallet?.countsInTotal ?? false
-        case .wallet(let wallet): transaction.wallet == wallet
+        case .total: wallet?.countsInTotal ?? false
+        case .wallet(let selected): wallet == selected
         }
     }
 
