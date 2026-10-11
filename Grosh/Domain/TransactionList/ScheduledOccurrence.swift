@@ -7,6 +7,8 @@ struct ScheduledOccurrence: Identifiable, Hashable {
     let recurring: RecurringTransaction
     /// The due day, after today.
     let day: CalendarDay
+    /// What the occurrence adds to or takes from its wallet: the schedule's signed amount, or a varying Bill's estimate.
+    let amount: Money
 
     var id: Self { self }
 
@@ -19,9 +21,6 @@ struct ScheduledOccurrence: Identifiable, Hashable {
         hasher.combine(ObjectIdentifier(recurring))
         hasher.combine(day)
     }
-
-    /// What the occurrence will add to or take from its wallet, signed by its category.
-    var amount: Money { recurring.signedAmount }
 
     /// Whether the transaction the occurrence makes starts Estimated: a Bill whose amount varies. Its row carries the
     /// Estimated mark too.
@@ -42,11 +41,17 @@ extension RecurringTransaction {
 
 extension Sequence where Element == RecurringTransaction {
     /// The Scheduled rows Future lists on `today` for the schedules paid from `selection`'s wallets: newest day first
-    /// and, within a day, the most recently added schedule first, as the transactions on a day are listed.
-    func scheduledOccurrences(selection: WalletSelection, today: CalendarDay) -> [ScheduledOccurrence] {
+    /// and, within a day, the most recently added schedule first, as the transactions on a day are listed. `history` is
+    /// what a varying Bill's estimate is averaged over.
+    func scheduledOccurrences(
+        selection: WalletSelection, today: CalendarDay, history: [Transaction]
+    ) -> [ScheduledOccurrence] {
         filter { selection.includesWallet($0.wallet) }
-            .flatMap { recurring in
-                recurring.scheduledDays(today: today).map { ScheduledOccurrence(recurring: recurring, day: $0) }
+            .flatMap { recurring -> [ScheduledOccurrence] in
+                let amount = recurring.startingAmount(among: history)
+                return recurring.scheduledDays(today: today).map {
+                    ScheduledOccurrence(recurring: recurring, day: $0, amount: amount)
+                }
             }
             .sorted { lhs, rhs in
                 lhs.day == rhs.day ? lhs.recurring.createdAt > rhs.recurring.createdAt : lhs.day > rhs.day

@@ -265,6 +265,23 @@ extension RecurringTransaction {
         }
     }
 
+    /// The estimate a varying Bill's transactions start at now: the average ``AmountEstimate`` gives over `history`
+    /// for its category and wallet currency. `nil` for other Kinds, and when there is nothing to average. Making a
+    /// transaction and showing the schedule both use it, so what the rows show is what gets made.
+    func estimateCents(among history: [Transaction]) -> Int? {
+        guard estimatesAmount, let category = self.category, let wallet = self.wallet else { return nil }
+        return AmountEstimate.cents(among: history, for: category, currencyCode: wallet.currencyCode)
+    }
+
+    /// What each transaction it makes now is for, signed by its category: the estimate when there is one, otherwise the
+    /// typed amount. Rows show this, so a varying Bill shows the amount its transactions will hold.
+    func startingAmount(among history: [Transaction]) -> Money {
+        Money(
+            cents: (estimateCents(among: history) ?? amountCents) * (category?.sign ?? -1),
+            currencyCode: wallet?.currencyCode ?? Money.defaultCurrencyCode
+        )
+    }
+
     /// The transactions a varying Bill's estimate is averaged over, read once per run. Other Kinds read nothing.
     private func estimateHistory(in context: ModelContext) -> [Transaction] {
         estimatesAmount ? ((try? context.fetch(FetchDescriptor<Transaction>())) ?? []) : []
@@ -276,9 +293,7 @@ extension RecurringTransaction {
     @discardableResult
     func makeTransaction(on day: CalendarDay, history: [Transaction], in context: ModelContext) -> Transaction? {
         guard let wallet = self.wallet, let category = self.category else { return nil }
-        let estimate = estimatesAmount
-            ? AmountEstimate.cents(among: history, for: category, currencyCode: wallet.currencyCode)
-            : nil
+        let estimate = estimateCents(among: history)
         let transaction = Transaction(
             amount: Money(cents: (estimate ?? amountCents) * category.sign, currencyCode: wallet.currencyCode),
             day: day,

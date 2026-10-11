@@ -12,6 +12,8 @@ struct RecurringTransactionDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    /// Every transaction a varying Bill's estimate is averaged over, so the amount shown is the one it will make.
+    @Query(Transaction.notDeleted) private var transactions: [Transaction]
     @State private var isEditing = false
     @State private var isDuplicating = false
     @State private var editingTransaction: Transaction?
@@ -40,7 +42,12 @@ struct RecurringTransactionDetailView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(recurring.name)
                             .font(.title3.weight(.semibold))
-                        AmountText(amount: recurring.signedAmount)
+                        HStack(spacing: 6) {
+                            AmountText(amount: recurring.startingAmount(among: transactions))
+                            if recurring.estimatesAmount {
+                                EstimatedBadge()
+                            }
+                        }
                     }
                 }
                 LabeledContent("Wallet") {

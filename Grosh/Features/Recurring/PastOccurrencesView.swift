@@ -10,6 +10,8 @@ struct PastOccurrencesView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    /// Every transaction a varying Bill's estimate is averaged over, so each day shows the amount it will make.
+    @Query(Transaction.notDeleted) private var transactions: [Transaction]
     @State private var selected: Set<CalendarDay> = []
     @State private var errorMessage: String?
 
@@ -68,7 +70,10 @@ struct PastOccurrencesView: View {
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
                 Text(day.date(), style: .date)
                 Spacer(minLength: 8)
-                AmountText(amount: recurring.signedAmount)
+                if recurring.estimatesAmount {
+                    EstimatedBadge()
+                }
+                AmountText(amount: recurring.startingAmount(among: transactions))
             }
             .contentShape(Rectangle())
         }

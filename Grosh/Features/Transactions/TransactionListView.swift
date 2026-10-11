@@ -44,7 +44,7 @@ struct TransactionListView: View {
         let shown = filter.listed(from: transactions, selection: walletSelection, on: shownDays)
         // Future's Scheduled rows are listed by day, and only while nothing is searched, filtered or being selected.
         let scheduled: [ScheduledOccurrence] = period == .future && grouping == .day && !filter.isOn && !isSelecting
-            ? recurringTransactions.scheduledOccurrences(selection: walletSelection, today: today)
+            ? recurringTransactions.scheduledOccurrences(selection: walletSelection, today: today, history: transactions)
             : []
 
         list {
