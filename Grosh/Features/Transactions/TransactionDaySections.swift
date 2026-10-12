@@ -31,7 +31,7 @@ struct TransactionDaySections<Row: View>: View {
 }
 
 /// A day's date with its day number big, the weekday and the month and year stacked small beside it, and the day's
-/// net total in color. At the largest text sizes the total moves under the date so neither is cut short. A day with
+/// net total. At the largest text sizes the total moves under the date so neither is cut short. A day with
 /// only Scheduled rows has no total.
 struct TransactionDayHeader: View {
     let day: TransactionDay
@@ -81,7 +81,7 @@ struct TransactionDayHeader: View {
     }
 
     private var total: some View {
-        AmountText(amount: day.net, showsPlusSign: true)
+        AmountText(amount: day.net, showsPlusSign: true, showsColor: false)
             .font(.subheadline.weight(.semibold))
     }
 }

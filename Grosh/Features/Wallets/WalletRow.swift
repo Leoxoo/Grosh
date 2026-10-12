@@ -21,7 +21,7 @@ struct WalletRow: View {
             Spacer()
             Text(balance.formatted())
                 .monospacedDigit()
-                .foregroundStyle(balance.cents < 0 ? .red : .primary)
+                .foregroundStyle(balance.cents < 0 ? balance.tint : .primary)
         }
         .contentShape(Rectangle())
     }

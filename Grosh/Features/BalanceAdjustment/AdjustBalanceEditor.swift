@@ -67,7 +67,7 @@ private struct AdjustBalanceForm: View {
             DayStepper(title: "Date", day: $draft.day)
             if let recorded = draft.recordedBalance {
                 LabeledContent("Recorded balance") {
-                    AmountText(amount: recorded)
+                    AmountText(amount: recorded, showsColor: false)
                 }
             }
             fields.amountRow(
@@ -86,7 +86,11 @@ private struct AdjustBalanceForm: View {
     private func reasonSection(_ fields: KeypadSheetFields) -> some View {
         Section {
             LabeledContent("Difference") {
-                AmountText(amount: draft.difference ?? Money(cents: 0, currencyCode: draft.currencyCode), showsPlusSign: true)
+                AmountText(
+                    amount: draft.difference ?? Money(cents: 0, currencyCode: draft.currencyCode),
+                    showsPlusSign: true,
+                    showsColor: false
+                )
             }
             if let reasonType = draft.reasonType {
                 CategoryPicker(title: "Reason", type: reasonType, selection: $draft.category)
