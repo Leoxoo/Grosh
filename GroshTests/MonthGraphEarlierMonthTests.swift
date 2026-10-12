@@ -43,6 +43,23 @@ struct MonthGraphEarlierMonthTests {
         #expect(strip.map { $0.title(today: today) } == ["08/2026", "Last month", "This month"])
     }
 
+    /// July's only transaction that counts is deleted, so the strip drops July: a card left on July shows this month,
+    /// and one on September stays there.
+    @Test func aMonthTheStripNoLongerOffersGivesWayToThisMonth() throws {
+        let coffee = try store.record(-15_00, "Café", on: day(2026, 7, 4))
+        try store.record(-25_00, "Café", on: day(2026, 9, 5))
+        var july = Period.month(month(2026, 7))
+        var september = Period.month(month(2026, 9))
+
+        try [coffee].delete(.onlySelected, in: context)
+        let strip = try MonthGraph.months(of: store.transactions(), today: today)
+        july.showCurrentPeriod(.month(month(2026, 10)), unlessOfferedBy: strip)
+        september.showCurrentPeriod(.month(month(2026, 10)), unlessOfferedBy: strip)
+
+        #expect(july == .month(month(2026, 10)))
+        #expect(september == .month(month(2026, 9)))
+    }
+
     // MARK: An earlier month
 
     /// March would be a fourth month before July, and August, September and October come after it: only April, May and
