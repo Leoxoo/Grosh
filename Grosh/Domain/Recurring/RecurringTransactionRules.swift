@@ -323,16 +323,22 @@ extension RecurringTransaction {
         try context.save()
     }
 
-    /// Whether Add the Transaction can make one now: the schedule is neither paused nor deleted, and has a wallet and a
-    /// category to make it with.
-    var canAddTransactionNow: Bool { isActive && wallet != nil && category != nil }
+    /// Why Add the Transaction can't make one now, or `nil` when it can: the schedule is paused or deleted, or has no
+    /// wallet or category to make it with.
+    var addBlocker: AddTransactionNowError? {
+        guard isActive else { return .inactive }
+        guard wallet != nil, category != nil else { return .incomplete }
+        return nil
+    }
+
+    /// Whether Add the Transaction can make one now, see ``addBlocker``.
+    var canAddTransactionNow: Bool { addBlocker == nil }
 
     /// Makes one transaction now, dated `today`, from the schedule's values, and attaches it. Unlike an occurrence it
-    /// consumes or skips nothing: the next occurrence still falls on its day. Throws rather than saving nothing when the
-    /// schedule is paused or deleted, or has no wallet or category. Saves.
+    /// consumes or skips nothing: the next occurrence still falls on its day. Throws its ``addBlocker`` rather than
+    /// saving nothing. Saves.
     func addTransactionNow(today: CalendarDay = .today, in context: ModelContext) throws {
-        guard isActive else { throw AddTransactionNowError.inactive }
-        guard wallet != nil, category != nil else { throw AddTransactionNowError.incomplete }
+        if let addBlocker { throw addBlocker }
         makeTransaction(on: today, history: estimateHistory(in: context), in: context)
         try context.save()
     }
