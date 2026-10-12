@@ -38,11 +38,7 @@ struct TransactionRow: View {
                         ForgivenBadge()
                     }
                     if let card = transaction.card {
-                        Image(systemName: Card.symbolName)
-                            .font(.caption)
-                            .foregroundStyle(card.color.color)
-                            .accessibilityLabel(card.name)
-                            .help(Text(card.name))
+                        CardIndicator(card: card)
                     }
                     if showsWalletIcon, let wallet = transaction.wallet {
                         Image(systemName: wallet.symbolName)
@@ -55,6 +51,20 @@ struct TransactionRow: View {
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// The Card a transaction was paid with, drawn as its symbol in the Card's color. Its name is the accessibility label
+/// and a Mac hover tooltip.
+struct CardIndicator: View {
+    let card: Card
+
+    var body: some View {
+        Image(systemName: Card.symbolName)
+            .font(.caption)
+            .foregroundStyle(card.color.color)
+            .accessibilityLabel(card.name)
+            .help(Text(card.name))
     }
 }
 
