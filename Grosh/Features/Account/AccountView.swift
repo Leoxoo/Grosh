@@ -1,11 +1,9 @@
 import SwiftData
 import SwiftUI
 
-/// The Account tab: Wallets, Categories, Cards, Debts & Loans, Recently Deleted, Import, Export, Currency, Recurring
+/// The Account tab: Wallets, Categories, Cards, Debts & Loans, Recently Deleted, Import, Export, Settings, Recurring
 /// transactions.
 struct AccountView: View {
-    @AppStorage(CurrencyPickerView.currencyCodeKey) private var currencyCode = Money.defaultCurrencyCode
-
     var body: some View {
         NavigationStack {
             List {
@@ -52,13 +50,9 @@ struct AccountView: View {
 
                 Section {
                     NavigationLink {
-                        CurrencyPickerView()
+                        SettingsView()
                     } label: {
-                        LabeledContent {
-                            Text(currencyCode)
-                        } label: {
-                            Label("Currency", systemImage: "dollarsign.circle")
-                        }
+                        Label("Settings", systemImage: "gearshape")
                     }
                 }
 
