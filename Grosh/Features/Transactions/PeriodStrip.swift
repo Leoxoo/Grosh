@@ -73,7 +73,7 @@ struct PeriodStrip: View {
                             .frame(height: 2)
                     }
                 }
-                .contentShape(Rectangle())
+                .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -140,7 +140,7 @@ private struct DragToScroll: ViewModifier {
         content
             .onScrollGeometryChange(for: ScrollGeometry.self, of: { $0 }) { _, new in geometry = new }
             // The gaps between tabs start a drag too.
-            .contentShape(Rectangle())
+            .contentShape(.rect)
             // Takes over from the tab under the pointer once the drag passes a few points, so the drag doesn't select
             // it; a click without movement still does.
             .highPriorityGesture(

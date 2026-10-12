@@ -75,9 +75,8 @@ struct MonthGraphChart: View {
         }
         .chartOverlay { proxy in
             GeometryReader { geometry in
-                Rectangle()
-                    .fill(.clear)
-                    .contentShape(Rectangle())
+                Color.clear
+                    .contentShape(.rect)
                     .onScrub { select(atX: $0, proxy: proxy, geometry: geometry) }
             }
         }
@@ -125,8 +124,9 @@ struct MonthGraphChart: View {
 
     /// Moves the marker to the day nearest `x`, a position across the overlay `geometry` measures.
     private func select(atX x: CGFloat, proxy: ChartProxy, geometry: GeometryProxy) {
-        let plotOriginX = geometry[proxy.plotAreaFrame].origin.x
-        guard let position = proxy.value(atX: x - plotOriginX, as: Double.self) else { return }
+        guard let plotFrame = proxy.plotFrame,
+              let position = proxy.value(atX: x - geometry[plotFrame].origin.x, as: Double.self)
+        else { return }
         selection = graph.day(nearest: position)
     }
 }
