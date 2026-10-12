@@ -1,0 +1,33 @@
+{
+  "name": "Glass bells",
+  "instrument": {
+    "attack": 0.002,
+    "partials": [
+      {"ratio": 1.0, "level": 1.0, "ring": 1.0},
+      {"ratio": 2.0, "level": 0.3, "ring": 0.55},
+      {"ratio": 2.76, "level": 0.14, "ring": 0.3},
+      {"ratio": 5.4, "level": 0.06, "ring": 0.12}
+    ],
+    "sparkle": {
+      "partials": [
+        {"ratio": 2.0, "level": 0.22},
+        {"ratio": 3.0, "level": 0.12},
+        {"ratio": 5.0, "level": 0.05}
+      ],
+      "shimmer": 6.0,
+      "attack": 0.025
+    }
+  },
+  "endings": {
+    "income": [
+      {"pitch": 79, "start": 0.0, "loudness": 0.7, "ring": 0.24},
+      {"pitch": 86, "start": 0.07, "loudness": 0.8, "ring": 0.26},
+      {"pitch": 95, "start": 0.14, "loudness": 0.9, "ring": 0.48, "sparkle": 1.0}
+    ],
+    "expense": [
+      {"pitch": 79, "start": 0.0, "loudness": 0.7, "ring": 0.24},
+      {"pitch": 86, "start": 0.07, "loudness": 0.8, "ring": 0.26},
+      {"pitch": 91, "start": 0.14, "loudness": 1.0, "ring": 0.32}
+    ]
+  }
+}
