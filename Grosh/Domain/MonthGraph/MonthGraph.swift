@@ -24,6 +24,9 @@ struct MonthGraph {
 
     let side: SpentOrIncome
     let month: CalendarMonth
+    /// The legend's name for the line, as the strip above the cards names the month: "This month", "Last month",
+    /// "07/2026".
+    let lineName: String
     /// The running total through the end of each day the line reaches, the 1st first.
     private let dailyTotals: [(day: CalendarDay, total: Money)]
     /// The Average through the end of each day of the month, the 1st first, or `nil` when no month counts toward it.
@@ -35,6 +38,7 @@ struct MonthGraph {
         let counted = transactions.compactMap(\.countedAmount)
         self.side = side
         self.month = month
+        self.lineName = Period.month(month).title(today: today)
         self.dailyTotals = counted.dailyTotals(side, in: month, through: today)
         self.dailyAverages = MonthGraphAverage.dailyTotals(side, of: counted, for: month)
         self.dayCount = month.dayCount
@@ -79,6 +83,16 @@ struct MonthGraph {
     private func points(_ daily: [(day: CalendarDay, total: Money)]) -> [Point] {
         [Point(position: 0, total: Money(cents: 0))]
             + daily.map { Point(position: position(of: $0.day), total: $0.total) }
+    }
+}
+
+extension MonthGraph {
+    /// The months the strip above the cards offers, oldest first: from the month of the first transaction that counts
+    /// on the Month graph, on either card, through `today`'s month, or `today`'s month alone when nothing counts.
+    /// Never Future.
+    static func months(of transactions: [Transaction], today: CalendarDay) -> [Period] {
+        let firstDay = transactions.compactMap(\.countedAmount).map(\.day).min()
+        return TimeRange.month.periods(from: firstDay, today: today).filter { $0 != .future }
     }
 }
 

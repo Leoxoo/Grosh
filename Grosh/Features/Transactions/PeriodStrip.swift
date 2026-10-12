@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// The row of periods above the transaction list: `… 08/2026 · Last month · This month · Future`. It keeps the selected
-/// period's tab in view, scrolling it to the center whenever the selection changes, and once the Current period's tab
-/// is scrolled out of view, a button at the trailing edge brings it back. On Mac, holding and dragging scrolls it too.
-/// Lazy, since a day strip holds every day back to the first with data.
+/// The row of periods above the transaction list: `… 08/2026 · Last month · This month · Future`, and of months alone
+/// above Home's Month graph. It keeps the selected period's tab in view, scrolling it to the center whenever the
+/// selection changes, and once the Current period's tab is scrolled out of view, a button at the trailing edge brings
+/// it back. On Mac, holding and dragging scrolls it too. Lazy, since a day strip holds every day back to the first with
+/// data.
 struct PeriodStrip: View {
     let periods: [Period]
     @Binding var selection: Period
