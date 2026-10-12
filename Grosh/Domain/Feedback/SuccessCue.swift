@@ -54,11 +54,9 @@ nonisolated enum SuccessCue {
         var sparkle: Double?
     }
 
-    /// A chime's notes for each ending. The note list also says how its instrument sounds, which only the script that
-    /// renders the sounds reads.
+    /// A chime's notes for each ending. The note list also gives the chime's name and says how its instrument sounds,
+    /// which only the script that renders the sounds reads.
     nonisolated struct NoteList: Decodable, Sendable {
-        /// The chime's name as the note list gives it.
-        let name: String
         let endings: Endings
 
         nonisolated struct Endings: Decodable, Sendable {

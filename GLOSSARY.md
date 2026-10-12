@@ -201,5 +201,9 @@ The on-screen calculator-style pad for typing an amount, shared by every sheet t
 _Avoid_: Keyboard, numpad
 
 **Success cue**:
-The sound and haptic that play together when a new Expense or Income transaction is saved: one motif with one ending for Income and another for Expense. Editing a transaction, a Transfer, a Loan or Debt, and anything the app makes on its own play none.
+The sound and haptic that play together when a new Expense or Income transaction is saved: the picked Chime, with one ending for Income and another for Expense. Editing a transaction, a Transfer, a Loan or Debt, and anything the app makes on its own play none.
 _Avoid_: Reward, jingle, celebration
+
+**Chime**:
+One of the Success cue's motifs, picked in Settings: Marimba, Glass bells or Bubble pops. All three ship for now, so the user can choose between them on the device itself.
+_Avoid_: Sound (a Chime is felt as well as heard), tone, ringtone

@@ -39,8 +39,6 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("Sounds & Haptics")
-                } footer: {
-                    Text("The chime plays when you save a new expense or income.")
                 }
             }
         }
@@ -61,12 +59,17 @@ struct SettingsView: View {
     /// returns at once, and a sample that can't play is skipped without a word.
     private func playSample(changingFrom old: SoundsAndHaptics.Preferences, to new: SoundsAndHaptics.Preferences) {
         guard let sample = SuccessCue.Sample(changingFrom: old, to: new, on: .current) else { return }
-        SuccessCuePlayer.shared.play(sample.chime, ending: sample.ending, sound: sample.sound, haptic: sample.haptic)
+        SuccessCuePlayer.shared.play(
+            sample.chime,
+            ending: sample.ending,
+            sound: sample.playsSound,
+            haptic: sample.playsHaptic
+        )
     }
 }
 
 private extension SuccessCue.Chime {
-    /// The chime's name, as its note list gives it.
+    /// The chime's name, as the Chime picker shows it.
     var title: String {
         switch self {
         case .marimba: String(localized: "Marimba")
