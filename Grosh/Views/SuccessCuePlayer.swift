@@ -1,8 +1,6 @@
 import Foundation
-#if os(iOS)
 import AVFoundation
 import CoreHaptics
-#endif
 
 /// Plays the Success cue: a chime's sound for one ending and the haptic made from its note list, started together.
 /// The sound mixes with whatever else is playing and never pauses it, is silent while the ringer is off, and plays at a
@@ -10,7 +8,8 @@ import CoreHaptics
 /// document as following the system's Haptics switch, so the Haptics switch in Settings is the way to turn it off.
 ///
 /// Nothing here holds up the caller or shows an error: the work happens off the main thread, and a sound or haptic that
-/// can't start is skipped. It plays on iOS only; elsewhere ``play(_:ending:sound:haptic:)`` does nothing.
+/// can't start is skipped, as is the haptic on hardware that can't play one. It plays whatever it's asked on any
+/// device: which devices get the cue is ``SoundsAndHaptics/isOffered(on:)``'s to decide.
 actor SuccessCuePlayer {
     /// The app's one player, so a cue that starts cuts off the one before rather than playing over it.
     static let shared = SuccessCuePlayer()
@@ -19,19 +18,18 @@ actor SuccessCuePlayer {
     /// once. Whether each plays is the caller's to decide, with ``SoundsAndHaptics/playsSounds(on:soundsOn:)`` and
     /// ``SoundsAndHaptics/playsHaptics(on:hapticsOn:)``.
     nonisolated func play(_ chime: SuccessCue.Chime, ending: SuccessCue.Ending, sound: Bool, haptic: Bool) {
-        #if os(iOS)
         guard sound || haptic else { return }
         Task {
             await self.start(chime, ending: ending, sound: sound, haptic: haptic)
         }
-        #endif
     }
 
-    #if os(iOS)
     /// The sound's level before the volume buttons scale it: well below full, so the cue never startles.
     private let soundVolume: Float = 0.5
 
+    #if !os(macOS)
     private var isSessionAmbient = false
+    #endif
     private var hapticEngine: CHHapticEngine?
     /// Held until the next cue, so the cue isn't cut off when ``start(_:ending:sound:haptic:)`` returns.
     private var soundPlayer: AVAudioPlayer?
@@ -62,15 +60,19 @@ actor SuccessCuePlayer {
 
     /// Puts the app's audio in the ambient category, once: it mixes with other apps' audio instead of pausing it, and
     /// the ringer switch silences it. Returns whether it is, since a sound played in the default category would pause
-    /// other audio.
+    /// other audio. A Mac has no audio session, and its apps' audio always mixes, so there it always is.
     private func makesSessionAmbient() -> Bool {
+        #if os(macOS)
+        return true
+        #else
         if !isSessionAmbient {
             isSessionAmbient = (try? AVAudioSession.sharedInstance().setCategory(.ambient)) != nil
         }
         return isSessionAmbient
+        #endif
     }
 
-    /// The chime's haptic for `ending`, ready to start, or `nil` if the iPhone can't play it.
+    /// The chime's haptic for `ending`, ready to start, or `nil` if this device's hardware can't play it.
     private func preparedHaptic(
         _ chime: SuccessCue.Chime,
         _ ending: SuccessCue.Ending
@@ -142,5 +144,4 @@ actor SuccessCuePlayer {
         }
         return try CHHapticPattern(events: taps + buzzes, parameterCurves: fades)
     }
-    #endif
 }
