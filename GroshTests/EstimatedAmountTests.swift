@@ -245,7 +245,7 @@ struct EstimatedAmountTests {
 
     @Test func theFirstReminderAsksToSendNotificationsThenIsScheduled() async throws {
         let made = try estimatedElectricity()
-        let scheduler = RecordingEstimateScheduler()
+        let scheduler = RecordingReminderScheduler<EstimateReminder>()
 
         await EstimatedAmounts([made]).reschedule(
             at: at(day(2026, 10, 14), hour: 8), calendar: .utcGregorian, after: nil, using: scheduler
@@ -253,7 +253,7 @@ struct EstimatedAmountTests {
 
         #expect(scheduler.calls == [
             .requestPermission,
-            .replacePendingEstimateReminders([
+            .replacePending([
                 EstimateReminder(
                     original: made.persistentModelID, day: day(2026, 10, 14), name: "Electricity",
                     estimate: Money(cents: 2_500, currencyCode: "USD")
@@ -264,34 +264,13 @@ struct EstimatedAmountTests {
 
     @Test func withNoEstimateToRemindOfNothingAsksToSendNotifications() async throws {
         let none: [Transaction] = []
-        let scheduler = RecordingEstimateScheduler()
+        let scheduler = RecordingReminderScheduler<EstimateReminder>()
 
         await EstimatedAmounts(none).reschedule(
             at: at(day(2026, 10, 14), hour: 8), calendar: .utcGregorian, after: nil, using: scheduler
         )
 
-        #expect(scheduler.calls == [.replacePendingEstimateReminders([])])
+        #expect(scheduler.calls == [.replacePending([])])
     }
 }
 
-/// Records what it is asked, instead of asking the user or scheduling notifications. Notifications are always allowed.
-@MainActor
-private final class RecordingEstimateScheduler: ReminderScheduler {
-    enum Call: Equatable {
-        case requestPermission
-        case replacePendingEstimateReminders([EstimateReminder])
-    }
-
-    private(set) var calls: [Call] = []
-
-    func requestPermission() async -> Bool {
-        calls.append(.requestPermission)
-        return true
-    }
-
-    func replacePendingReminders(with reminders: [DebtReminder]) async {}
-
-    func replacePendingEstimateReminders(with reminders: [EstimateReminder]) async {
-        calls.append(.replacePendingEstimateReminders(reminders))
-    }
-}

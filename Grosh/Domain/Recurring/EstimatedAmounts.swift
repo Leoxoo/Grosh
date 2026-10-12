@@ -2,7 +2,9 @@ import Foundation
 import SwiftData
 
 /// A notification on the reminder day of an Estimated transaction, asking the user to enter its real amount.
-nonisolated struct EstimateReminder: Hashable, Sendable {
+nonisolated struct EstimateReminder: PendingReminder {
+    static let identifierPrefix = "grosh.estimate-reminder."
+
     /// The Estimated transaction it reminds of.
     let original: PersistentIdentifier
     let day: CalendarDay
@@ -10,17 +12,11 @@ nonisolated struct EstimateReminder: Hashable, Sendable {
     let name: String
     /// The estimate the transaction holds, without its sign.
     let estimate: Money
-    /// When the notification arrives.
     var arrival = ReminderArrival.onItsDay
-
-    /// Whether `other` reminds of the same transaction on the same day, whatever its amount is by now.
-    func isSameReminder(as other: EstimateReminder) -> Bool {
-        original == other.original && day == other.day
-    }
 }
 
 /// Every Estimated transaction, which the Home bell and the reminders track until their real amounts are entered.
-struct EstimatedAmounts {
+struct EstimatedAmounts: ReminderSource {
     /// The Estimated transactions, in no particular order.
     let open: [Transaction]
 
@@ -53,36 +49,6 @@ struct EstimatedAmounts {
             )
         }
         .sorted { $0.day < $1.day }
-    }
-
-    /// The notifications to keep pending at `now`: the ``reminders(from:)`` of that day, each arriving at 09:00 on its
-    /// day. Once 09:00 has passed, one for today arrives right away when it is new since `earlier`, and is left out
-    /// otherwise.
-    func reminders(
-        at now: Date, calendar: Calendar = .current, after earlier: [EstimateReminder]?
-    ) -> [EstimateReminder] {
-        let today = CalendarDay(now, in: calendar)
-        let hasPassedTheHour = calendar.component(.hour, from: now) >= DebtReminder.hour
-        return reminders(from: today).compactMap { reminder in
-            guard reminder.day == today, hasPassedTheHour else { return reminder }
-            guard let earlier, !earlier.contains(where: reminder.isSameReminder) else { return nil }
-            var rightAway = reminder
-            rightAway.arrival = .rightAway
-            return rightAway
-        }
-    }
-
-    /// Hands `scheduler` the ``reminders(at:calendar:after:)`` to keep pending, replacing those scheduled before. When
-    /// there is any, it first asks the user to allow notifications, as the Loan and Debt reminders do.
-    func reschedule(
-        at now: Date, calendar: Calendar = .current, after earlier: [EstimateReminder]?,
-        using scheduler: some ReminderScheduler
-    ) async {
-        let pending = reminders(at: now, calendar: calendar, after: earlier)
-        if !pending.isEmpty {
-            _ = await scheduler.requestPermission()
-        }
-        await scheduler.replacePendingEstimateReminders(with: pending)
     }
 }
 
