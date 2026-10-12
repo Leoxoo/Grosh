@@ -17,8 +17,8 @@ struct MonthGraphChart: View {
 
     /// Room above the plot for the popup, growing with the text size.
     @ScaledMetric(relativeTo: .subheadline) private var popupHeight: CGFloat = 66
-    /// More room above the plot for each scheduled item the popup lists.
-    @ScaledMetric(relativeTo: .caption) private var scheduledItemHeight: CGFloat = 16
+    /// More room above the plot for each Occurrence the popup lists.
+    @ScaledMetric(relativeTo: .caption) private var occurrenceHeight: CGFloat = 16
 
     var body: some View {
         let popup = graph.popup(on: selection)
@@ -31,48 +31,30 @@ struct MonthGraphChart: View {
                 }
 
             if let comparisonLine = graph.comparisonLine {
-                ForEach(comparisonLine, id: \.position) { point in
-                    LineMark(
-                        x: .value("Day", point.position),
-                        y: .value("Total", Double(point.total.cents)),
-                        series: .value("Line", "Comparison")
-                    )
-                }
-                .foregroundStyle(Self.comparisonColor)
-                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                line(comparisonLine, series: "Comparison")
+                    .foregroundStyle(Self.comparisonColor)
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
             }
 
-            ForEach(graph.line, id: \.position) { point in
-                LineMark(
-                    x: .value("Day", point.position),
-                    y: .value("Total", Double(point.total.cents)),
-                    series: .value("Line", "This month")
-                )
-            }
-            .foregroundStyle(graph.side.color)
-            .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+            line(graph.line, series: "Month")
+                .foregroundStyle(graph.side.color)
+                .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
 
             if let scheduledLine = graph.scheduledLine {
                 // In steps, so each payment rises on its own due day instead of sloping across it.
-                ForEach(scheduledLine, id: \.position) { point in
-                    LineMark(
-                        x: .value("Day", point.position),
-                        y: .value("Total", Double(point.total.cents)),
-                        series: .value("Line", "Scheduled")
-                    )
-                }
-                .interpolationMethod(.stepEnd)
-                .foregroundStyle(graph.side.color)
-                .lineStyle(Self.scheduledStroke)
+                line(scheduledLine, series: "Scheduled")
+                    .interpolationMethod(.stepEnd)
+                    .foregroundStyle(graph.side.color)
+                    .lineStyle(Self.scheduledStroke)
             }
 
             if let comparison = popup.comparison {
-                PointMark(x: .value("Day", graph.position(of: selection)), y: .value("Total", Double(comparison.cents)))
+                marker(at: comparison)
                     .foregroundStyle(Self.comparisonColor)
             }
             // On the line through today, or on the dotted line after it.
             if let total = popup.total ?? popup.expected {
-                PointMark(x: .value("Day", graph.position(of: selection)), y: .value("Total", Double(total.cents)))
+                marker(at: total)
                     .foregroundStyle(graph.side.color)
             }
         }
@@ -102,22 +84,34 @@ struct MonthGraphChart: View {
         // The headline already says the amount so far, and the line's positions mean nothing read aloud.
         .accessibilityHidden(true)
         .frame(height: 150)
-        .padding(.top, popupHeight + scheduledItemHeight * CGFloat(mostScheduledOnADay))
+        .padding(.top, popupHeight + occurrenceHeight * CGFloat(mostScheduledOnADay))
+    }
+
+    /// `points` joined into one line, kept apart from the chart's other lines by `series`.
+    private func line(_ points: [MonthGraph.Point], series: String) -> some ChartContent {
+        ForEach(points, id: \.position) { point in
+            LineMark(
+                x: .value("Day", point.position),
+                y: .value("Total", Double(point.total.cents)),
+                series: .value("Line", series)
+            )
+        }
+    }
+
+    /// A dot on the selected day at `total`.
+    private func marker(at total: Money) -> some ChartContent {
+        PointMark(x: .value("Day", graph.position(of: selection)), y: .value("Total", Double(total.cents)))
     }
 
     /// The days named along the bottom: every seventh day from the 1st.
     private var labeledDays: [CalendarDay] {
-        stride(from: 1, through: graph.month.dayCount, by: 7).map {
-            CalendarDay(year: graph.month.year, month: graph.month.month, day: $0)
-        }
+        stride(from: 1, through: graph.month.dayCount, by: 7).map { graph.month.day($0) }
     }
 
-    /// The most scheduled items the popup lists on any one day, which the room above the plot is kept for, so the plot
+    /// The most Occurrences the popup lists on any one day, which the room above the plot is kept for, so the plot
     /// stays put as the marker moves.
     private var mostScheduledOnADay: Int {
-        (1...graph.month.dayCount).map { number in
-            graph.popup(on: CalendarDay(year: graph.month.year, month: graph.month.month, day: number)).scheduled.count
-        }.max() ?? 0
+        (1...graph.month.dayCount).map { graph.popup(on: graph.month.day($0)).scheduled.count }.max() ?? 0
     }
 
     /// From zero, or below it when refunds take Spent under zero, to the highest total of any line. A flat line at zero
@@ -160,11 +154,14 @@ private struct MonthGraphPopup: View {
                     .font(.subheadline.weight(.semibold))
                     .monospacedDigit()
             }
-            ForEach(Array(popup.scheduled.enumerated()), id: \.offset) { _, item in
-                Text("\(item.name) \(item.amount.formatted())")
-                    .font(.caption)
-                    .monospacedDigit()
-                    .lineLimit(1)
+            ForEach(popup.scheduled) { occurrence in
+                // Each counts toward the card, by what it adds to the card's total.
+                if let counted = occurrence.countedAmount {
+                    Text("\(occurrence.recurring.name) \(counted.amount.formatted())")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                }
             }
             if let comparison = popup.comparison {
                 // The name is already localized: shown as it is.

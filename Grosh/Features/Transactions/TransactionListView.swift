@@ -96,7 +96,7 @@ struct TransactionListView: View {
             VStack(spacing: 4) {
                 VStack(spacing: 4) {
                     WalletSelector(selection: $walletSelection, today: today)
-                    PeriodStrip(periods: periods, selection: $period, today: today)
+                    PeriodStrip(periods: periods, selection: $period, current: currentPeriod, today: today)
                 }
                 .hiddenWhileSearching(filter)
                 if filter.isOn {
@@ -113,10 +113,10 @@ struct TransactionListView: View {
         .modifier(SearchWhileOpen(text: $filter.searchText, isOpen: $isSearchPresented))
         .onChange(of: walletSelection) {
             // A wallet with a shorter history may not reach back to the period being shown.
-            showCurrentPeriodUnlessOffered(by: strip(for: selected))
+            period.showCurrentPeriod(currentPeriod, unlessOfferedBy: strip(for: selected))
         }
         .onChange(of: filter.wallet) {
-            showCurrentPeriodUnlessOffered(by: strip(for: selected))
+            period.showCurrentPeriod(currentPeriod, unlessOfferedBy: strip(for: selected))
         }
         .onChange(of: timeRange) {
             // Unlike a wallet change, a new time range always starts on the Current period, even from Future.
@@ -173,13 +173,6 @@ struct TransactionListView: View {
             NavigationLink(value: transaction) {
                 TransactionRow(transaction: transaction, showsDay: showsDay, showsWalletIcon: showsWalletIcon)
             }
-        }
-    }
-
-    /// Keeps the period being shown when the strip still offers it; otherwise shows the Current period.
-    private func showCurrentPeriodUnlessOffered(by strip: [Period]) {
-        if !strip.contains(period) {
-            period = currentPeriod
         }
     }
 

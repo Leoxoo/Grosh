@@ -29,16 +29,7 @@ struct ScheduledOccurrenceTests {
         draft.wallet = wallet ?? store.wallet
         draft.category = category
         draft.preset = preset
-        switch end {
-        case .forever:
-            draft.endKind = .forever
-        case .until(let last):
-            draft.endKind = .until
-            draft.untilDay = last
-        case .afterCount(let count):
-            draft.endKind = .afterCount
-            draft.occurrenceCount = count
-        }
+        draft.end = end
         return try RecurringTransaction.create(draft, today: today, in: context)
     }
 

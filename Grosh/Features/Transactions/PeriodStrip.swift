@@ -8,6 +8,8 @@ import SwiftUI
 struct PeriodStrip: View {
     let periods: [Period]
     @Binding var selection: Period
+    /// The Current period, one of `periods`, which the return button brings back.
+    let current: Period
     let today: CalendarDay
 
     @Environment(\.locale) private var locale
@@ -38,7 +40,7 @@ struct PeriodStrip: View {
         // Any part of the tab on screen counts as in view, so the button waits until the tab is fully gone.
         .onScrollTargetVisibilityChange(idType: Period.self, threshold: 0.001) { visible in
             withAnimation {
-                isCurrentPeriodInView = currentPeriod.map { visible.contains($0) } ?? true
+                isCurrentPeriodInView = visible.contains(current)
             }
         }
         .onAppear { scrollToSelection() }
@@ -49,15 +51,10 @@ struct PeriodStrip: View {
         .modifier(DragToScroll(position: $position))
         #endif
         .overlay(alignment: .trailing) {
-            if let current = currentPeriod, !isCurrentPeriodInView {
+            if !isCurrentPeriodInView {
                 returnButton(to: current)
             }
         }
-    }
-
-    /// The Current period: the strip's period holding today, which Future never does.
-    private var currentPeriod: Period? {
-        periods.last { $0.days(today: today).contains(today) }
     }
 
     private func tab(for period: Period) -> some View {
@@ -114,6 +111,17 @@ struct PeriodStrip: View {
     private func scrollToSelection(animated: Bool = false) {
         withAnimation(animated ? .easeInOut(duration: 0.5) : nil) {
             position.scrollTo(id: selection, anchor: .center)
+        }
+    }
+}
+
+extension Period {
+    /// Stays the period shown while `strip` still offers it; otherwise becomes `current`, the Current period. A strip
+    /// of a wallet with a shorter history, or with the only transaction of its first period gone, may no longer offer
+    /// it.
+    mutating func showCurrentPeriod(_ current: Period, unlessOfferedBy strip: [Period]) {
+        if !strip.contains(self) {
+            self = current
         }
     }
 }

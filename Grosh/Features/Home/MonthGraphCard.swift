@@ -3,7 +3,8 @@ import SwiftUI
 
 /// Home's Month graph: the month strip, then the Spent card and the Income card, each with the running total of the
 /// month the strip picks beside the Average of the months before it, or the same month last year while that card's
-/// switch is on. Their amounts show even while the Total is hidden. Use inside a `List`.
+/// switch is on. A month the strip no longer offers, once the only transaction that counted in it is gone, gives way to
+/// this month. Their amounts show even while the Total is hidden. Use inside a `List`.
 struct MonthGraphCards: View {
     /// Remembers across launches whether the Spent card compares its month with Last year.
     static let spentComparesWithLastYearKey = "home.monthGraph.spent.comparesWithLastYear"
@@ -20,11 +21,15 @@ struct MonthGraphCards: View {
     @AppStorage(Self.incomeComparesWithLastYearKey) private var incomeComparesWithLastYear = false
 
     var body: some View {
+        let months = MonthGraph.months(of: transactions, today: today)
         Section {
-            PeriodStrip(periods: MonthGraph.months(of: transactions, today: today), selection: $period, today: today)
+            PeriodStrip(periods: months, selection: $period, current: currentPeriod, today: today)
                 // The strip pads its own tabs, and sits above the cards rather than on one.
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
+                .onChange(of: months) { _, months in
+                    period.showCurrentPeriod(currentPeriod, unlessOfferedBy: months)
+                }
         }
         ForEach(SpentOrIncome.allCases, id: \.self) { side in
             let lastYearSwitch = comparesWithLastYear(side)
@@ -44,6 +49,11 @@ struct MonthGraphCards: View {
         case .spent: $spentComparesWithLastYear
         case .income: $incomeComparesWithLastYear
         }
+    }
+
+    /// The Current period: this month.
+    private var currentPeriod: Period {
+        TimeRange.month.period(containing: today)
     }
 
     /// The month of the period picked in the strip, which offers only months.
@@ -100,10 +110,7 @@ extension SpentOrIncome {
 
     /// The color amounts going out (Spent) or coming in (Income) have everywhere in the app.
     var color: Color {
-        switch self {
-        case .spent: Color("AmountRed")
-        case .income: Color("AmountGreen")
-        }
+        Money(cents: self == .spent ? -1 : 1).tint
     }
 }
 
