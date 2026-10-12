@@ -1,11 +1,11 @@
 import SwiftData
 import SwiftUI
 
-/// The Transactions tab's list: the wallet selector and its balance, the period strip, the period's Opening and
-/// Ending balances, then its transactions by day, newest first, or by category. Future also lists the Scheduled rows
-/// of Recurring transactions still to come, by day. The "…" menu picks the time range and the grouping, and selects
-/// transactions to delete. Search and the filters narrow what is listed: grouped, selected and summed are the
-/// matching transactions only.
+/// The Transactions tab's list. Its header holds the wallet selector and its balance, the period strip and the period's
+/// Opening and Ending balances; the list then holds its transactions by day, newest first, or by category. Future also
+/// lists the Scheduled rows of Recurring transactions still to come, by day. The "…" menu picks the time range and the
+/// grouping, and selects transactions to delete. The Search button opens a field that narrows what is listed, and so do
+/// the filters: grouped, selected and summed are the matching transactions only.
 struct TransactionListView: View {
     /// The transaction whose detail is showing.
     @Binding var selectedTransaction: Transaction?
@@ -20,6 +20,8 @@ struct TransactionListView: View {
     @State private var grouping = TransactionGrouping.day
     /// Search text and filters. Searching looks across all time and every wallet; filters narrow the period.
     @State private var filter = TransactionFilter()
+    /// Whether the search field is open, from the toolbar's Search button.
+    @State private var isSearchOpen = false
     /// Whether the list is choosing transactions to delete, and the ones chosen so far.
     @State private var isSelecting = false
     @State private var chosen = Set<Transaction>()
@@ -30,6 +32,9 @@ struct TransactionListView: View {
     private var selected: [Transaction] {
         filter.transactions(in: walletSelection, from: transactions)
     }
+
+    /// Whether the search field shows: while it is open, and whenever there is search text to clear.
+    private var showsSearchField: Bool { isSearchOpen || filter.isSearching }
 
     /// The periods the strip offers for `selected`, back to its first day with data.
     private func strip(for selected: [Transaction]) -> [Period] {
@@ -48,13 +53,9 @@ struct TransactionListView: View {
             : []
 
         list {
-            Section {
-                if filter.isOn {
+            if filter.isOn {
+                Section {
                     FilterSummaryView(filter: $filter, transactions: shown)
-                } else {
-                    PeriodSummaryView(
-                        summary: PeriodSummary(of: selected, in: period, today: today), period: period, today: today
-                    )
                 }
             }
 
@@ -88,15 +89,23 @@ struct TransactionListView: View {
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 4) {
-                WalletSelector(selection: $walletSelection, today: today)
-                PeriodStrip(periods: periods, selection: $period, today: today)
+            VStack(spacing: 0) {
+                if showsSearchField {
+                    TransactionSearchBar(text: $filter.searchText) { closeSearch() }
+                }
+                VStack(spacing: 4) {
+                    WalletSelector(selection: $walletSelection, today: today)
+                    PeriodStrip(periods: periods, selection: $period, today: today)
+                    PeriodSummaryView(
+                        summary: PeriodSummary(of: selected, in: period, today: today), period: period, today: today
+                    )
+                }
+                .padding(.top, 8)
+                .padding(.bottom, 8)
+                .hiddenWhileSearching(filter)
             }
-            .padding(.top, 8)
             .background(.bar)
-            .hiddenWhileSearching(filter)
         }
-        .searchable(text: $filter.searchText, prompt: "Note, category or amount")
         .onChange(of: walletSelection) {
             // A wallet with a shorter history may not reach back to the period being shown.
             showPeriodHoldingTodayUnlessOffered(by: strip(for: selected))
@@ -120,6 +129,9 @@ struct TransactionListView: View {
                         walletSelection: walletSelection, timeRange: $timeRange, grouping: $grouping,
                         startSelecting: startSelecting
                     )
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Search", systemImage: "magnifyingglass") { isSearchOpen = true }
                 }
                 ToolbarItem(placement: .primaryAction) {
                     TransactionFilterButton(filter: $filter)
@@ -165,6 +177,12 @@ struct TransactionListView: View {
         selectedTransaction = nil
         chosen = []
         isSelecting = true
+    }
+
+    /// Closes the search field and clears its text, so the period and its header come back.
+    private func closeSearch() {
+        isSearchOpen = false
+        filter.searchText = ""
     }
 }
 
