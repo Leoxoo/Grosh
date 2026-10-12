@@ -15,17 +15,13 @@ struct TransactionDaySections<Row: View>: View {
         ForEach(TransactionDay.days(of: transactions, scheduled: scheduled)) { day in
             let count = day.transactions.count + day.scheduled.count
             Section {
-                ForEach(Array(day.transactions.enumerated()), id: \.element.id) { index, transaction in
-                    row(transaction)
-                        .groupedRow(GroupPosition(index: index, count: count), isSelected: isSelected(transaction))
-                }
-                ForEach(Array(day.scheduled.enumerated()), id: \.element.id) { index, occurrence in
+                GroupedForEach(day.transactions, rowsInSection: count, isSelected: isSelected) { row($0) }
+                GroupedForEach(day.scheduled, rowsBefore: day.transactions.count, rowsInSection: count) { occurrence in
                     NavigationLink {
                         RecurringTransactionDetailView(recurring: occurrence.recurring)
                     } label: {
                         ScheduledRow(occurrence: occurrence)
                     }
-                    .groupedRow(GroupPosition(index: day.transactions.count + index, count: count))
                 }
             } header: {
                 TransactionDayHeader(day: day)

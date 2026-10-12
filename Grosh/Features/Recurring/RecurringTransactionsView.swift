@@ -23,7 +23,7 @@ struct RecurringTransactionsView: View {
         List {
             ForEach(groups) { group in
                 Section(group.kind.sectionTitle) {
-                    ForEach(Array(group.items.enumerated()), id: \.element.id) { index, item in
+                    GroupedForEach(group.items) { item in
                         NavigationLink {
                             RecurringTransactionDetailView(recurring: item)
                         } label: {
@@ -34,7 +34,6 @@ struct RecurringTransactionsView: View {
                                 editorMode = .duplicate(item)
                             }
                         }
-                        .groupedRow(GroupPosition(index: index, count: group.items.count))
                     }
                 }
             }

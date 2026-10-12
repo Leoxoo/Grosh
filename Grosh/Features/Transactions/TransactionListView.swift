@@ -77,12 +77,8 @@ struct TransactionListView: View {
             case .category:
                 ForEach(TransactionCategoryGroup.groups(of: shown)) { group in
                     Section {
-                        ForEach(Array(group.transactions.enumerated()), id: \.element.id) { index, transaction in
-                            row(transaction, showsDay: true)
-                                .groupedRow(
-                                    GroupPosition(index: index, count: group.transactions.count),
-                                    isSelected: highlighted.contains(transaction)
-                                )
+                        GroupedForEach(group.transactions, isSelected: { highlighted.contains($0) }) {
+                            row($0, showsDay: true)
                         }
                     } header: {
                         TransactionCategoryHeader(group: group)

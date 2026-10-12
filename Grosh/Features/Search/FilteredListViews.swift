@@ -28,22 +28,30 @@ struct FilterSummaryView: View {
     /// The transactions the list shows.
     let transactions: [Transaction]
 
+    private enum Row: Identifiable {
+        case count, total, clearFilters
+
+        var id: Self { self }
+    }
+
     var body: some View {
-        // The section's rows on Mac: the count and total, and Clear Filters while a filter is set.
-        let count = filter.hasFilters ? 3 : 2
-        LabeledContent("Transactions") {
-            Text(transactions.count.formatted())
-                .monospacedDigit()
-        }
-        .groupedRow(GroupPosition(index: 0, count: count))
-        LabeledContent(filter.totalTitle) {
-            AmountText(amount: transactions.net, showsPlusSign: true)
-                .fontWeight(.semibold)
-        }
-        .groupedRow(GroupPosition(index: 1, count: count))
-        if filter.hasFilters {
-            Button("Clear Filters", systemImage: "xmark.circle") { filter.clearFilters() }
-                .groupedRow(GroupPosition(index: 2, count: count))
+        // The count and total, and Clear Filters while a filter is set.
+        let rows: [Row] = filter.hasFilters ? [.count, .total, .clearFilters] : [.count, .total]
+        GroupedForEach(rows) { row in
+            switch row {
+            case .count:
+                LabeledContent("Transactions") {
+                    Text(transactions.count.formatted())
+                        .monospacedDigit()
+                }
+            case .total:
+                LabeledContent(filter.totalTitle) {
+                    AmountText(amount: transactions.net, showsPlusSign: true)
+                        .fontWeight(.semibold)
+                }
+            case .clearFilters:
+                Button("Clear Filters", systemImage: "xmark.circle") { filter.clearFilters() }
+            }
         }
     }
 }
