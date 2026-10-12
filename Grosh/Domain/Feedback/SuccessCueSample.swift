@@ -14,9 +14,9 @@ extension SuccessCue {
         /// The chime it plays: the one just picked, or the one already picked when a switch is turned on.
         let chime: Chime
         /// Whether it plays the sound.
-        let sound: Bool
+        let playsSound: Bool
         /// Whether it plays the haptic.
-        let haptic: Bool
+        let playsHaptic: Bool
 
         /// A sample always ends the Income way.
         var ending: Ending { .income }
@@ -33,14 +33,14 @@ extension SuccessCue {
             let picksChime = new.chime != old.chime
             let turnsSoundsOn = new.soundsOn && !old.soundsOn
             let turnsHapticsOn = new.hapticsOn && !old.hapticsOn
-            let sound = (turnsSoundsOn || picksChime)
+            let playsSound = (turnsSoundsOn || picksChime)
                 && SoundsAndHaptics.playsSounds(on: device, soundsOn: new.soundsOn)
-            let haptic = (turnsHapticsOn || picksChime)
+            let playsHaptic = (turnsHapticsOn || picksChime)
                 && SoundsAndHaptics.playsHaptics(on: device, hapticsOn: new.hapticsOn)
-            guard sound || haptic else { return nil }
+            guard playsSound || playsHaptic else { return nil }
             self.chime = new.chime
-            self.sound = sound
-            self.haptic = haptic
+            self.playsSound = playsSound
+            self.playsHaptic = playsHaptic
         }
     }
 }

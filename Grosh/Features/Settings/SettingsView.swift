@@ -59,7 +59,12 @@ struct SettingsView: View {
     /// returns at once, and a sample that can't play is skipped without a word.
     private func playSample(changingFrom old: SoundsAndHaptics.Preferences, to new: SoundsAndHaptics.Preferences) {
         guard let sample = SuccessCue.Sample(changingFrom: old, to: new, on: .current) else { return }
-        SuccessCuePlayer.shared.play(sample.chime, ending: sample.ending, sound: sample.sound, haptic: sample.haptic)
+        SuccessCuePlayer.shared.play(
+            sample.chime,
+            ending: sample.ending,
+            sound: sample.playsSound,
+            haptic: sample.playsHaptic
+        )
     }
 }
 

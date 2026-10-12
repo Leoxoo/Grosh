@@ -39,7 +39,7 @@ extension SuccessCue {
             taps = notes.map { note in
                 Tap(
                     time: note.start,
-                    intensity: Self.unit(note.loudness),
+                    intensity: Self.clampedToUnitInterval(note.loudness),
                     sharpness: Self.sharpness(ofPitch: note.pitch)
                 )
             }
@@ -48,7 +48,7 @@ extension SuccessCue {
                 return Buzz(
                     time: note.start,
                     duration: note.ring,
-                    intensity: Self.unit(Self.buzzLevel * note.loudness * sparkle),
+                    intensity: Self.clampedToUnitInterval(Self.buzzLevel * note.loudness * sparkle),
                     sharpness: Self.sharpness(ofPitch: note.pitch)
                 )
             }
@@ -56,10 +56,12 @@ extension SuccessCue {
 
         /// A pitch as a sharpness, evenly across ``sharpnessPitches``: each semitone higher is a step sharper.
         static func sharpness(ofPitch pitch: Double) -> Double {
-            unit((pitch - sharpnessPitches.lowerBound) / (sharpnessPitches.upperBound - sharpnessPitches.lowerBound))
+            clampedToUnitInterval(
+                (pitch - sharpnessPitches.lowerBound) / (sharpnessPitches.upperBound - sharpnessPitches.lowerBound)
+            )
         }
 
-        private static func unit(_ value: Double) -> Double {
+        private static func clampedToUnitInterval(_ value: Double) -> Double {
             min(max(value, 0), 1)
         }
     }

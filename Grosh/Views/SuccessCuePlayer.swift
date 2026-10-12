@@ -49,7 +49,7 @@ actor SuccessCuePlayer {
 
     /// The chime's sound for `ending`, ready to play, or `nil` if it can't play without pausing other audio.
     private func preparedSound(_ chime: SuccessCue.Chime, _ ending: SuccessCue.Ending) -> AVAudioPlayer? {
-        guard makesSessionAmbient(),
+        guard makeSessionAmbient(),
               let url = Bundle.main.url(forResource: chime.soundName(for: ending), withExtension: "caf"),
               let player = try? AVAudioPlayer(contentsOf: url)
         else { return nil }
@@ -61,7 +61,7 @@ actor SuccessCuePlayer {
     /// Puts the app's audio in the ambient category, once: it mixes with other apps' audio instead of pausing it, and
     /// the ringer switch silences it. Returns whether it is, since a sound played in the default category would pause
     /// other audio. A Mac has no audio session, and its apps' audio always mixes, so there it always is.
-    private func makesSessionAmbient() -> Bool {
+    private func makeSessionAmbient() -> Bool {
         #if os(macOS)
         return true
         #else
