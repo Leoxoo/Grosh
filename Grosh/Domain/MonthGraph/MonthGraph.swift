@@ -34,10 +34,10 @@ struct MonthGraph {
     /// The legend's name for the line, as the strip above the card names the month: "This month", "Last month",
     /// "07/2026".
     let lineName: String
-    /// What the gray line is, which the legend and the popup name it after: Last year when the tab's switch asks for
-    /// it and it is available, otherwise the Average.
+    /// What the gray line is, which the legend and the popup name it after: Last year when the "vs last year" switch
+    /// asks for it and it is available, otherwise the Average.
     let comparison: MonthGraphComparison
-    /// Whether Last year is available for the month, so the tab's "vs last year" switch can be used.
+    /// Whether Last year is available for the month, so the "vs last year" switch can be used.
     let isLastYearAvailable: Bool
     /// The running total through the end of each day the line reaches, the 1st first.
     private let dailyTotals: [DailyTotal]
@@ -49,7 +49,7 @@ struct MonthGraph {
     private let dayCount: Int
 
     /// The tab for `side` showing `month`, the current month or an earlier one, as it stands on `today`, with what
-    /// `recurring` still has due this month, compared with `choice`, as the tab's switch is set.
+    /// `recurring` still has due this month, compared with `choice`, as the "vs last year" switch is set.
     init(
         _ side: SpentOrIncome, of transactions: [Transaction], recurring: [RecurringTransaction] = [],
         in month: CalendarMonth, today: CalendarDay, comparingWith choice: MonthGraphComparison = .average

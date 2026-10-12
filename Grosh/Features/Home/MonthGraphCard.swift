@@ -3,13 +3,12 @@ import SwiftUI
 
 /// Home's Month graph: the month strip, then one card with a Spent tab and an Income tab. The tab shown draws the
 /// running total of the month the strip picks beside the Average of the months before it, or the same month last year
-/// while that tab's switch is on. A month the strip no longer offers, once the only transaction that counted in it is
-/// gone, gives way to this month. Its amounts show even while the Total is hidden. Use inside a `List`.
+/// while the "vs last year" switch, which both tabs share, is on. A month the strip no longer offers, once the only
+/// transaction that counted in it is gone, gives way to this month. Its amounts show even while the Total is hidden.
+/// Use inside a `List`.
 struct HomeMonthGraph: View {
-    /// Remembers across launches whether the Spent tab compares its month with Last year.
-    static let spentComparesWithLastYearKey = "home.monthGraph.spent.comparesWithLastYear"
-    /// Remembers across launches whether the Income tab compares its month with Last year.
-    static let incomeComparesWithLastYearKey = "home.monthGraph.income.comparesWithLastYear"
+    /// Remembers across launches whether both tabs compare their month with Last year.
+    static let comparesWithLastYearKey = "home.monthGraph.comparesWithLastYear"
 
     let today: CalendarDay
 
@@ -19,8 +18,7 @@ struct HomeMonthGraph: View {
     @State private var period = Period.month(CalendarMonth(.today))
     /// The tab the card shows.
     @State private var side = SpentOrIncome.spent
-    @AppStorage(Self.spentComparesWithLastYearKey) private var spentComparesWithLastYear = false
-    @AppStorage(Self.incomeComparesWithLastYearKey) private var incomeComparesWithLastYear = false
+    @AppStorage(Self.comparesWithLastYearKey) private var comparesWithLastYear = false
 
     var body: some View {
         let months = MonthGraph.months(of: transactions, today: today)
@@ -37,24 +35,16 @@ struct HomeMonthGraph: View {
             spent: graph(for: .spent),
             income: graph(for: .income),
             side: $side,
-            comparesWithLastYear: comparesWithLastYear(side)
+            comparesWithLastYear: $comparesWithLastYear
         )
     }
 
-    /// The graph of `side`'s tab for the month picked, compared as that tab's switch is set.
+    /// The graph of `side`'s tab for the month picked, compared as the "vs last year" switch is set.
     private func graph(for side: SpentOrIncome) -> MonthGraph {
         MonthGraph(
             side, of: transactions, recurring: recurringTransactions, in: month, today: today,
-            comparingWith: comparesWithLastYear(side).wrappedValue ? .lastYear : .average
+            comparingWith: comparesWithLastYear ? .lastYear : .average
         )
-    }
-
-    /// The "vs last year" switch of `side`'s tab, each tab's its own.
-    private func comparesWithLastYear(_ side: SpentOrIncome) -> Binding<Bool> {
-        switch side {
-        case .spent: $spentComparesWithLastYear
-        case .income: $incomeComparesWithLastYear
-        }
     }
 
     /// The Current period: this month.
@@ -70,14 +60,14 @@ struct HomeMonthGraph: View {
 }
 
 /// A list section holding the Month graph's card: a Spent tab and an Income tab, each naming its month's total so
-/// far, then the chart of the tab shown and the legend under it with that tab's "vs last year" switch. It draws the
-/// graphs as given, and keeps the day the user left the marker on, whichever tab is shown.
+/// far, then the chart of the tab shown and the legend under it with the "vs last year" switch. It draws the graphs as
+/// given, and keeps the day the user left the marker on, whichever tab is shown.
 struct MonthGraphCard: View {
     let spent: MonthGraph
     let income: MonthGraph
     /// The tab shown.
     @Binding var side: SpentOrIncome
-    /// Whether the shown tab's "vs last year" switch is on.
+    /// Whether the "vs last year" switch, which both tabs share, is on.
     @Binding var comparesWithLastYear: Bool
 
     /// The day the user last moved the marker to, or `nil` until they move it.

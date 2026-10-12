@@ -1,7 +1,7 @@
 import Foundation
 
-/// The gray line a Month graph tab compares its month with: the Average, or Last year while the tab's "vs last year"
-/// switch is on. Either is the mean of the running totals of other months, each laid out across the month shown so that
+/// The gray line a Month graph tab compares its month with: the Average, or Last year while the "vs last year" switch
+/// is on. Either is the mean of the running totals of other months, each laid out across the month shown so that
 /// months of different lengths line up.
 ///
 /// The Average takes up to three complete months before the month shown. Months count from the month of the first

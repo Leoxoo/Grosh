@@ -2,11 +2,11 @@ import SwiftUI
 
 /// The legend under a Month graph tab's chart: a short stroke in each line's color and its name, the month as the
 /// strip names it ("This month", "Last month", "07/2026") for the line in the tab's color and, while the chart has
-/// one, "Average" or "Last year" for the gray line; then, at the right end, the tab's "vs last year" switch. While the
+/// one, "Average" or "Last year" for the gray line; then, at the right end, the "vs last year" switch. While the
 /// chart has a dotted line, a row under them names it "Scheduled", with Expected by month end.
 struct MonthGraphLegend: View {
     let graph: MonthGraph
-    /// Whether the tab's "vs last year" switch is on.
+    /// Whether the "vs last year" switch is on.
     @Binding var comparesWithLastYear: Bool
 
     var body: some View {
