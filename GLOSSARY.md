@@ -174,3 +174,22 @@ The period holding every transaction dated after today.
 
 **Lead-in transactions**:
 On a Credit card's statement view, the transactions from the two days before the statement period begins, shown muted because they are not part of it. They never count in the statement total unless the user adds one for the moment they are looking.
+
+### Reports
+
+**Month graph**:
+Home's card with a Spent tab and an Income tab, each naming its month's total so far. The tab shown draws the running total of its month as a line beside a gray line to compare it with and, for the current month, a dotted line for what the Recurring transactions will still add. Every month is laid out as 0–100% of its length, so months of different lengths line up. A strip of months above the card, from the month of the first transaction that counts through this month, picks the month both tabs show; it opens on this month.
+_Avoid_: Report this month
+
+**Spent**:
+The Month graph tab for money going out: the month's Expense-category transactions in the wallets counted in the Total, less refunds, plus what was forgiven on Loans that month. Its counterpart, the Income tab, adds up Income-category transactions and what was forgiven on Debts.
+_Avoid_: Expenses, Expense (that is a Category type)
+
+**Average**:
+The gray line a Month graph tab compares its month with unless Last year is on: the mean of the running totals of up to three complete months before the month shown. Months before the month of the first transaction that counts are left out; a later month with nothing that counts is zero.
+
+**Last year**:
+The gray line a Month graph tab shows in place of the Average while its "vs last year" switch is on: the same month 12 months before the month shown. It is there only when that month holds something that counts for the tab; otherwise the switch is greyed out and the tab shows the Average, keeping the switch as it was. One switch serves both tabs, remembered between launches.
+
+**Expected by month end**:
+Today's total on a Month graph tab plus what the Recurring transactions still have due through the month's last day: what the month ends at if nothing unscheduled is spent or earned. The graph's projection is not a Scheduled row: it takes every Occurrence left in the month, and changes no balance, report or transaction.

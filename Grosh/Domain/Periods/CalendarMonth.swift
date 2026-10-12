@@ -22,9 +22,14 @@ nonisolated struct CalendarMonth: Hashable, Sendable {
         return CalendarMonth(year: index.floorDiv(12), month: index.floorMod(12) + 1)
     }
 
-    var firstDay: CalendarDay { CalendarDay(year: year, month: month, day: 1) }
+    /// Day `number`, 1 to `dayCount`, of the month.
+    func day(_ number: Int) -> CalendarDay {
+        CalendarDay(year: year, month: month, day: number)
+    }
 
-    var lastDay: CalendarDay { CalendarDay(year: year, month: month, day: dayCount) }
+    var firstDay: CalendarDay { day(1) }
+
+    var lastDay: CalendarDay { day(dayCount) }
 
     /// How many days the month has: 28 to 31.
     var dayCount: Int {

@@ -85,7 +85,7 @@ extension CalendarMonth {
     /// The day a statement closing on `statementDay` (1–31) closes in this month: that day, or the month's last day
     /// when the month is shorter, as 02/28 for a statement on the 31st.
     nonisolated func statementClosingDay(_ statementDay: Int) -> CalendarDay {
-        CalendarDay(year: year, month: month, day: min(statementDay, dayCount))
+        day(min(statementDay, dayCount))
     }
 }
 

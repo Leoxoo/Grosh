@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Home's coming-soon cards (Report this month, Top spending), placed where the real reports will go.
+/// Home's coming-soon cards (Top spending), placed where the real reports will go.
 /// Use inside a `List`.
 struct HomeComingSoonCards: View {
     var body: some View {

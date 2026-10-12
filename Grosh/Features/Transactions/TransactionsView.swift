@@ -5,6 +5,10 @@ import SwiftUI
 /// (pushed on iPhone).
 struct TransactionsView: View {
     @State private var selectedTransaction: Transaction?
+    #if os(macOS)
+    /// How far the app's sidebar reaches over the tab from its leading edge, while the sidebar is open.
+    @State private var appSidebarWidth: CGFloat = 0
+    #endif
 
     var body: some View {
         NavigationSplitView {
@@ -26,6 +30,13 @@ struct TransactionsView: View {
             }
             .id(selectedTransaction?.persistentModelID)
         }
+        #if os(macOS)
+        // The app's sidebar floats over the tab, and a split view laid out under it pushes its detail the sidebar's
+        // width away from the list. Beside the sidebar, the split view lays out as it does while the sidebar is closed.
+        .padding(.leading, appSidebarWidth)
+        .ignoresSafeArea(.container, edges: .leading)
+        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.leading } action: { appSidebarWidth = $0 }
+        #endif
     }
 }
 

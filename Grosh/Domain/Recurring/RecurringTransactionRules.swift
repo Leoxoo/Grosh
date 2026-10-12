@@ -145,12 +145,7 @@ struct RecurringDraft {
         preset = RepeatPreset(rule: schedule.rule)
         customRule = schedule.rule
         monthlyDay = schedule.monthlyDay
-        endKind = schedule.end.kind
-        switch schedule.end {
-        case .forever: break
-        case .until(let last): untilDay = last
-        case .afterCount(let count): occurrenceCount = count
-        }
+        end = schedule.end
     }
 
     /// A new Recurring transaction like `recurring`, starting `today` ("Duplicate"). It copies every field and the Kind's
@@ -170,12 +165,22 @@ struct RecurringDraft {
     /// The repeat the form has picked.
     var rule: RepeatRule { preset.rule ?? customRule }
 
-    /// When the Recurring transaction ends, as the form has it.
+    /// When the Recurring transaction ends, as the form has it. Setting it sets the form's end and its day or count.
     var end: RepeatEnd {
-        switch endKind {
-        case .forever: .forever
-        case .until: .until(untilDay)
-        case .afterCount: .afterCount(occurrenceCount)
+        get {
+            switch endKind {
+            case .forever: .forever
+            case .until: .until(untilDay)
+            case .afterCount: .afterCount(occurrenceCount)
+            }
+        }
+        set {
+            endKind = newValue.kind
+            switch newValue {
+            case .forever: break
+            case .until(let last): untilDay = last
+            case .afterCount(let count): occurrenceCount = count
+            }
         }
     }
 
