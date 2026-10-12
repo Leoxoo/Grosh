@@ -21,9 +21,9 @@ struct ScheduledOccurrenceTests {
     }
 
     /// A Recurring transaction of 15.99 starting on `start`, paid from the fixture's wallet unless `wallet` is given,
-    /// and saved on `today`.
+    /// repeating `preset` until `end`, and saved on `today`.
     private func makeSchedule(
-        starting start: CalendarDay, preset: RepeatPreset = .monthly, wallet: Wallet? = nil
+        starting start: CalendarDay, preset: RepeatPreset = .monthly, wallet: Wallet? = nil, end: RepeatEnd = .forever
     ) throws -> RecurringTransaction {
         let category = Grosh.Category(name: "Subscriptions", type: .expense, symbolName: "repeat", color: .purple)
         context.insert(category)
@@ -33,37 +33,80 @@ struct ScheduledOccurrenceTests {
         draft.wallet = wallet ?? store.wallet
         draft.category = category
         draft.preset = preset
+        switch end {
+        case .forever:
+            draft.endKind = .forever
+        case .until(let last):
+            draft.endKind = .until
+            draft.untilDay = last
+        case .afterCount(let count):
+            draft.endKind = .afterCount
+            draft.occurrenceCount = count
+        }
         return try RecurringTransaction.create(draft, today: today, in: context)
     }
 
-    @Test func theNextTwelveOccurrencesAfterTodayAreListed() throws {
+    @Test func aScheduleThatRepeatsForeverListsOnlyItsNextOccurrence() throws {
         let recurring = try makeSchedule(starting: day(2026, 10, 12), preset: .daily)
 
-        #expect(recurring.scheduledDays(today: today) == (12...23).map { day(2026, 10, $0) })
+        #expect(recurring.scheduledDays(today: today) == [day(2026, 10, 12)])
     }
 
-    @Test func nothingBeyondOneYearAheadIsListed() throws {
-        let recurring = try makeSchedule(starting: day(2026, 10, 12), preset: .yearly)
+    @Test func aScheduleEndingAfterACountListsEveryPaymentStillToCome() throws {
+        // Fifteen monthly payments from October 12 run on to December 12 of the following year: past twelve rows, and
+        // past the year Future used to stop at.
+        let recurring = try makeSchedule(starting: day(2026, 10, 12), end: .afterCount(15))
 
-        #expect(recurring.scheduledDays(today: today) == [day(2026, 10, 12)])
+        let days = recurring.scheduledDays(today: today)
+        #expect(days.count == 15)
+        #expect(days.last == day(2027, 12, 12))
+    }
+
+    @Test func aScheduleEndingOnADateListsEveryOccurrenceUpToThatDay() throws {
+        // Monthly on the 12th from October 2026 to December 12, 2028: 27 payments, the last on the end day.
+        let recurring = try makeSchedule(starting: day(2026, 10, 12), end: .until(day(2028, 12, 12)))
+
+        let days = recurring.scheduledDays(today: today)
+        #expect(days.count == 27)
+        #expect(days.last == day(2028, 12, 12))
     }
 
     @Test func occurrencesAlreadyMadeOrSkippedAreNotListed() throws {
         // Saved on October 11, so the October 1 occurrence was already due and is skipped rather than listed.
         let recurring = try makeSchedule(starting: day(2026, 10, 1))
 
-        #expect(recurring.scheduledDays(today: today).first == day(2026, 11, 1))
-        #expect(recurring.scheduledDays(today: today).count == 12)
+        #expect(recurring.scheduledDays(today: today) == [day(2026, 11, 1)])
 
         try RecurringTransaction.catchUp(through: day(2026, 11, 1), in: context)
 
         #expect(recurring.attachedTransactions.map(\.day) == [day(2026, 11, 1)])
-        #expect(recurring.scheduledDays(today: day(2026, 11, 1)).first == day(2026, 12, 1))
+        #expect(recurring.scheduledDays(today: day(2026, 11, 1)) == [day(2026, 12, 1)])
+    }
+
+    @Test func aScheduleEndingAfterACountSkipsPaymentsAlreadyMadeOrSkipped() throws {
+        // Five payments from October 1: October's is skipped when the schedule is saved on October 11.
+        let recurring = try makeSchedule(starting: day(2026, 10, 1), end: .afterCount(5))
+
+        #expect(recurring.scheduledDays(today: today) == [
+            day(2026, 11, 1), day(2026, 12, 1), day(2027, 1, 1), day(2027, 2, 1),
+        ])
+
+        try RecurringTransaction.catchUp(through: day(2026, 12, 1), in: context)
+
+        #expect(recurring.scheduledDays(today: day(2026, 12, 1)) == [day(2027, 1, 1), day(2027, 2, 1)])
+    }
+
+    @Test func aScheduleThatHasEndedListsNothing() throws {
+        // Two payments from October 1: October's is skipped when the schedule is saved, November's is still to come.
+        let recurring = try makeSchedule(starting: day(2026, 10, 1), end: .afterCount(2))
+
+        #expect(recurring.scheduledDays(today: today) == [day(2026, 11, 1)])
+        #expect(recurring.scheduledDays(today: day(2026, 11, 2)).isEmpty)
     }
 
     @Test func aPausedOrRecentlyDeletedWalletListsNoScheduledRows() throws {
         let recurring = try makeSchedule(starting: day(2026, 10, 12), preset: .daily)
-        #expect(recurring.scheduledDays(today: today).count == 12)
+        #expect(recurring.scheduledDays(today: today) == [day(2026, 10, 12)])
 
         store.wallet.isArchived = true
         #expect(recurring.scheduledDays(today: today).isEmpty)
@@ -75,7 +118,7 @@ struct ScheduledOccurrenceTests {
 
     @Test func aScheduleInRecentlyDeletedListsNoScheduledRows() throws {
         let recurring = try makeSchedule(starting: day(2026, 10, 12), preset: .daily)
-        #expect(recurring.scheduledDays(today: today).count == 12)
+        #expect(recurring.scheduledDays(today: today) == [day(2026, 10, 12)])
 
         try recurring.delete(today: today, in: context)
         #expect(recurring.scheduledDays(today: today).isEmpty)
@@ -141,24 +184,24 @@ struct ScheduledOccurrenceTests {
         let total = schedules.scheduledOccurrences(selection: .total, today: today, history: [])
         let inSavings = schedules.scheduledOccurrences(selection: .wallet(savings), today: today, history: [])
 
-        #expect(total.count == 12)
+        #expect(total.count == 1)
         #expect(total.allSatisfy { $0.recurring == checking })
-        #expect(inSavings.count == 12)
+        #expect(inSavings.count == 1)
         #expect(inSavings.allSatisfy { $0.recurring == kept })
     }
 
     @Test func rowsListNewestDayFirst() throws {
-        let daily = try makeSchedule(starting: day(2026, 10, 12), preset: .daily)
-        let weekly = try makeSchedule(starting: day(2026, 10, 12), preset: .weekly)
+        let daily = try makeSchedule(starting: day(2026, 10, 12), preset: .daily, end: .afterCount(3))
+        let weekly = try makeSchedule(starting: day(2026, 10, 12), preset: .weekly, end: .afterCount(3))
 
         let days = [daily, weekly].scheduledOccurrences(selection: .total, today: today, history: []).map(\.day)
 
-        #expect(days.first == day(2026, 12, 28))
+        #expect(days.first == day(2026, 10, 26))
         #expect(days == days.sorted(by: >))
     }
 
     @Test func aDayListsItsTransactionsThenItsScheduledRowsAndTotalsOnlyTheTransactions() throws {
-        let netflix = try makeSchedule(starting: day(2026, 10, 20))
+        let netflix = try makeSchedule(starting: day(2026, 10, 20), end: .afterCount(3))
         let rows = [netflix].scheduledOccurrences(selection: .total, today: today, history: [])
         let lunch = Transaction(
             amount: Money(cents: -5_00), day: day(2026, 10, 20), wallet: store.wallet, category: nil
@@ -167,9 +210,9 @@ struct ScheduledOccurrenceTests {
 
         let days = TransactionDay.days(of: [lunch], scheduled: rows)
 
-        #expect(days.count == 12)
-        #expect(days.first?.day == day(2027, 9, 20))
-        #expect(days.filter { $0.transactions.isEmpty }.count == 11)
+        #expect(days.count == 3)
+        #expect(days.first?.day == day(2026, 12, 20))
+        #expect(days.filter { $0.transactions.isEmpty }.count == 2)
         let october = try #require(days.first { $0.day == day(2026, 10, 20) })
         #expect(october.transactions == [lunch])
         #expect(october.scheduled.map(\.day) == [day(2026, 10, 20)])

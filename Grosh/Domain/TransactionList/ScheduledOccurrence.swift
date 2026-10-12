@@ -28,14 +28,23 @@ struct ScheduledOccurrence: Identifiable, Hashable {
 }
 
 extension RecurringTransaction {
-    /// The days Future lists this schedule's Scheduled rows on, as seen from `today`: the next twelve after today that
-    /// haven't been dealt with, and none beyond a year ahead. A schedule that isn't active lists none: one in Recently
-    /// Deleted, one paused by an archived wallet, or one whose wallet is in Recently Deleted.
+    /// The days Future lists this schedule's Scheduled rows on, as seen from `today`: the occurrences after today that
+    /// haven't been dealt with. A schedule that repeats forever lists only its next one; one that ends, on a date or
+    /// after a number of payments, lists every payment still to come. A schedule that isn't active lists none: one in
+    /// Recently Deleted, one paused by an archived wallet, or one whose wallet is in Recently Deleted.
     func scheduledDays(today: CalendarDay) -> [CalendarDay] {
         guard isActive, let wallet, !wallet.isArchived, wallet.deletedAt == nil else { return [] }
         // Occurrences up to `handledThrough` are transactions already, or were skipped when the schedule was saved.
         let dealtWith = handledThrough.map { max($0, today) } ?? today
-        return Array(schedule.occurrences(after: dealtWith, through: today.adding(days: 365)).prefix(12))
+        switch schedule.end {
+        case .forever:
+            return schedule.nextOccurrence(after: dealtWith).map { [$0] } ?? []
+        case .until(let last):
+            return schedule.occurrences(after: dealtWith, through: last)
+        case .afterCount(let count):
+            // Bounded by the last payment the count allows, so no look-ahead horizon is needed.
+            return schedule.occurrences(after: dealtWith, through: schedule.dueDay(ofOccurrence: count - 1))
+        }
     }
 }
 
