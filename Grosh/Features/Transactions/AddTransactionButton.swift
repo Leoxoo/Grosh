@@ -15,7 +15,8 @@ struct AddTransactionButton: View {
                 #endif
         }
         #if os(iOS)
-        .buttonStyle(.glassProminent)
+        // A plain prominent style: the glass style re-laid out its effect on every tab switch and navigation.
+        .buttonStyle(.borderedProminent)
         .buttonBorderShape(.circle)
         #endif
         .tint(.green)
