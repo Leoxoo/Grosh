@@ -55,9 +55,7 @@ struct CardEditor: View {
             Form {
                 Section {
                     HStack(spacing: 12) {
-                        if let image = draft.imageData.flatMap(CroppedPhoto.image(from:)) {
-                            CroppedPhotoImage(image: image, shape: .creditCard, height: 26)
-                        } else {
+                        CardMark(image: draft.imageData.flatMap(CroppedPhoto.image(from:)), height: 26) {
                             SymbolCircle(symbolName: Card.symbolName, color: draft.color, size: 40)
                         }
                         TextField("Name", text: $draft.name)

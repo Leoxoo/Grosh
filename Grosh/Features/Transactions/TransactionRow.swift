@@ -60,14 +60,10 @@ struct CardIndicator: View {
     let card: Card
 
     var body: some View {
-        Group {
-            if let image = card.image {
-                CroppedPhotoImage(image: image, shape: .creditCard, height: 15)
-            } else {
-                Image(systemName: Card.symbolName)
-                    .font(.caption)
-                    .foregroundStyle(card.color.color)
-            }
+        CardMark(image: card.image, height: 15) {
+            Image(systemName: Card.symbolName)
+                .font(.caption)
+                .foregroundStyle(card.color.color)
         }
         .frame(width: 24, height: 16)
         .accessibilityElement(children: .ignore)

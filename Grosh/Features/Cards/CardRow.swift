@@ -36,9 +36,7 @@ struct CardRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            if let image = card.image {
-                CroppedPhotoImage(image: image, shape: .creditCard, height: 28)
-            } else {
+            CardMark(image: card.image, height: 28) {
                 SymbolCircle(symbolName: Card.symbolName, color: card.color)
             }
             VStack(alignment: .leading, spacing: 2) {
