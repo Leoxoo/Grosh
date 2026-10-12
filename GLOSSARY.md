@@ -174,3 +174,22 @@ The period holding every transaction dated after today.
 
 **Lead-in transactions**:
 On a Credit card's statement view, the transactions from the two days before the statement period begins, shown muted because they are not part of it. They never count in the statement total unless the user adds one for the moment they are looking.
+
+### Reports
+
+**Month graph**:
+Home's Spent and Income cards, each drawing the running total of its month as a line beside a gray line to compare it with and, for the current month, a dotted line for what the Recurring transactions will still add. Every month is laid out as 0–100% of its length, so months of different lengths line up.
+_Avoid_: Report this month
+
+**Spent**:
+The Month graph card for money going out: the month's Expense-category transactions in the wallets counted in the Total, less refunds, plus what was forgiven on Loans that month. Its counterpart, the Income card, adds up Income-category transactions and what was forgiven on Debts.
+_Avoid_: Expenses, Expense (that is a Category type)
+
+**Average**:
+The gray line a Month graph card compares its month with unless Last year is on: the mean of the running totals of up to three complete months before the month shown. Months before the month of the first transaction that counts are left out; a later month with nothing that counts is zero.
+
+**Last year**:
+The gray line a Month graph card shows in place of the Average while its "vs last year" switch is on: the same month 12 months before the month shown.
+
+**Expected by month end**:
+Today's total on a Month graph card plus what the Recurring transactions still have due through the month's last day: what the month ends at if nothing unscheduled is spent or earned. The graph's projection is not a Scheduled row: it takes every Occurrence left in the month, and changes no balance, report or transaction.

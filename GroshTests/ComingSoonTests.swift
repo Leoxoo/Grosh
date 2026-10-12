@@ -8,8 +8,9 @@ import Testing
 
 @MainActor
 struct ComingSoonTests {
-    @Test func homeShowsReportThisMonthThenTopSpending() {
-        #expect(ComingSoon.homeCards.map(\.title) == ["Report this month", "Top spending"])
+    /// The Spent and Income cards took Report this month's place, so Top spending is all Home still waits for.
+    @Test func homeShowsOnlyTopSpending() {
+        #expect(ComingSoon.homeCards.map(\.title) == ["Top spending"])
     }
 
     @Test func budgetsIsNamedAsInTheSpec() {
