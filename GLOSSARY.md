@@ -193,3 +193,13 @@ The gray line a Month graph tab shows in place of the Average while its "vs last
 
 **Expected by month end**:
 Today's total on a Month graph tab plus what the Recurring transactions still have due through the month's last day: what the month ends at if nothing unscheduled is spent or earned. The graph's projection is not a Scheduled row: it takes every Occurrence left in the month, and changes no balance, report or transaction.
+
+### Feedback
+
+**Keypad**:
+The on-screen calculator-style pad for typing an amount, shared by every sheet that takes one. It is not the system keyboard that types text such as a Note or a With.
+_Avoid_: Keyboard, numpad
+
+**Success cue**:
+The sound and haptic that play together when a new Expense or Income transaction is saved: one motif with one ending for Income and another for Expense. Editing a transaction, a Transfer, a Loan or Debt, and anything the app makes on its own play none.
+_Avoid_: Reward, jingle, celebration
