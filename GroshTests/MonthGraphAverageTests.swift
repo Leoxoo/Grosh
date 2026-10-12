@@ -35,7 +35,7 @@ struct MonthGraphAverageTests {
 
     /// Where this month's gray line ends: the Average through the month's last day.
     private func averageAtMonthEnd(_ side: SpentOrIncome) throws -> Money? {
-        try graph(side).averageLine?.last?.total
+        try graph(side).comparisonLine?.last?.total
     }
 
     // MARK: Which months count
@@ -49,16 +49,16 @@ struct MonthGraphAverageTests {
 
         let card = try graph(side)
 
-        #expect(card.averageLine == nil)
-        #expect(card.popup(on: today).average == nil)
+        #expect(card.comparisonLine == nil)
+        #expect(card.popup(on: today).comparison == nil)
     }
 
     @Test func theMonthShownIsNeverPartOfItsOwnAverage() throws {
         try record(-40_00, "Café", on: day(2026, 10, 3))
         try record(1_500_00, "Salary", .income, on: day(2026, 10, 5))
 
-        #expect(try graph(.spent).averageLine == nil)
-        #expect(try graph(.income).averageLine == nil)
+        #expect(try graph(.spent).comparisonLine == nil)
+        #expect(try graph(.income).comparisonLine == nil)
     }
 
     /// September 15th ends halfway through September, so on October's chart it falls between the ends of the 15th and
@@ -67,11 +67,11 @@ struct MonthGraphAverageTests {
         try record(-30_00, "Café", on: day(2026, 9, 15))
 
         let spent = try graph(.spent)
-        let average = try #require(spent.averageLine)
+        let average = try #require(spent.comparisonLine)
 
-        #expect(spent.popup(on: day(2026, 10, 14)).average == Money(cents: 0))
-        #expect(spent.popup(on: day(2026, 10, 15)).average == Money(cents: 15_48))
-        #expect(spent.popup(on: day(2026, 10, 16)).average == Money(cents: 30_00))
+        #expect(spent.popup(on: day(2026, 10, 14)).comparison == Money(cents: 0))
+        #expect(spent.popup(on: day(2026, 10, 15)).comparison == Money(cents: 15_48))
+        #expect(spent.popup(on: day(2026, 10, 16)).comparison == Money(cents: 30_00))
         #expect(average.count == 32)
         #expect(average.last?.position == 1)
         #expect(average.last?.total == Money(cents: 30_00))
@@ -103,8 +103,8 @@ struct MonthGraphAverageTests {
 
         let spent = try graph(.spent)
 
-        #expect(spent.popup(on: day(2026, 10, 10)).average == Money(cents: 10_00))
-        #expect(spent.averageLine?.last?.total == Money(cents: 30_00))
+        #expect(spent.popup(on: day(2026, 10, 10)).comparison == Money(cents: 10_00))
+        #expect(spent.comparisonLine?.last?.total == Money(cents: 30_00))
     }
 
     /// Neither the Starting balance in July nor the excluded transaction in August counts, so the months start with
@@ -150,7 +150,7 @@ struct MonthGraphAverageTests {
         }
         let shown = earlier.adding(months: 1)
 
-        let average = try #require(try graph(.spent, in: shown).averageLine)
+        let average = try #require(try graph(.spent, in: shown).comparisonLine)
 
         #expect(average.count == shown.dayCount + 1)
         #expect(average.last?.position == 1)
@@ -168,7 +168,7 @@ struct MonthGraphAverageTests {
         let popup = spent.popup(on: today)
 
         #expect(popup.total == Money(cents: 10_00))
-        #expect(popup.average == Money(cents: 60_00))
+        #expect(popup.comparison == Money(cents: 60_00))
         #expect(spent.headline == Money(cents: 10_00))
     }
 
@@ -181,6 +181,6 @@ struct MonthGraphAverageTests {
 
         #expect(popup.day == day(2026, 10, 20))
         #expect(popup.total == nil)
-        #expect(popup.average == Money(cents: 60_00))
+        #expect(popup.comparison == Money(cents: 60_00))
     }
 }

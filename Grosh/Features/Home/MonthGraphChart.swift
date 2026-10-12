@@ -2,12 +2,12 @@ import Charts
 import SwiftUI
 
 /// The chart of a Month graph card: the running total as a line in the card's color across the whole month, from zero
-/// at the left edge, over the gray line of the Average, then dotted from today to the month's end with what is still
-/// scheduled, and a marker with a popup on the selected day. Scrubbing across the chart moves the marker from day to
-/// day. A few days are named along the bottom; no amounts are named up the side.
+/// at the left edge, over the gray line it is compared with, then dotted from today to the month's end with what is
+/// still scheduled, and a marker with a popup on the selected day. Scrubbing across the chart moves the marker from day
+/// to day. A few days are named along the bottom; no amounts are named up the side.
 struct MonthGraphChart: View {
-    /// The gray of the Average's line, which the legend matches.
-    static let averageColor = Color.gray
+    /// The gray of the line the month is compared with, the Average or Last year, which the legend matches.
+    static let comparisonColor = Color.gray
     /// The dots of the line of what is still scheduled, which the legend matches.
     static let scheduledStroke = StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round, dash: [0, 5])
 
@@ -27,18 +27,18 @@ struct MonthGraphChart: View {
                 .foregroundStyle(Color.secondary.opacity(0.5))
                 .lineStyle(StrokeStyle(lineWidth: 1))
                 .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                    MonthGraphPopup(popup: popup)
+                    MonthGraphPopup(popup: popup, comparisonName: graph.comparison.name)
                 }
 
-            if let averageLine = graph.averageLine {
-                ForEach(averageLine, id: \.position) { point in
+            if let comparisonLine = graph.comparisonLine {
+                ForEach(comparisonLine, id: \.position) { point in
                     LineMark(
                         x: .value("Day", point.position),
                         y: .value("Total", Double(point.total.cents)),
-                        series: .value("Line", "Average")
+                        series: .value("Line", "Comparison")
                     )
                 }
-                .foregroundStyle(Self.averageColor)
+                .foregroundStyle(Self.comparisonColor)
                 .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
             }
 
@@ -66,9 +66,9 @@ struct MonthGraphChart: View {
                 .lineStyle(Self.scheduledStroke)
             }
 
-            if let average = popup.average {
-                PointMark(x: .value("Day", graph.position(of: selection)), y: .value("Total", Double(average.cents)))
-                    .foregroundStyle(Self.averageColor)
+            if let comparison = popup.comparison {
+                PointMark(x: .value("Day", graph.position(of: selection)), y: .value("Total", Double(comparison.cents)))
+                    .foregroundStyle(Self.comparisonColor)
             }
             // On the line through today, or on the dotted line after it.
             if let total = popup.total ?? popup.expected {
@@ -123,7 +123,7 @@ struct MonthGraphChart: View {
     /// From zero, or below it when refunds take Spent under zero, to the highest total of any line. A flat line at zero
     /// sits at the bottom.
     private var totalsDomain: ClosedRange<Double> {
-        let lines = graph.line + (graph.averageLine ?? []) + (graph.scheduledLine ?? [])
+        let lines = graph.line + (graph.comparisonLine ?? []) + (graph.scheduledLine ?? [])
         let totals = lines.map { Double($0.total.cents) }
         let lowest = min(totals.min() ?? 0, 0)
         return lowest...max(totals.max() ?? 0, lowest + 1)
@@ -138,9 +138,12 @@ struct MonthGraphChart: View {
 }
 
 /// The popup over the marker: the selected day's date, the running total through it or, on a day still to come, the
-/// total expected by then and what is scheduled that day, and the Average there.
+/// total expected by then and what is scheduled that day, and the gray line's total there under the legend's name for
+/// it.
 private struct MonthGraphPopup: View {
     let popup: MonthGraph.Popup
+    /// What the legend calls the gray line: "Average" or "Last year".
+    let comparisonName: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -163,8 +166,9 @@ private struct MonthGraphPopup: View {
                     .monospacedDigit()
                     .lineLimit(1)
             }
-            if let average = popup.average {
-                Text("Average \(average.formatted())")
+            if let comparison = popup.comparison {
+                // The name is already localized: shown as it is.
+                Text("\(comparisonName) \(comparison.formatted())")
                     .font(.caption)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)

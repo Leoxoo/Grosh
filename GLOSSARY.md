@@ -189,7 +189,7 @@ _Avoid_: Expenses, Expense (that is a Category type)
 The gray line a Month graph card compares its month with unless Last year is on: the mean of the running totals of up to three complete months before the month shown. Months before the month of the first transaction that counts are left out; a later month with nothing that counts is zero.
 
 **Last year**:
-The gray line a Month graph card shows in place of the Average while its "vs last year" switch is on: the same month 12 months before the month shown.
+The gray line a Month graph card shows in place of the Average while its "vs last year" switch is on: the same month 12 months before the month shown. It is there only when that month holds something that counts for the card; otherwise the switch is greyed out and the card shows the Average, keeping the switch as it was. Each card has its own switch, remembered between launches.
 
 **Expected by month end**:
 Today's total on a Month graph card plus what the Recurring transactions still have due through the month's last day: what the month ends at if nothing unscheduled is spent or earned. The graph's projection is not a Scheduled row: it takes every Occurrence left in the month, and changes no balance, report or transaction.
