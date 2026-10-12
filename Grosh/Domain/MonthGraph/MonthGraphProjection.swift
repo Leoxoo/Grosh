@@ -1,4 +1,4 @@
-/// What the Recurring transactions still have due for a Month graph card in the current month, which it draws as a
+/// What the Recurring transactions still have due for a Month graph tab in the current month, which it draws as a
 /// dotted line from today's point to the end of the month's last day.
 ///
 /// It takes every Occurrence after today through the month's last day of every active schedule paid from the Total's
@@ -6,13 +6,13 @@
 /// schedule that repeats forever. A varying Bill counts its estimate, and each Occurrence counts by its category as its
 /// transaction would. It is a projection, computed on demand (ADR-0005): it changes no balance, report or transaction.
 struct MonthGraphProjection {
-    /// What is still due for the card: the Occurrences that count toward it.
+    /// What is still due for the tab: the Occurrences that count toward it.
     private let scheduled: [ScheduledOccurrence]
     /// Today's total plus what is due through the end of each day, from today to the month's last day.
     let dailyTotals: [DailyTotal]
 
     /// What `recurring` still has due for `side` in `month` as it stands on `today`, on top of `todaysTotal`, or `nil`
-    /// when `month` isn't the current month or nothing is due for the card. `history` is what a varying Bill's estimate
+    /// when `month` isn't the current month or nothing is due for the tab. `history` is what a varying Bill's estimate
     /// is averaged over.
     init?(
         _ side: SpentOrIncome, of recurring: [RecurringTransaction], history: [Transaction],

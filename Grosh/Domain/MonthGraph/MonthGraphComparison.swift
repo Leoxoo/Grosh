@@ -1,13 +1,13 @@
-/// The gray line a Month graph card compares its month with: the Average, or Last year while the card's "vs last year"
+/// The gray line a Month graph tab compares its month with: the Average, or Last year while the tab's "vs last year"
 /// switch is on. Either is the mean of the running totals of other months, each laid out across the month shown so that
 /// months of different lengths line up.
 ///
 /// The Average takes up to three complete months before the month shown. Months count from the month of the first
-/// transaction that counts on the Month graph, on either card: a partial first month counts, a month before it doesn't,
-/// and a counted month with nothing for the card counts as zero. The month shown is never part of its own Average.
+/// transaction that counts on the Month graph, on either tab: a partial first month counts, a month before it doesn't,
+/// and a counted month with nothing for the tab counts as zero. The month shown is never part of its own Average.
 ///
 /// Last year takes the same month 12 months before the month shown, and only when it holds something that counts for
-/// the card: a month with nothing for the card is no comparison, and neither is a month before the first transaction
+/// the tab: a month with nothing for the tab is no comparison, and neither is a month before the first transaction
 /// that counts.
 enum MonthGraphComparison {
     case average

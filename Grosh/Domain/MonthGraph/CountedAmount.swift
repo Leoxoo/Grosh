@@ -1,4 +1,4 @@
-/// One of the Month graph's two cards: Spent, for money going out, or Income, for money coming in.
+/// One of the Month graph's two tabs: Spent, for money going out, or Income, for money coming in.
 nonisolated enum SpentOrIncome: CaseIterable, Sendable {
     case spent
     case income
@@ -8,7 +8,7 @@ nonisolated enum SpentOrIncome: CaseIterable, Sendable {
 struct CountedAmount {
     let side: SpentOrIncome
     let day: CalendarDay
-    /// What it adds to its card's total. A refund takes away from Spent, so it is below zero there.
+    /// What it adds to its tab's total. A refund takes away from Spent, so it is below zero there.
     let amount: Money
 }
 
@@ -30,7 +30,7 @@ extension CountedAmount {
 }
 
 extension Transaction {
-    /// What the transaction counts on the Month graph, or `nil` when it counts toward neither card. Only the wallets
+    /// What the transaction counts on the Month graph, or `nil` when it counts toward neither tab. Only the wallets
     /// counted in the Total count, and nothing in Recently Deleted does.
     ///
     /// A forgiven Loan or Debt counts what was forgiven, on the day it was forgiven and under the category that amount
@@ -48,7 +48,7 @@ extension Transaction {
 
 extension ScheduledOccurrence {
     /// What the occurrence would count on the Month graph: what the transaction it makes would count on its due day,
-    /// by its Recurring transaction's category, or `nil` when that counts toward neither card. Which schedules and
+    /// by its Recurring transaction's category, or `nil` when that counts toward neither tab. Which schedules and
     /// wallets count is up to whoever picks the occurrences.
     var countedAmount: CountedAmount? {
         CountedAmount(amount, filedUnder: recurring.category, on: day)

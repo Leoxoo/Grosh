@@ -1,10 +1,10 @@
 import Charts
 import SwiftUI
 
-/// The chart of a Month graph card: the running total as a line in the card's color across the whole month, from zero
+/// The chart of a Month graph tab: the running total as a line in the tab's color across the whole month, from zero
 /// at the left edge, over the gray line it is compared with, then dotted from today to the month's end with what is
 /// still scheduled, and a marker with a popup on the selected day. Scrubbing across the chart moves the marker from day
-/// to day. A few days are named along the bottom; no amounts are named up the side.
+/// to day. A few days are named along the bottom, and a few amounts up the right side, shortened as in "5K".
 struct MonthGraphChart: View {
     /// The gray of the line the month is compared with, the Average or Last year, which the legend matches.
     static let comparisonColor = Color.gray
@@ -69,8 +69,13 @@ struct MonthGraphChart: View {
             }
         }
         .chartYAxis {
-            AxisMarks { _ in
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
                 AxisGridLine()
+                AxisValueLabel {
+                    if let cents = value.as(Double.self) {
+                        Text(Money(cents: Int(cents.rounded())).decimalValue, format: .number.notation(.compactName))
+                    }
+                }
             }
         }
         .chartOverlay { proxy in
@@ -114,13 +119,13 @@ struct MonthGraphChart: View {
         (1...graph.month.dayCount).map { graph.popup(on: graph.month.day($0)).scheduled.count }.max() ?? 0
     }
 
-    /// From zero, or below it when refunds take Spent under zero, to the highest total of any line. A flat line at zero
-    /// sits at the bottom.
+    /// From zero, or below it when refunds take Spent under zero, to the highest total of any line, and at least one
+    /// whole unit of money tall, so a flat line at zero sits at the bottom of an axis that reads in whole amounts.
     private var totalsDomain: ClosedRange<Double> {
         let lines = graph.line + (graph.comparisonLine ?? []) + (graph.scheduledLine ?? [])
         let totals = lines.map { Double($0.total.cents) }
         let lowest = min(totals.min() ?? 0, 0)
-        return lowest...max(totals.max() ?? 0, lowest + 1)
+        return lowest...max(totals.max() ?? 0, lowest + 100)
     }
 
     /// Moves the marker to the day nearest `x`, a position across the overlay `geometry` measures.
@@ -155,7 +160,7 @@ private struct MonthGraphPopup: View {
                     .monospacedDigit()
             }
             ForEach(popup.scheduled) { occurrence in
-                // Each counts toward the card, by what it adds to the card's total.
+                // Each counts toward the tab, by what it adds to the tab's total.
                 if let counted = occurrence.countedAmount {
                     Text("\(occurrence.recurring.name) \(counted.amount.formatted())")
                         .font(.caption)
