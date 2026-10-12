@@ -1,0 +1,32 @@
+{
+  "name": "Bubble pops",
+  "instrument": {
+    "attack": 0.004,
+    "partials": [
+      {"ratio": 1.0, "level": 1.0, "ring": 1.0},
+      {"ratio": 2.0, "level": 0.1, "ring": 0.4},
+      {"ratio": 3.0, "level": 0.04, "ring": 0.2}
+    ],
+    "glide": {"semitones": -5.0, "time": 0.012},
+    "sparkle": {
+      "partials": [
+        {"ratio": 2.0, "level": 0.2},
+        {"ratio": 3.0, "level": 0.1}
+      ],
+      "shimmer": 8.0,
+      "attack": 0.03
+    }
+  },
+  "endings": {
+    "income": [
+      {"pitch": 81, "start": 0.0, "loudness": 0.7, "ring": 0.2},
+      {"pitch": 84, "start": 0.08, "loudness": 0.8, "ring": 0.22},
+      {"pitch": 93, "start": 0.16, "loudness": 0.9, "ring": 0.45, "sparkle": 1.0}
+    ],
+    "expense": [
+      {"pitch": 81, "start": 0.0, "loudness": 0.7, "ring": 0.2},
+      {"pitch": 84, "start": 0.08, "loudness": 0.8, "ring": 0.22},
+      {"pitch": 89, "start": 0.16, "loudness": 1.0, "ring": 0.28}
+    ]
+  }
+}
