@@ -64,7 +64,7 @@ struct SettingsView: View {
 }
 
 private extension SuccessCue.Chime {
-    /// The chime's name, as its note list gives it.
+    /// The chime's name, as the Chime picker shows it.
     var title: String {
         switch self {
         case .marimba: String(localized: "Marimba")
