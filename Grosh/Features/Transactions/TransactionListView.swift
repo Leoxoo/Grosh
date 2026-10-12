@@ -39,6 +39,11 @@ struct TransactionListView: View {
         timeRange.periods(from: selected.firstDay, today: today)
     }
 
+    /// The Current period: the period of the time range that holds today.
+    private var currentPeriod: Period {
+        timeRange.period(containing: today)
+    }
+
     var body: some View {
         let today = today
         let selected = selected
@@ -108,13 +113,14 @@ struct TransactionListView: View {
         .modifier(SearchWhileOpen(text: $filter.searchText, isOpen: $isSearchPresented))
         .onChange(of: walletSelection) {
             // A wallet with a shorter history may not reach back to the period being shown.
-            showPeriodHoldingTodayUnlessOffered(by: strip(for: selected))
+            showCurrentPeriodUnlessOffered(by: strip(for: selected))
         }
         .onChange(of: filter.wallet) {
-            showPeriodHoldingTodayUnlessOffered(by: strip(for: selected))
+            showCurrentPeriodUnlessOffered(by: strip(for: selected))
         }
         .onChange(of: timeRange) {
-            showPeriodHoldingTodayUnlessOffered(by: strip(for: selected))
+            // Unlike a wallet change, a new time range always starts on the Current period, even from Future.
+            period = currentPeriod
         }
         .transactionSelectionMode(
             isSelecting: $isSelecting, chosen: $chosen, title: String(localized: "Transactions")
@@ -170,10 +176,10 @@ struct TransactionListView: View {
         }
     }
 
-    /// Keeps the period being shown when the strip still offers it; otherwise shows the one holding today.
-    private func showPeriodHoldingTodayUnlessOffered(by strip: [Period]) {
+    /// Keeps the period being shown when the strip still offers it; otherwise shows the Current period.
+    private func showCurrentPeriodUnlessOffered(by strip: [Period]) {
         if !strip.contains(period) {
-            period = timeRange.period(containing: today)
+            period = currentPeriod
         }
     }
 
