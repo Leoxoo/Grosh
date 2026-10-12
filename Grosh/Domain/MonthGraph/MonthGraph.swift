@@ -4,7 +4,8 @@
 /// Its line is the month's running total, starting at zero at the start of the 1st. The end of day `d` of an `N`-day
 /// month sits `d/N` of the way across, so months of different lengths span the same width. In the current month the
 /// line runs through today; in an earlier month, through its last day. The gray line of the Average
-/// (``MonthGraphAverage``) runs across the whole month.
+/// (``MonthGraphAverage``) runs across the whole month. In the current month, a dotted line continues from today to the
+/// end of the month with what the Recurring transactions still have due (``MonthGraphProjection``).
 struct MonthGraph {
     /// A point of the line: how far across the month it sits, from 0 at the start of the 1st to 1 at the end of the
     /// last day, and the running total there.
@@ -20,6 +21,12 @@ struct MonthGraph {
         let total: Money?
         /// The Average through the end of the day, or `nil` when the card has no gray line.
         let average: Money?
+        /// What the Recurring transactions have due on the day, by name and what each adds to the card's total: only
+        /// on a day after today in the current month.
+        let scheduled: [MonthGraphProjection.Item]
+        /// Today's total plus what is due through the end of the day, on a day after today once something due has
+        /// fallen on or before it; otherwise `nil`.
+        let expected: Money?
     }
 
     let side: SpentOrIncome
@@ -31,16 +38,27 @@ struct MonthGraph {
     private let dailyTotals: [(day: CalendarDay, total: Money)]
     /// The Average through the end of each day of the month, the 1st first, or `nil` when no month counts toward it.
     private let dailyAverages: [(day: CalendarDay, total: Money)]?
+    /// What `recurring` still has due for the card this month, or `nil` in an earlier month or with nothing due.
+    private let projection: MonthGraphProjection?
     private let dayCount: Int
 
-    /// The card for `side` showing `month`, the current month or an earlier one, as it stands on `today`.
-    init(_ side: SpentOrIncome, of transactions: [Transaction], in month: CalendarMonth, today: CalendarDay) {
+    /// The card for `side` showing `month`, the current month or an earlier one, as it stands on `today`, with what
+    /// `recurring` still has due this month.
+    init(
+        _ side: SpentOrIncome, of transactions: [Transaction], recurring: [RecurringTransaction] = [],
+        in month: CalendarMonth, today: CalendarDay
+    ) {
         let counted = transactions.compactMap(\.countedAmount)
+        let dailyTotals = counted.dailyTotals(side, in: month, through: today)
         self.side = side
         self.month = month
         self.lineName = Period.month(month).title(today: today)
-        self.dailyTotals = counted.dailyTotals(side, in: month, through: today)
+        self.dailyTotals = dailyTotals
         self.dailyAverages = MonthGraphAverage.dailyTotals(side, of: counted, for: month)
+        self.projection = MonthGraphProjection(
+            side, of: recurring, history: transactions, in: month, today: today,
+            todaysTotal: dailyTotals.last?.total ?? Money(cents: 0)
+        )
         self.dayCount = month.dayCount
     }
 
@@ -50,6 +68,15 @@ struct MonthGraph {
     /// The gray line: the Average from zero at the start of the 1st to the end of the month's last day, or `nil` when
     /// no month counts toward it.
     var averageLine: [Point]? { dailyAverages.map { points($0) } }
+
+    /// The dotted line: from today's point, today's total plus what the Recurring transactions have due through the end
+    /// of each day to the month's last; or `nil` in an earlier month, or when nothing is due for the card.
+    var scheduledLine: [Point]? {
+        projection?.dailyTotals.map { Point(position: position(of: $0.day), total: $0.total) }
+    }
+
+    /// Expected by month end: where the dotted line ends, or `nil` without one.
+    var expectedByMonthEnd: Money? { projection?.dailyTotals.last?.total }
 
     /// The month's total so far, the card's headline: where the line ends.
     var headline: Money { dailyTotals.last?.total ?? Money(cents: 0) }
@@ -75,7 +102,9 @@ struct MonthGraph {
         Popup(
             day: day,
             total: dailyTotals.first { $0.day == day }?.total,
-            average: dailyAverages?.first { $0.day == day }?.total
+            average: dailyAverages?.first { $0.day == day }?.total,
+            scheduled: projection?.items(on: day) ?? [],
+            expected: projection?.expectedTotal(through: day)
         )
     }
 

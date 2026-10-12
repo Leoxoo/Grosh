@@ -8,6 +8,7 @@ struct MonthGraphCards: View {
     let today: CalendarDay
 
     @Query(Transaction.notDeleted) private var transactions: [Transaction]
+    @Query private var recurringTransactions: [RecurringTransaction]
     /// The month both cards show, picked in the strip. Every launch starts on this month.
     @State private var period = Period.month(CalendarMonth(.today))
 
@@ -19,7 +20,9 @@ struct MonthGraphCards: View {
                 .listRowBackground(Color.clear)
         }
         ForEach(SpentOrIncome.allCases, id: \.self) { side in
-            MonthGraphCard(graph: MonthGraph(side, of: transactions, in: month, today: today))
+            MonthGraphCard(graph: MonthGraph(
+                side, of: transactions, recurring: recurringTransactions, in: month, today: today
+            ))
         }
     }
 
