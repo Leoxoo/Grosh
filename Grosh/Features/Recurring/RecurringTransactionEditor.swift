@@ -79,7 +79,7 @@ private struct RecurringForm: View {
 
     /// The estimate a varying Bill starts at: the average of its category's history, or `nil` when there is none.
     private var estimateCents: Int? {
-        guard draft.kind == .bill, draft.amountVaries, let category = draft.category else { return nil }
+        guard draft.estimatesAmount, let category = draft.category else { return nil }
         return AmountEstimate.cents(among: transactions, for: category, currencyCode: currencyCode)
     }
 

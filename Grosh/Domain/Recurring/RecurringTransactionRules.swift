@@ -90,6 +90,8 @@ struct RecurringDraft {
     /// The average a varying Bill's transactions would start at, from its category's history. It stands in for an
     /// amount left empty. The form sets it, and it is never saved.
     var estimateCents: Int?
+    /// Whether each transaction it makes would start Estimated: a Bill whose amount varies, as on the model.
+    var estimatesAmount: Bool { kind.estimates(amountVaries: amountVaries) }
     var note = ""
     /// A Subscription's cropped icon, as JPEG data. It is kept while the Kind is something else, as on the model.
     var iconData: Data?
@@ -187,7 +189,7 @@ struct RecurringDraft {
         guard !trimmedName.isEmpty else { throw RecurringRuleError.missingName }
         guard wallet != nil else { throw RecurringRuleError.missingWallet }
         // A varying Bill may leave its amount empty when there is an estimate to start its transactions from.
-        let startsFromEstimate = kind == .bill && amountVaries && estimateCents != nil
+        let startsFromEstimate = estimatesAmount && estimateCents != nil
         guard amount.cents > 0 || startsFromEstimate else { throw RecurringRuleError.missingAmount }
         guard category != nil else { throw RecurringRuleError.missingCategory }
         guard card == nil || card?.payingWallet === wallet else { throw RecurringRuleError.cardNotInWallet }

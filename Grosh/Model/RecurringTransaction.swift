@@ -114,7 +114,7 @@ final class RecurringTransaction {
     }
 
     /// Whether each transaction it makes starts Estimated: a Bill whose amount varies.
-    var estimatesAmount: Bool { kind == .bill && amountVaries }
+    var estimatesAmount: Bool { kind.estimates(amountVaries: amountVaries) }
 
     /// The currency its amounts are in: its wallet's, or the default while it has no wallet.
     var currencyCode: String { wallet?.currencyCode ?? Money.defaultCurrencyCode }
