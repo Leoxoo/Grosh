@@ -19,11 +19,12 @@ nonisolated enum LockedRole: String, CaseIterable, Sendable {
 @Model
 final class Category {
     var name: String = ""
-    var typeRaw: String = CategoryType.expense.rawValue
-    var symbolName: String = "questionmark"
+    // The three below were stored under other names before; an upgraded store keeps their values under those names.
+    @Attribute(originalName: "typeValue") var typeRaw: String = CategoryType.expense.rawValue
+    @Attribute(originalName: "iconName") var symbolName: String = "questionmark"
     var colorName: String = PaletteColor.gray.rawValue
     var isHidden: Bool = false
-    var lockedRoleRaw: String?
+    @Attribute(originalName: "roleValue") var lockedRoleRaw: String?
     var sortOrder: Int = 0
     /// The ``RecurringKind`` the user set, or `nil` while the category has none of its own. See ``defaultKind``.
     var ownKindRaw: String?
