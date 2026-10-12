@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// One transaction as every list shows it: category icon and name, note, Estimated and Forgiven badges, the Card's
-/// symbol, the wallet icon, and the amount in color. A forgiven Loan or Debt keeps its true amount.
+/// symbol or image, the wallet icon, and the amount in color. A forgiven Loan or Debt keeps its true amount.
 struct TransactionRow: View {
     let transaction: Transaction
     /// Shows the transaction's day, for lists not grouped by day.
@@ -54,17 +54,25 @@ struct TransactionRow: View {
     }
 }
 
-/// The Card a transaction was paid with, drawn as its symbol in the Card's color. Its name is the accessibility label
-/// and a Mac hover tooltip.
+/// The Card a transaction was paid with, in a fixed-size slot: its image as a landscape thumbnail, or else its symbol in
+/// the Card's color. Its name is the accessibility label and a Mac hover tooltip.
 struct CardIndicator: View {
     let card: Card
 
     var body: some View {
-        Image(systemName: Card.symbolName)
-            .font(.caption)
-            .foregroundStyle(card.color.color)
-            .accessibilityLabel(card.name)
-            .help(Text(card.name))
+        Group {
+            if let image = card.image {
+                CroppedPhotoImage(image: image, shape: .creditCard, height: 15)
+            } else {
+                Image(systemName: Card.symbolName)
+                    .font(.caption)
+                    .foregroundStyle(card.color.color)
+            }
+        }
+        .frame(width: 24, height: 16)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(card.name)
+        .help(Text(card.name))
     }
 }
 

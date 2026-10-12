@@ -178,6 +178,17 @@ struct CardManagementTests {
         #expect(checking.balance(asOf: today) == Money(cents: -136_86))
     }
 
+    @Test func mergingKeepsTheImageOfTheCardMergedInto() throws {
+        let nfcu = try addCard("NFCU")
+        let navyFederal = try addCard("Navy Federal")
+        nfcu.imageData = Data([4, 5, 6])
+        navyFederal.imageData = Data([1, 2, 3])
+
+        try nfcu.merge(into: navyFederal, in: context)
+
+        #expect(navyFederal.imageData == Data([1, 2, 3]))
+    }
+
     @Test func aCardMergesOnlyIntoTheOtherUnarchivedCardsPaidFromTheSameWallet() throws {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
         let nfcu = try addCard("NFCU")

@@ -43,8 +43,12 @@ struct CardPicker: View {
                 Label {
                     Text(card.isArchived ? "\(card.displayName) (Archived)" : card.displayName)
                 } icon: {
-                    Image(systemName: Card.symbolName)
-                        .foregroundStyle(card.color.color)
+                    if let image = card.image {
+                        CroppedPhotoImage(image: image, shape: .creditCard, height: 16)
+                    } else {
+                        Image(systemName: Card.symbolName)
+                            .foregroundStyle(card.color.color)
+                    }
                 }
                 .tag(Optional(card))
             }
