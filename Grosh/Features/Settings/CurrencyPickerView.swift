@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Account → Currency. Only USD is offered for now; each wallet already stores its own currency code.
+/// Settings → Currency. Only USD is offered for now; each wallet already stores its own currency code.
 struct CurrencyPickerView: View {
     static let currencyCodeKey = "currencyCode"
     static let offeredCurrencyCodes = [Money.defaultCurrencyCode]
