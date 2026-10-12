@@ -16,10 +16,6 @@ struct EstimatedAmountTests {
         store = try CategoryFixture()
     }
 
-    private func day(_ year: Int, _ month: Int, _ day: Int) -> CalendarDay {
-        CalendarDay(year: year, month: month, day: day)
-    }
-
     /// The instant at `hour` o'clock on `when`, in the UTC calendar the reminders are tested on.
     private func at(_ when: CalendarDay, hour: Int) -> Date {
         Calendar.utcGregorian.date(from: DateComponents(year: when.year, month: when.month, day: when.day, hour: hour))

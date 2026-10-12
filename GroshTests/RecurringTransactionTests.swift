@@ -16,10 +16,6 @@ struct RecurringTransactionTests {
         store = try CategoryFixture()
     }
 
-    private func day(_ year: Int, _ month: Int, _ day: Int) -> CalendarDay {
-        CalendarDay(year: year, month: month, day: day)
-    }
-
     private func category(_ name: String, _ type: CategoryType) -> Grosh.Category {
         let category = Grosh.Category(name: name, type: type, symbolName: "repeat", color: .purple)
         context.insert(category)

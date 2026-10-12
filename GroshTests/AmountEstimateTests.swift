@@ -14,10 +14,6 @@ struct AmountEstimateTests {
         store = try CategoryFixture()
     }
 
-    private func day(_ year: Int, _ month: Int, _ day: Int) -> CalendarDay {
-        CalendarDay(year: year, month: month, day: day)
-    }
-
     /// An expense category, inserted, optionally under `parent`.
     private func category(_ name: String, parent: Grosh.Category? = nil) -> Grosh.Category {
         let category = Grosh.Category(name: name, type: .expense, symbolName: "bolt", color: .purple, parent: parent)

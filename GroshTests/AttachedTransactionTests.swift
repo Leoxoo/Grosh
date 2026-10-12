@@ -16,10 +16,6 @@ struct AttachedTransactionTests {
         store = try CategoryFixture()
     }
 
-    private func day(_ year: Int, _ month: Int, _ day: Int) -> CalendarDay {
-        CalendarDay(year: year, month: month, day: day)
-    }
-
     /// A monthly Netflix of 15.99 starting on `start`, paid from the fixture's wallet.
     private func netflix(starting start: CalendarDay) throws -> RecurringTransaction {
         let category = Grosh.Category(name: "Subscriptions", type: .expense, symbolName: "repeat", color: .purple)

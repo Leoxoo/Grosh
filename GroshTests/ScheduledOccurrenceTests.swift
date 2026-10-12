@@ -16,10 +16,6 @@ struct ScheduledOccurrenceTests {
         store = try CategoryFixture()
     }
 
-    private func day(_ year: Int, _ month: Int, _ day: Int) -> CalendarDay {
-        CalendarDay(year: year, month: month, day: day)
-    }
-
     /// A Recurring transaction of 15.99 starting on `start`, paid from the fixture's wallet unless `wallet` is given,
     /// repeating `preset` until `end`, and saved on `today`.
     private func makeSchedule(

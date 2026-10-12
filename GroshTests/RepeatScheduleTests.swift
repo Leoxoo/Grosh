@@ -4,10 +4,6 @@ import Testing
 /// When a Recurring transaction falls due: the due days of each repeat, where its end cuts them off, and which one
 /// comes next. The expected days are worked out by hand from the calendar, not by the code under test.
 struct RepeatScheduleTests {
-    private func day(_ year: Int, _ month: Int, _ day: Int) -> CalendarDay {
-        CalendarDay(year: year, month: month, day: day)
-    }
-
     @Test func dailyRepeatFallsOnEveryDay() {
         let schedule = RepeatSchedule(start: day(2026, 10, 4), rule: RepeatRule(unit: .day, every: 1), end: .forever)
 
