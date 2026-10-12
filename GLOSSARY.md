@@ -31,6 +31,10 @@ Debit (spends straight from its wallet, no statement) or Credit (has a statement
 **Paying wallet**:
 The wallet a Card belongs to or is paid off from. A Card is only offered on that wallet's transactions.
 
+**Card image**:
+A photo of the physical card, cropped to a credit card's proportions and shown in place of the Card's symbol. A Card with an image takes its color from the image's average color.
+_Avoid_: Card photo, card picture
+
 **Statement date**:
 The optional day a Credit card's statement closes, or the month's last day when the month is shorter. A **statement period** runs from the day after one statement date through the next.
 

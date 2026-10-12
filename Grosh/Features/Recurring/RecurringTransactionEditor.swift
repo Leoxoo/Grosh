@@ -157,7 +157,7 @@ private struct RecurringForm: View {
                 }
             }
             if draft.kind == .subscription {
-                SubscriptionIconField(iconData: $draft.iconData)
+                PhotoField(shape: .appIcon, data: $draft.iconData)
             }
             CardPicker(title: "Card", wallet: draft.wallet, selection: $draft.card)
             fields.noteField($draft.note)

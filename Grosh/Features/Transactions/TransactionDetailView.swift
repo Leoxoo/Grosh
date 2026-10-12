@@ -116,8 +116,12 @@ struct TransactionDetailView: View {
         if let card = transaction.card {
             LabeledContent("Card") {
                 HStack(spacing: 6) {
-                    Image(systemName: Card.symbolName)
-                        .foregroundStyle(card.color.color)
+                    if let image = card.image {
+                        CroppedPhotoImage(image: image, shape: .creditCard, height: 18)
+                    } else {
+                        Image(systemName: Card.symbolName)
+                            .foregroundStyle(card.color.color)
+                    }
                     Text(card.displayName)
                 }
             }

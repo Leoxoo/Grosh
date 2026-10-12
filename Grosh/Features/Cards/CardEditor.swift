@@ -55,7 +55,11 @@ struct CardEditor: View {
             Form {
                 Section {
                     HStack(spacing: 12) {
-                        SymbolCircle(symbolName: Card.symbolName, color: draft.color, size: 40)
+                        if let image = draft.imageData.flatMap(CroppedPhoto.image(from:)) {
+                            CroppedPhotoImage(image: image, shape: .creditCard, height: 26)
+                        } else {
+                            SymbolCircle(symbolName: Card.symbolName, color: draft.color, size: 40)
+                        }
                         TextField("Name", text: $draft.name)
                     }
                     Picker("Kind", selection: $draft.kind) {
@@ -70,6 +74,7 @@ struct CardEditor: View {
                         #if os(iOS)
                         .keyboardType(.numberPad)
                         #endif
+                    PhotoField(shape: .creditCard, data: imageData)
                 } footer: {
                     if wallets.isEmpty && draft.payingWallet == nil {
                         Text("Add a wallet first. A Card is paid from a wallet and only offered on its transactions.")
@@ -87,8 +92,15 @@ struct CardEditor: View {
                     statementSection
                 }
 
-                Section("Color") {
+                Section {
                     PaletteColorGrid(selection: $draft.color)
+                        .disabled(draft.imageData != nil)
+                } header: {
+                    Text("Color")
+                } footer: {
+                    if draft.imageData != nil {
+                        Text("A Card with an image takes its color from the image.")
+                    }
                 }
 
                 if let card = editedCard {
@@ -118,6 +130,14 @@ struct CardEditor: View {
             }
             .errorAlert("Couldn't Save Card", message: $errorMessage)
         }
+    }
+
+    /// The Card's image, which also sets its color (``CardDraft/setImage(_:)``).
+    private var imageData: Binding<Data?> {
+        Binding(
+            get: { draft.imageData },
+            set: { draft.setImage($0) }
+        )
     }
 
     /// The last 4 digits field, which keeps only up to four digits as the user types.
