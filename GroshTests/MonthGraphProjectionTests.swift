@@ -234,7 +234,7 @@ struct MonthGraphProjectionTests {
         let popup = try graph(.spent).popup(on: day(2026, 10, 15))
 
         #expect(popup.day == day(2026, 10, 15))
-        #expect(popup.average != nil)
+        #expect(popup.comparison != nil)
         #expect(popup.total == nil)
         #expect(popup.scheduled.isEmpty)
         #expect(popup.expected == nil)

@@ -88,8 +88,8 @@ struct MonthGraphEarlierMonthTests {
         #expect(july.line.last?.position == 1)
         #expect(july.popup(on: day(2026, 7, 30)).total == Money(cents: 10_00))
         #expect(july.popup(on: day(2026, 7, 31)).total == Money(cents: 30_00))
-        #expect(july.averageLine?.last?.position == 1)
-        #expect(july.averageLine?.last?.total == Money(cents: 60_00))
+        #expect(july.comparisonLine?.last?.position == 1)
+        #expect(july.comparisonLine?.last?.total == Money(cents: 60_00))
     }
 
     /// June, July and August average $60; September's own $40 is its total.
@@ -104,7 +104,7 @@ struct MonthGraphEarlierMonthTests {
 
         #expect(september.defaultSelection == day(2026, 9, 30))
         #expect(popup.total == Money(cents: 40_00))
-        #expect(popup.average == Money(cents: 60_00))
+        #expect(popup.comparison == Money(cents: 60_00))
     }
 
     // MARK: The legend
