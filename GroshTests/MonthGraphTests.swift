@@ -3,7 +3,8 @@ import SwiftData
 import Testing
 @testable import Grosh
 
-/// Home's Spent and Income cards: what counts toward each, and the running total of the month so far.
+/// Home's Spent and Income cards: what counts toward each, the running total of the month so far, and the day the
+/// marker is on.
 @MainActor
 struct MonthGraphTests {
     private let store: CategoryFixture
@@ -258,5 +259,37 @@ struct MonthGraphTests {
 
         #expect(popup.day == day(2026, 10, 20))
         #expect(popup.total == nil)
+    }
+
+    /// A day after today can be picked too, though the line doesn't reach it yet.
+    @Test func aDragAcrossTheChartSnapsToTheDayWhoseEndIsNearest() throws {
+        let spent = try graph(.spent)
+
+        #expect(spent.day(nearest: 12.0 / 31) == today)
+        #expect(spent.day(nearest: 12.4 / 31) == today)
+        #expect(spent.day(nearest: 12.6 / 31) == day(2026, 10, 13))
+        #expect(spent.day(nearest: 20.0 / 31) == day(2026, 10, 20))
+    }
+
+    @Test func aDragPastEitherEdgeStopsOnTheFirstOrLastDay() throws {
+        let spent = try graph(.spent)
+
+        #expect(spent.day(nearest: 0) == day(2026, 10, 1))
+        #expect(spent.day(nearest: -0.2) == day(2026, 10, 1))
+        #expect(spent.day(nearest: 1) == day(2026, 10, 31))
+        #expect(spent.day(nearest: 1.3) == day(2026, 10, 31))
+    }
+
+    @Test func aSelectedDayShowsItsDateAndTheRunningTotalThroughIt() throws {
+        try record(-12_00, "Café", on: day(2026, 10, 2))
+        try record(-8_00, "Products", on: day(2026, 10, 5))
+
+        let spent = try graph(.spent)
+        let selected = spent.day(nearest: spent.position(of: day(2026, 10, 4)))
+        let popup = spent.popup(on: selected)
+
+        #expect(selected == day(2026, 10, 4))
+        #expect(popup.day == day(2026, 10, 4))
+        #expect(popup.total == Money(cents: 12_00))
     }
 }
