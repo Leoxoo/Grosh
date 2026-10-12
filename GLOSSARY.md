@@ -178,7 +178,7 @@ On a Credit card's statement view, the transactions from the two days before the
 ### Reports
 
 **Month graph**:
-Home's Spent and Income cards, each drawing the running total of its month as a line beside a gray line to compare it with and, for the current month, a dotted line for what the Recurring transactions will still add. Every month is laid out as 0–100% of its length, so months of different lengths line up.
+Home's Spent and Income cards, each drawing the running total of its month as a line beside a gray line to compare it with and, for the current month, a dotted line for what the Recurring transactions will still add. Every month is laid out as 0–100% of its length, so months of different lengths line up. A strip of months above the cards, from the month of the first transaction that counts through this month, picks the month both show; it opens on this month.
 _Avoid_: Report this month
 
 **Spent**:
