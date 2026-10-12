@@ -19,7 +19,7 @@ struct LinkExistingTransactionView: View {
     }
 
     private var candidates: [Transaction] {
-        transactions.filter(\.isAttachable).matching(filter).sorted(by: Transaction.newestFirst)
+        transactions.filter(\.isAttachable).matching(filter).inListOrder()
     }
 
     var body: some View {

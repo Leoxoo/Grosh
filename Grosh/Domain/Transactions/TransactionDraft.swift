@@ -100,10 +100,7 @@ struct TransactionDraft {
     init(paymentFor recurring: RecurringTransaction, on today: CalendarDay) {
         self.init(type: recurring.category?.type ?? .expense, day: today)
         wallet = recurring.wallet
-        amount = Money(
-            cents: abs(recurring.amountCents),
-            currencyCode: recurring.wallet?.currencyCode ?? Money.defaultCurrencyCode
-        )
+        amount = Money(cents: abs(recurring.amountCents), currencyCode: recurring.currencyCode)
         category = recurring.category
         card = recurring.card
         note = recurring.note

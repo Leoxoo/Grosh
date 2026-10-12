@@ -33,7 +33,7 @@ extension RecurringTransaction {
     /// after a number of payments, lists every payment still to come. A schedule that isn't active lists none: one in
     /// Recently Deleted, one paused by an archived wallet, or one whose wallet is in Recently Deleted.
     func scheduledDays(today: CalendarDay) -> [CalendarDay] {
-        guard isActive, let wallet, !wallet.isArchived, wallet.deletedAt == nil else { return [] }
+        guard isActive, wallet != nil else { return [] }
         // Occurrences up to `handledThrough` are transactions already, or were skipped when the schedule was saved.
         let dealtWith = handledThrough.map { max($0, today) } ?? today
         switch schedule.end {

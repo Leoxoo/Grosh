@@ -17,9 +17,7 @@ enum AmountEstimate {
             return transaction.deletedAt == nil && !transaction.isEstimated && !transaction.isExcludedFromReport
                 && transaction.wallet?.currencyCode == currencyCode
         }
-        let recent = usable
-            .sorted { lhs, rhs in lhs.dayRaw == rhs.dayRaw ? lhs.createdAt > rhs.createdAt : lhs.dayRaw > rhs.dayRaw }
-            .prefix(sampleSize)
+        let recent = usable.inListOrder().prefix(sampleSize)
         guard !recent.isEmpty else { return nil }
         let total = recent.reduce(0) { $0 + abs($1.amountCents) }
         return Int((Double(total) / Double(recent.count)).rounded())

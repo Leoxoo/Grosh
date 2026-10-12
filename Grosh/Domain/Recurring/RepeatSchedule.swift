@@ -158,19 +158,14 @@ nonisolated struct RepeatSchedule: Hashable, Sendable {
     /// such weekday, since not every month has a fifth.
     private func nthWeekdayDueDay(year: Int, month: Int) -> CalendarDay {
         let week = (start.day - 1) / 7
-        let startWeekday = Self.weekday(of: start)
+        let startWeekday = start.weekday
         if week == 4 {
             let lastDay = Self.daysInMonth(year: year, month: month)
-            let lastWeekday = Self.weekday(of: CalendarDay(year: year, month: month, day: lastDay))
+            let lastWeekday = CalendarDay(year: year, month: month, day: lastDay).weekday
             return CalendarDay(year: year, month: month, day: lastDay - (lastWeekday - startWeekday + 7) % 7)
         }
-        let firstWeekday = Self.weekday(of: CalendarDay(year: year, month: month, day: 1))
+        let firstWeekday = CalendarDay(year: year, month: month, day: 1).weekday
         return CalendarDay(year: year, month: month, day: 1 + (startWeekday - firstWeekday + 7) % 7 + week * 7)
-    }
-
-    /// The weekday of `day` as ``Calendar`` counts it: 1 for Sunday through 7 for Saturday.
-    private static func weekday(of day: CalendarDay) -> Int {
-        Calendar.utcGregorian.component(.weekday, from: day.date(in: .utcGregorian))
     }
 
     private func isWithinEnd(index: Int, day: CalendarDay) -> Bool {

@@ -116,6 +116,9 @@ final class RecurringTransaction {
     /// Whether each transaction it makes starts Estimated: a Bill whose amount varies.
     var estimatesAmount: Bool { kind == .bill && amountVaries }
 
+    /// The currency its amounts are in: its wallet's, or the default while it has no wallet.
+    var currencyCode: String { wallet?.currencyCode ?? Money.defaultCurrencyCode }
+
     /// The last due day dealt with, or `nil` before any has been.
     var handledThrough: CalendarDay? {
         get { handledThroughRaw.map { CalendarDay(rawValue: $0) } }

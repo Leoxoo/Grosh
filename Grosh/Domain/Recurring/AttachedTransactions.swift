@@ -17,11 +17,6 @@ extension Transaction {
     /// Recurring transaction holds it yet. A transaction belongs to one schedule at a time, so attaching one that
     /// another schedule holds is refused.
     var isAttachable: Bool { deletedAt == nil && recurring == nil }
-
-    /// Orders transactions newest first: by day, then by when each was entered.
-    static func newestFirst(_ lhs: Transaction, _ rhs: Transaction) -> Bool {
-        lhs.dayRaw == rhs.dayRaw ? lhs.createdAt > rhs.createdAt : lhs.dayRaw > rhs.dayRaw
-    }
 }
 
 extension RecurringTransaction {
