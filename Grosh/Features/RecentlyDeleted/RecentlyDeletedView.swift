@@ -28,7 +28,8 @@ struct RecentlyDeletedView: View {
                                 Label(schedule.name, systemImage: "repeat")
                             }
                             ForEach(deletedWithIt) { transaction in
-                                TransactionRow(transaction: transaction, showsDay: true)
+                                // All from this wallet, which its row already names.
+                                TransactionRow(transaction: transaction, showsDay: true, showsWalletIcon: false)
                             }
                         } label: {
                             DeletedWalletRow(wallet: wallet, transactionCount: deletedWithIt.count, now: now)

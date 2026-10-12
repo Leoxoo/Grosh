@@ -22,7 +22,7 @@ struct TransactionSearchView: View {
                 NavigationLink {
                     TransactionDetailView(transaction: transaction)
                 } label: {
-                    TransactionRow(transaction: transaction)
+                    TransactionRow(transaction: transaction, showsWalletIcon: filter.wallet == nil)
                 }
             }
         }

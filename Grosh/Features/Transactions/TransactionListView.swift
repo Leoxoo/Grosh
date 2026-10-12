@@ -158,12 +158,14 @@ struct TransactionListView: View {
 
     @ViewBuilder
     private func row(_ transaction: Transaction, showsDay: Bool = false) -> some View {
+        // The Total with no wallet filter lists every wallet; a selected wallet or a wallet filter lists one.
+        let showsWalletIcon = walletSelection == .total && filter.wallet == nil
         if isSelecting {
-            TransactionRow(transaction: transaction, showsDay: showsDay)
+            TransactionRow(transaction: transaction, showsDay: showsDay, showsWalletIcon: showsWalletIcon)
                 .tag(transaction)
         } else {
             NavigationLink(value: transaction) {
-                TransactionRow(transaction: transaction, showsDay: showsDay)
+                TransactionRow(transaction: transaction, showsDay: showsDay, showsWalletIcon: showsWalletIcon)
             }
         }
     }

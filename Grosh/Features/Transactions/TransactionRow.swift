@@ -1,11 +1,13 @@
 import SwiftUI
 
-/// One transaction as every list shows it: category icon and name, note, Estimated, Forgiven and Card badges, wallet
-/// icon, and the amount in color. A forgiven Loan or Debt keeps its true amount.
+/// One transaction as every list shows it: category icon and name, note, Estimated and Forgiven badges, the Card's
+/// symbol, the wallet icon, and the amount in color. A forgiven Loan or Debt keeps its true amount.
 struct TransactionRow: View {
     let transaction: Transaction
     /// Shows the transaction's day, for lists not grouped by day.
     var showsDay = false
+    /// Shows the paying wallet's icon in gray, for lists that mix wallets. A list of one wallet turns it off.
+    var showsWalletIcon = true
 
     var body: some View {
         HStack(spacing: 12) {
@@ -36,12 +38,16 @@ struct TransactionRow: View {
                         ForgivenBadge()
                     }
                     if let card = transaction.card {
-                        CardBadge(card: card)
+                        Image(systemName: Card.symbolName)
+                            .font(.caption)
+                            .foregroundStyle(card.color.color)
+                            .accessibilityLabel(card.name)
+                            .help(Text(card.name))
                     }
-                    if let wallet = transaction.wallet {
+                    if showsWalletIcon, let wallet = transaction.wallet {
                         Image(systemName: wallet.symbolName)
                             .font(.caption)
-                            .foregroundStyle(wallet.color.color)
+                            .foregroundStyle(.secondary)
                             .accessibilityLabel(wallet.name)
                     }
                 }
@@ -49,22 +55,6 @@ struct TransactionRow: View {
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// A small capsule naming the Card a transaction was paid with.
-struct CardBadge: View {
-    let card: Card
-
-    var body: some View {
-        Label(card.name, systemImage: Card.symbolName)
-            .labelStyle(.titleAndIcon)
-            .font(.caption2.weight(.medium))
-            .lineLimit(1)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .foregroundStyle(card.color.color)
-            .background(card.color.color.opacity(0.15), in: Capsule())
     }
 }
 
