@@ -21,9 +21,9 @@ struct MonthGraph {
         let total: Money?
         /// The gray line's total through the end of the day, or `nil` when the card has no gray line.
         let comparison: Money?
-        /// What the Recurring transactions have due on the day, by name and what each adds to the card's total: only
-        /// on a day after today in the current month.
-        let scheduled: [MonthGraphProjection.Item]
+        /// The Occurrences the Recurring transactions have due on the day, the most recently added schedule first, each
+        /// adding its `countedAmount` to the card's total: only on a day after today in the current month.
+        let scheduled: [ScheduledOccurrence]
         /// Today's total plus what is due through the end of the day, on a day after today once something due has
         /// fallen on or before it; otherwise `nil`.
         let expected: Money?
@@ -40,10 +40,10 @@ struct MonthGraph {
     /// Whether Last year is available for the month, so the card's "vs last year" switch can be used.
     let isLastYearAvailable: Bool
     /// The running total through the end of each day the line reaches, the 1st first.
-    private let dailyTotals: [(day: CalendarDay, total: Money)]
+    private let dailyTotals: [DailyTotal]
     /// The gray line's total through the end of each day of the month, the 1st first, or `nil` when no month counts
     /// toward it.
-    private let dailyComparisons: [(day: CalendarDay, total: Money)]?
+    private let dailyComparisons: [DailyTotal]?
     /// What `recurring` still has due for the card this month, or `nil` in an earlier month or with nothing due.
     private let projection: MonthGraphProjection?
     private let dayCount: Int
@@ -109,22 +109,22 @@ struct MonthGraph {
     /// chart: a day the line doesn't reach yet too, and the first or last day past either edge.
     func day(nearest position: Double) -> CalendarDay {
         let number = min(max(1, (position * Double(dayCount)).rounded()), Double(dayCount))
-        return CalendarDay(year: month.year, month: month.month, day: Int(number))
+        return month.day(Int(number))
     }
 
     /// What the popup says about `day`.
     func popup(on day: CalendarDay) -> Popup {
         Popup(
             day: day,
-            total: dailyTotals.first { $0.day == day }?.total,
-            comparison: dailyComparisons?.first { $0.day == day }?.total,
-            scheduled: projection?.items(on: day) ?? [],
+            total: dailyTotals.total(on: day),
+            comparison: dailyComparisons?.total(on: day),
+            scheduled: projection?.occurrences(on: day) ?? [],
             expected: projection?.expectedTotal(through: day)
         )
     }
 
     /// Zero at the start of the 1st, then each of `daily`'s totals at the end of its day.
-    private func points(_ daily: [(day: CalendarDay, total: Money)]) -> [Point] {
+    private func points(_ daily: [DailyTotal]) -> [Point] {
         [Point(position: 0, total: Money(cents: 0))]
             + daily.map { Point(position: position(of: $0.day), total: $0.total) }
     }
@@ -135,28 +135,45 @@ extension MonthGraph {
     /// on the Month graph, on either card, through `today`'s month, or `today`'s month alone when nothing counts.
     /// Never Future.
     static func months(of transactions: [Transaction], today: CalendarDay) -> [Period] {
-        let firstDay = transactions.compactMap(\.countedAmount).map(\.day).min()
+        let firstDay = transactions.compactMap(\.countedAmount).firstDay
         return TimeRange.month.periods(from: firstDay, today: today).filter { $0 != .future }
     }
 }
 
+/// A Month graph card's running total through the end of a day.
+struct DailyTotal {
+    let day: CalendarDay
+    let total: Money
+}
+
+extension Array where Element == DailyTotal {
+    /// The running total through the end of `day`, or `nil` for a day these don't reach.
+    func total(on day: CalendarDay) -> Money? {
+        first { $0.day == day }?.total
+    }
+}
+
 extension Sequence where Element == CountedAmount {
+    /// The earliest day anything counts on the Month graph, on either card, or `nil` when nothing does: the day of the
+    /// first transaction that counts, which the strip and the Average count months from.
+    var firstDay: CalendarDay? {
+        map(\.day).min()
+    }
+
     /// The running total of what counts toward `side` in `month`, through the end of each of its days up to `lastDay`,
     /// the 1st first.
-    func dailyTotals(
-        _ side: SpentOrIncome, in month: CalendarMonth, through lastDay: CalendarDay
-    ) -> [(day: CalendarDay, total: Money)] {
+    func dailyTotals(_ side: SpentOrIncome, in month: CalendarMonth, through lastDay: CalendarDay) -> [DailyTotal] {
         var centsByDay: [CalendarDay: Int] = [:]
         for counted in self where counted.side == side && CalendarMonth(counted.day) == month {
             centsByDay[counted.day, default: 0] += counted.amount.cents
         }
         var running = 0
-        var dailyTotals: [(day: CalendarDay, total: Money)] = []
+        var dailyTotals: [DailyTotal] = []
         for number in 1...month.dayCount {
-            let day = CalendarDay(year: month.year, month: month.month, day: number)
+            let day = month.day(number)
             guard day <= lastDay else { break }
             running += centsByDay[day, default: 0]
-            dailyTotals.append((day: day, total: Money(cents: running)))
+            dailyTotals.append(DailyTotal(day: day, total: Money(cents: running)))
         }
         return dailyTotals
     }

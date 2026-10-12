@@ -7,32 +7,18 @@ import Testing
 /// marker is on.
 @MainActor
 struct MonthGraphTests {
-    private let store: CategoryFixture
+    private let store: MonthGraphFixture
     private var context: ModelContext { store.context }
-    private var checking: Wallet { store.wallet }
-    /// The 12th of a 31-day month.
-    private let today = day(2026, 10, 12)
+    private var checking: Wallet { store.checking }
+    private var today: CalendarDay { store.today }
 
     init() throws {
-        store = try CategoryFixture()
+        store = try MonthGraphFixture()
     }
 
-    /// Records `cents` (signed, as it moves the wallet) filed under `categoryName` on `day`, in Checking unless another
-    /// wallet is given.
-    @discardableResult
-    private func record(
-        _ cents: Int, _ categoryName: String, _ type: CategoryType = .expense, on day: CalendarDay,
-        in wallet: Wallet? = nil
-    ) throws -> Transaction {
-        let transaction = Transaction(amount: Money(cents: cents), day: day, wallet: nil, category: nil)
-        context.insert(transaction)
-        transaction.wallet = wallet ?? checking
-        transaction.category = try store.category(categoryName, type)
-        return transaction
-    }
-
-    /// A Loan (you lent) or Debt (you borrowed) of `cents`, saved through the Add sheet's draft. It is left in the
-    /// report, so only its category keeps it off the cards.
+    /// A Loan (you lent) or Debt (you borrowed) of `cents`, saved through a draft made as Debt/Loan from the start. It
+    /// skips the Add sheet's switch to the Debt/Loan tab, which is what turns Exclude from report on, so it is left in
+    /// the report and only its category keeps it off the cards.
     @discardableResult
     private func record(_ role: LockedRole, _ cents: Int, on day: CalendarDay) throws -> Transaction {
         var draft = TransactionDraft(type: .debtLoan, day: day)
@@ -56,39 +42,32 @@ struct MonthGraphTests {
         try Forgiveness.record(ForgiveDraft(forgiving: loanOrDebt, on: day, in: context), in: context)
     }
 
-    /// The card for `side` showing `month` (this month unless another is given), made from every transaction in the
-    /// store, those in Recently Deleted included.
-    private func graph(_ side: SpentOrIncome, in month: CalendarMonth? = nil) throws -> MonthGraph {
-        let transactions = try context.fetch(FetchDescriptor<Transaction>())
-        return MonthGraph(side, of: transactions, in: month ?? CalendarMonth(today), today: today)
-    }
-
     // MARK: What counts
 
     @Test func anExpenseCountsAsSpentAndAnIncomeAsIncome() throws {
-        try record(-40_00, "Café", on: day(2026, 10, 3))
-        try record(1_500_00, "Salary", .income, on: day(2026, 10, 5))
+        try store.record(-40_00, "Café", on: day(2026, 10, 3))
+        try store.record(1_500_00, "Salary", .income, on: day(2026, 10, 5))
 
-        #expect(try graph(.spent).headline == Money(cents: 40_00))
-        #expect(try graph(.income).headline == Money(cents: 1_500_00))
+        #expect(try store.graph(.spent).headline == Money(cents: 40_00))
+        #expect(try store.graph(.income).headline == Money(cents: 1_500_00))
     }
 
     @Test func aRefundLowersSpent() throws {
-        try record(-80_00, "Clothing", on: day(2026, 10, 2))
-        try record(30_00, "Clothing", on: day(2026, 10, 6))
+        try store.record(-80_00, "Clothing", on: day(2026, 10, 2))
+        try store.record(30_00, "Clothing", on: day(2026, 10, 6))
 
-        #expect(try graph(.spent).headline == Money(cents: 50_00))
-        #expect(try graph(.income).headline == Money(cents: 0))
+        #expect(try store.graph(.spent).headline == Money(cents: 50_00))
+        #expect(try store.graph(.income).headline == Money(cents: 0))
     }
 
     @Test func aTransactionExcludedFromReportCountsInNeither() throws {
-        let coffee = try record(-40_00, "Café", on: day(2026, 10, 3))
-        let salary = try record(1_500_00, "Salary", .income, on: day(2026, 10, 5))
+        let coffee = try store.record(-40_00, "Café", on: day(2026, 10, 3))
+        let salary = try store.record(1_500_00, "Salary", .income, on: day(2026, 10, 5))
         coffee.isExcludedFromReport = true
         salary.isExcludedFromReport = true
 
-        #expect(try graph(.spent).headline == Money(cents: 0))
-        #expect(try graph(.income).headline == Money(cents: 0))
+        #expect(try store.graph(.spent).headline == Money(cents: 0))
+        #expect(try store.graph(.income).headline == Money(cents: 0))
     }
 
     /// A transfer's halves are filed under an Expense and an Income category, and neither is excluded from report.
@@ -101,17 +80,17 @@ struct MonthGraphTests {
         draft.amount = Money(cents: 250_00)
         try Transfer.create(draft, in: context)
 
-        #expect(try graph(.spent).headline == Money(cents: 0))
-        #expect(try graph(.income).headline == Money(cents: 0))
+        #expect(try store.graph(.spent).headline == Money(cents: 0))
+        #expect(try store.graph(.income).headline == Money(cents: 0))
     }
 
     /// A new wallet's Starting balance is excluded from report; one an import brings may not be. Neither counts.
     @Test func aStartingBalanceCountsInNeither() throws {
         try Wallet.create(name: "Cash", startingBalance: Money(cents: 300_00), on: day(2026, 10, 1), in: context)
-        try record(500_00, "Starting balance", .system, on: day(2026, 10, 2))
+        try store.record(500_00, "Starting balance", .system, on: day(2026, 10, 2))
 
-        #expect(try graph(.income).headline == Money(cents: 0))
-        #expect(try graph(.spent).headline == Money(cents: 0))
+        #expect(try store.graph(.income).headline == Money(cents: 0))
+        #expect(try store.graph(.spent).headline == Money(cents: 0))
     }
 
     /// Payments are recorded excluded from report; an import may leave them in, as it may a Loan or Debt.
@@ -123,11 +102,12 @@ struct MonthGraphTests {
         collection.isExcludedFromReport = false
         repayment.isExcludedFromReport = false
 
-        #expect(try graph(.spent).headline == Money(cents: 0))
-        #expect(try graph(.income).headline == Money(cents: 0))
+        #expect(try store.graph(.spent).headline == Money(cents: 0))
+        #expect(try store.graph(.income).headline == Money(cents: 0))
     }
 
-    /// A Loan or Debt starts excluded from report, and was lent or borrowed last month: only what is forgiven counts.
+    /// Lent and borrowed last month, and excluded from report as the Add sheet would save them: only what is forgiven
+    /// counts, whatever their own flag says.
     @Test func aForgivenLoanCountsAsSpentAndAForgivenDebtAsIncomeOnTheDayTheyWereForgiven() throws {
         let loan = try record(.loan, 100_00, on: day(2026, 9, 20))
         let debt = try record(.debt, 250_00, on: day(2026, 9, 25))
@@ -136,8 +116,8 @@ struct MonthGraphTests {
         try forgive(loan, on: day(2026, 10, 5))
         try forgive(debt, on: day(2026, 10, 7))
 
-        let spent = try graph(.spent)
-        let income = try graph(.income)
+        let spent = try store.graph(.spent)
+        let income = try store.graph(.income)
 
         #expect(spent.popup(on: day(2026, 10, 4)).total == Money(cents: 0))
         #expect(spent.popup(on: day(2026, 10, 5)).total == Money(cents: 100_00))
@@ -154,20 +134,20 @@ struct MonthGraphTests {
             reason: store.category("Collect Interest", .income), in: context
         )
 
-        #expect(try graph(.spent).headline == Money(cents: 12_00))
-        #expect(try graph(.income).headline == Money(cents: 3_50))
+        #expect(try store.graph(.spent).headline == Money(cents: 12_00))
+        #expect(try store.graph(.income).headline == Money(cents: 3_50))
     }
 
     @Test func nothingInRecentlyDeletedCounts() throws {
-        let coffee = try record(-4_50, "Café", on: day(2026, 10, 3))
-        let salary = try record(1_500_00, "Salary", .income, on: day(2026, 10, 5))
+        let coffee = try store.record(-4_50, "Café", on: day(2026, 10, 3))
+        let salary = try store.record(1_500_00, "Salary", .income, on: day(2026, 10, 5))
         let loan = try record(.loan, 100_00, on: day(2026, 9, 20))
         try forgive(loan, on: day(2026, 10, 6))
 
         try [coffee, salary, loan].delete(.onlySelected, in: context)
 
-        #expect(try graph(.spent).headline == Money(cents: 0))
-        #expect(try graph(.income).headline == Money(cents: 0))
+        #expect(try store.graph(.spent).headline == Money(cents: 0))
+        #expect(try store.graph(.income).headline == Money(cents: 0))
     }
 
     @Test func onlyTheWalletsCountedInTheTotalCount() throws {
@@ -179,27 +159,27 @@ struct MonthGraphTests {
         for wallet in [brokerage, oldBank, cash] {
             context.insert(wallet)
         }
-        try record(-40_00, "Café", on: day(2026, 10, 3))
-        try record(-500_00, "Investment", on: day(2026, 10, 3), in: brokerage)
-        try record(900_00, "Salary", .income, on: day(2026, 10, 4), in: oldBank)
-        try record(-25_00, "Café", on: day(2026, 10, 5), in: cash)
+        try store.record(-40_00, "Café", on: day(2026, 10, 3))
+        try store.record(-500_00, "Investment", on: day(2026, 10, 3), in: brokerage)
+        try store.record(900_00, "Salary", .income, on: day(2026, 10, 4), in: oldBank)
+        try store.record(-25_00, "Café", on: day(2026, 10, 5), in: cash)
         try cash.delete()
 
-        #expect(try graph(.spent).headline == Money(cents: 40_00))
-        #expect(try graph(.income).headline == Money(cents: 0))
+        #expect(try store.graph(.spent).headline == Money(cents: 40_00))
+        #expect(try store.graph(.income).headline == Money(cents: 0))
     }
 
     // MARK: The running total
 
     @Test func theLineStartsAtZeroAndAddsUpEachDayThroughToday() throws {
-        try record(-7_00, "Café", on: day(2026, 9, 30))
-        try record(-10_00, "Café", on: day(2026, 10, 1))
-        try record(-20_00, "Products", on: day(2026, 10, 5))
-        try record(-5_00, "Café", on: day(2026, 10, 5))
-        try record(-3_00, "Café", on: today)
-        try record(-100_00, "Rentals", on: day(2026, 10, 13))
+        try store.record(-7_00, "Café", on: day(2026, 9, 30))
+        try store.record(-10_00, "Café", on: day(2026, 10, 1))
+        try store.record(-20_00, "Products", on: day(2026, 10, 5))
+        try store.record(-5_00, "Café", on: day(2026, 10, 5))
+        try store.record(-3_00, "Café", on: today)
+        try store.record(-100_00, "Rentals", on: day(2026, 10, 13))
 
-        let spent = try graph(.spent)
+        let spent = try store.graph(.spent)
 
         #expect(spent.line.map(\.total.cents) == [
             0, 10_00, 10_00, 10_00, 10_00, 35_00, 35_00, 35_00, 35_00, 35_00, 35_00, 35_00, 38_00,
@@ -209,18 +189,18 @@ struct MonthGraphTests {
     }
 
     @Test func dayDOfAnNDayMonthSitsDOverNOfTheWayAcross() throws {
-        let spent = try graph(.spent)
+        let spent = try store.graph(.spent)
 
         #expect(spent.line.map(\.position) == (0...12).map { Double($0) / 31 })
         #expect(spent.position(of: today) == 12.0 / 31)
     }
 
     @Test func anEarlierMonthRunsThroughItsLastDay() throws {
-        try record(-60_00, "Rentals", on: day(2026, 2, 1))
-        try record(-15_00, "Café", on: day(2026, 2, 28))
-        try record(-9_00, "Café", on: day(2026, 3, 1))
+        try store.record(-60_00, "Rentals", on: day(2026, 2, 1))
+        try store.record(-15_00, "Café", on: day(2026, 2, 28))
+        try store.record(-9_00, "Café", on: day(2026, 3, 1))
 
-        let february = try graph(.spent, in: CalendarMonth(year: 2026, month: 2))
+        let february = try store.graph(.spent, in: CalendarMonth(year: 2026, month: 2))
 
         #expect(february.line.count == 29)
         #expect(february.line.last?.position == 1)
@@ -230,7 +210,7 @@ struct MonthGraphTests {
 
     @Test(arguments: SpentOrIncome.allCases)
     func withNothingToCountTheCardShowsAFlatLineAtZero(side: SpentOrIncome) throws {
-        let card = try graph(side)
+        let card = try store.graph(side)
 
         #expect(card.line.count == 13)
         #expect(card.line.allSatisfy { $0.total == Money(cents: 0) })
@@ -240,10 +220,10 @@ struct MonthGraphTests {
     // MARK: The selected day
 
     @Test func todayIsSelectedAndItsPopupShowsTheDateAndTheAmountSoFar() throws {
-        try record(-12_00, "Café", on: day(2026, 10, 2))
-        try record(-3_00, "Café", on: today)
+        try store.record(-12_00, "Café", on: day(2026, 10, 2))
+        try store.record(-3_00, "Café", on: today)
 
-        let spent = try graph(.spent)
+        let spent = try store.graph(.spent)
         let popup = spent.popup(on: spent.defaultSelection)
 
         #expect(spent.defaultSelection == today)
@@ -253,9 +233,9 @@ struct MonthGraphTests {
     }
 
     @Test func aDayTheLineDoesNotReachYetHasNoAmountSoFar() throws {
-        try record(-12_00, "Café", on: day(2026, 10, 2))
+        try store.record(-12_00, "Café", on: day(2026, 10, 2))
 
-        let popup = try graph(.spent).popup(on: day(2026, 10, 20))
+        let popup = try store.graph(.spent).popup(on: day(2026, 10, 20))
 
         #expect(popup.day == day(2026, 10, 20))
         #expect(popup.total == nil)
@@ -263,7 +243,7 @@ struct MonthGraphTests {
 
     /// A day after today can be picked too, though the line doesn't reach it yet.
     @Test func aDragAcrossTheChartSnapsToTheDayWhoseEndIsNearest() throws {
-        let spent = try graph(.spent)
+        let spent = try store.graph(.spent)
 
         #expect(spent.day(nearest: 12.0 / 31) == today)
         #expect(spent.day(nearest: 12.4 / 31) == today)
@@ -272,7 +252,7 @@ struct MonthGraphTests {
     }
 
     @Test func aDragPastEitherEdgeStopsOnTheFirstOrLastDay() throws {
-        let spent = try graph(.spent)
+        let spent = try store.graph(.spent)
 
         #expect(spent.day(nearest: 0) == day(2026, 10, 1))
         #expect(spent.day(nearest: -0.2) == day(2026, 10, 1))
@@ -281,10 +261,10 @@ struct MonthGraphTests {
     }
 
     @Test func aSelectedDayShowsItsDateAndTheRunningTotalThroughIt() throws {
-        try record(-12_00, "Café", on: day(2026, 10, 2))
-        try record(-8_00, "Products", on: day(2026, 10, 5))
+        try store.record(-12_00, "Café", on: day(2026, 10, 2))
+        try store.record(-8_00, "Products", on: day(2026, 10, 5))
 
-        let spent = try graph(.spent)
+        let spent = try store.graph(.spent)
         let selected = spent.day(nearest: spent.position(of: day(2026, 10, 4)))
         let popup = spent.popup(on: selected)
 

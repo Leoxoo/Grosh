@@ -6,35 +6,12 @@ import Testing
 /// three complete months before it, and selected on its last day to start with.
 @MainActor
 struct MonthGraphEarlierMonthTests {
-    private let store: CategoryFixture
+    private let store: MonthGraphFixture
     private var context: ModelContext { store.context }
-    /// The 12th of a 31-day month, after a 30-day September.
-    private let today = day(2026, 10, 12)
+    private var today: CalendarDay { store.today }
 
     init() throws {
-        store = try CategoryFixture()
-    }
-
-    /// Records `cents` (signed, as it moves the wallet) filed under `categoryName` on `day`, in Checking.
-    @discardableResult
-    private func record(
-        _ cents: Int, _ categoryName: String, _ type: CategoryType = .expense, on day: CalendarDay
-    ) throws -> Transaction {
-        let transaction = Transaction(amount: Money(cents: cents), day: day, wallet: nil, category: nil)
-        context.insert(transaction)
-        transaction.wallet = store.wallet
-        transaction.category = try store.category(categoryName, type)
-        return transaction
-    }
-
-    /// Every transaction in the store, those in Recently Deleted included.
-    private func transactions() throws -> [Transaction] {
-        try context.fetch(FetchDescriptor<Transaction>())
-    }
-
-    /// The card for `side` showing `month`.
-    private func graph(_ side: SpentOrIncome, in month: CalendarMonth) throws -> MonthGraph {
-        try MonthGraph(side, of: transactions(), in: month, today: today)
+        store = try MonthGraphFixture()
     }
 
     private func month(_ year: Int, _ month: Int) -> CalendarMonth {
@@ -44,7 +21,7 @@ struct MonthGraphEarlierMonthTests {
     // MARK: The month strip
 
     @Test func withNoTransactionsTheStripHoldsOnlyThisMonth() throws {
-        #expect(try MonthGraph.months(of: transactions(), today: today) == [.month(month(2026, 10))])
+        #expect(try MonthGraph.months(of: store.transactions(), today: today) == [.month(month(2026, 10))])
     }
 
     /// The Starting balance, the excluded transaction and the one in Recently Deleted count on neither card, so the
@@ -52,15 +29,15 @@ struct MonthGraphEarlierMonthTests {
     /// Future.
     @Test func theStripRunsFromTheMonthOfTheFirstTransactionThatCountsThroughThisMonth() throws {
         try Wallet.create(name: "Cash", startingBalance: Money(cents: 300_00), on: day(2026, 5, 1), in: context)
-        let deleted = try record(-15_00, "Café", on: day(2026, 6, 4))
+        let deleted = try store.record(-15_00, "Café", on: day(2026, 6, 4))
         try [deleted].delete(.onlySelected, in: context)
-        let excluded = try record(-40_00, "Café", on: day(2026, 7, 3))
+        let excluded = try store.record(-40_00, "Café", on: day(2026, 7, 3))
         excluded.isExcludedFromReport = true
-        try record(1_500_00, "Salary", .income, on: day(2026, 8, 20))
-        try record(-25_00, "Café", on: day(2026, 9, 5))
-        try record(-100_00, "Rentals", on: day(2026, 11, 3))
+        try store.record(1_500_00, "Salary", .income, on: day(2026, 8, 20))
+        try store.record(-25_00, "Café", on: day(2026, 9, 5))
+        try store.record(-100_00, "Rentals", on: day(2026, 11, 3))
 
-        let strip = try MonthGraph.months(of: transactions(), today: today)
+        let strip = try MonthGraph.months(of: store.transactions(), today: today)
 
         #expect(strip == [.month(month(2026, 8)), .month(month(2026, 9)), .month(month(2026, 10))])
         #expect(strip.map { $0.title(today: today) } == ["08/2026", "Last month", "This month"])
@@ -71,17 +48,17 @@ struct MonthGraphEarlierMonthTests {
     /// March would be a fourth month before July, and August, September and October come after it: only April, May and
     /// June make July's Average. July's line runs to the end of its last day.
     @Test func anEarlierMonthShowsItsFullTotalBesideTheAverageOfTheThreeCompleteMonthsBeforeIt() throws {
-        try record(-900_00, "Rentals", on: day(2026, 3, 2))
-        try record(-30_00, "Café", on: day(2026, 4, 2))
-        try record(-60_00, "Café", on: day(2026, 5, 2))
-        try record(-90_00, "Café", on: day(2026, 6, 2))
-        try record(-10_00, "Café", on: day(2026, 7, 1))
-        try record(-20_00, "Café", on: day(2026, 7, 31))
-        try record(-500_00, "Rentals", on: day(2026, 8, 2))
-        try record(-700_00, "Rentals", on: day(2026, 9, 2))
-        try record(-1_000_00, "Rentals", on: day(2026, 10, 2))
+        try store.record(-900_00, "Rentals", on: day(2026, 3, 2))
+        try store.record(-30_00, "Café", on: day(2026, 4, 2))
+        try store.record(-60_00, "Café", on: day(2026, 5, 2))
+        try store.record(-90_00, "Café", on: day(2026, 6, 2))
+        try store.record(-10_00, "Café", on: day(2026, 7, 1))
+        try store.record(-20_00, "Café", on: day(2026, 7, 31))
+        try store.record(-500_00, "Rentals", on: day(2026, 8, 2))
+        try store.record(-700_00, "Rentals", on: day(2026, 9, 2))
+        try store.record(-1_000_00, "Rentals", on: day(2026, 10, 2))
 
-        let july = try graph(.spent, in: month(2026, 7))
+        let july = try store.graph(.spent, in: month(2026, 7))
 
         #expect(july.headline == Money(cents: 30_00))
         #expect(july.line.count == 32)
@@ -94,12 +71,12 @@ struct MonthGraphEarlierMonthTests {
 
     /// June, July and August average $60; September's own $40 is its total.
     @Test func anEarlierMonthStartsOnItsLastDaySoItsFinalTotalAndAverageShow() throws {
-        try record(-30_00, "Café", on: day(2026, 6, 10))
-        try record(-60_00, "Café", on: day(2026, 7, 10))
-        try record(-90_00, "Café", on: day(2026, 8, 10))
-        try record(-40_00, "Café", on: day(2026, 9, 15))
+        try store.record(-30_00, "Café", on: day(2026, 6, 10))
+        try store.record(-60_00, "Café", on: day(2026, 7, 10))
+        try store.record(-90_00, "Café", on: day(2026, 8, 10))
+        try store.record(-40_00, "Café", on: day(2026, 9, 15))
 
-        let september = try graph(.spent, in: month(2026, 9))
+        let september = try store.graph(.spent, in: month(2026, 9))
         let popup = september.popup(on: september.defaultSelection)
 
         #expect(september.defaultSelection == day(2026, 9, 30))
@@ -110,8 +87,8 @@ struct MonthGraphEarlierMonthTests {
     // MARK: The legend
 
     @Test func theLegendNamesTheLineAsTheStripNamesTheMonth() throws {
-        #expect(try graph(.spent, in: month(2026, 10)).lineName == "This month")
-        #expect(try graph(.income, in: month(2026, 9)).lineName == "Last month")
-        #expect(try graph(.spent, in: month(2026, 7)).lineName == "07/2026")
+        #expect(try store.graph(.spent, in: month(2026, 10)).lineName == "This month")
+        #expect(try store.graph(.income, in: month(2026, 9)).lineName == "Last month")
+        #expect(try store.graph(.spent, in: month(2026, 7)).lineName == "07/2026")
     }
 }

@@ -100,10 +100,7 @@ extension SpentOrIncome {
 
     /// The color amounts going out (Spent) or coming in (Income) have everywhere in the app.
     var color: Color {
-        switch self {
-        case .spent: Color("AmountRed")
-        case .income: Color("AmountGreen")
-        }
+        Money(cents: self == .spent ? -1 : 1).tint
     }
 }
 
