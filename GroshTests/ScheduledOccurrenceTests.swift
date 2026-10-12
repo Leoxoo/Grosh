@@ -218,4 +218,21 @@ struct ScheduledOccurrenceTests {
         #expect(october.scheduled.map(\.day) == [day(2026, 10, 20)])
         #expect(october.net.cents == -5_00)
     }
+
+    @Test func futureListsTransactionsEnteredForAFutureDayAlongsideScheduledRows() throws {
+        let netflix = try makeSchedule(starting: day(2026, 10, 20), end: .afterCount(3))
+        let rows = [netflix].scheduledOccurrences(selection: .total, today: today, history: [])
+        let dinner = Transaction(
+            amount: Money(cents: -40_00), day: day(2026, 11, 3), wallet: store.wallet, category: nil
+        )
+        context.insert(dinner)
+
+        let future = Period.future.days(today: today)
+        let shown = TransactionFilter().listed(from: [dinner], selection: .total, on: future)
+        let days = TransactionDay.days(of: shown, scheduled: rows)
+
+        #expect(shown == [dinner])
+        #expect(days.map(\.day) == [day(2026, 12, 20), day(2026, 11, 20), day(2026, 11, 3), day(2026, 10, 20)])
+        #expect(days.first { $0.day == day(2026, 11, 3) }?.transactions == [dinner])
+    }
 }
