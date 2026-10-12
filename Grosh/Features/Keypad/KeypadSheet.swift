@@ -30,17 +30,25 @@ struct KeypadSheet<Content: View>: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                content(KeypadSheetFields(
-                    entry: $entry, secondEntry: secondEntry, focus: $focus, isKeypadShown: $isKeypadShown,
-                    typingInto: $typingInto
-                ))
-            }
-            .formStyle(.grouped)
-            .safeAreaInset(edge: .bottom) {
-                if isKeypadShown {
-                    AmountKeypad(entry: keypadEntry)
-                        .background(.bar)
+            ScrollViewReader { proxy in
+                Form {
+                    content(KeypadSheetFields(
+                        entry: $entry, secondEntry: secondEntry, focus: $focus, isKeypadShown: $isKeypadShown,
+                        typingInto: $typingInto
+                    ))
+                }
+                .formStyle(.grouped)
+                .safeAreaInset(edge: .bottom) {
+                    if isKeypadShown {
+                        AmountKeypad(entry: keypadEntry)
+                            .background(.bar)
+                    }
+                }
+                .onChange(of: typingInto) { _, newValue in
+                    // The keypad covers the bottom of the form, so bring the second amount's row above it.
+                    if newValue == .secondAmount {
+                        withAnimation { proxy.scrollTo(KeypadSheetField.secondAmount, anchor: .center) }
+                    }
                 }
             }
             .navigationTitle(title)
@@ -114,6 +122,7 @@ struct KeypadSheetFields {
                 isKeypadShown = true
             }
             .focused(focus, equals: .secondAmount)
+            .id(KeypadSheetField.secondAmount)
         }
     }
 
