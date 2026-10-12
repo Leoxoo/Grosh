@@ -20,6 +20,7 @@ enum GroshStore {
     static func makeSeededContainer(inMemory: Bool = false) throws -> ModelContainer {
         let container = try makeContainer(inMemory: inMemory)
         try CategorySeeder.seedIfNeeded(in: container.mainContext)
+        try CategorySeeder.restoreMissingDefaults(in: container.mainContext)
         return container
     }
 }

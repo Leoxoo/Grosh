@@ -67,4 +67,91 @@ struct CategorySeedingTests {
 
         #expect(try allCategories().count == 83)
     }
+
+    /// A store upgraded from an older build keeps its categories, but their icons and locked roles came back empty.
+    @Test func anUpgradedStoreGetsItsIconsAndLockedCategoriesBack() throws {
+        try CategorySeeder.seedIfNeeded(in: context)
+        for category in try allCategories() {
+            category.symbolName = "questionmark"
+            category.lockedRole = nil
+        }
+        try context.save()
+
+        try CategorySeeder.restoreMissingDefaults(in: context)
+
+        #expect(try allCategories().count == 83)
+        #expect(try category(named: "Food & Beverage")?.symbolName == "fork.knife")
+        #expect(try allCategories().allSatisfy { $0.symbolName != "questionmark" })
+        for role in LockedRole.allCases {
+            #expect(try context.lockedCategory(role).lockedRole == role)
+        }
+    }
+
+    /// An icon the user chose is kept; only the placeholder is replaced.
+    @Test func restoringKeepsAnIconTheUserChose() throws {
+        try CategorySeeder.seedIfNeeded(in: context)
+        let products = try #require(try category(named: "Products"))
+        products.symbolName = "star.fill"
+        try context.save()
+
+        try CategorySeeder.restoreMissingDefaults(in: context)
+
+        #expect(products.symbolName == "star.fill")
+    }
+
+    /// A locked category that has gone missing comes back under its seeded name and type.
+    @Test func aMissingLockedCategoryIsAddedBack() throws {
+        try CategorySeeder.seedIfNeeded(in: context)
+        context.delete(try #require(try category(named: "Other Income")))
+        try context.save()
+
+        try CategorySeeder.restoreMissingDefaults(in: context)
+
+        let restored = try context.lockedCategory(.otherIncome)
+        #expect(restored.name == "Other Income")
+        #expect(restored.type == .income)
+        #expect(try allCategories().count == 83)
+    }
+
+    /// Running the repair on a complete store changes nothing.
+    @Test func restoringACompleteStoreChangesNothing() throws {
+        try CategorySeeder.seedIfNeeded(in: context)
+
+        try CategorySeeder.restoreMissingDefaults(in: context)
+
+        #expect(try allCategories().count == 83)
+        #expect(try allCategories().filter(\.isLocked).count == 9)
+        #expect(try category(named: "Food & Beverage")?.symbolName == "fork.knife")
+    }
+
+    /// An upgraded store can have every category as an Expense; the repair brings the seeded types back.
+    @Test func anUpgradedStoreGetsItsCategoryTypesBack() throws {
+        try CategorySeeder.seedIfNeeded(in: context)
+        for category in try allCategories() {
+            category.type = .expense
+            category.symbolName = "questionmark"
+            category.lockedRole = nil
+        }
+        try context.save()
+
+        try CategorySeeder.restoreMissingDefaults(in: context)
+
+        #expect(try allCategories().filter { $0.type == .expense }.count == 64)
+        #expect(try allCategories().filter { $0.type == .income }.count == 14)
+        #expect(try allCategories().filter { $0.type == .debtLoan }.count == 4)
+        #expect(try context.lockedCategory(.otherIncome).type == .income)
+    }
+
+    /// A store that still has Income categories is left alone, so a type the user changed is kept.
+    @Test func aStoreWithIncomeCategoriesKeepsItsTypes() throws {
+        try CategorySeeder.seedIfNeeded(in: context)
+        let salary = try #require(try category(named: "Salary"))
+        salary.type = .expense
+        try context.save()
+
+        try CategorySeeder.restoreMissingDefaults(in: context)
+
+        #expect(salary.type == .expense)
+    }
+
 }
