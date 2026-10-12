@@ -22,6 +22,15 @@ struct TransactionEditor: View {
             case .edit(let transaction): ["edit", transaction.persistentModelID] as [AnyHashable]
             }
         }
+
+        /// How the Success cue ends once a transaction of `type` saves in this mode, or `nil` when it plays none: only
+        /// a new Expense or Income plays it, whether added, duplicated or paid toward a Purchase. An edit never does.
+        func successCueEnding(saving type: CategoryType) -> SuccessCue.Ending? {
+            switch self {
+            case .add, .duplicate, .payment: SuccessCue.Ending(newTransactionOf: type)
+            case .edit: nil
+            }
+        }
     }
 
     let mode: Mode
@@ -48,6 +57,10 @@ private struct TransactionForm: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+
+    @AppStorage(SoundsAndHaptics.soundsKey) private var soundsOn = SoundsAndHaptics.defaultIsOn
+    @AppStorage(SoundsAndHaptics.hapticsKey) private var hapticsOn = SoundsAndHaptics.defaultIsOn
+    @AppStorage(SoundsAndHaptics.chimeKey) private var chime = SuccessCue.Chime.default
 
     @State private var draft: TransactionDraft
     @State private var entry: AmountEntry
@@ -177,10 +190,23 @@ private struct TransactionForm: View {
             case .edit(let transaction):
                 try transaction.update(with: draftToSave)
             }
+            playSuccessCue()
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Plays the Success cue for a new Expense or Income that just saved, with the chime picked in Settings and as its
+    /// switches allow. It never holds up the sheet closing, and a cue that can't play is skipped without a word.
+    private func playSuccessCue() {
+        guard let ending = mode.successCueEnding(saving: draftToSave.type) else { return }
+        SuccessCuePlayer.shared.play(
+            chime,
+            ending: ending,
+            sound: SoundsAndHaptics.playsSounds(on: .current, soundsOn: soundsOn),
+            haptic: SoundsAndHaptics.playsHaptics(on: .current, hapticsOn: hapticsOn)
+        )
     }
 }
 
