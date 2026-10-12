@@ -74,6 +74,20 @@ extension KeypadKey {
         default: return nil
         }
     }
+
+    /// What a key is for, which sets how it looks on the keypad and how its tick feels: a digit, AC or delete, or
+    /// an operator or `=`.
+    nonisolated enum Role: Sendable {
+        case digit, function, operation
+    }
+
+    nonisolated var role: Role {
+        switch self {
+        case .digit, .doubleZero: .digit
+        case .backspace, .allClear: .function
+        case .operation, .equals: .operation
+        }
+    }
 }
 
 /// An amount being typed on the cents-first keypad: each digit is a cent, so `1276` is 12.76.
