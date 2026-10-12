@@ -1,5 +1,6 @@
-/// The app's sounds and haptics, such as the Keypad's ticks: which devices get them, and the switches in Settings →
-/// Sounds & Haptics that turn them off. The system's own settings, such as its Haptics switch, still apply on top.
+/// The app's sounds and haptics, such as the Keypad's ticks and the Success cue: which devices get them, and the
+/// preferences in Settings → Sounds & Haptics, whose switches turn them off. The system's own settings, such as the
+/// ringer switch, still apply on top.
 nonisolated enum SoundsAndHaptics {
     /// The sort of device the app runs on, as far as sounds and haptics go.
     nonisolated enum Device: CaseIterable, Sendable {
@@ -16,10 +17,22 @@ nonisolated enum SoundsAndHaptics {
     /// Each switch is on until the user turns it off.
     static let defaultIsOn = true
 
+    /// Where the Sounds switch is remembered.
+    static let soundsKey = "soundsAndHaptics.sounds"
+
     /// Where the Haptics switch is remembered.
     static let hapticsKey = "soundsAndHaptics.haptics"
 
-    /// Whether haptics play on `device` while the Haptics switch is `hapticsOn`.
+    /// Where the Success cue's chime is remembered, as its ``SuccessCue/Chime`` raw value. It is
+    /// ``SuccessCue/Chime/default`` until the user picks another.
+    static let chimeKey = "soundsAndHaptics.chime"
+
+    /// Whether sounds play on `device` while the Sounds switch is `soundsOn`, whatever the Haptics switch says.
+    static func playsSounds(on device: Device, soundsOn: Bool) -> Bool {
+        isOffered(on: device) && soundsOn
+    }
+
+    /// Whether haptics play on `device` while the Haptics switch is `hapticsOn`, whatever the Sounds switch says.
     static func playsHaptics(on device: Device, hapticsOn: Bool) -> Bool {
         isOffered(on: device) && hapticsOn
     }
