@@ -7,10 +7,13 @@ struct MonthGraphCards: View {
     let today: CalendarDay
 
     @Query(Transaction.notDeleted) private var transactions: [Transaction]
+    @Query private var recurringTransactions: [RecurringTransaction]
 
     var body: some View {
         ForEach(SpentOrIncome.allCases, id: \.self) { side in
-            MonthGraphCard(graph: MonthGraph(side, of: transactions, in: CalendarMonth(today), today: today))
+            MonthGraphCard(graph: MonthGraph(
+                side, of: transactions, recurring: recurringTransactions, in: CalendarMonth(today), today: today
+            ))
         }
     }
 }

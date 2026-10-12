@@ -45,3 +45,12 @@ extension Transaction {
         return countsInReport ? CountedAmount(amount, filedUnder: category, on: day) : nil
     }
 }
+
+extension ScheduledOccurrence {
+    /// What the occurrence would count on the Month graph: what the transaction it makes would count on its due day,
+    /// by its Recurring transaction's category, or `nil` when that counts toward neither card. Which schedules and
+    /// wallets count is up to whoever picks the occurrences.
+    var countedAmount: CountedAmount? {
+        CountedAmount(amount, filedUnder: recurring.category, on: day)
+    }
+}
