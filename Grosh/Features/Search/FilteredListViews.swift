@@ -29,16 +29,21 @@ struct FilterSummaryView: View {
     let transactions: [Transaction]
 
     var body: some View {
+        // The section's rows on Mac: the count and total, and Clear Filters while a filter is set.
+        let count = filter.hasFilters ? 3 : 2
         LabeledContent("Transactions") {
             Text(transactions.count.formatted())
                 .monospacedDigit()
         }
+        .groupedRow(GroupPosition(index: 0, count: count))
         LabeledContent(filter.totalTitle) {
             AmountText(amount: transactions.net, showsPlusSign: true)
                 .fontWeight(.semibold)
         }
+        .groupedRow(GroupPosition(index: 1, count: count))
         if filter.hasFilters {
             Button("Clear Filters", systemImage: "xmark.circle") { filter.clearFilters() }
+                .groupedRow(GroupPosition(index: 2, count: count))
         }
     }
 }

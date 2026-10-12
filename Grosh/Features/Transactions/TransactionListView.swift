@@ -52,6 +52,8 @@ struct TransactionListView: View {
         let scheduled: [ScheduledOccurrence] = period == .future && grouping == .day && !filter.isOn && !isSelecting
             ? recurringTransactions.scheduledOccurrences(selection: walletSelection, today: today, history: transactions)
             : []
+        // The rows highlighted: the chosen ones while selecting, otherwise the one whose detail is showing.
+        let highlighted = isSelecting ? chosen : Set([selectedTransaction].compactMap { $0 })
 
         list {
             if shown.isEmpty && filter.isOn {
@@ -72,11 +74,19 @@ struct TransactionListView: View {
 
             switch grouping {
             case .day:
-                TransactionDaySections(transactions: shown, scheduled: scheduled) { row($0) }
+                TransactionDaySections(
+                    transactions: shown, scheduled: scheduled, isSelected: { highlighted.contains($0) }
+                ) { row($0) }
             case .category:
                 ForEach(TransactionCategoryGroup.groups(of: shown)) { group in
                     Section {
-                        ForEach(group.transactions) { row($0, showsDay: true) }
+                        ForEach(Array(group.transactions.enumerated()), id: \.element.id) { index, transaction in
+                            row(transaction, showsDay: true)
+                                .groupedRow(
+                                    GroupPosition(index: index, count: group.transactions.count),
+                                    isSelected: highlighted.contains(transaction)
+                                )
+                        }
                     } header: {
                         TransactionCategoryHeader(group: group)
                     }

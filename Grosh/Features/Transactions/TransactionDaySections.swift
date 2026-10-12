@@ -7,20 +7,25 @@ struct TransactionDaySections<Row: View>: View {
     let transactions: [Transaction]
     /// Future's Scheduled rows: occurrences not yet made into transactions.
     var scheduled: [ScheduledOccurrence] = []
+    /// Whether a transaction's row is highlighted. Only Mac draws the highlight, in the row's group.
+    var isSelected: (Transaction) -> Bool = { _ in false }
     @ViewBuilder let row: (Transaction) -> Row
 
     var body: some View {
         ForEach(TransactionDay.days(of: transactions, scheduled: scheduled)) { day in
+            let count = day.transactions.count + day.scheduled.count
             Section {
-                ForEach(day.transactions) { transaction in
+                ForEach(Array(day.transactions.enumerated()), id: \.element.id) { index, transaction in
                     row(transaction)
+                        .groupedRow(GroupPosition(index: index, count: count), isSelected: isSelected(transaction))
                 }
-                ForEach(day.scheduled) { occurrence in
+                ForEach(Array(day.scheduled.enumerated()), id: \.element.id) { index, occurrence in
                     NavigationLink {
                         RecurringTransactionDetailView(recurring: occurrence.recurring)
                     } label: {
                         ScheduledRow(occurrence: occurrence)
                     }
+                    .groupedRow(GroupPosition(index: day.transactions.count + index, count: count))
                 }
             } header: {
                 TransactionDayHeader(day: day)
