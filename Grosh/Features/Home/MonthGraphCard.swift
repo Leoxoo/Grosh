@@ -1,17 +1,32 @@
 import SwiftData
 import SwiftUI
 
-/// Home's Month graph: the Spent card and the Income card, each with the running total of this month so far beside the
-/// Average of the months before it. Their amounts show even while the Total is hidden. Use inside a `List`.
+/// Home's Month graph: the month strip, then the Spent card and the Income card, each with the running total of the
+/// month the strip picks beside the Average of the months before it. Their amounts show even while the Total is hidden.
+/// Use inside a `List`.
 struct MonthGraphCards: View {
     let today: CalendarDay
 
     @Query(Transaction.notDeleted) private var transactions: [Transaction]
+    /// The month both cards show, picked in the strip. Every launch starts on this month.
+    @State private var period = Period.month(CalendarMonth(.today))
 
     var body: some View {
-        ForEach(SpentOrIncome.allCases, id: \.self) { side in
-            MonthGraphCard(graph: MonthGraph(side, of: transactions, in: CalendarMonth(today), today: today))
+        Section {
+            PeriodStrip(periods: MonthGraph.months(of: transactions, today: today), selection: $period, today: today)
+                // The strip pads its own tabs, and sits above the cards rather than on one.
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
         }
+        ForEach(SpentOrIncome.allCases, id: \.self) { side in
+            MonthGraphCard(graph: MonthGraph(side, of: transactions, in: month, today: today))
+        }
+    }
+
+    /// The month of the period picked in the strip, which offers only months.
+    private var month: CalendarMonth {
+        guard case .month(let month) = period else { return CalendarMonth(today) }
+        return month
     }
 }
 
