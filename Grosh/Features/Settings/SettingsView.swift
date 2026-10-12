@@ -39,8 +39,6 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("Sounds & Haptics")
-                } footer: {
-                    Text("The chime plays when you save a new expense or income.")
                 }
             }
         }
