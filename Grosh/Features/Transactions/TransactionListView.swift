@@ -182,7 +182,7 @@ struct TransactionListView: View {
     }
 }
 
-/// A category's icon and name, and its total for the period in color.
+/// A category's icon and name, and its total for the period in plain text.
 private struct TransactionCategoryHeader: View {
     let group: TransactionCategoryGroup
 
@@ -191,7 +191,7 @@ private struct TransactionCategoryHeader: View {
             CategoryIcon(category: group.category, size: 20)
             Text(group.category?.name ?? String(localized: "Uncategorized"))
             Spacer()
-            AmountText(amount: group.total, showsPlusSign: true)
+            AmountText(amount: group.total, showsPlusSign: true, showsColor: false)
         }
         .textCase(nil)
     }

@@ -1,9 +1,9 @@
 import SwiftUI
 
 extension Money {
-    /// Green for money coming in, red for money going out.
+    /// Muted green for money coming in, muted red for money going out; zero stays plain text.
     var tint: Color {
-        cents > 0 ? .green : cents < 0 ? .red : .primary
+        cents > 0 ? Color("AmountGreen") : cents < 0 ? Color("AmountRed") : .primary
     }
 
     /// The amount with its sign always shown: "+$12.76", "−$4.50". Zero has no sign.
@@ -18,10 +18,12 @@ struct AmountText: View {
     let amount: Money
     /// Whether to show "+" on amounts that add, as day totals and differences do.
     var showsPlusSign = false
+    /// Whether to color the amount. Totals are plain text, and their sign shows which way they go.
+    var showsColor = true
 
     var body: some View {
         Text(showsPlusSign ? amount.signedFormatted() : amount.formatted())
             .monospacedDigit()
-            .foregroundStyle(amount.tint)
+            .foregroundStyle(showsColor ? amount.tint : .primary)
     }
 }
