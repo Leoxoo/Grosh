@@ -27,7 +27,6 @@ struct TransactionSearchBar: View {
             Button("Cancel", action: close)
         }
         .padding(.horizontal)
-        .padding(.vertical, 8)
         .onAppear { isFocused = true }
     }
 }

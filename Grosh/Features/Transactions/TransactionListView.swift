@@ -1,11 +1,12 @@
 import SwiftData
 import SwiftUI
 
-/// The Transactions tab's list. Its header holds the wallet selector and its balance, the period strip and the period's
-/// Opening and Ending balances; the list then holds its transactions by day, newest first, or by category. Future also
-/// lists the Scheduled rows of Recurring transactions still to come, by day. The "…" menu picks the time range and the
-/// grouping, and selects transactions to delete. The Search button opens a field that narrows what is listed, and so do
-/// the filters: grouped, selected and summed are the matching transactions only.
+/// The Transactions tab's list. Its header holds the wallet selector and its balance, the period strip, and either the
+/// period's Opening and Ending balances or, while a search or filter is on, the count and total of what matches. The
+/// list then holds the transactions by day, newest first, or by category. Future also lists the Scheduled rows of
+/// Recurring transactions still to come, by day. The "…" menu picks the time range and the grouping, and selects
+/// transactions to delete. The Search button opens a field that narrows what is listed, and so do the filters: grouped,
+/// selected and summed are the matching transactions only.
 struct TransactionListView: View {
     /// The transaction whose detail is showing.
     @Binding var selectedTransaction: Transaction?
@@ -53,12 +54,6 @@ struct TransactionListView: View {
             : []
 
         list {
-            if filter.isOn {
-                Section {
-                    FilterSummaryView(filter: $filter, transactions: shown)
-                }
-            }
-
             if shown.isEmpty && filter.isOn {
                 Section {
                     NoMatchingTransactionsView(filter: filter)
@@ -89,21 +84,24 @@ struct TransactionListView: View {
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 0) {
+            VStack(spacing: 4) {
                 if showsSearchField {
                     TransactionSearchBar(text: $filter.searchText) { closeSearch() }
                 }
                 VStack(spacing: 4) {
                     WalletSelector(selection: $walletSelection, today: today)
                     PeriodStrip(periods: periods, selection: $period, today: today)
+                }
+                .hiddenWhileSearching(filter)
+                if filter.isOn {
+                    FilterSummaryFigures(filter: $filter, transactions: shown)
+                } else {
                     PeriodSummaryView(
                         summary: PeriodSummary(of: selected, in: period, today: today), period: period, today: today
                     )
                 }
-                .padding(.top, 8)
-                .padding(.bottom, 8)
-                .hiddenWhileSearching(filter)
             }
+            .padding(.vertical, 8)
             .background(.bar)
         }
         .onChange(of: walletSelection) {
