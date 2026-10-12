@@ -1,0 +1,3 @@
+# The Success cue's sound and haptic are generated from one note list
+
+The Success cue's sound and its haptic are both rendered from a single list of notes (pitch, start time, loudness) by a script kept in the repo: each haptic tap lands on its note's start, its strength follows the note's loudness and its sharpness follows the note's pitch. That makes them match by construction. We rejected recorded audio paired with hand-authored haptic files: the Duolingo sounds that inspired the cue aren't ours to use, and a haptic tuned by ear to a recording drifts out of step the moment either is touched. The cost is that the sounds are synthesized, so simpler than a studio recording, and swapping in a recording later means authoring its haptic by hand.
