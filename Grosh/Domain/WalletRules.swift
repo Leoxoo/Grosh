@@ -53,15 +53,25 @@ extension Wallet {
         return try create(draft, startingBalance: startingBalance, on: day, in: context)
     }
 
-    /// Retires the wallet: it leaves the Total and every picker, but keeps all of its transactions. Saves.
-    func archive() throws {
+    /// Retires the wallet: it leaves the Total and every picker, but keeps all of its transactions. Its Recurring
+    /// transactions pause, after making what has fallen due by `today`, and make nothing until it is unarchived. Saves.
+    func archive(today: CalendarDay = .today) throws {
+        if let context = modelContext {
+            for schedule in recurringTransactions ?? [] {
+                schedule.makeDueTransactions(through: today, in: context)
+            }
+        }
         isArchived = true
         try modelContext?.save()
     }
 
-    /// Brings an archived wallet back into its place in the user's order. Saves.
-    func unarchive() throws {
+    /// Brings an archived wallet back into its place in the user's order. Its Recurring transactions resume, and what
+    /// fell due while it was archived is not made. Saves.
+    func unarchive(today: CalendarDay = .today) throws {
         isArchived = false
+        for schedule in recurringTransactions ?? [] where schedule.isActive {
+            schedule.skipOccurrences(through: today)
+        }
         try modelContext?.save()
     }
 

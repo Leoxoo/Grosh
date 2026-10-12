@@ -6,19 +6,23 @@ struct CategoryDraft {
     var color: PaletteColor
     /// The parent category, or `nil` for a top-level category.
     var parent: Category?
+    /// The Kind the category sets for its Recurring transactions, or `nil` to follow its parent's.
+    var ownKind: RecurringKind?
 
     init(
         name: String = "",
         type: CategoryType = .expense,
         symbolName: String = "questionmark",
         color: PaletteColor = .gray,
-        parent: Category? = nil
+        parent: Category? = nil,
+        ownKind: RecurringKind? = nil
     ) {
         self.name = name
         self.type = type
         self.symbolName = symbolName
         self.color = color
         self.parent = parent
+        self.ownKind = ownKind
     }
 
     /// The category's current fields, ready to edit.
@@ -28,7 +32,8 @@ struct CategoryDraft {
             type: category.type,
             symbolName: category.symbolName,
             color: category.color,
-            parent: category.parent
+            parent: category.parent,
+            ownKind: category.ownKind
         )
     }
 }

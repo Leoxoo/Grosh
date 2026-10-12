@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// One transaction as every list shows it: category icon and name, note, Forgiven and Card badges, wallet icon, and
-/// the amount in color. A forgiven Loan or Debt keeps its true amount.
+/// One transaction as every list shows it: category icon and name, note, Estimated, Forgiven and Card badges, wallet
+/// icon, and the amount in color. A forgiven Loan or Debt keeps its true amount.
 struct TransactionRow: View {
     let transaction: Transaction
     /// Shows the transaction's day, for lists not grouped by day.
@@ -9,7 +9,7 @@ struct TransactionRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            CategoryIcon(category: transaction.category)
+            CategoryIcon(category: transaction.category, subscriptionIcon: transaction.recurring?.subscriptionIcon)
             VStack(alignment: .leading, spacing: 2) {
                 Text(transaction.categoryName)
                     .lineLimit(1)
@@ -29,6 +29,9 @@ struct TransactionRow: View {
             VStack(alignment: .trailing, spacing: 4) {
                 AmountText(amount: transaction.amount)
                 HStack(spacing: 6) {
+                    if transaction.isEstimated {
+                        EstimatedBadge()
+                    }
                     if transaction.isForgiven {
                         ForgivenBadge()
                     }
@@ -62,6 +65,20 @@ struct CardBadge: View {
             .padding(.vertical, 2)
             .foregroundStyle(card.color.color)
             .background(card.color.color.opacity(0.15), in: Capsule())
+    }
+}
+
+/// A small capsule marking a transaction whose amount is still an estimate, until the real one is entered.
+struct EstimatedBadge: View {
+    var body: some View {
+        Text("est.")
+            .font(.caption2.weight(.medium))
+            .lineLimit(1)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .foregroundStyle(.orange)
+            .background(Color.orange.opacity(0.15), in: Capsule())
+            .accessibilityLabel("Estimated")
     }
 }
 

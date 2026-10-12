@@ -56,17 +56,39 @@ nonisolated enum RepeatEndKind: String, CaseIterable, Sendable {
     case forever, until, afterCount
 }
 
+/// Which day of the month a monthly repeat falls on. The start day decides what each choice names: "on the 29th",
+/// "on the last Thursday", "on the last day".
+nonisolated enum MonthlyDay: String, CaseIterable, Sendable {
+    /// The start day's number. A shorter month falls back to its last day.
+    case sameDay
+    /// The start day's weekday in its week of the month: the second Tuesday. A fifth one is the last such weekday of
+    /// the month, since not every month has a fifth.
+    case nthWeekday
+    /// The last day of the month. Offered only from the 28th on.
+    case lastDay
+
+    /// The days a monthly repeat starting on `start` offers, in the order the form lists them. The last day is offered
+    /// only from the 28th on, so a start near the end of its month.
+    static func offered(startingOn start: CalendarDay) -> [MonthlyDay] {
+        start.day >= 28 ? [.sameDay, .nthWeekday, .lastDay] : [.sameDay, .nthWeekday]
+    }
+}
+
 /// When a Recurring transaction falls due: from `start`, every `rule`, until `end`. Occurrences are computed, never
 /// stored, so an edit reshapes the occurrences still to come and never the ones already made.
 nonisolated struct RepeatSchedule: Hashable, Sendable {
     var start: CalendarDay
     var rule: RepeatRule
     var end: RepeatEnd
+    /// Which day of the month a monthly rule falls on. The other units don't use it.
+    var monthlyDay: MonthlyDay = .sameDay
 
-    /// The due day of occurrence `index`, counted from 0 for the start day, before the end is applied. Monthly and
-    /// yearly occurrences keep the start day's number and fall back to a shorter month's last day. Each is counted
-    /// from the start, so a schedule from January 31 falls on February 28, then March 31.
+    /// The due day of occurrence `index`, counted from 0 for the start day, before the end is applied. The start day is
+    /// always occurrence 0, even when a monthly rule would name a later day of its month. Monthly occurrences fall on
+    /// the day ``monthlyDay`` names; yearly ones keep the start day's number and fall back to a shorter month's last
+    /// day. Each is counted from the start, so a schedule from January 31 falls on February 28, then March 31.
     func dueDay(ofOccurrence index: Int) -> CalendarDay {
+        guard index > 0 else { return start }
         let steps = index * interval
         switch rule.unit {
         case .day:
@@ -75,7 +97,7 @@ nonisolated struct RepeatSchedule: Hashable, Sendable {
             return start.adding(days: steps * 7)
         case .month:
             let months = start.year * 12 + (start.month - 1) + steps
-            return monthDay(year: months / 12, month: months % 12 + 1)
+            return monthlyDueDay(year: months / 12, month: months % 12 + 1)
         case .year:
             return monthDay(year: start.year + steps, month: start.month)
         }
@@ -121,6 +143,29 @@ nonisolated struct RepeatSchedule: Hashable, Sendable {
 
     private func monthDay(year: Int, month: Int) -> CalendarDay {
         CalendarDay(year: year, month: month, day: min(start.day, Self.daysInMonth(year: year, month: month)))
+    }
+
+    /// The due day in `month` of `year` for a monthly occurrence, on the day ``monthlyDay`` names.
+    private func monthlyDueDay(year: Int, month: Int) -> CalendarDay {
+        switch monthlyDay {
+        case .sameDay: monthDay(year: year, month: month)
+        case .nthWeekday: nthWeekdayDueDay(year: year, month: month)
+        case .lastDay: CalendarDay(year: year, month: month, day: Self.daysInMonth(year: year, month: month))
+        }
+    }
+
+    /// The start day's weekday in `month`, in the same week of the month as the start day. A fifth week means the last
+    /// such weekday, since not every month has a fifth.
+    private func nthWeekdayDueDay(year: Int, month: Int) -> CalendarDay {
+        let week = (start.day - 1) / 7
+        let startWeekday = start.weekday
+        if week == 4 {
+            let lastDay = Self.daysInMonth(year: year, month: month)
+            let lastWeekday = CalendarDay(year: year, month: month, day: lastDay).weekday
+            return CalendarDay(year: year, month: month, day: lastDay - (lastWeekday - startWeekday + 7) % 7)
+        }
+        let firstWeekday = CalendarDay(year: year, month: month, day: 1).weekday
+        return CalendarDay(year: year, month: month, day: 1 + (startWeekday - firstWeekday + 7) % 7 + week * 7)
     }
 
     private func isWithinEnd(index: Int, day: CalendarDay) -> Bool {

@@ -1,16 +1,24 @@
 import SwiftData
 import SwiftUI
 
-/// One Recurring transaction: what it is, when it next falls due, and the transactions it has made. A transaction
-/// opens in the normal editor. Edit changes only what is still to come. Delete removes the schedule and keeps what
-/// it made.
+/// One Recurring transaction: what it is, when it next falls due, and the transactions it has made or the user has
+/// attached. A transaction opens in the normal editor. Add the Transaction makes one now, dated today, without touching
+/// the schedule. Link existing attaches one from any wallet, and Unlink detaches it without deleting it. A Purchase
+/// shows its progress and adds a payment in the normal editor, prefilled from it. Edit changes only what is still to
+/// come. Duplicate opens a copy to edit, starting today. Delete moves the schedule to Recently Deleted and keeps what
+/// it holds.
 struct RecurringTransactionDetailView: View {
     let recurring: RecurringTransaction
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    /// Every transaction a varying Bill's estimate is averaged over, so the amount shown is the one it will make.
+    @Query(Transaction.notDeleted) private var transactions: [Transaction]
     @State private var isEditing = false
+    @State private var isDuplicating = false
     @State private var editingTransaction: Transaction?
+    @State private var isAddingPayment = false
+    @State private var isLinking = false
     @State private var isConfirmingDelete = false
     @State private var errorMessage: String?
 
@@ -30,11 +38,16 @@ struct RecurringTransactionDetailView: View {
         List {
             Section {
                 HStack(spacing: 12) {
-                    CategoryIcon(category: recurring.category, size: 44)
+                    CategoryIcon(category: recurring.category, subscriptionIcon: recurring.subscriptionIcon, size: 44)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(recurring.name)
                             .font(.title3.weight(.semibold))
-                        AmountText(amount: recurring.signedAmount)
+                        HStack(spacing: 6) {
+                            AmountText(amount: recurring.startingAmount(among: transactions))
+                            if recurring.estimatesAmount {
+                                EstimatedBadge()
+                            }
+                        }
                     }
                 }
                 LabeledContent("Wallet") {
@@ -53,10 +66,18 @@ struct RecurringTransactionDetailView: View {
                         .multilineTextAlignment(.trailing)
                 }
                 LabeledContent("Next") {
-                    if let next = recurring.nextDueDay {
+                    if recurring.isPaused {
+                        Text("Paused")
+                    } else if let next = recurring.nextDueDay {
                         Text(next.date(), style: .date)
                     } else {
                         Text("Ended")
+                    }
+                }
+                if let progress = recurring.purchaseProgress {
+                    LabeledContent("Progress") {
+                        Text(progress.summary)
+                            .multilineTextAlignment(.trailing)
                     }
                 }
                 if !recurring.note.isEmpty {
@@ -65,9 +86,26 @@ struct RecurringTransactionDetailView: View {
                             .multilineTextAlignment(.trailing)
                     }
                 }
+            } footer: {
+                if recurring.isPaused {
+                    Text("Its wallet is archived, so it makes nothing until the wallet is unarchived.")
+                }
             }
 
             Section {
+                Button("Add the Transaction", systemImage: "plus.circle") {
+                    addTransactionNow()
+                }
+                .disabled(!recurring.canAddTransactionNow)
+                if recurring.kind == .purchase {
+                    Button("Add a payment", systemImage: "square.and.pencil") {
+                        isAddingPayment = true
+                    }
+                    .disabled(!recurring.isActive)
+                }
+                Button("Link existing", systemImage: "link") {
+                    isLinking = true
+                }
                 ForEach(recurring.attachedTransactions) { transaction in
                     Button {
                         editingTransaction = transaction
@@ -75,12 +113,24 @@ struct RecurringTransactionDetailView: View {
                         TransactionRow(transaction: transaction, showsDay: true)
                     }
                     .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing) {
+                        Button("Unlink") { unlink(transaction) }
+                    }
+                    .contextMenu {
+                        Button("Unlink") { unlink(transaction) }
+                    }
                 }
             } header: {
                 Text("Transactions")
             } footer: {
                 if recurring.attachedTransactions.isEmpty {
                     Text("The transactions it makes appear here, on their due days.")
+                }
+            }
+
+            Section {
+                Button("Duplicate", systemImage: "doc.on.doc") {
+                    isDuplicating = true
                 }
             }
 
@@ -103,6 +153,15 @@ struct RecurringTransactionDetailView: View {
         .sheet(item: $editingTransaction) { transaction in
             TransactionEditor(mode: .edit(transaction))
         }
+        .sheet(isPresented: $isLinking) {
+            LinkExistingTransactionView(recurring: recurring)
+        }
+        .sheet(isPresented: $isAddingPayment) {
+            TransactionEditor(mode: .payment(recurring))
+        }
+        .sheet(isPresented: $isDuplicating) {
+            RecurringTransactionEditor(mode: .duplicate(recurring))
+        }
         .confirmationDialog(
             "Delete this recurring transaction?",
             isPresented: $isConfirmingDelete,
@@ -111,15 +170,31 @@ struct RecurringTransactionDetailView: View {
             Button("Delete Recurring Transaction", role: .destructive) { delete() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The transactions it made stay in your wallets.")
+            Text("It goes to Recently Deleted for \(RecentlyDeleted.keptDays) days. The transactions it made or that are attached stay in your wallets.")
         }
-        .errorAlert("Couldn't Delete Recurring Transaction", message: $errorMessage)
+        .errorAlert("Couldn't Change Recurring Transaction", message: $errorMessage)
+    }
+
+    private func addTransactionNow() {
+        do {
+            try recurring.addTransactionNow(in: context)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func delete() {
         do {
             try recurring.delete(in: context)
             dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func unlink(_ transaction: Transaction) {
+        do {
+            try recurring.unlink(transaction, in: context)
         } catch {
             errorMessage = error.localizedDescription
         }

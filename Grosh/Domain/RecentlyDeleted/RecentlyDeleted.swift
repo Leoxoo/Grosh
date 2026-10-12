@@ -1,15 +1,18 @@
 import Foundation
 import SwiftData
 
-/// Account → Recently Deleted: the wallets and transactions deleted in the last 30 days, waiting to be restored or
-/// removed for good. A deleted wallet is one item holding the transactions deleted with it. Nothing in it counts in
-/// any balance, list, search or report.
+/// Account → Recently Deleted: the wallets, Recurring transactions and transactions deleted in the last 30 days, waiting
+/// to be restored or removed for good. A deleted wallet is one item holding the transactions and Recurring transactions
+/// deleted with it. Nothing in it counts in any balance, list, search or report.
 struct RecentlyDeleted {
     /// How long an item waits before it is removed for good.
     static let keptDays = 30
 
     /// The wallets in the bin, the most recently deleted first.
     let wallets: [Wallet]
+    /// The Recurring transactions deleted on their own, the most recently deleted first. Those deleted with their
+    /// wallet are part of the wallet's item instead.
+    let recurring: [RecurringTransaction]
     /// The transactions deleted on their own, the most recently deleted first. Those deleted with their wallet are
     /// part of the wallet's item instead.
     let transactions: [Transaction]
@@ -19,25 +22,37 @@ struct RecentlyDeleted {
         FetchDescriptor(predicate: #Predicate { $0.deletedAt != nil })
     }
 
+    /// Every Recurring transaction deleted on its own, not with its wallet.
+    static var deletedRecurring: FetchDescriptor<RecurringTransaction> {
+        FetchDescriptor(predicate: #Predicate { $0.deletedAt != nil && !$0.deletedWithWallet })
+    }
+
     /// Every transaction deleted on its own, not with its wallet.
     static var deletedTransactions: FetchDescriptor<Transaction> {
         FetchDescriptor(predicate: #Predicate { $0.deletedAt != nil && !$0.deletedWithWallet })
     }
 
-    /// The bin made of `wallets` and `transactions` (what ``deletedWallets`` and ``deletedTransactions`` fetch).
-    init(wallets: some Sequence<Wallet>, transactions: some Sequence<Transaction>) {
+    /// The bin made of `wallets`, `transactions` and `recurring` (what the descriptors above fetch).
+    init(
+        wallets: some Sequence<Wallet>,
+        transactions: some Sequence<Transaction>,
+        recurring: [RecurringTransaction] = []
+    ) {
         self.wallets = wallets.sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
+        self.recurring = recurring.sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
         self.transactions = transactions.sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
     }
 
     /// The bin as it is in `context`.
     init(in context: ModelContext) throws {
         self.init(
-            wallets: try context.fetch(Self.deletedWallets), transactions: try context.fetch(Self.deletedTransactions)
+            wallets: try context.fetch(Self.deletedWallets),
+            transactions: try context.fetch(Self.deletedTransactions),
+            recurring: try context.fetch(Self.deletedRecurring)
         )
     }
 
-    var isEmpty: Bool { wallets.isEmpty && transactions.isEmpty }
+    var isEmpty: Bool { wallets.isEmpty && recurring.isEmpty && transactions.isEmpty }
 
     /// How many days an item deleted at `deletedAt` has left at `now` before it is removed for good, rounded up:
     /// 30 straight after deleting, 1 on its last day, 0 once it is due.
@@ -51,36 +66,45 @@ struct RecentlyDeleted {
         deletedAt.addingTimeInterval(keptInterval) <= now
     }
 
-    /// Removes for good every item that has waited its 30 days by `now`: a wallet with all its transactions, and each
-    /// transaction deleted on its own. The app does this when it opens; nothing runs in the background. Saves.
+    /// Removes for good every item that has waited its 30 days by `now`: a wallet with all its transactions and
+    /// Recurring transactions, and each transaction or Recurring transaction deleted on its own. The app does this when
+    /// it opens; nothing runs in the background. Saves.
     static func purgeExpired(in context: ModelContext, now: Date = .now) throws {
         let bin = try RecentlyDeleted(in: context)
         let expired = { (deletedAt: Date?) in deletedAt.map { Self.isExpired(since: $0, now: now) } ?? false }
         try removeForGood(
             wallets: bin.wallets.filter { expired($0.deletedAt) },
             transactions: bin.transactions.filter { expired($0.deletedAt) },
+            recurring: bin.recurring.filter { expired($0.deletedAt) },
             in: context
         )
     }
 
-    /// Empty Bin: removes every wallet and transaction in it for good. Saves.
+    /// Empty Bin: removes every wallet, Recurring transaction and transaction in it for good. Saves.
     static func empty(in context: ModelContext) throws {
         let bin = try RecentlyDeleted(in: context)
-        try removeForGood(wallets: bin.wallets, transactions: bin.transactions, in: context)
+        try removeForGood(wallets: bin.wallets, transactions: bin.transactions, recurring: bin.recurring, in: context)
     }
 
-    /// Removes `wallets`, each with every transaction in it and the Cards paid from it that are left with none, and
-    /// `transactions` from the store. Saves.
+    /// Removes `wallets`, each with every transaction and Recurring transaction in it and the Cards paid from it that
+    /// are left with none, and `recurring` and `transactions` from the store. Saves.
     fileprivate static func removeForGood(
-        wallets: [Wallet], transactions: [Transaction], in context: ModelContext
+        wallets: [Wallet],
+        transactions: [Transaction],
+        recurring: [RecurringTransaction] = [],
+        in context: ModelContext
     ) throws {
         var removed = Set<PersistentIdentifier>()
-        func remove(_ transaction: Transaction) {
-            if removed.insert(transaction.persistentModelID).inserted {
-                context.delete(transaction)
+        func remove<Model: PersistentModel>(_ model: Model) {
+            if removed.insert(model.persistentModelID).inserted {
+                context.delete(model)
             }
         }
         for wallet in wallets {
+            // A wallet's Recurring transactions go with it, as its transactions do, even if deleted on their own.
+            for schedule in wallet.recurringTransactions ?? [] {
+                remove(schedule)
+            }
             for transaction in wallet.transactions ?? [] {
                 remove(transaction)
             }
@@ -91,7 +115,12 @@ struct RecentlyDeleted {
             }
             context.delete(wallet)
         }
-        transactions.forEach(remove)
+        for schedule in recurring {
+            remove(schedule)
+        }
+        for transaction in transactions {
+            remove(transaction)
+        }
         try context.save()
     }
 
@@ -126,13 +155,24 @@ extension Wallet {
     /// Whether the wallet is in Recently Deleted.
     var isInRecentlyDeleted: Bool { deletedAt != nil }
 
-    /// Deletes the wallet: moves it and every transaction in it to Recently Deleted as one item. It leaves the Total,
-    /// every list and every picker. A transfer's other half in another wallet stays where it is. Saves.
+    /// Deletes the wallet: moves it, every transaction in it and its Recurring transactions to Recently Deleted as one
+    /// item. Due Recurring transactions are made first, so no due day is lost. It leaves the Total, every list and every
+    /// picker. A transfer's other half in another wallet stays where it is. Saves.
     func delete(at now: Date = .now) throws {
+        let schedules = (recurringTransactions ?? []).filter { !$0.isInRecentlyDeleted }
+        if let context = modelContext {
+            for schedule in schedules {
+                schedule.makeDueTransactions(through: CalendarDay(now), in: context)
+            }
+        }
         deletedAt = now
         for transaction in (transactions ?? []).notDeleted {
             transaction.deletedAt = now
             transaction.deletedWithWallet = true
+        }
+        for schedule in schedules {
+            schedule.deletedAt = now
+            schedule.deletedWithWallet = true
         }
         try modelContext?.save()
     }
@@ -142,13 +182,26 @@ extension Wallet {
         (transactions ?? []).filter { $0.isInRecentlyDeleted && $0.deletedWithWallet }.inListOrder()
     }
 
-    /// Brings the wallet back from Recently Deleted with the transactions deleted with it. Transactions deleted on
-    /// their own before it stay in the bin. Saves.
-    func restore() throws {
+    /// The Recurring transactions that went to Recently Deleted with this wallet, oldest first: the rest of its item.
+    var recurringDeletedWithIt: [RecurringTransaction] {
+        (recurringTransactions ?? [])
+            .filter { $0.isInRecentlyDeleted && $0.deletedWithWallet }
+            .sorted { $0.createdAt < $1.createdAt }
+    }
+
+    /// Brings the wallet back from Recently Deleted with the transactions and Recurring transactions deleted with it.
+    /// Transactions deleted on their own before it stay in the bin. Its Recurring transactions skip what fell due while
+    /// it was away, so nothing is backfilled. Saves.
+    func restore(today: CalendarDay = .today) throws {
         guard isInRecentlyDeleted else { throw RecentlyDeletedError.notDeleted }
         for transaction in transactionsDeletedWithIt {
             transaction.deletedAt = nil
             transaction.deletedWithWallet = false
+        }
+        for schedule in recurringDeletedWithIt {
+            schedule.deletedAt = nil
+            schedule.deletedWithWallet = false
+            schedule.skipOccurrences(through: today)
         }
         deletedAt = nil
         try modelContext?.save()
@@ -159,6 +212,33 @@ extension Wallet {
     func deleteForever(in context: ModelContext) throws {
         guard isInRecentlyDeleted else { throw RecentlyDeletedError.notDeleted }
         try RecentlyDeleted.removeForGood(wallets: [self], transactions: [], in: context)
+    }
+}
+
+extension RecurringTransaction {
+    /// Why this schedule in Recently Deleted can't be restored on its own, or `nil` when it can.
+    var restoreBlocker: RecentlyDeletedError? {
+        guard isInRecentlyDeleted else { return .notDeleted }
+        if deletedWithWallet { return .deletedWithWallet }
+        if wallet?.isInRecentlyDeleted == true { return .walletIsDeleted }
+        return nil
+    }
+
+    /// Brings a schedule deleted on its own back from Recently Deleted, with its settings. What fell due while it was
+    /// away is not made: it is skipped through `today`, as saving a schedule today skips the days before it. Saves.
+    func restore(today: CalendarDay = .today) throws {
+        if let restoreBlocker { throw restoreBlocker }
+        skipOccurrences(through: today)
+        deletedAt = nil
+        try modelContext?.save()
+    }
+
+    /// Delete Forever: removes a schedule deleted on its own for good. The transactions it made stay as ordinary ones.
+    /// Saves.
+    func deleteForever(in context: ModelContext) throws {
+        guard isInRecentlyDeleted else { throw RecentlyDeletedError.notDeleted }
+        guard !deletedWithWallet else { throw RecentlyDeletedError.deletedWithWallet }
+        try RecentlyDeleted.removeForGood(wallets: [], transactions: [], recurring: [self], in: context)
     }
 }
 

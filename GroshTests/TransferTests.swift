@@ -302,7 +302,8 @@ struct TransferTests {
         var coffee = TransactionDraft(type: .expense, day: today)
         coffee.wallet = checking
         coffee.amount = Money(cents: 4_50)
-        coffee.category = try #require(try context.fetch(FetchDescriptor<Grosh.Category>()).first { $0.name == "Café" })
+        let cafe = try #require(try context.fetch(FetchDescriptor<Grosh.Category>()).first { $0.name == "Café" })
+        coffee.category = cafe
         let counted = try Transaction.create(coffee, in: context)
         coffee.isExcludedFromReport = true
         let excluded = try Transaction.create(coffee, in: context)

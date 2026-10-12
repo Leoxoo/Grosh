@@ -1,8 +1,30 @@
 import Foundation
 import SwiftData
 
+/// A notification on a reminder day: what the Loan and Debt reminders and the Estimated-amount reminders have in common.
+nonisolated protocol PendingReminder: Hashable, Sendable {
+    /// Marks the pending notifications of this sort, so replacing them leaves any other alone.
+    static var identifierPrefix: String { get }
+    /// The transaction it reminds of.
+    var original: PersistentIdentifier { get }
+    var day: CalendarDay { get }
+    /// When the notification arrives.
+    var arrival: ReminderArrival { get set }
+    var title: String { get }
+    var body: String { get }
+}
+
+extension PendingReminder {
+    /// Whether `other` reminds of the same transaction on the same day, whatever it says by now.
+    func isSameReminder(as other: Self) -> Bool {
+        original == other.original && day == other.day
+    }
+}
+
 /// A notification on the reminder day of an open Loan or Debt, saying who it is with and what is outstanding.
-nonisolated struct DebtReminder: Hashable, Sendable {
+nonisolated struct DebtReminder: PendingReminder {
+    static let identifierPrefix = "grosh.debt-reminder."
+
     /// The Loan or Debt it reminds of.
     let original: PersistentIdentifier
     let day: CalendarDay
@@ -10,36 +32,75 @@ nonisolated struct DebtReminder: Hashable, Sendable {
     let outstanding: Money
     /// A Loan (they owe the user) or a Debt (the user owes them).
     let kind: LoanOrDebtKind
-    /// When the notification arrives.
     var arrival = ReminderArrival.onItsDay
-
-    /// The hour of its day a reminder arrives at: 09:00.
-    static let hour = 9
-
-    /// Whether `other` reminds of the same Loan or Debt on the same day, whatever is outstanding by now.
-    func isSameReminder(as other: DebtReminder) -> Bool {
-        original == other.original && day == other.day
-    }
 }
 
 /// When a reminder's notification arrives.
 nonisolated enum ReminderArrival: Hashable, Sendable {
-    /// At ``DebtReminder/hour`` on the reminder day.
+    /// At ``hour`` on the reminder day.
     case onItsDay
     /// As soon as it is scheduled: it was set for today once that hour had passed.
     case rightAway
+
+    /// The hour of its day a reminder arrives at: 09:00.
+    static let hour = 9
 }
 
-/// Where Loan and Debt reminders go: the system's local notifications in the app, a stand-in in tests.
+/// Where reminders go: the system's local notifications in the app, a stand-in in tests.
 protocol ReminderScheduler {
     /// Asks the user to allow notifications, unless they already answered. Returns whether they are allowed.
     func requestPermission() async -> Bool
-    /// Makes `reminders` the pending Loan and Debt reminders, replacing every one scheduled before. Schedules
-    /// nothing while notifications aren't allowed.
-    func replacePendingReminders(with reminders: [DebtReminder]) async
+    /// Makes `reminders` the pending reminders of their sort, whether Loan and Debt or Estimated-amount ones, replacing
+    /// every one of that sort scheduled before. Schedules nothing while notifications aren't allowed.
+    func replacePending<Reminder: PendingReminder>(_ reminders: [Reminder]) async
 }
 
-extension DebtsAndLoans {
+/// What the Home bell and the notifications remind of, made from the transactions it is fetched from.
+protocol ReminderSource {
+    associatedtype Reminder: PendingReminder
+
+    /// Every transaction it is made from. A source made from them stays current, since a change to one changes what
+    /// this fetches.
+    static var transactions: FetchDescriptor<Transaction> { get }
+
+    init(_ transactions: [Transaction])
+
+    /// The notifications that should be pending: one for each reminder day `today` or later, the soonest first.
+    func reminders(from today: CalendarDay) -> [Reminder]
+}
+
+extension ReminderSource {
+    /// The notifications to keep pending at `now`: the ``reminders(from:)`` of that day, each arriving at 09:00 on its
+    /// day. Once 09:00 has passed, one for today arrives right away when it is new since `earlier` (what the previous
+    /// sync handed over), and is left out otherwise, since it has arrived already. Before the first sync of a run
+    /// (`earlier` is `nil`), every one for today counts as arrived.
+    func reminders(at now: Date, calendar: Calendar = .current, after earlier: [Reminder]?) -> [Reminder] {
+        let today = CalendarDay(now, in: calendar)
+        let hasPassedTheHour = calendar.component(.hour, from: now) >= ReminderArrival.hour
+        return reminders(from: today).compactMap { reminder in
+            guard reminder.day == today, hasPassedTheHour else { return reminder }
+            guard let earlier, !earlier.contains(where: reminder.isSameReminder) else { return nil }
+            var rightAway = reminder
+            rightAway.arrival = .rightAway
+            return rightAway
+        }
+    }
+
+    /// Hands `scheduler` the ``reminders(at:calendar:after:)`` to keep pending, replacing those scheduled before. When
+    /// there is any, it first asks the user to allow notifications (the system asks only once), so the first reminder
+    /// is scheduled as soon as they allow it.
+    func reschedule(
+        at now: Date, calendar: Calendar = .current, after earlier: [Reminder]?, using scheduler: some ReminderScheduler
+    ) async {
+        let reminders = reminders(at: now, calendar: calendar, after: earlier)
+        if !reminders.isEmpty {
+            _ = await scheduler.requestPermission()
+        }
+        await scheduler.replacePending(reminders)
+    }
+}
+
+extension DebtsAndLoans: ReminderSource {
     /// The open Loans and Debts whose reminder day is `today` or earlier, the earliest first: what the Home bell
     /// lists. A settled one is never due.
     func due(on today: CalendarDay) -> [LoanOrDebt] {
@@ -58,36 +119,6 @@ extension DebtsAndLoans {
             )
         }
         .sorted { $0.day < $1.day }
-    }
-
-    /// The notifications to keep pending at `now`: the ``reminders(from:)`` of that day, each arriving at 09:00 on
-    /// its day. Once 09:00 has passed, one for today arrives right away when it is new since `earlier` (what the
-    /// previous sync handed over), and is left out otherwise, since it has arrived already. Before the first sync of
-    /// a run (`earlier` is `nil`), every one for today counts as arrived.
-    func reminders(at now: Date, calendar: Calendar = .current, after earlier: [DebtReminder]?) -> [DebtReminder] {
-        let today = CalendarDay(now, in: calendar)
-        let hasPassedTheHour = calendar.component(.hour, from: now) >= DebtReminder.hour
-        return reminders(from: today).compactMap { reminder in
-            guard reminder.day == today, hasPassedTheHour else { return reminder }
-            guard let earlier, !earlier.contains(where: reminder.isSameReminder) else { return nil }
-            var rightAway = reminder
-            rightAway.arrival = .rightAway
-            return rightAway
-        }
-    }
-
-    /// Hands `scheduler` the ``reminders(at:calendar:after:)`` to keep pending, replacing those scheduled before.
-    /// When there is any, it first asks the user to allow notifications (the system asks only once), so the first
-    /// reminder is scheduled as soon as they allow it.
-    func reschedule(
-        at now: Date, calendar: Calendar = .current, after earlier: [DebtReminder]?,
-        using scheduler: some ReminderScheduler
-    ) async {
-        let reminders = reminders(at: now, calendar: calendar, after: earlier)
-        if !reminders.isEmpty {
-            _ = await scheduler.requestPermission()
-        }
-        await scheduler.replacePendingReminders(with: reminders)
     }
 }
 

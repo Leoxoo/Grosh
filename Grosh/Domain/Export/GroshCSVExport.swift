@@ -72,7 +72,7 @@ enum GroshCSVExport {
 
     /// `text` as one CSV field: in double quotes, with its quotes doubled, when it holds a comma, a quote or a line
     /// break; as it is otherwise.
-    private static func field(_ text: String) -> String {
+    nonisolated private static func field(_ text: String) -> String {
         guard text.contains(where: { $0 == "," || $0 == "\"" || $0.isNewline }) else { return text }
         return "\"" + text.replacingOccurrences(of: "\"", with: "\"\"") + "\""
     }

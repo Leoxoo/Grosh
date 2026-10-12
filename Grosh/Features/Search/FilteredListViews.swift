@@ -20,26 +20,75 @@ struct TransactionFilterButton: View {
     }
 }
 
-/// The header of a searched or filtered list, in place of the period's balances: how many transactions match and
-/// what they add up to. With a Card filter on, that is the Card's total, to check against the bank's app.
-/// Use inside a `List` section.
+/// A searched or filtered list's count and what the matches add up to, as a list section: how many transactions match
+/// and their net total. With a Card filter on, that is the Card's total, to check against the bank's app. Use inside a
+/// `List` section. The Transactions tab shows the same in its header with ``FilterSummaryFigures``.
 struct FilterSummaryView: View {
     @Binding var filter: TransactionFilter
     /// The transactions the list shows.
     let transactions: [Transaction]
 
+    private enum Row: Identifiable {
+        case count, total, clearFilters
+
+        var id: Self { self }
+    }
+
     var body: some View {
-        LabeledContent("Transactions") {
-            Text(transactions.count.formatted())
-                .monospacedDigit()
+        // The count and total, and Clear Filters while a filter is set.
+        let rows: [Row] = filter.hasFilters ? [.count, .total, .clearFilters] : [.count, .total]
+        GroupedForEach(rows) { row in
+            switch row {
+            case .count:
+                LabeledContent("Transactions") {
+                    Text(transactions.count.formatted())
+                        .monospacedDigit()
+                }
+            case .total:
+                LabeledContent(filter.totalTitle) {
+                    AmountText(amount: transactions.net, showsPlusSign: true)
+                        .fontWeight(.semibold)
+                }
+            case .clearFilters:
+                Button("Clear Filters", systemImage: "xmark.circle") { filter.clearFilters() }
+            }
         }
-        LabeledContent(filter.card.map { "\($0.name) total" } ?? String(localized: "Net total")) {
-            AmountText(amount: transactions.net, showsPlusSign: true)
-                .fontWeight(.semibold)
+    }
+}
+
+/// A searched or filtered list's count and total in the Transactions tab's header, in place of the period's balances,
+/// with Clear Filters under them while a filter is set. With a Card filter on, the total is the Card's.
+struct FilterSummaryFigures: View {
+    @Binding var filter: TransactionFilter
+    /// The transactions the list shows.
+    let transactions: [Transaction]
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack(alignment: .top, spacing: 8) {
+                SummaryFigure(
+                    title: Text("Transactions"),
+                    value: Text(transactions.count.formatted()).monospacedDigit()
+                )
+                SummaryFigure(
+                    title: Text(verbatim: filter.totalTitle),
+                    value: AmountText(amount: transactions.net, showsPlusSign: true)
+                )
+            }
+            if filter.hasFilters {
+                Button("Clear Filters", systemImage: "xmark.circle") { filter.clearFilters() }
+                    .font(.subheadline)
+                    .buttonStyle(.borderless)
+            }
         }
-        if filter.hasFilters {
-            Button("Clear Filters", systemImage: "xmark.circle") { filter.clearFilters() }
-        }
+        .padding(.horizontal)
+    }
+}
+
+private extension TransactionFilter {
+    /// The title of the total: the Card's when a Card filter is on, otherwise the net total.
+    var totalTitle: String {
+        card.map { "\($0.name) total" } ?? String(localized: "Net total")
     }
 }
 

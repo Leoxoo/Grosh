@@ -24,6 +24,19 @@ struct TransactionFilter: Equatable {
     /// Only transactions excluded from report.
     var excludedOnly = false
 
+    /// Wallets, categories and Cards are compared by identity, so this doesn't rely on their Equatable conformance.
+    static func == (lhs: TransactionFilter, rhs: TransactionFilter) -> Bool {
+        lhs.searchText == rhs.searchText
+            && lhs.wallet === rhs.wallet
+            && lhs.category === rhs.category
+            && lhs.card === rhs.card
+            && lhs.type == rhs.type
+            && lhs.dateRange == rhs.dateRange
+            && lhs.minimumAmount == rhs.minimumAmount
+            && lhs.maximumAmount == rhs.maximumAmount
+            && lhs.excludedOnly == rhs.excludedOnly
+    }
+
     /// Whether `transaction` passes the search and every filter that is set.
     func matches(_ transaction: Transaction) -> Bool {
         guard dateRange.contains(transaction.day) else { return false }
@@ -31,9 +44,9 @@ struct TransactionFilter: Equatable {
         let enteredCents = abs(transaction.amountCents)
         if let minimumAmount, enteredCents < minimumAmount.cents { return false }
         if let maximumAmount, enteredCents > maximumAmount.cents { return false }
-        if let wallet, transaction.wallet != wallet { return false }
-        if let category, transaction.category != category, transaction.category?.parent != category { return false }
-        if let card, transaction.card != card { return false }
+        if let wallet, transaction.wallet !== wallet { return false }
+        if let category, transaction.category !== category, transaction.category?.parent !== category { return false }
+        if let card, transaction.card !== card { return false }
         if let type, transaction.category?.type != type { return false }
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         return query.isEmpty

@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// The fields of a ``KeypadSheet`` that take focus: the amount, typed on the keypad, and the text fields, which
+/// The fields of a ``KeypadSheet`` that take focus: the amounts, typed on the keypad, and the text fields, which
 /// hide it.
 enum KeypadSheetField: Hashable {
-    case amount, note, withName
+    case amount, secondAmount, note, withName
 }
 
 /// The shell of every sheet that types an amount on ``AmountKeypad``: a grouped form in its own navigation stack,
@@ -13,6 +13,8 @@ enum KeypadSheetField: Hashable {
 struct KeypadSheet<Content: View>: View {
     let title: Text
     @Binding var entry: AmountEntry
+    /// A second amount the form takes, such as a Purchase's total. Its row types on the same keypad while it has focus.
+    var secondEntry: Binding<AmountEntry>? = nil
     let canSave: Bool
     let save: () -> Void
     /// The sheet's smallest and starting height on a Mac.
@@ -21,17 +23,23 @@ struct KeypadSheet<Content: View>: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var isKeypadShown = true
+    /// Which amount the keypad types into. A row's tap sets it, rather than focus, so the keypad reaches a second
+    /// amount whether or not focus lands on its row.
+    @State private var typingInto: KeypadSheetField = .amount
     @FocusState private var focus: KeypadSheetField?
 
     var body: some View {
         NavigationStack {
             Form {
-                content(KeypadSheetFields(entry: $entry, focus: $focus, isKeypadShown: $isKeypadShown))
+                content(KeypadSheetFields(
+                    entry: $entry, secondEntry: secondEntry, focus: $focus, isKeypadShown: $isKeypadShown,
+                    typingInto: $typingInto
+                ))
             }
             .formStyle(.grouped)
             .safeAreaInset(edge: .bottom) {
                 if isKeypadShown {
-                    AmountKeypad(entry: $entry)
+                    AmountKeypad(entry: keypadEntry)
                         .background(.bar)
                 }
             }
@@ -50,7 +58,7 @@ struct KeypadSheet<Content: View>: View {
             }
             .defaultFocus($focus, .amount)
             .onChange(of: focus) {
-                if let focus, focus != .amount {
+                if let focus, focus != .amount, focus != .secondAmount {
                     isKeypadShown = false
                 }
             }
@@ -59,22 +67,54 @@ struct KeypadSheet<Content: View>: View {
         .frame(minWidth: 420, idealWidth: 460, minHeight: macHeight.min, idealHeight: macHeight.ideal)
         #endif
     }
+
+    /// The amount the keypad types into: the second one once its row is tapped, otherwise the first.
+    private var keypadEntry: Binding<AmountEntry> {
+        if typingInto == .secondAmount, let secondEntry {
+            return secondEntry
+        }
+        return $entry
+    }
 }
 
 /// What a ``KeypadSheet``'s form makes its focusable fields with, so they work with the keypad.
 struct KeypadSheetFields {
     @Binding var entry: AmountEntry
+    /// The form's second amount, when it takes one.
+    let secondEntry: Binding<AmountEntry>?
     /// Which field has focus, for a form that shows something more while one does.
     let focus: FocusState<KeypadSheetField?>.Binding
     @Binding var isKeypadShown: Bool
+    /// Which amount the keypad types into, as the row last tapped sets it.
+    @Binding var typingInto: KeypadSheetField
 
-    /// The row showing the amount typed on the keypad. Tapping it focuses it and shows or hides the keypad.
+    /// The row showing the amount typed on the keypad. Tapping it focuses it, sends the keypad to it, and shows or
+    /// hides the keypad. Tapping it while the keypad types into the second amount sends the keypad back here instead.
     func amountRow(_ title: LocalizedStringKey, currencyCode: String, tint: Color = .primary) -> some View {
         AmountRow(title: title, entry: $entry, currencyCode: currencyCode, tint: tint) {
             focus.wrappedValue = .amount
-            isKeypadShown.toggle()
+            if isKeypadShown && typingInto == .amount {
+                isKeypadShown = false
+            } else {
+                typingInto = .amount
+                isKeypadShown = true
+            }
         }
         .focused(focus, equals: .amount)
+    }
+
+    /// The row showing the form's second amount, such as a Purchase's total, typed on the keypad. Tapping it focuses
+    /// it, sends the keypad to it, and shows the keypad. Nothing is shown when the form takes no second amount.
+    @ViewBuilder
+    func secondAmountRow(_ title: LocalizedStringKey, currencyCode: String, tint: Color = .primary) -> some View {
+        if let secondEntry {
+            AmountRow(title: title, entry: secondEntry, currencyCode: currencyCode, tint: tint) {
+                focus.wrappedValue = .secondAmount
+                typingInto = .secondAmount
+                isKeypadShown = true
+            }
+            .focused(focus, equals: .secondAmount)
+        }
     }
 
     /// The Note field. Focusing it hides the keypad.

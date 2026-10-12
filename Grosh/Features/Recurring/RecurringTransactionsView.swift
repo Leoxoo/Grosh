@@ -1,22 +1,44 @@
 import SwiftData
 import SwiftUI
 
-/// Account → Recurring transactions: every schedule, in the order it was added. Tap one to see what it has made, and
+/// Account → Recurring transactions: every schedule, grouped by Kind and in the order it was added within each group.
+/// A paused one, whose wallet is archived, shows muted. A deleted one waits in Recently Deleted. A wallet filter in the
+/// toolbar narrows the list to one wallet's schedules. Tap one to see what it has made, swipe one to duplicate it, and
 /// add one with the plus.
 struct RecurringTransactionsView: View {
-    @Query(sort: \RecurringTransaction.createdAt) private var recurring: [RecurringTransaction]
-    @State private var editorMode: EditorMode<RecurringTransaction>?
+    @Query(filter: #Predicate<RecurringTransaction> { $0.deletedAt == nil }, sort: \RecurringTransaction.createdAt)
+    private var recurring: [RecurringTransaction]
+    @Query(Wallet.unarchived) private var wallets: [Wallet]
+    /// Every transaction a varying Bill's estimate is averaged over, so each row shows the amount it will make.
+    @Query(Transaction.notDeleted) private var transactions: [Transaction]
+    @State private var editorMode: RecurringTransactionEditor.Mode?
+    /// The wallet the list is narrowed to, or `nil` for every wallet. Each time the tab opens it shows every wallet.
+    @State private var walletFilter: Wallet?
+
+    private var groups: [RecurringListing.KindGroup] {
+        RecurringListing.groups(of: recurring, wallet: walletFilter)
+    }
 
     var body: some View {
         List {
-            ForEach(recurring) { item in
-                NavigationLink {
-                    RecurringTransactionDetailView(recurring: item)
-                } label: {
-                    RecurringTransactionRow(recurring: item)
+            ForEach(groups) { group in
+                Section(group.kind.sectionTitle) {
+                    GroupedForEach(group.items) { item in
+                        NavigationLink {
+                            RecurringTransactionDetailView(recurring: item)
+                        } label: {
+                            RecurringTransactionRow(recurring: item, history: transactions)
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button("Duplicate", systemImage: "doc.on.doc") {
+                                editorMode = .duplicate(item)
+                            }
+                        }
+                    }
                 }
             }
         }
+        .roundedSectionsListStyle()
         .overlay {
             if recurring.isEmpty {
                 ContentUnavailableView {
@@ -26,11 +48,18 @@ struct RecurringTransactionsView: View {
                 } actions: {
                     Button("Add Recurring Transaction") { editorMode = .add }
                 }
+            } else if groups.isEmpty, let walletFilter {
+                ContentUnavailableView {
+                    Label("No Recurring Transactions", systemImage: "repeat")
+                } description: {
+                    Text("None are paid from \(walletFilter.name).")
+                }
             }
         }
         .navigationTitle("Recurring transactions")
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                walletMenu
                 Button("Add Recurring Transaction", systemImage: "plus") { editorMode = .add }
             }
         }
@@ -38,33 +67,68 @@ struct RecurringTransactionsView: View {
             RecurringTransactionEditor(mode: mode)
         }
     }
+
+    /// Narrows the list to every wallet, or to one unarchived wallet.
+    private var walletMenu: some View {
+        Menu {
+            Picker("Wallet", selection: $walletFilter) {
+                Text("All wallets").tag(Wallet?.none)
+                ForEach(wallets) { wallet in
+                    Label(wallet.name, systemImage: wallet.symbolName).tag(Optional(wallet))
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Label("Wallet", systemImage: walletFilter == nil ? "wallet.bifold" : "wallet.bifold.fill")
+        }
+        .accessibilityValue(walletFilter?.name ?? String(localized: "All wallets"))
+    }
 }
 
-/// One Recurring transaction in the list: its category icon, name, wallet and next day, and its signed amount.
+/// One Recurring transaction in the list: its icon, name, wallet and next day, and its amount. A varying Bill shows its
+/// estimate while it has one, as the transactions it makes will.
 struct RecurringTransactionRow: View {
     let recurring: RecurringTransaction
+    /// The transactions a varying Bill's estimate is averaged over.
+    let history: [Transaction]
 
     var body: some View {
         HStack(spacing: 12) {
-            CategoryIcon(category: recurring.category)
+            CategoryIcon(category: recurring.category, subscriptionIcon: recurring.subscriptionIcon)
             VStack(alignment: .leading, spacing: 2) {
-                Text(recurring.name)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(recurring.name)
+                        .lineLimit(1)
+                    if recurring.estimatesAmount {
+                        EstimatedBadge()
+                    }
+                }
                 Text(detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                if let progress = recurring.purchaseProgress {
+                    Text(progress.summary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
             Spacer(minLength: 8)
-            AmountText(amount: recurring.signedAmount)
+            AmountText(amount: recurring.startingAmount(among: history))
         }
         .contentShape(Rectangle())
+        .opacity(recurring.isPaused ? 0.5 : 1)
         .accessibilityElement(children: .combine)
     }
 
-    /// The wallet and the next day it falls due, such as "Checking · Next Nov 4, 2026".
+    /// The wallet and the next day it falls due, such as "Checking · Next Nov 4, 2026", or "Paused" while its wallet
+    /// is archived.
     private var detail: String {
         let wallet = recurring.wallet?.name ?? String(localized: "No wallet")
+        if recurring.isPaused {
+            return String(localized: "\(wallet) · Paused")
+        }
         guard let next = recurring.nextDueDay else {
             return String(localized: "\(wallet) · Ended")
         }

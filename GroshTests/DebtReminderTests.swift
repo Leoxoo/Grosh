@@ -103,7 +103,7 @@ struct DebtReminderTests {
 
     @Test func theFirstReminderAsksToSendNotificationsThenIsScheduledOnceAllowed() async throws {
         let loan = try record(.loan, 100_00, with: "Pasha", remindOn: today.adding(days: 5))
-        let scheduler = RecordingReminderScheduler()
+        let scheduler = RecordingReminderScheduler<DebtReminder>()
 
         try await DebtsAndLoans(in: context).reschedule(
             at: now(at: 8), calendar: .utcGregorian, after: [], using: scheduler
@@ -111,7 +111,7 @@ struct DebtReminderTests {
 
         #expect(scheduler.calls == [
             .requestPermission,
-            .replacePendingReminders([
+            .replacePending([
                 DebtReminder(
                     original: loan.persistentModelID, day: today.adding(days: 5), withName: "Pasha",
                     outstanding: Money(cents: 100_00), kind: .loan
@@ -122,13 +122,13 @@ struct DebtReminderTests {
 
     @Test func withNoReminderToSendNothingAsksToSendNotifications() async throws {
         try record(.loan, 100_00, with: "Pasha", remindOn: nil)
-        let scheduler = RecordingReminderScheduler()
+        let scheduler = RecordingReminderScheduler<DebtReminder>()
 
         try await DebtsAndLoans(in: context).reschedule(
             at: now(at: 8), calendar: .utcGregorian, after: [], using: scheduler
         )
 
-        #expect(scheduler.calls == [.replacePendingReminders([])])
+        #expect(scheduler.calls == [.replacePending([])])
     }
 
     @Test func aReminderForTodayArrivesAtNineOrRightAwayWhenSetAfterNine() throws {
@@ -195,23 +195,3 @@ struct DebtReminderTests {
     }
 }
 
-/// Records what it is asked, in order, instead of asking the user or scheduling notifications. Notifications are
-/// always allowed.
-@MainActor
-private final class RecordingReminderScheduler: ReminderScheduler {
-    enum Call: Equatable {
-        case requestPermission
-        case replacePendingReminders([DebtReminder])
-    }
-
-    private(set) var calls: [Call] = []
-
-    func requestPermission() async -> Bool {
-        calls.append(.requestPermission)
-        return true
-    }
-
-    func replacePendingReminders(with reminders: [DebtReminder]) async {
-        calls.append(.replacePendingReminders(reminders))
-    }
-}
