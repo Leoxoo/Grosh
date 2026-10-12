@@ -26,6 +26,7 @@ struct TransactionSearchView: View {
                 }
             }
         }
+        .roundedSectionsListStyle()
         .overlay {
             if !filter.isOn {
                 ContentUnavailableView(

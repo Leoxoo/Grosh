@@ -38,6 +38,7 @@ struct RecurringTransactionsView: View {
                 }
             }
         }
+        .roundedSectionsListStyle()
         .overlay {
             if recurring.isEmpty {
                 ContentUnavailableView {

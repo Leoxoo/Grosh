@@ -83,6 +83,7 @@ struct TransactionListView: View {
                 }
             }
         }
+        .roundedSectionsListStyle()
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 4) {
                 if showsSearchField {
