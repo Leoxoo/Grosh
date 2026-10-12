@@ -10,6 +10,8 @@ nonisolated struct CardDraft {
     var lastFourDigits: String?
     /// The day of the month (1–31) a Credit card's statement closes.
     var statementDay: Int?
+    /// The Card's cropped image as JPEG data. Set it with ``setImage(_:)``, which also sets the color.
+    var imageData: Data?
 }
 
 /// Why a Card change was refused.
@@ -61,8 +63,18 @@ extension CardDraft {
             payingWallet: card.payingWallet,
             color: card.color,
             lastFourDigits: card.lastFourDigits,
-            statementDay: card.statementDay
+            statementDay: card.statementDay,
+            imageData: card.imageData
         )
+    }
+
+    /// Sets or removes the Card's image. A Card with an image takes its color from the image's average color, and
+    /// removing the image keeps that color.
+    mutating func setImage(_ data: Data?) {
+        imageData = data
+        if let data, let average = CroppedPhoto.averagePaletteColor(of: data) {
+            color = average
+        }
     }
 
     fileprivate var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -126,6 +138,7 @@ extension Card {
         color = draft.color
         lastFourDigits = draft.storedLastFourDigits
         statementDay = draft.statementDay
+        imageData = draft.imageData
     }
 
     /// The order Cards are listed in everywhere: the order they were added.

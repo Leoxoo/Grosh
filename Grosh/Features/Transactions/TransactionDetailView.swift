@@ -81,16 +81,23 @@ struct TransactionDetailView: View {
                     Button("Duplicate", systemImage: "plus.square.on.square") {
                         isDuplicating = true
                     }
+                    .fullWidthRowButton()
                 }
                 TransactionDeleteButton(transaction: transaction) {
                     if let didDelete { didDelete() } else { dismiss() }
                 }
+                .fullWidthRowButton()
             } footer: {
                 if transaction.canBeDuplicated {
                     Text("Duplicate opens a new transaction with the same details, dated today.")
                 }
             }
         }
+        #if os(macOS)
+        // A readable-width column, pinned to the pane's left edge.
+        .frame(maxWidth: 520, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        #endif
         .toolbar {
             if let editFlow = transaction.editFlow {
                 ToolbarItem(placement: .primaryAction) {
@@ -109,8 +116,10 @@ struct TransactionDetailView: View {
         if let card = transaction.card {
             LabeledContent("Card") {
                 HStack(spacing: 6) {
-                    Image(systemName: Card.symbolName)
-                        .foregroundStyle(card.color.color)
+                    CardMark(image: card.image, height: 18) {
+                        Image(systemName: Card.symbolName)
+                            .foregroundStyle(card.color.color)
+                    }
                     Text(card.displayName)
                 }
             }
@@ -169,4 +178,17 @@ private struct ExcludedFromReportBanner: View {
 
 extension TransactionEditFlow: Identifiable {
     var id: Self { self }
+}
+
+extension View {
+    /// On Mac, a list button fills its row and is clickable across it, rather than floating as a bordered button.
+    fileprivate func fullWidthRowButton() -> some View {
+        #if os(macOS)
+        buttonStyle(.borderless)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        #else
+        self
+        #endif
+    }
 }

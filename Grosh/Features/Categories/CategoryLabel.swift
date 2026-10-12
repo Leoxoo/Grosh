@@ -22,8 +22,8 @@ struct CategoryIcon: View {
     var size: CGFloat = 32
 
     var body: some View {
-        if let subscriptionIcon, let image = SubscriptionIcon.image(from: subscriptionIcon) {
-            SubscriptionIconImage(image: image, size: size)
+        if let subscriptionIcon, let image = CroppedPhoto.image(from: subscriptionIcon) {
+            CroppedPhotoImage(image: image, height: size)
         } else {
             SymbolCircle(symbolName: category?.symbolName ?? "questionmark", color: category?.color ?? .gray, size: size)
         }

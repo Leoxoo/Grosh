@@ -41,7 +41,7 @@ final class RecurringTransaction {
     /// Set on a schedule that went to Recently Deleted with its wallet, as part of that one item: it is restored with
     /// the wallet, never on its own.
     var deletedWithWallet: Bool = false
-    /// A Subscription's cropped icon, as JPEG data (``SubscriptionIcon``). It is kept when the Kind changes, so changing
+    /// A Subscription's cropped icon, as JPEG data (``CroppedPhoto``). It is kept when the Kind changes, so changing
     /// back shows it again, but only ``subscriptionIcon`` shows it. External storage keeps the image out of the row.
     @Attribute(.externalStorage) var iconData: Data?
     /// A Purchase's total price in cents, or `nil` when none was given. It is kept when the Kind changes, as the icon is,

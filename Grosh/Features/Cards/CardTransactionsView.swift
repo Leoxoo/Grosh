@@ -62,7 +62,7 @@ struct CardTransactionsView: View {
                         .monospacedDigit()
                 }
                 LabeledContent {
-                    AmountText(amount: (shown + added).net, showsPlusSign: true)
+                    AmountText(amount: (shown + added).net, showsPlusSign: true, showsColor: false)
                         .fontWeight(.semibold)
                 } label: {
                     Text(period.isStatement ? "Statement total" : "Total")

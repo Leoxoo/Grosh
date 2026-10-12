@@ -43,8 +43,10 @@ struct CardPicker: View {
                 Label {
                     Text(card.isArchived ? "\(card.displayName) (Archived)" : card.displayName)
                 } icon: {
-                    Image(systemName: Card.symbolName)
-                        .foregroundStyle(card.color.color)
+                    CardMark(image: card.image, height: 16) {
+                        Image(systemName: Card.symbolName)
+                            .foregroundStyle(card.color.color)
+                    }
                 }
                 .tag(Optional(card))
             }

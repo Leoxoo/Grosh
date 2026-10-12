@@ -17,6 +17,9 @@ final class Card {
     var name: String = ""
     var kindRaw: String = CardKind.credit.rawValue
     var colorName: String = PaletteColor.blue.rawValue
+    /// The Card's photo, cropped to a credit card's proportions (``CroppedPhoto``) as JPEG data. Its average color is the
+    /// Card's color.
+    @Attribute(.externalStorage) var imageData: Data?
     var lastFourDigits: String?
     /// The day of the month (1–31) a Credit card's statement closes.
     var statementDay: Int?

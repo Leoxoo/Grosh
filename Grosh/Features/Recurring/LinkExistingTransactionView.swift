@@ -40,7 +40,9 @@ struct LinkExistingTransactionView: View {
                         Button {
                             attach(transaction)
                         } label: {
-                            TransactionRow(transaction: transaction, showsDay: true)
+                            TransactionRow(
+                                transaction: transaction, showsDay: true, showsWalletIcon: filter.wallet == nil
+                            )
                         }
                         .buttonStyle(.plain)
                     }

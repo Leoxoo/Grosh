@@ -19,7 +19,7 @@ struct PeriodSummaryView: View {
             )
             SummaryFigure(
                 title: Text("Difference"),
-                value: AmountText(amount: summary.difference, showsPlusSign: true)
+                value: AmountText(amount: summary.difference, showsPlusSign: true, showsColor: false)
             )
         }
         .padding(.horizontal)

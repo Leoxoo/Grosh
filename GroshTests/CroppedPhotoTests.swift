@@ -5,10 +5,10 @@ import Testing
 import UniformTypeIdentifiers
 @testable import Grosh
 
-/// A Subscription's icon: which part of a picked photo the window shows, the JPEG the crop is saved as, and when the
-/// icon shows on its Recurring transaction.
+/// A cropped photo: which part of a picked photo the window shows, the JPEG a crop is saved as, the color a photo averages
+/// to, and when a Subscription's icon shows on its Recurring transaction.
 @MainActor
-struct SubscriptionIconTests {
+struct CroppedPhotoTests {
     private let wide = CGSize(width: 1000, height: 400)
     private let tall = CGSize(width: 400, height: 1000)
 
@@ -33,60 +33,101 @@ struct SubscriptionIconTests {
     }
 
     @Test func theWholeShortSideOfAWidePhotoIsCroppedToASquareInTheMiddle() {
-        #expect(IconCrop.centered(on: wide).sourceRect(in: wide) == CGRect(x: 300, y: 0, width: 400, height: 400))
+        #expect(PhotoCrop.centered(on: wide).sourceRect(in: wide) == CGRect(x: 300, y: 0, width: 400, height: 400))
     }
 
     @Test func aTallPhotoIsCroppedToItsWidthAndCenteredTopToBottom() {
-        #expect(IconCrop.centered(on: tall).sourceRect(in: tall) == CGRect(x: 0, y: 300, width: 400, height: 400))
+        #expect(PhotoCrop.centered(on: tall).sourceRect(in: tall) == CGRect(x: 0, y: 300, width: 400, height: 400))
     }
 
     @Test func zoomingInShowsASmallerSquareAroundTheSameCenter() {
-        let crop = IconCrop(zoom: 2, center: CGPoint(x: 500, y: 200))
+        let crop = PhotoCrop(zoom: 2, center: CGPoint(x: 500, y: 200))
         #expect(crop.sourceRect(in: wide) == CGRect(x: 400, y: 100, width: 200, height: 200))
     }
 
     @Test func zoomStaysInItsRangeAndTheWindowStaysOnThePhoto() {
         let center = CGPoint(x: 500, y: 200)
-        #expect(IconCrop(zoom: 0.5, center: center).clamped(to: wide).zoom == IconCrop.zoomRange.lowerBound)
-        #expect(IconCrop(zoom: 9, center: center).clamped(to: wide).zoom == IconCrop.zoomRange.upperBound)
+        #expect(PhotoCrop(zoom: 0.5, center: center).clamped(to: wide).zoom == PhotoCrop.zoomRange.lowerBound)
+        #expect(PhotoCrop(zoom: 9, center: center).clamped(to: wide).zoom == PhotoCrop.zoomRange.upperBound)
         // At zoom 1 the window is 400 pixels across, so a center on the left edge is pulled in to half of that.
-        #expect(IconCrop(zoom: 1, center: CGPoint(x: 0, y: 200)).clamped(to: wide).center.x == 200)
+        #expect(PhotoCrop(zoom: 1, center: CGPoint(x: 0, y: 200)).clamped(to: wide).center.x == 200)
     }
 
     @Test func aDragNeverMovesTheWindowPastAnEdgeOfThePhoto() {
-        let left = IconCrop.centered(on: wide)
-            .panned(by: CGSize(width: 10_000, height: 0), windowSide: 400, in: wide)
+        let left = PhotoCrop.centered(on: wide)
+            .panned(by: CGSize(width: 10_000, height: 0), windowWidth: 400, in: wide)
         #expect(left.sourceRect(in: wide).minX == 0)
 
-        let right = IconCrop.centered(on: wide)
-            .panned(by: CGSize(width: -10_000, height: 0), windowSide: 400, in: wide)
+        let right = PhotoCrop.centered(on: wide)
+            .panned(by: CGSize(width: -10_000, height: 0), windowWidth: 400, in: wide)
         #expect(right.sourceRect(in: wide).maxX == wide.width)
     }
 
     @Test func aDragMovesThePhotoWithTheFingerAtTheZoomedScale() {
         // At zoom 2 the window shows 200 pixels across 400 points, so a 100-point drag moves the window 50 pixels.
-        let crop = IconCrop(zoom: 2, center: CGPoint(x: 500, y: 200))
-            .panned(by: CGSize(width: 100, height: 0), windowSide: 400, in: wide)
+        let crop = PhotoCrop(zoom: 2, center: CGPoint(x: 500, y: 200))
+            .panned(by: CGSize(width: 100, height: 0), windowWidth: 400, in: wide)
         #expect(crop.sourceRect(in: wide).origin == CGPoint(x: 350, y: 100))
+    }
+
+    @Test func aCardImageWindowHasACreditCardsProportions() {
+        let size = PhotoCrop.centered(on: wide, shape: .creditCard).size(in: wide)
+        #expect(abs(size.width / size.height - CropShape.creditCard.aspect) < 0.001)
+        #expect(size.height <= wide.height)
     }
 
     @Test func theSavedIconIsASquareOfTheStoredSizeThatDecodesBack() throws {
         let photo = try solidPhoto(width: 1000, height: 400)
-        let data = try #require(SubscriptionIcon.jpegData(cropping: photo, to: .centered(on: wide)))
-        let icon = try #require(SubscriptionIcon.image(from: data))
-        #expect(icon.width == SubscriptionIcon.pixelSide)
-        #expect(icon.height == SubscriptionIcon.pixelSide)
+        let data = try #require(CroppedPhoto.jpegData(cropping: photo, to: .centered(on: wide)))
+        let icon = try #require(CroppedPhoto.image(from: data))
+        #expect(icon.width == CropShape.appIcon.pixelWidth)
+        #expect(icon.height == CropShape.appIcon.pixelWidth)
+    }
+
+    @Test func theSavedCardImageIsLandscapeAtItsStoredWidth() throws {
+        let photo = try solidPhoto(width: 1000, height: 400)
+        let data = try #require(CroppedPhoto.jpegData(cropping: photo, to: .centered(on: wide, shape: .creditCard)))
+        let image = try #require(CroppedPhoto.image(from: data))
+        #expect(image.width == CropShape.creditCard.pixelWidth)
+        #expect(image.height < image.width)
     }
 
     @Test func aPickedPhotoIsDecodedNoLargerThanTheLimit() throws {
         let png = try pngData(of: try solidPhoto(width: 1000, height: 400))
-        let decoded = try #require(SubscriptionIcon.decode(png, maxPixelSide: 500))
+        let decoded = try #require(CroppedPhoto.decode(png, maxPixelSide: 500))
         #expect(max(decoded.width, decoded.height) == 500)
     }
 
     @Test func dataThatIsNotAPhotoDoesNotDecode() {
-        #expect(SubscriptionIcon.decode(Data("not a photo".utf8)) == nil)
-        #expect(SubscriptionIcon.image(from: Data("not a photo".utf8)) == nil)
+        #expect(CroppedPhoto.decode(Data("not a photo".utf8)) == nil)
+        #expect(CroppedPhoto.image(from: Data("not a photo".utf8)) == nil)
+    }
+
+    @Test func aPhotoAveragesToTheNearestPaletteColor() throws {
+        // The solid photo is a blue, so its average is that blue.
+        let data = try pngData(of: try solidPhoto(width: 1000, height: 400))
+        #expect(CroppedPhoto.averagePaletteColor(of: data) == .blue)
+        #expect(CroppedPhoto.averagePaletteColor(of: Data("not a photo".utf8)) == nil)
+    }
+
+    @Test func aColorIsTheNearestPaletteEntryToItsHueOrGrayOrBrownWhenMuted() {
+        #expect(PaletteColor.nearest(red: 0.2, green: 0.5, blue: 0.9) == .blue)
+        #expect(PaletteColor.nearest(red: 0.635, green: 0.518, blue: 0.369) == .brown)
+        #expect(PaletteColor.nearest(red: 0.5, green: 0.5, blue: 0.5) == .gray)
+    }
+
+    @Test func aCardImageSetsItsColorAndRemovingItKeepsTheColor() throws {
+        let data = try pngData(of: try solidPhoto(width: 1000, height: 400))
+        var draft = CardDraft(name: "Card", kind: .credit, payingWallet: nil)
+        draft.color = .red
+
+        draft.setImage(data)
+        #expect(draft.imageData == data)
+        #expect(draft.color == .blue)
+
+        draft.setImage(nil)
+        #expect(draft.imageData == nil)
+        #expect(draft.color == .blue)
     }
 
     @Test func aSubscriptionShowsItsIconAndAnotherKindShowsNone() {
