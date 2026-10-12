@@ -46,6 +46,22 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Settings")
+        .onChange(of: preferences) { old, new in
+            playSample(changingFrom: old, to: new)
+        }
+    }
+
+    /// The Sounds & Haptics preferences as they stand, watched so that changing one can play a sample of the Success
+    /// cue. Opening Settings changes none of them, so it plays nothing.
+    private var preferences: SoundsAndHaptics.Preferences {
+        SoundsAndHaptics.Preferences(soundsOn: soundsOn, hapticsOn: hapticsOn, chime: chime)
+    }
+
+    /// Plays the sample of the Success cue that changing the preferences from `old` to `new` calls for, if any. It
+    /// returns at once, and a sample that can't play is skipped without a word.
+    private func playSample(changingFrom old: SoundsAndHaptics.Preferences, to new: SoundsAndHaptics.Preferences) {
+        guard let sample = SuccessCue.Sample(changingFrom: old, to: new, on: .current) else { return }
+        SuccessCuePlayer.shared.play(sample.chime, ending: sample.ending, sound: sample.sound, haptic: sample.haptic)
     }
 }
 
