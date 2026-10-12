@@ -21,8 +21,8 @@ struct TransactionListView: View {
     @State private var grouping = TransactionGrouping.day
     /// Search text and filters. Searching looks across all time and every wallet; filters narrow the period.
     @State private var filter = TransactionFilter()
-    /// Whether the search field is open, from the toolbar's Search button.
-    @State private var isSearchOpen = false
+    /// Whether the search field is presented, which the toolbar's Search button turns on.
+    @State private var isSearchPresented = false
     /// Whether the list is choosing transactions to delete, and the ones chosen so far.
     @State private var isSelecting = false
     @State private var chosen = Set<Transaction>()
@@ -33,9 +33,6 @@ struct TransactionListView: View {
     private var selected: [Transaction] {
         filter.transactions(in: walletSelection, from: transactions)
     }
-
-    /// Whether the search field shows: while it is open, and whenever there is search text to clear.
-    private var showsSearchField: Bool { isSearchOpen || filter.isSearching }
 
     /// The periods the strip offers for `selected`, back to its first day with data.
     private func strip(for selected: [Transaction]) -> [Period] {
@@ -96,9 +93,6 @@ struct TransactionListView: View {
         .roundedSectionsListStyle()
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 4) {
-                if showsSearchField {
-                    TransactionSearchBar(text: $filter.searchText) { closeSearch() }
-                }
                 VStack(spacing: 4) {
                     WalletSelector(selection: $walletSelection, today: today)
                     PeriodStrip(periods: periods, selection: $period, today: today)
@@ -115,6 +109,7 @@ struct TransactionListView: View {
             .padding(.vertical, 8)
             .background(.bar)
         }
+        .modifier(SearchWhileOpen(text: $filter.searchText, isOpen: $isSearchPresented))
         .onChange(of: walletSelection) {
             // A wallet with a shorter history may not reach back to the period being shown.
             showPeriodHoldingTodayUnlessOffered(by: strip(for: selected))
@@ -139,9 +134,11 @@ struct TransactionListView: View {
                         startSelecting: startSelecting
                     )
                 }
+                #if os(iOS)
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Search", systemImage: "magnifyingglass") { isSearchOpen = true }
+                    Button("Search", systemImage: "magnifyingglass") { isSearchPresented = true }
                 }
+                #endif
                 ToolbarItem(placement: .primaryAction) {
                     TransactionFilterButton(filter: $filter)
                 }
@@ -187,12 +184,6 @@ struct TransactionListView: View {
         chosen = []
         isSelecting = true
     }
-
-    /// Closes the search field and clears its text, so the period and its header come back.
-    private func closeSearch() {
-        isSearchOpen = false
-        filter.searchText = ""
-    }
 }
 
 /// A category's icon and name, and its total for the period in color.
@@ -207,5 +198,25 @@ private struct TransactionCategoryHeader: View {
             AmountText(amount: group.total, showsPlusSign: true)
         }
         .textCase(nil)
+    }
+}
+
+/// Adds the system search field. On iPhone and iPad it is there only while the Search button has it open, or search text
+/// is left to clear, so it doesn't take room from the header the rest of the time. Mac keeps its search field in the
+/// toolbar, and has no Search button.
+private struct SearchWhileOpen: ViewModifier {
+    @Binding var text: String
+    @Binding var isOpen: Bool
+
+    func body(content: Content) -> some View {
+        #if os(macOS)
+        content.searchable(text: $text, prompt: "Note, category or amount")
+        #else
+        if isOpen || !text.isEmpty {
+            content.searchable(text: $text, isPresented: $isOpen, prompt: "Note, category or amount")
+        } else {
+            content
+        }
+        #endif
     }
 }
