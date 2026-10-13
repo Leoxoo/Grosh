@@ -48,7 +48,7 @@ struct WalletPicker: View {
                 ForEach(choices) { wallet in
                     Label {
                         Text(Self.name(of: wallet))
-                        Text(wallet.pickerOptionBalance(asOf: balancesDay))
+                        Text(wallet.balance(asOf: balancesDay).formatted())
                     } icon: {
                         Image(systemName: wallet.symbolName)
                     }
@@ -57,7 +57,7 @@ struct WalletPicker: View {
             } label: {
                 Text(title)
                 if let selection {
-                    Text(selection.pickerBalanceLine(asOf: balancesDay))
+                    Text(selection.balanceLine(asOf: balancesDay))
                 }
             } currentValueLabel: {
                 if let selection {
