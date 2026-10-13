@@ -62,6 +62,8 @@ struct WalletPicker: View {
                 Text(title)
                 if let selection {
                     Text(selection.balanceLine(asOf: today))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             } currentValueLabel: {
                 if let selection {
