@@ -33,7 +33,7 @@ struct WalletPickerBalanceTests {
         record(1_000_00, on: CalendarDay(year: 2026, month: 9, day: 1), in: checking)
         record(-12_76, in: checking)
 
-        #expect(checking.pickerBalanceLine(asOf: today, locale: unitedStates) == "Balance today: $987.24")
+        #expect(checking.balanceLine(asOf: today, locale: unitedStates) == "Balance today: $987.24")
     }
 
     @Test func eachDropdownOptionShowsItsWalletsBalanceToday() {
@@ -44,7 +44,7 @@ struct WalletPickerBalanceTests {
         record(-12_76, in: checking)
         record(-5_00, in: cash)
 
-        let options = [checking, cash, savings].map { $0.pickerOptionBalance(asOf: today, locale: unitedStates) }
+        let options = [checking, cash, savings].map { $0.balance(asOf: today).formatted(locale: unitedStates) }
 
         #expect(options == ["$987.24", "-$5.00", "$0.00"])
     }
@@ -54,8 +54,8 @@ struct WalletPickerBalanceTests {
         euros.currencyCode = "EUR"
         record(50_00, in: euros)
 
-        #expect(euros.pickerBalanceLine(asOf: today, locale: unitedStates) == "Balance today: €50.00")
-        #expect(euros.pickerOptionBalance(asOf: today, locale: unitedStates) == "€50.00")
+        #expect(euros.balanceLine(asOf: today, locale: unitedStates) == "Balance today: €50.00")
+        #expect(euros.balance(asOf: today).formatted(locale: unitedStates) == "€50.00")
     }
 
     @Test func aTransferDatedAfterTodayDoesNotChangeTheBalancesShown() throws {
@@ -70,9 +70,9 @@ struct WalletPickerBalanceTests {
 
         try Transfer.create(nextWeek, in: context)
 
-        #expect(checking.pickerBalanceLine(asOf: today, locale: unitedStates) == "Balance today: $1,000.00")
-        #expect(savings.pickerBalanceLine(asOf: today, locale: unitedStates) == "Balance today: $0.00")
-        #expect(checking.pickerOptionBalance(asOf: today, locale: unitedStates) == "$1,000.00")
-        #expect(savings.pickerOptionBalance(asOf: today, locale: unitedStates) == "$0.00")
+        #expect(checking.balanceLine(asOf: today, locale: unitedStates) == "Balance today: $1,000.00")
+        #expect(savings.balanceLine(asOf: today, locale: unitedStates) == "Balance today: $0.00")
+        #expect(checking.balance(asOf: today).formatted(locale: unitedStates) == "$1,000.00")
+        #expect(savings.balance(asOf: today).formatted(locale: unitedStates) == "$0.00")
     }
 }

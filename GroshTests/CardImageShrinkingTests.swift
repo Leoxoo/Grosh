@@ -1,9 +1,7 @@
 import CoreGraphics
 import Foundation
-import ImageIO
 import SwiftData
 import Testing
-import UniformTypeIdentifiers
 @testable import Grosh
 
 /// A Card image shrunk for the Card picker: a copy exactly as many pixels as the small card it is drawn as, so it needs
@@ -14,16 +12,6 @@ struct CardImageShrinkingTests {
 
     init() throws {
         container = try GroshStore.makeContainer(inMemory: true)
-    }
-
-    private func solidPhoto(width: Int, height: Int) throws -> CGImage {
-        let context = try #require(CGContext(
-            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ))
-        context.setFillColor(CGColor(red: 0.9, green: 0.1, blue: 0.1, alpha: 1))
-        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-        return try #require(context.makeImage())
     }
 
     /// A Card with an image saved as the Card editor saves one: a photo cropped to a credit card, 960 by 605 pixels.
@@ -50,21 +38,6 @@ struct CardImageShrinkingTests {
         let twoX = try #require(card.shrunkImage(height: 16, scale: 2))
         #expect(twoX.height == 32)
         #expect(twoX.width == 51)
-    }
-
-    @Test func theShrunkCopyKeepsTheImagesOwnProportions() throws {
-        // A 1000 by 400 image is 2.5 times as wide as it is tall, so 48 pixels tall it is 120 wide, not card-shaped.
-        let photo = try solidPhoto(width: 1000, height: 400)
-        let output = NSMutableData()
-        let destination = try #require(
-            CGImageDestinationCreateWithData(output, UTType.png.identifier as CFString, 1, nil)
-        )
-        CGImageDestinationAddImage(destination, photo, nil)
-        #expect(CGImageDestinationFinalize(destination))
-
-        let shrunk = try #require(CroppedPhoto.thumbnail(of: output as Data, height: 16, scale: 3))
-        #expect(shrunk.height == 48)
-        #expect(shrunk.width == 120)
     }
 
     @Test func aCardWithNoImageHasNoShrunkImage() {

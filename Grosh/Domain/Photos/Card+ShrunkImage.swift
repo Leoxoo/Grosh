@@ -6,6 +6,6 @@ extension Card {
     /// keeps the image's proportions and is drawn at its own size, so no picker or menu can stretch it. `nil` when the
     /// Card has no image.
     func shrunkImage(height: CGFloat, scale: CGFloat) -> CGImage? {
-        imageData.flatMap { CroppedPhoto.thumbnail(of: $0, height: height, scale: scale) }
+        imageData.flatMap { CroppedPhoto.shrunkImage(from: $0, height: height, scale: scale) }
     }
 }

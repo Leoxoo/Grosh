@@ -15,6 +15,7 @@ struct CardPicker: View {
     private let noneTitle: LocalizedStringKey
 
     @Query(sort: Card.userOrder) private var allCards: [Card]
+    @Environment(\.displayScale) private var displayScale
 
     private enum Offered {
         case paidFrom(Wallet?)
@@ -44,7 +45,7 @@ struct CardPicker: View {
                 Label {
                     Text(card.isArchived ? "\(card.displayName) (Archived)" : card.displayName)
                 } icon: {
-                    PickerCardMark(card: card)
+                    mark(of: card)
                 }
                 .tag(Optional(card))
             }
@@ -57,26 +58,16 @@ struct CardPicker: View {
         case .every: allCards.filter { !$0.isPaidFromDeletedWallet }
         }
     }
-}
 
-/// A Card's mark in the picker: its image as a small card 16 points tall, or its coloured symbol when it has none. The
-/// image is a copy shrunk to that size for this screen and drawn at its own size, never resized, because a picker's
-/// label and menu rows ignore a frame and would draw a full-size image at full size.
-private struct PickerCardMark: View {
-    let card: Card
-
-    @Environment(\.displayScale) private var displayScale
-
-    private let height: CGFloat = 16
-
-    var body: some View {
-        if let image = card.shrunkImage(height: height, scale: displayScale) {
-            Image(decorative: image, scale: displayScale)
-                .clipShape(
-                    RoundedRectangle(cornerRadius: height * CropShape.creditCard.cornerRatio, style: .continuous)
-                )
-                .accessibilityHidden(true)
-        } else {
+    /// A Card's mark in the picker: its image as a small card 16 points tall, or its coloured symbol when it has none.
+    /// The image is a copy shrunk to that size for this screen, drawn at its own size since a picker ignores a frame.
+    private func mark(of card: Card) -> some View {
+        let height: CGFloat = 16
+        return CardMark(
+            image: card.shrunkImage(height: height, scale: displayScale),
+            height: height,
+            sizing: .shrunk(scale: displayScale)
+        ) {
             Image(systemName: Card.symbolName)
                 .foregroundStyle(card.color.color)
         }

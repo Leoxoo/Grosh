@@ -7,57 +7,63 @@ import SwiftUI
 struct WalletPicker: View {
     let title: LocalizedStringKey
     @Binding var selection: Wallet?
-    /// The first choice, which picks no wallet, such as "Any". `nil` offers wallets only.
-    private let noneTitle: LocalizedStringKey?
-    /// The day whose balances the picker shows, or `nil` to show none.
-    private let balancesDay: CalendarDay?
+    /// Which wallets the picker offers, and what it shows beside them.
+    private let offered: Offered
 
     @Query private var wallets: [Wallet]
 
+    /// What a picker can offer: the initializer used picks one.
+    private enum Offered {
+        /// The unarchived wallets.
+        case unarchived
+        /// The unarchived wallets, each with its balance on the day.
+        case unarchivedWithBalances(CalendarDay)
+        /// Every wallet, archived ones included, after a first choice that picks none, titled such as "Any".
+        case everyWalletOr(LocalizedStringKey)
+
+        /// The wallets to fetch for these choices.
+        var wallets: FetchDescriptor<Wallet> {
+            switch self {
+            case .unarchived, .unarchivedWithBalances: Wallet.unarchived
+            case .everyWalletOr: Wallet.notDeleted
+            }
+        }
+    }
+
     /// Picks from the unarchived wallets.
     init(title: LocalizedStringKey, selection: Binding<Wallet?>) {
-        self.title = title
-        _selection = selection
-        noneTitle = nil
-        balancesDay = nil
-        _wallets = Query(Wallet.unarchived)
+        self.init(title: title, selection: selection, offered: .unarchived)
     }
 
     /// Picks from the unarchived wallets, showing each one's balance on `today`: the chosen wallet's in a small line
     /// under the row, and every wallet's in its option in the dropdown, so they can be compared before choosing.
     init(title: LocalizedStringKey, selection: Binding<Wallet?>, balancesAsOf today: CalendarDay) {
-        self.title = title
-        _selection = selection
-        noneTitle = nil
-        balancesDay = today
-        _wallets = Query(Wallet.unarchived)
+        self.init(title: title, selection: selection, offered: .unarchivedWithBalances(today))
     }
 
     /// Picks from every wallet, archived ones included, or none (`noneTitle`, such as "Any"): for filters.
     init(title: LocalizedStringKey, everyWalletOr noneTitle: LocalizedStringKey, selection: Binding<Wallet?>) {
+        self.init(title: title, selection: selection, offered: .everyWalletOr(noneTitle))
+    }
+
+    /// Picks from the wallets `offered` names, fetching just those.
+    private init(title: LocalizedStringKey, selection: Binding<Wallet?>, offered: Offered) {
         self.title = title
         _selection = selection
-        self.noneTitle = noneTitle
-        balancesDay = nil
-        _wallets = Query(Wallet.notDeleted)
+        self.offered = offered
+        _wallets = Query(offered.wallets)
     }
 
     var body: some View {
-        if let balancesDay {
+        if case .unarchivedWithBalances(let today) = offered {
             Picker(selection: $selection) {
-                ForEach(choices) { wallet in
-                    Label {
-                        Text(Self.name(of: wallet))
-                        Text(wallet.pickerOptionBalance(asOf: balancesDay))
-                    } icon: {
-                        Image(systemName: wallet.symbolName)
-                    }
-                    .tag(Optional(wallet))
-                }
+                options(balancesAsOf: today)
             } label: {
                 Text(title)
                 if let selection {
-                    Text(selection.pickerBalanceLine(asOf: balancesDay))
+                    Text(selection.balanceLine(asOf: today))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             } currentValueLabel: {
                 if let selection {
@@ -66,14 +72,27 @@ struct WalletPicker: View {
             }
         } else {
             Picker(title, selection: $selection) {
-                if let noneTitle {
+                if case .everyWalletOr(let noneTitle) = offered {
                     Text(noneTitle).tag(Wallet?.none)
                 }
-                ForEach(choices) { wallet in
-                    Label(Self.name(of: wallet), systemImage: wallet.symbolName)
-                        .tag(Optional(wallet))
-                }
+                options(balancesAsOf: nil)
             }
+        }
+    }
+
+    /// An option for each of the choices: the wallet's symbol and name, with its balance on `today` under the name when
+    /// there is a day to show.
+    private func options(balancesAsOf today: CalendarDay?) -> some View {
+        ForEach(choices) { wallet in
+            Label {
+                Text(Self.name(of: wallet))
+                if let today {
+                    Text(wallet.balance(asOf: today).formatted())
+                }
+            } icon: {
+                Image(systemName: wallet.symbolName)
+            }
+            .tag(Optional(wallet))
         }
     }
 
