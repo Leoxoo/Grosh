@@ -1,36 +1,14 @@
 import CoreGraphics
 import Foundation
-import ImageIO
 import Testing
-import UniformTypeIdentifiers
 @testable import Grosh
 
-/// A cropped photo: which part of a picked photo the window shows, the JPEG a crop is saved as, the color a photo averages
-/// to, and when a Subscription's icon shows on its Recurring transaction.
+/// A cropped photo: which part of a picked photo the window shows, the JPEG a crop is saved as, a copy shrunk to a small
+/// mark's size, the color a photo averages to, and when a Subscription's icon shows on its Recurring transaction.
 @MainActor
 struct CroppedPhotoTests {
     private let wide = CGSize(width: 1000, height: 400)
     private let tall = CGSize(width: 400, height: 1000)
-
-    private func solidPhoto(width: Int, height: Int) throws -> CGImage {
-        let context = try #require(CGContext(
-            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ))
-        context.setFillColor(CGColor(red: 0.2, green: 0.5, blue: 0.9, alpha: 1))
-        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-        return try #require(context.makeImage())
-    }
-
-    private func pngData(of photo: CGImage) throws -> Data {
-        let output = NSMutableData()
-        let destination = try #require(
-            CGImageDestinationCreateWithData(output, UTType.png.identifier as CFString, 1, nil)
-        )
-        CGImageDestinationAddImage(destination, photo, nil)
-        #expect(CGImageDestinationFinalize(destination))
-        return output as Data
-    }
 
     @Test func theWholeShortSideOfAWidePhotoIsCroppedToASquareInTheMiddle() {
         #expect(PhotoCrop.centered(on: wide).sourceRect(in: wide) == CGRect(x: 300, y: 0, width: 400, height: 400))
@@ -96,6 +74,14 @@ struct CroppedPhotoTests {
         let png = try pngData(of: try solidPhoto(width: 1000, height: 400))
         let decoded = try #require(CroppedPhoto.decode(png, maxPixelSide: 500))
         #expect(max(decoded.width, decoded.height) == 500)
+    }
+
+    @Test func theShrunkCopyKeepsTheImagesOwnProportions() throws {
+        // A 1000 by 400 image is 2.5 times as wide as it is tall, so 48 pixels tall it is 120 wide, not card-shaped.
+        let png = try pngData(of: try solidPhoto(width: 1000, height: 400))
+        let shrunk = try #require(CroppedPhoto.thumbnail(of: png, height: 16, scale: 3))
+        #expect(shrunk.height == 48)
+        #expect(shrunk.width == 120)
     }
 
     @Test func dataThatIsNotAPhotoDoesNotDecode() {
