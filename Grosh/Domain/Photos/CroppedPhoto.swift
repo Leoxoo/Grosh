@@ -27,7 +27,11 @@ nonisolated enum CroppedPhoto {
     /// The image a stored crop holds, shrunk to `height` points tall on a screen of `scale` pixels per point, its width
     /// keeping the image's proportions. Drawn at its own size it is exactly that tall and sharp, so no layout needs to
     /// resize it. `nil` if the data isn't an image.
-    static func thumbnail(of data: Data, height: CGFloat, scale: CGFloat) -> CGImage? {
+    ///
+    /// It draws the copy itself rather than through ``decode(_:maxPixelSide:)``: ImageIO bounds a thumbnail only by its
+    /// long side and works out the short side with rounding it doesn't document, so it can't promise the exact pixel
+    /// height a sharp mark needs.
+    static func shrunkImage(from data: Data, height: CGFloat, scale: CGFloat) -> CGImage? {
         guard let stored = image(from: data), stored.width > 0, stored.height > 0 else { return nil }
         let pixelHeight = max(1, Int((height * scale).rounded()))
         let pixelWidth = max(1, Int((CGFloat(pixelHeight) * CGFloat(stored.width) / CGFloat(stored.height)).rounded()))

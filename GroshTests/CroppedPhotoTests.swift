@@ -3,8 +3,8 @@ import Foundation
 import Testing
 @testable import Grosh
 
-/// A cropped photo: which part of a picked photo the window shows, the JPEG a crop is saved as, a copy shrunk to a small
-/// mark's size, the color a photo averages to, and when a Subscription's icon shows on its Recurring transaction.
+/// A cropped photo: which part of a picked photo the window shows, the JPEG a crop is saved as, a copy shrunk for a
+/// small mark, the color a photo averages to, and when a Subscription's icon shows on its Recurring transaction.
 @MainActor
 struct CroppedPhotoTests {
     private let wide = CGSize(width: 1000, height: 400)
@@ -79,7 +79,7 @@ struct CroppedPhotoTests {
     @Test func theShrunkCopyKeepsTheImagesOwnProportions() throws {
         // A 1000 by 400 image is 2.5 times as wide as it is tall, so 48 pixels tall it is 120 wide, not card-shaped.
         let png = try pngData(of: try solidPhoto(width: 1000, height: 400))
-        let shrunk = try #require(CroppedPhoto.thumbnail(of: png, height: 16, scale: 3))
+        let shrunk = try #require(CroppedPhoto.shrunkImage(from: png, height: 16, scale: 3))
         #expect(shrunk.height == 48)
         #expect(shrunk.width == 120)
     }
