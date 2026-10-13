@@ -1,9 +1,11 @@
 import SwiftUI
 
 /// The Apple Calculator–style keypad for typing an amount cents-first, with green operators.
-/// Pair it with ``AmountRow`` showing the same ``AmountEntry``.
+/// Pair it with ``AmountRow`` showing the same ``AmountEntry``. Each key ticks the moment a finger lands on it, on a
+/// device that gets haptics while the Haptics switch is on.
 struct AmountKeypad: View {
     @Binding var entry: AmountEntry
+    @AppStorage(SoundsAndHaptics.hapticsKey) private var hapticsOn = SoundsAndHaptics.defaultIsOn
 
     var body: some View {
         Grid(horizontalSpacing: 8, verticalSpacing: 8) {
@@ -46,24 +48,16 @@ struct AmountKeypad: View {
             key.label
                 .frame(maxWidth: .infinity, minHeight: 44)
         }
-        .buttonStyle(KeypadButtonStyle(role: key.role))
+        .buttonStyle(KeypadButtonStyle(role: key.role, tick: playsTicks ? key.tick.feedback : nil))
         .accessibilityLabel(key.accessibilityLabel)
+    }
+
+    private var playsTicks: Bool {
+        SoundsAndHaptics.playsHaptics(on: .current, hapticsOn: hapticsOn)
     }
 }
 
 private extension KeypadKey {
-    enum Role {
-        case digit, function, operation
-    }
-
-    var role: Role {
-        switch self {
-        case .digit, .doubleZero: .digit
-        case .backspace, .allClear: .function
-        case .operation, .equals: .operation
-        }
-    }
-
     @ViewBuilder
     var label: some View {
         switch self {
@@ -91,9 +85,24 @@ private extension KeypadKey {
     }
 }
 
-/// A rounded calculator key: digits on a light fill, AC and delete on a stronger one, operators in green.
+private extension KeypadTick {
+    /// How the tick feels. Only the system's impact haptics play, so a tick makes no sound and follows the system's
+    /// Haptics setting.
+    var feedback: SensoryFeedback {
+        switch self {
+        case .light: .impact(weight: .light)
+        case .soft: .impact(flexibility: .soft, intensity: 0.7)
+        case .firm: .impact(weight: .medium)
+        }
+    }
+}
+
+/// A rounded calculator key: digits on a light fill, AC and delete on a stronger one, operators in green. It plays
+/// `tick` as soon as it is pressed, before it is let go and types.
 private struct KeypadButtonStyle: ButtonStyle {
     let role: KeypadKey.Role
+    /// `nil` for no tick.
+    let tick: SensoryFeedback?
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -103,6 +112,9 @@ private struct KeypadButtonStyle: ButtonStyle {
             .background(background, in: .rect(cornerRadius: 12))
             .opacity(configuration.isPressed ? 0.6 : 1)
             .contentShape(.rect(cornerRadius: 12))
+            .sensoryFeedback(trigger: configuration.isPressed) { [tick] _, isPressed in
+                isPressed ? tick : nil
+            }
     }
 
     private var background: AnyShapeStyle {
