@@ -14,6 +14,10 @@ _Avoid_: Account, bank
 The combined balance of every unarchived wallet marked "include in total".
 _Avoid_: Net worth, all accounts
 
+**Wallet selector**:
+The control at the top of the Transactions tab that picks whose transactions the list shows, the Total or one wallet, and names that selection's balance today. Opening it lists the Total and every unarchived wallet, each with its balance.
+_Avoid_: Total menu, Total button
+
 **Archived wallet**:
 A wallet the user no longer uses: left out of the Total and the pickers, but keeping its full history.
 
