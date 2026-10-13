@@ -1,25 +1,19 @@
 import SwiftData
 import SwiftUI
 
-/// The top of the Transactions tab: a menu choosing the Total or one wallet, and that selection's balance today.
+/// The Wallet selector at the top of the Transactions tab: the selection's name and its balance today. Tapping it
+/// opens the Select Wallet sheet to choose the Total or one wallet.
 struct WalletSelector: View {
     @Binding var selection: WalletSelection
     let today: CalendarDay
 
     @Query(Wallet.unarchived) private var wallets: [Wallet]
+    @State private var isChoosing = false
 
     var body: some View {
         VStack(spacing: 2) {
-            Menu {
-                Picker("Wallet", selection: $selection) {
-                    Label("Total", systemImage: WalletSelection.total.symbolName)
-                        .tag(WalletSelection.total)
-                    ForEach(wallets) { wallet in
-                        Label(wallet.name, systemImage: wallet.symbolName)
-                            .tag(WalletSelection.wallet(wallet))
-                    }
-                }
-                .pickerStyle(.inline)
+            Button {
+                isChoosing = true
             } label: {
                 HStack(spacing: 4) {
                     Label(selection.name, systemImage: selection.symbolName)
@@ -29,11 +23,13 @@ struct WalletSelector: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             }
-            .menuStyle(.button)
             .buttonStyle(.borderless)
             .fixedSize()
             .accessibilityLabel("Wallet")
             .accessibilityValue(selection.name)
+            .sheet(isPresented: $isChoosing) {
+                SelectWalletSheet(selection: $selection, today: today)
+            }
 
             Text(selection.balance(asOf: today, wallets: wallets).formatted())
                 .font(.title2.bold())
@@ -45,6 +41,7 @@ struct WalletSelector: View {
 }
 
 extension WalletSelection {
+    /// "Total", or the wallet's name.
     var name: String {
         switch self {
         case .total: String(localized: "Total")
@@ -52,6 +49,7 @@ extension WalletSelection {
         }
     }
 
+    /// The Total's globe, or the wallet's own symbol.
     var symbolName: String {
         switch self {
         case .total: "globe"
