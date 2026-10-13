@@ -6,11 +6,13 @@ import SwiftUI
 struct CardMark<Symbol: View>: View {
     let image: CGImage?
     let height: CGFloat
+    /// How the image is made `height` points tall: resized, unless it is a copy already shrunk to that size.
+    var sizing: CroppedPhotoImage.Sizing = .resized
     @ViewBuilder let symbol: () -> Symbol
 
     var body: some View {
         if let image {
-            CroppedPhotoImage(image: image, shape: .creditCard, height: height)
+            CroppedPhotoImage(image: image, shape: .creditCard, height: height, sizing: sizing)
         } else {
             symbol()
         }
