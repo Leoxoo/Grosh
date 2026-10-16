@@ -15,7 +15,7 @@ The combined balance of every unarchived wallet marked "include in total".
 _Avoid_: Net worth, all accounts
 
 **Wallet selector**:
-The control at the top of the Transactions tab that picks whose transactions the list shows, the Total or one wallet, and names that selection's balance today. Opening it lists the Total and every unarchived wallet, each with its balance.
+The control at the top of the Transactions tab and the Report that picks whose transactions they show, the Total or one wallet, and names that selection's balance today. Opening it lists the Total and every unarchived wallet, each with its balance.
 _Avoid_: Total menu, Total button
 
 **Archived wallet**:
@@ -161,10 +161,10 @@ _Avoid_: Linked (that is Linked transactions)
 ### Time
 
 **Period**:
-The span of time the transaction list is showing: a month by default, or Future.
+The span of time the transaction list or the Report is showing: a month by default. The transaction list also offers Future; the Report never does.
 
 **Time range**:
-How long each period of the transaction list is: a day, week, month (the default), quarter or year; all time; or a custom range of days. Only Future and a custom range reach past today.
+How long each period of the transaction list or the Report is: a day, week, month (the default), quarter or year; all time; or a custom range of days. Only Future and the transaction list's custom range reach past today.
 
 **Current period**:
 The period of the chosen time range that holds today, so This month by default, or Today, This week, This quarter or This year. The list opens on it and again whenever the time range changes. It is never Future.
@@ -186,11 +186,22 @@ Home's card with a Spent tab and an Income tab, each naming its month's total so
 _Avoid_: Report this month
 
 **Spent**:
-The Month graph tab for money going out: the month's Expense-category transactions in the wallets counted in the Total, less refunds, plus what was forgiven on Loans that month. Its counterpart, the Income tab, adds up Income-category transactions and what was forgiven on Debts.
+Money going out in a period: its Expense-category transactions that count in the report, less refunds, plus what was forgiven on Loans. Its counterpart, **Income**, adds up Income-category transactions and what was forgiven on Debts. The Month graph counts the wallets in the Total; the Report counts the Wallet selector's choice.
 _Avoid_: Expenses, Expense (that is a Category type)
 
+**Net income**:
+Income less Spent over a period.
+_Avoid_: Profit, savings, difference (that is the change in balance, which counts every transaction)
+
+**Report**:
+The screen, opened from Home's Month graph, that sums up a period for the Wallet selector's choice: its Opening and Ending balances, its Net income, and its Category report. It only looks back: none of its periods reaches past today.
+_Avoid_: Statistics, analytics
+
+**Category report**:
+The Report's card showing a period's Income and Spent as two donuts, one slice per parent category with its subcategories folded in.
+
 **Average**:
-The gray line a Month graph tab compares its month with unless Last year is on: the mean of the running totals of up to three complete months before the month shown. Months before the month of the first transaction that counts are left out; a later month with nothing that counts is zero.
+The gray line a running total is compared with unless Last year is on: the mean of the running totals of up to three complete periods of the same length before the one shown (months on Home; weeks, months, quarters or years in the Report). Periods before the one holding the first transaction that counts are left out; a later one with nothing that counts is zero.
 
 **Last year**:
 The gray line a Month graph tab shows in place of the Average while its "vs last year" switch is on: the same month 12 months before the month shown. It is there only when that month holds something that counts for the tab; otherwise the switch is greyed out and the tab shows the Average, keeping the switch as it was. One switch serves both tabs, remembered between launches.
