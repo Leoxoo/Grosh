@@ -200,6 +200,17 @@ _Avoid_: Statistics, analytics
 **Category report**:
 The Report's card showing a period's Income and Spent as two donuts, one slice per parent category with its subcategories folded in.
 
+**Breakdown**:
+The part of an Income or Spent detail that splits a period's total by parent category: a donut of the five largest, the rest as one **Everything else** slice, and a list of every parent category with its amount and share.
+_Avoid_: Others (too close to the Other Income and Other Expense categories)
+
+**Trend**:
+The part of an Income or Spent detail, and the whole of the Net income detail, that splits a period into Steps and shows the total of each.
+
+**Step**:
+How long each bar of a Trend covers. One size smaller than the time range (a week's days, a month's weeks, a quarter's or a year's months); for all time and a custom range it follows the length: days up to a month, weeks up to three months, months up to a year, quarters up to three years, then years.
+_Avoid_: Bucket, interval, period (that is the whole span shown)
+
 **Average**:
 The gray line a running total is compared with unless Last year is on: the mean of the running totals of up to three complete periods of the same length before the one shown (months on Home; weeks, months, quarters or years in the Report). Periods before the one holding the first transaction that counts are left out; a later one with nothing that counts is zero.
 
