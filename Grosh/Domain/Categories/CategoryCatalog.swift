@@ -19,9 +19,18 @@ struct CategoryCatalog {
     /// Puts the categories of `type` found in `all` in tree order, as ``categories(of:includingHidden:)`` does.
     /// For views that already hold the categories from a query.
     static func tree(of type: CategoryType, from all: [Category], includingHidden: Bool = true) -> [Category] {
-        let topLevel = all.filter { $0.type == type && $0.parent == nil }
-        let tree = sorted(topLevel).flatMap { [$0] + sorted($0.children ?? []) }
+        let tree = parents(of: type, from: all).flatMap { [$0] + subcategories(of: $0) }
         return includingHidden ? tree : tree.filter { !$0.isHiddenInTree }
+    }
+
+    /// The top-level categories of `type` found in `all`, in the user's order, hidden ones included.
+    static func parents(of type: CategoryType, from all: [Category]) -> [Category] {
+        sorted(all.filter { $0.type == type && $0.parent == nil })
+    }
+
+    /// A parent's subcategories in the user's order, hidden ones included.
+    static func subcategories(of parent: Category) -> [Category] {
+        sorted(parent.children ?? [])
     }
 
     /// The categories of `type` the user may file a transaction under, in tree order. Hidden categories, and those
@@ -135,6 +144,23 @@ struct CategoryCatalog {
             $0 != category && $0.name.compare(name, options: .caseInsensitive) == .orderedSame
         }
         guard !taken else { throw CategoryRuleError.nameTaken }
+    }
+
+    // MARK: Reordering
+
+    /// Moves the categories at `source` among `siblings` to `destination`, the offsets a list's drag reports, and
+    /// saves. `siblings` are a type's top-level categories or one parent's subcategories, in the user's order, hidden
+    /// ones included: a parent moves with its subcategories, and a subcategory stays within its parent. They are
+    /// numbered afresh, so a category added later goes after them all.
+    func move(_ siblings: [Category], fromOffsets source: IndexSet, toOffset destination: Int) throws {
+        let moving = source.map { siblings[$0] }
+        var reordered = siblings.enumerated().filter { !source.contains($0.offset) }.map(\.element)
+        let insertionIndex = destination - source.count(in: 0..<destination)
+        reordered.insert(contentsOf: moving, at: insertionIndex)
+        for (position, category) in reordered.enumerated() {
+            category.sortOrder = position
+        }
+        try context.save()
     }
 
     // MARK: Hiding
