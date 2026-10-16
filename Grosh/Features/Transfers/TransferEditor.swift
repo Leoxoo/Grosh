@@ -39,8 +39,9 @@ private struct TransferForm: View {
     var body: some View {
         KeypadSheet(title: Text("Transfer"), entry: $entry, canSave: draftToSave.canSave, save: save) { fields in
             Section {
-                WalletPicker(title: "From", selection: $draft.from)
-                WalletPicker(title: "To", selection: $draft.to)
+                // Always today's balances, whatever the Date: a transfer dated later doesn't move them today.
+                WalletPicker(title: "From", selection: $draft.from, balancesAsOf: .today)
+                WalletPicker(title: "To", selection: $draft.to, balancesAsOf: .today)
                 fields.amountRow("Amount", currencyCode: currencyCode)
                 DayStepper(title: "Date", day: $draft.day)
                 fields.noteField($draft.note)

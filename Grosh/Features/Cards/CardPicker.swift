@@ -1,3 +1,4 @@
+import CoreGraphics
 import SwiftData
 import SwiftUI
 
@@ -14,6 +15,7 @@ struct CardPicker: View {
     private let noneTitle: LocalizedStringKey
 
     @Query(sort: Card.userOrder) private var allCards: [Card]
+    @Environment(\.displayScale) private var displayScale
 
     private enum Offered {
         case paidFrom(Wallet?)
@@ -43,10 +45,7 @@ struct CardPicker: View {
                 Label {
                     Text(card.isArchived ? "\(card.displayName) (Archived)" : card.displayName)
                 } icon: {
-                    CardMark(image: card.image, height: 16) {
-                        Image(systemName: Card.symbolName)
-                            .foregroundStyle(card.color.color)
-                    }
+                    mark(of: card)
                 }
                 .tag(Optional(card))
             }
@@ -57,6 +56,20 @@ struct CardPicker: View {
         switch offered {
         case .paidFrom(let wallet): Card.pickerChoices(for: wallet, keeping: selection)
         case .every: allCards.filter { !$0.isPaidFromDeletedWallet }
+        }
+    }
+
+    /// A Card's mark in the picker: its image as a small card 16 points tall, or its coloured symbol when it has none.
+    /// The image is a copy shrunk to that size for this screen, drawn at its own size since a picker ignores a frame.
+    private func mark(of card: Card) -> some View {
+        let height: CGFloat = 16
+        return CardMark(
+            image: card.shrunkImage(height: height, scale: displayScale),
+            height: height,
+            sizing: .shrunk(scale: displayScale)
+        ) {
+            Image(systemName: Card.symbolName)
+                .foregroundStyle(card.color.color)
         }
     }
 }
