@@ -35,8 +35,9 @@ struct WalletPicker: View {
         self.init(title: title, selection: selection, offered: .unarchived)
     }
 
-    /// Picks from the unarchived wallets, showing each one's balance on `today`: the chosen wallet's in a small line
-    /// under the row, and every wallet's in its option in the dropdown, so they can be compared before choosing.
+    /// Picks from the unarchived wallets, showing each one's balance on `today`: the chosen wallet's on a Balance row of
+    /// its own under the picker, and every wallet's in its option in the dropdown, so they can be compared before
+    /// choosing. The row shows the chosen wallet's color.
     init(title: LocalizedStringKey, selection: Binding<Wallet?>, balancesAsOf today: CalendarDay) {
         self.init(title: title, selection: selection, offered: .unarchivedWithBalances(today))
     }
@@ -56,18 +57,21 @@ struct WalletPicker: View {
 
     var body: some View {
         if case .unarchivedWithBalances(let today) = offered {
-            Picker(selection: $selection) {
-                options(balancesAsOf: today)
-            } label: {
-                Text(title)
-                if let selection {
-                    Text(selection.balanceLine(asOf: today))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            LabeledContent(title) {
+                Menu {
+                    Picker(title, selection: $selection) {
+                        options(balancesAsOf: today)
+                    }
+                    .pickerStyle(.inline)
+                } label: {
+                    selectionLabel
                 }
-            } currentValueLabel: {
-                if let selection {
-                    Text(Self.name(of: selection))
+                .menuStyle(.button)
+                .buttonStyle(.borderless)
+            }
+            if let selection {
+                LabeledContent("Balance") {
+                    AmountText(amount: selection.balance(asOf: today), showsColor: false)
                 }
             }
         } else {
@@ -77,6 +81,26 @@ struct WalletPicker: View {
                 }
                 options(balancesAsOf: nil)
             }
+        }
+    }
+
+    /// The chosen wallet as the row shows it: its symbol on its colored circle and its name, on one line however long
+    /// the name is. A picker's own row can't show the color, so this draws the menu's button itself.
+    private var selectionLabel: some View {
+        HStack(spacing: 8) {
+            if let selection {
+                SymbolCircle(symbolName: selection.symbolName, color: selection.color)
+                Text(Self.name(of: selection))
+                    .lineLimit(1)
+                    .foregroundStyle(.primary)
+            } else {
+                Text("Choose")
+                    .foregroundStyle(.secondary)
+            }
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
         }
     }
 

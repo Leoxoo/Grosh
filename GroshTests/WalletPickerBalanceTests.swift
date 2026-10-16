@@ -4,7 +4,7 @@ import Testing
 @testable import Grosh
 
 /// The balances a wallet picker shows when it opts in, as the Transfer sheet's From and To do: the chosen wallet's
-/// balance today under the row, and each wallet's balance today in its dropdown option.
+/// balance today on a Balance row of its own under the picker, and each wallet's balance today in its dropdown option.
 @MainActor
 struct WalletPickerBalanceTests {
     private let container: ModelContainer
@@ -28,12 +28,12 @@ struct WalletPickerBalanceTests {
         transaction.wallet = wallet
     }
 
-    @Test func theRowNamesTheChosenWalletsBalanceToday() {
+    @Test func theBalanceRowShowsTheChosenWalletsBalanceToday() {
         let checking = wallet("Checking")
         record(1_000_00, on: CalendarDay(year: 2026, month: 9, day: 1), in: checking)
         record(-12_76, in: checking)
 
-        #expect(checking.balanceLine(asOf: today, locale: unitedStates) == "Balance today: $987.24")
+        #expect(checking.balance(asOf: today).formatted(locale: unitedStates) == "$987.24")
     }
 
     @Test func eachDropdownOptionShowsItsWalletsBalanceToday() {
@@ -54,7 +54,6 @@ struct WalletPickerBalanceTests {
         euros.currencyCode = "EUR"
         record(50_00, in: euros)
 
-        #expect(euros.balanceLine(asOf: today, locale: unitedStates) == "Balance today: €50.00")
         #expect(euros.balance(asOf: today).formatted(locale: unitedStates) == "€50.00")
     }
 
@@ -70,8 +69,6 @@ struct WalletPickerBalanceTests {
 
         try Transfer.create(nextWeek, in: context)
 
-        #expect(checking.balanceLine(asOf: today, locale: unitedStates) == "Balance today: $1,000.00")
-        #expect(savings.balanceLine(asOf: today, locale: unitedStates) == "Balance today: $0.00")
         #expect(checking.balance(asOf: today).formatted(locale: unitedStates) == "$1,000.00")
         #expect(savings.balance(asOf: today).formatted(locale: unitedStates) == "$0.00")
     }
