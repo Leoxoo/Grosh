@@ -4,7 +4,8 @@ import SwiftUI
 /// Picks a category. A transaction's category is picked from the categories of its type the user may pick by hand
 /// (``CategoryCatalog/pickerCategories(of:)``): hidden ones and those the app files itself are left out, and Debt/Loan
 /// offers only Loan and Debt; the current selection still shows when it isn't offered any more. A filter picks from
-/// every category of every type, hidden and locked ones included, or none.
+/// every category of every type, hidden and locked ones included, or none. The list it opens puts the categories used
+/// most in the last month first, and can be searched by name.
 struct CategoryPicker: View {
     let title: LocalizedStringKey
     @Binding var selection: Category?
@@ -44,7 +45,9 @@ struct CategoryPicker: View {
     }
 }
 
-/// The list ``CategoryPicker`` pushes: the offered categories in tree order, subcategories indented.
+/// The list ``CategoryPicker`` pushes: the offered categories, the most used lately first
+/// (``CategoryCatalog/byRecentUse(_:transactions:today:)``), each parent followed by its subcategories, indented.
+/// A search narrows it to the categories whose names match.
 private struct CategoryChoiceList: View {
     enum Offered {
         /// The categories of a type the user may pick by hand.
@@ -62,10 +65,26 @@ private struct CategoryChoiceList: View {
     @Environment(\.modelContext) private var context
     /// Keeps the list current when categories change.
     @Query private var categories: [Category]
+    /// The transactions that decide which categories are used most lately.
+    @Query private var recentTransactions: [Transaction]
+    @State private var query = ""
+
+    init(
+        title: LocalizedStringKey, offered: Offered, noneTitle: LocalizedStringKey?, selection: Binding<Category?>
+    ) {
+        self.title = title
+        self.offered = offered
+        self.noneTitle = noneTitle
+        _selection = selection
+        let firstDay = CalendarDay.today.adding(days: -(CategoryCatalog.recentUseDays - 1)).rawValue
+        _recentTransactions = Query(filter: #Predicate<Transaction> { $0.dayRaw >= firstDay && $0.deletedAt == nil })
+    }
+
+    private var isSearching: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
         List {
-            if noneTitle != nil {
+            if noneTitle != nil && !isSearching {
                 Section {
                     row(nil)
                 }
@@ -80,6 +99,12 @@ private struct CategoryChoiceList: View {
                 }
             }
         }
+        .overlay {
+            if isSearching && sections.isEmpty {
+                ContentUnavailableView.search(text: query.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+        }
+        .searchable(text: $query, prompt: "Search categories")
         .navigationTitle(title)
     }
 
@@ -91,14 +116,24 @@ private struct CategoryChoiceList: View {
     }
 
     private var sections: [ChoiceSection] {
-        switch offered {
+        let all: [ChoiceSection] = switch offered {
         case .pickable(let type):
             [ChoiceSection(title: nil, categories: (try? CategoryCatalog(context: context).pickerCategories(of: type)) ?? [])]
         case .every:
-            CategoryType.allCases
-                .map { ChoiceSection(title: $0.title, categories: CategoryCatalog.tree(of: $0, from: categories)) }
-                .filter { !$0.categories.isEmpty }
+            CategoryType.allCases.map { type in
+                ChoiceSection(title: type.title, categories: CategoryCatalog.tree(of: type, from: categories))
+            }
         }
+        return all
+            .map { ChoiceSection(title: $0.title, categories: arranged($0.categories)) }
+            .filter { !$0.categories.isEmpty }
+    }
+
+    /// `tree` as the list shows it: the most used lately first, narrowed to the categories matching the search.
+    private func arranged(_ tree: [Category]) -> [Category] {
+        CategoryCatalog.matching(
+            query, in: CategoryCatalog.byRecentUse(tree, transactions: recentTransactions, today: .today)
+        )
     }
 
     private func row(_ category: Category?) -> some View {
@@ -108,7 +143,8 @@ private struct CategoryChoiceList: View {
         } label: {
             HStack {
                 if let category {
-                    CategoryLabel(category: category)
+                    // Search results stand alone, so a subcategory isn't indented under a parent that may not show.
+                    CategoryLabel(category: category, indentsSubcategories: !isSearching)
                 } else if let noneTitle {
                     Text(noneTitle)
                 }
