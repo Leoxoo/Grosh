@@ -5,7 +5,7 @@ import SwiftUI
 /// (``CategoryCatalog/pickerCategories(of:)``): hidden ones and those the app files itself are left out, and Debt/Loan
 /// offers only Loan and Debt; the current selection still shows when it isn't offered any more. A filter picks from
 /// every category of every type, hidden and locked ones included, or none. The list it opens puts the categories used
-/// most in the last month first, and can be searched by name.
+/// most in the last month first, each with its subcategories in their usual order, and can be searched by name.
 struct CategoryPicker: View {
     let title: LocalizedStringKey
     @Binding var selection: Category?
@@ -45,9 +45,9 @@ struct CategoryPicker: View {
     }
 }
 
-/// The list ``CategoryPicker`` pushes: the offered categories, the most used lately first
-/// (``CategoryCatalog/byRecentUse(_:transactions:today:)``), each parent followed by its subcategories, indented.
-/// A search narrows it to the categories whose names match.
+/// The list ``CategoryPicker`` pushes: the offered categories, the parents used most lately first
+/// (``CategoryCatalog/byRecentUse(_:transactions:today:)``), each followed by its subcategories in their usual order,
+/// indented. A search narrows it to the categories whose names match.
 private struct CategoryChoiceList: View {
     enum Offered {
         /// The categories of a type the user may pick by hand.

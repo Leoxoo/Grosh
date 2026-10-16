@@ -51,12 +51,15 @@ struct CategoryChoiceOrderTests {
         #expect(Array(names.prefix(3)) == ["Products", "Food & Beverage", "Café"])
     }
 
-    @Test func aMuchUsedSubcategoryLiftsItsParentAndLeadsItsSiblings() throws {
+    @Test func aMuchUsedSubcategoryLiftsItsParentButKeepsItsPlaceWithinIt() throws {
         try spend(2, on: "Internet Bill")
 
         let names = try arranged()
+        let bills = try fixture.category("Bills & Utilities")
+        let billsInTreeOrder = try expenseTree.filter { $0 == bills || $0.parent == bills }.map(\.name)
 
-        #expect(Array(names.prefix(3)) == ["Bills & Utilities", "Internet Bill", "Phone Bill"])
+        #expect(Array(names.prefix(billsInTreeOrder.count)) == billsInTreeOrder)
+        #expect(names[1] == "Phone Bill")
     }
 
     @Test func onlyTheLastThirtyDaysCount() throws {
