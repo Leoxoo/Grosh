@@ -78,22 +78,22 @@ private struct StepTotalsRow: View {
     }
 }
 
-/// One column per Step, Income above zero and Spent below it, in their colors. The rows under the chart name the Steps.
+/// One column per Step, Income above zero and Spent below it, in their colors. The Steps are named under the columns, and the
+/// rows below the chart list them with their totals.
 private struct StepColumns: View {
     let steps: [StepRow]
 
     var body: some View {
         Chart {
-            ForEach(Array(steps.enumerated()), id: \.offset) { index, row in
-                BarMark(x: .value("Step", index), y: .value("Income", row.totals.income.cents))
+            ForEach(steps) { row in
+                BarMark(x: .value("Step", row.title), y: .value("Income", row.totals.income.cents))
                     .foregroundStyle(SpentOrIncome.income.color)
-                BarMark(x: .value("Step", index), y: .value("Spent", -row.totals.spent.cents))
+                BarMark(x: .value("Step", row.title), y: .value("Spent", -row.totals.spent.cents))
                     .foregroundStyle(SpentOrIncome.spent.color)
             }
             RuleMark(y: .value("Zero", 0))
                 .foregroundStyle(.secondary.opacity(0.4))
         }
-        .chartXAxis(.hidden)
         .chartYAxis {
             AxisMarks(position: .leading) { value in
                 AxisValueLabel {
@@ -104,7 +104,7 @@ private struct StepColumns: View {
                 }
             }
         }
-        .frame(height: 160)
+        .frame(height: 260)
         .accessibilityHidden(true)
     }
 }

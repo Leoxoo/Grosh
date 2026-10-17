@@ -10,8 +10,8 @@ struct ReportView: View {
     /// How long each period of the strip is, chosen with the calendar button.
     @State private var timeRange = TimeRange.month
     @State private var period: Period
-    /// The side whose details a Category report tile opened, pushed until the user goes back.
-    @State private var openedSide: SpentOrIncome?
+    /// The screens pushed onto the Report, such as a side's details opened from a Category report tile.
+    @State private var path = NavigationPath()
     @Environment(\.dismiss) private var dismiss
 
     /// The Report opens on `period`, the period Home's strip was showing.
@@ -24,7 +24,7 @@ struct ReportView: View {
         let selected = transactions.filter(walletSelection.includes)
         let counted = transactions.counted(in: walletSelection, during: period, today: today)
         let summary = PeriodSummary(of: selected, in: period, today: today)
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
                 Section {
                     LabeledContent("Opening balance") {
@@ -43,7 +43,7 @@ struct ReportView: View {
                     CategoryReportCard(
                         income: CategoryBreakdown(side: .income, of: counted),
                         spent: CategoryBreakdown(side: .spent, of: counted),
-                        onOpen: { openedSide = $0 }
+                        onOpen: { path.append(ReportScreen.details(.side($0))) }
                     )
                 }
             }
@@ -57,11 +57,6 @@ struct ReportView: View {
             #endif
             .navigationDestination(for: ReportScreen.self) { screen in
                 ReportDestination(screen: screen, walletSelection: $walletSelection, timeRange: $timeRange, period: $period)
-            }
-            .navigationDestination(item: $openedSide) { side in
-                ReportDestination(
-                    screen: .details(.side(side)), walletSelection: $walletSelection, timeRange: $timeRange, period: $period
-                )
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
