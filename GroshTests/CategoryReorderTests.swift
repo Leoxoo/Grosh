@@ -65,8 +65,8 @@ struct CategoryReorderTests {
         let parents = try expenseParents()
         try fixture.catalog.move(parents, fromOffsets: [0], toOffset: parents.count)
 
-        try fixture.catalog.add(CategoryDraft(name: "Pets", type: .expense))
+        try fixture.catalog.add(CategoryDraft(name: "Stationery", type: .expense))
 
-        #expect(try expenseParents().last?.name == "Pets")
+        #expect(try expenseParents().last?.name == "Stationery")
     }
 }
