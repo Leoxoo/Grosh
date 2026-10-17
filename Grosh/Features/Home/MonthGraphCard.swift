@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// Home's Month graph: the month strip, then one card with a Spent tab and an Income tab. The tab shown draws the
+/// Home's Month graph: the month strip, with a link to the Report, then one card with a Spent tab and an Income tab. The tab shown draws the
 /// running total of the month the strip picks beside the Average of the months before it, or the same month last year
 /// while the "vs last year" switch, which both tabs share, is on. A month the strip no longer offers, once the only
 /// transaction that counted in it is gone, gives way to this month. Its amounts show even while the Total is hidden.
@@ -19,6 +19,8 @@ struct HomeMonthGraph: View {
     /// The tab the card shows.
     @State private var side = SpentOrIncome.spent
     @AppStorage(Self.comparesWithLastYearKey) private var comparesWithLastYear = false
+    /// Whether the Report is open, which "See reports" turns on.
+    @State private var isShowingReport = false
 
     var body: some View {
         let months = MonthGraph.months(of: transactions, today: today)
@@ -30,6 +32,17 @@ struct HomeMonthGraph: View {
                 .onChange(of: months) { _, months in
                     period.showCurrentPeriod(currentPeriod, unlessOfferedBy: months)
                 }
+        } header: {
+            HStack {
+                Spacer()
+                Button("See reports") { isShowingReport = true }
+                    .font(.subheadline)
+                    .textCase(nil)
+            }
+        }
+        .reportPresentation(isPresented: $isShowingReport) {
+            // The Report starts on the month this strip is showing, each time it opens.
+            ReportView(startingOn: period)
         }
         MonthGraphCard(
             spent: graph(for: .spent),

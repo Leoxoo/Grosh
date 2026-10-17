@@ -1,17 +1,21 @@
 import SwiftUI
 
-/// Picks the first and last day of a custom time range for the Transactions tab.
+/// Picks the first and last day of a custom time range. The Transactions tab's may reach past today, to Future; the
+/// Report's may not, so it passes the latest day it can pick.
 struct CustomRangeEditor: View {
     /// Called with the chosen days when the user taps Done.
     let choose: (DayRange) -> Void
+    /// The last day that can be picked, or `nil` for no limit.
+    let latest: CalendarDay?
 
     @Environment(\.dismiss) private var dismiss
     @State private var first: CalendarDay
     @State private var last: CalendarDay
 
     /// Starts from `days`, or from today for an open end.
-    init(days: DayRange, choose: @escaping (DayRange) -> Void) {
+    init(days: DayRange, latest: CalendarDay? = nil, choose: @escaping (DayRange) -> Void) {
         self.choose = choose
+        self.latest = latest
         _first = State(initialValue: days.first ?? .today)
         _last = State(initialValue: days.last ?? .today)
     }
@@ -19,8 +23,8 @@ struct CustomRangeEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                DayPicker(title: "From", day: $first)
-                DayPicker(title: "To", day: $last, earliest: first)
+                DayPicker(title: "From", day: $first, latest: latest)
+                DayPicker(title: "To", day: $last, earliest: first, latest: latest)
             }
             .navigationTitle("Custom Range")
             #if os(iOS)
