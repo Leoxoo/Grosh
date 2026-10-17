@@ -156,21 +156,21 @@ private struct CategoryBreakdownRow: View {
     }
 }
 
-/// One bar per Step, in the side's color, the bar's height its total. The rows under it name the Steps.
+/// One bar per Step, in the side's color, the bar's height its total. The Steps are named under the bars, and the rows
+/// below the chart list them with their totals.
 private struct SideTrendChart: View {
     let side: SpentOrIncome
     let rows: [StepRow]
 
     var body: some View {
         Chart {
-            ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
-                BarMark(x: .value("Step", index), y: .value("Total", row.total(of: side).cents))
+            ForEach(rows) { row in
+                BarMark(x: .value("Step", row.title), y: .value("Total", row.total(of: side).cents))
                     .foregroundStyle(side.color)
             }
             RuleMark(y: .value("Zero", 0))
                 .foregroundStyle(.secondary.opacity(0.4))
         }
-        .chartXAxis(.hidden)
         .chartYAxis {
             AxisMarks(position: .leading) { value in
                 AxisValueLabel {
@@ -181,7 +181,7 @@ private struct SideTrendChart: View {
                 }
             }
         }
-        .frame(height: 180)
+        .frame(height: 260)
         .accessibilityHidden(true)
     }
 }

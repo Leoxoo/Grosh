@@ -11,20 +11,26 @@ struct HomeMonthGraph: View {
     static let comparesWithLastYearKey = "home.monthGraph.comparesWithLastYear"
 
     let today: CalendarDay
+    /// The month the card shows, picked in the strip. Home holds it, since the Report opens on it.
+    @Binding var period: Period
+    /// Whether the Report is open, which "See reports" turns on. Home presents the Report, outside this list row.
+    @Binding var isShowingReport: Bool
 
     @Query(Transaction.notDeleted) private var transactions: [Transaction]
     @Query private var recurringTransactions: [RecurringTransaction]
-    /// The month the card shows, picked in the strip. Every launch starts on this month.
-    @State private var period = Period.month(CalendarMonth(.today))
     /// The tab the card shows.
     @State private var side = SpentOrIncome.spent
     @AppStorage(Self.comparesWithLastYearKey) private var comparesWithLastYear = false
-    /// Whether the Report is open, which "See reports" turns on.
-    @State private var isShowingReport = false
 
     var body: some View {
         let months = MonthGraph.months(of: transactions, today: today)
         Section {
+            HStack {
+                Spacer()
+                Button("See reports") { isShowingReport = true }
+                    .font(.subheadline)
+            }
+            .listRowBackground(Color.clear)
             PeriodStrip(periods: months, selection: $period, current: currentPeriod, today: today)
                 // The strip pads its own tabs, and sits above the card rather than on it.
                 .listRowInsets(EdgeInsets())
@@ -32,17 +38,6 @@ struct HomeMonthGraph: View {
                 .onChange(of: months) { _, months in
                     period.showCurrentPeriod(currentPeriod, unlessOfferedBy: months)
                 }
-        } header: {
-            HStack {
-                Spacer()
-                Button("See reports") { isShowingReport = true }
-                    .font(.subheadline)
-                    .textCase(nil)
-            }
-        }
-        .reportPresentation(isPresented: $isShowingReport) {
-            // The Report starts on the month this strip is showing, each time it opens.
-            ReportView(startingOn: period)
         }
         MonthGraphCard(
             spent: graph(for: .spent),
@@ -162,7 +157,9 @@ extension SpentOrIncome {
 
 #Preview {
     List {
-        HomeMonthGraph(today: .today)
+        HomeMonthGraph(
+            today: .today, period: .constant(.month(CalendarMonth(.today))), isShowingReport: .constant(false)
+        )
     }
     .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
 }

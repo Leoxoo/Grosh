@@ -1,22 +1,27 @@
 import SwiftUI
 
-/// The Report's Category report card: Income and Spent side by side, each with its total for the period and, under it,
-/// a donut of that side's parent categories.
+/// The Report's Category report card: Spent and Income side by side, each with its total for the period and, under it,
+/// a donut of that side's parent categories. Tapping a side opens its details.
 struct CategoryReportCard: View {
     let income: CategoryBreakdown
     let spent: CategoryBreakdown
+    /// Opens the details of a side, which the Report pushes. A tile is a button rather than a link: two links in one List row
+    /// all open the last of them.
+    let onOpen: (SpentOrIncome) -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            tile(income)
             tile(spent)
+            tile(income)
         }
         .padding(.vertical, 4)
     }
 
-    /// One side, a link to its details: its name and total, in its color, over its donut.
+    /// One side: its name and total, in its color, over its donut.
     private func tile(_ breakdown: CategoryBreakdown) -> some View {
-        NavigationLink(value: ReportScreen.details(.side(breakdown.side))) {
+        Button {
+            onOpen(breakdown.side)
+        } label: {
             VStack(spacing: 12) {
                 VStack(spacing: 2) {
                     HStack(spacing: 4) {

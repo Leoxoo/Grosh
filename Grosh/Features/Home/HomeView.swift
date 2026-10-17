@@ -9,6 +9,10 @@ struct HomeView: View {
 
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     @AppStorage(Self.isTotalHiddenKey) private var isTotalHidden = false
+    /// The month Home's Month graph shows, which the Report opens on.
+    @State private var monthPeriod = Period.month(CalendarMonth(.today))
+    /// Whether the Report is open.
+    @State private var isShowingReport = false
 
     private var today: CalendarDay { .today }
 
@@ -36,13 +40,17 @@ struct HomeView: View {
                     }
                 }
 
-                HomeMonthGraph(today: today)
+                HomeMonthGraph(today: today, period: $monthPeriod, isShowingReport: $isShowingReport)
 
                 HomeComingSoonCards()
 
                 RecentTransactionsSection()
             }
             .navigationTitle("Home")
+            // Presented from the list itself, not from a row of it, so the Report opens on the month the strip shows.
+            .reportPresentation(isPresented: $isShowingReport) {
+                ReportView(startingOn: monthPeriod)
+            }
             .transactionSearchButton()
             .dueRemindersBell()
             .addTransactionButton()
