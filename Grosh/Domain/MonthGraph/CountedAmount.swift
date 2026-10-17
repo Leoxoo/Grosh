@@ -10,6 +10,8 @@ struct CountedAmount {
     let day: CalendarDay
     /// What it adds to its tab's total. A refund takes away from Spent, so it is below zero there.
     let amount: Money
+    /// The category the amount is filed under, which the Category report groups by its parent.
+    let category: Category
 }
 
 extension CountedAmount {
@@ -18,11 +20,15 @@ extension CountedAmount {
     /// counts toward Income as it is. Under any other category, a Debt/Loan one or one of the app's own such as
     /// Starting balance, it counts toward neither.
     fileprivate init?(_ amount: Money, filedUnder category: Category?, on day: CalendarDay) {
-        switch category?.type {
+        guard let category else { return nil }
+        switch category.type {
         case .expense:
-            self.init(side: .spent, day: day, amount: Money(cents: -amount.cents, currencyCode: amount.currencyCode))
+            self.init(
+                side: .spent, day: day, amount: Money(cents: -amount.cents, currencyCode: amount.currencyCode),
+                category: category
+            )
         case .income:
-            self.init(side: .income, day: day, amount: amount)
+            self.init(side: .income, day: day, amount: amount, category: category)
         default:
             return nil
         }

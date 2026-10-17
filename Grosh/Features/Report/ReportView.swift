@@ -34,7 +34,7 @@ struct ReportView: View {
     var body: some View {
         let today = today
         let selected = transactions.filter(walletSelection.includes)
-        let totals = PeriodTotals(of: transactions, in: walletSelection, period: period, today: today)
+        let counted = transactions.counted(in: walletSelection, during: period, today: today)
         let summary = PeriodSummary(of: selected, in: period, today: today)
         NavigationStack {
             List {
@@ -48,7 +48,14 @@ struct ReportView: View {
                 }
 
                 Section {
-                    NetIncomeCard(totals: totals)
+                    NetIncomeCard(totals: PeriodTotals(of: counted))
+                }
+
+                Section {
+                    CategoryReportCard(
+                        income: CategoryBreakdown(side: .income, of: counted),
+                        spent: CategoryBreakdown(side: .spent, of: counted)
+                    )
                 }
             }
             .roundedSectionsListStyle()
