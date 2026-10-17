@@ -50,14 +50,14 @@ struct MonthGraph {
 
     /// The tab for `side` showing `month`, the current month or an earlier one, as it stands on `today`, with what
     /// `recurring` still has due this month, compared with `choice`, as the "vs last year" switch is set.
-    /// `transactions` hold at least those of the months the tab sums (``MonthGraphHistory``), and `firstDay` is the
-    /// first day anything counts, on either tab, or `nil` when nothing does.
+    /// `counted` holds at least what counts in the months the tab sums (the ``Transaction/countedAmount``s of the
+    /// transactions ``MonthGraphHistory`` reads), and `firstDay` is the first day anything counts, on either tab, or
+    /// `nil` when nothing does.
     init(
-        _ side: SpentOrIncome, of transactions: [Transaction], countingFrom firstDay: CalendarDay?,
+        _ side: SpentOrIncome, of counted: [CountedAmount], countingFrom firstDay: CalendarDay?,
         recurring: [RecurringTransaction] = [], in month: CalendarMonth, today: CalendarDay,
         comparingWith choice: MonthGraphComparison = .average
     ) {
-        let counted = transactions.compactMap(\.countedAmount)
         let dailyTotals = counted.dailyTotals(side, in: month, through: today)
         self.side = side
         self.month = month

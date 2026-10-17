@@ -79,19 +79,20 @@ private struct HomeMonthGraphCard: View {
     }
 
     var body: some View {
-        let history = transactions + forgiven
+        // What counts is worked out once for both tabs.
+        let counted = (transactions + forgiven).compactMap(\.countedAmount)
         MonthGraphCard(
-            spent: graph(for: .spent, of: history),
-            income: graph(for: .income, of: history),
+            spent: graph(for: .spent, of: counted),
+            income: graph(for: .income, of: counted),
             side: $side,
             comparesWithLastYear: $comparesWithLastYear
         )
     }
 
     /// The graph of `side`'s tab for the month, compared as the "vs last year" switch is set.
-    private func graph(for side: SpentOrIncome, of history: [Transaction]) -> MonthGraph {
+    private func graph(for side: SpentOrIncome, of counted: [CountedAmount]) -> MonthGraph {
         MonthGraph(
-            side, of: history, countingFrom: firstDay, recurring: recurringTransactions, in: month, today: today,
+            side, of: counted, countingFrom: firstDay, recurring: recurringTransactions, in: month, today: today,
             comparingWith: comparesWithLastYear ? .lastYear : .average
         )
     }

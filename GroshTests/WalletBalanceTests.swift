@@ -94,7 +94,7 @@ struct WalletBalanceTests {
         #expect(Wallet.total(of: [], asOf: today) == Money(cents: 0))
     }
 
-    /// Home and Account → Wallets add every balance up in one pass over what they read from the store at once.
+    /// Home and the Wallet selector add every balance up in one pass over the shared ledger entries.
     @Test func balancesAddedUpAtOnceMatchEachWalletsOwn() throws {
         let checking = wallet("Checking")
         let cash = wallet("Cash")
@@ -112,7 +112,7 @@ struct WalletBalanceTests {
         deleted.deletedAt = .now
         try context.save()
 
-        let balances = WalletBalances(try context.fetch(Transaction.notDeleted), asOf: today)
+        let balances = WalletBalances(NotDeletedTransactions.Store.of(context).entries, asOf: today)
 
         for wallet in [checking, cash, brokerage, empty] {
             #expect(balances.balance(of: wallet) == wallet.balance(asOf: today))

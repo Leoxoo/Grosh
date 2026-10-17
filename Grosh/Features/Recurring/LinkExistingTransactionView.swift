@@ -9,7 +9,7 @@ struct LinkExistingTransactionView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
-    @Query(Transaction.notDeleted) private var transactions: [Transaction]
+    @NotDeletedTransactions private var transactions: [Transaction]
     @State private var filter: TransactionFilter
     @State private var errorMessage: String?
 

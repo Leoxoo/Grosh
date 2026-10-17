@@ -96,30 +96,39 @@ extension Wallet {
     }
 }
 
-/// The balance of every wallet on one day, added up in one pass over every transaction outside Recently Deleted
-/// (``Transaction/notDeleted``), fetched at once: what ``Wallet/balance(asOf:)`` and ``Wallet/total(of:asOf:)`` work out
-/// wallet by wallet. Home shows them all as the app opens, before anything has read a transaction, and a wallet's own
-/// transactions are read from the store one by one the first time.
+/// The balance of every wallet on one day, added up in one pass over every transaction outside Recently Deleted, as
+/// ``NotDeletedTransactions`` keeps them: what ``Wallet/balance(asOf:)`` and ``Wallet/total(of:asOf:)`` work out wallet
+/// by wallet, reading each wallet's own transactions.
 struct WalletBalances {
-    private let centsByWallet: [PersistentIdentifier: Int]
+    private let centsByWallet: [ObjectIdentifier: Int]
 
-    /// The balances on `today` of the wallets `transactions` belong to: those dated today or earlier count.
-    init(_ transactions: [Transaction], asOf today: CalendarDay) {
-        var centsByWallet: [PersistentIdentifier: Int] = [:]
+    /// The balances on `today` of the wallets `transactions` belong to, from every transaction outside Recently
+    /// Deleted: those dated today or earlier count.
+    init(_ transactions: some Sequence<some DatedAmount>, asOf today: CalendarDay) {
+        var centsByWallet: [ObjectIdentifier: Int] = [:]
         for transaction in transactions where transaction.dayRaw <= today.rawValue {
             guard let wallet = transaction.wallet else { continue }
-            centsByWallet[wallet.persistentModelID, default: 0] += transaction.amountCents
+            centsByWallet[ObjectIdentifier(wallet), default: 0] += transaction.amountCents
         }
         self.centsByWallet = centsByWallet
     }
 
     /// The wallet's balance, as ``Wallet/balance(asOf:)`` has it.
     func balance(of wallet: Wallet) -> Money {
-        Money(cents: centsByWallet[wallet.persistentModelID] ?? 0, currencyCode: wallet.currencyCode)
+        Money(cents: centsByWallet[ObjectIdentifier(wallet)] ?? 0, currencyCode: wallet.currencyCode)
     }
 
     /// The Total of `wallets`, as ``Wallet/total(of:asOf:)`` has it.
     func total(of wallets: [Wallet]) -> Money {
         Money(cents: wallets.filter(\.countsInTotal).reduce(0) { $0 + balance(of: $1).cents })
+    }
+
+    /// The balance of `selection`, as ``WalletSelection/balance(asOf:wallets:)`` has it: the Total of `wallets`, or the
+    /// one wallet's balance.
+    func balance(of selection: WalletSelection, wallets: [Wallet]) -> Money {
+        switch selection {
+        case .total: total(of: wallets)
+        case .wallet(let wallet): balance(of: wallet)
+        }
     }
 }

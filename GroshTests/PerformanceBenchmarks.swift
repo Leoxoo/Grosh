@@ -140,11 +140,12 @@ struct PerformanceBenchmarks {
         let all = try container.mainContext.fetch(Grosh.Transaction.notDeleted)
         let today = CalendarDay.today
         let old = Period.month(CalendarMonth(today).adding(months: -30))
+        let entries = NotDeletedTransactions.Store.of(container.mainContext).entries
         time("Transactions body work for a month 2½ years back") {
             let filter = TransactionFilter()
-            let selected = filter.transactions(in: .total, from: all)
+            let selected = filter.transactions(in: .total, from: entries)
             _ = TimeRange.month.periods(from: selected.firstDay, today: today)
-            let shown = filter.listed(from: all, selection: .total, on: old.days(today: today))
+            let shown = filter.listed(from: all, selected: selected, on: old.days(today: today))
             _ = PeriodSummary(of: selected, in: old, today: today)
             _ = TransactionDay.days(of: shown, scheduled: [])
         }
@@ -158,8 +159,9 @@ struct PerformanceBenchmarks {
             )
             _ = MonthGraph.months(from: firstDay, today: today)
             let history = try context.fetch(MonthGraphHistory.transactions(for: month)) + forgiven
+            let counted = history.compactMap(\.countedAmount)
             for side in SpentOrIncome.allCases {
-                _ = MonthGraph(side, of: history, countingFrom: firstDay, recurring: recurring, in: month, today: today)
+                _ = MonthGraph(side, of: counted, countingFrom: firstDay, recurring: recurring, in: month, today: today)
             }
         }
     }

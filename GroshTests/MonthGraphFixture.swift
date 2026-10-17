@@ -45,8 +45,8 @@ struct MonthGraphFixture {
         let history = try context.fetch(MonthGraphHistory.transactions(for: month))
             + context.fetch(MonthGraphHistory.forgiven)
         return try MonthGraph(
-            side, of: history, countingFrom: firstDay(), recurring: recurring, in: month, today: today,
-            comparingWith: choice
+            side, of: history.compactMap(\.countedAmount), countingFrom: firstDay(), recurring: recurring, in: month,
+            today: today, comparingWith: choice
         )
     }
 
