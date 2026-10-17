@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// A donut of one side's parent categories. Each slice's icon sits on a circle around the ring, spread apart so no icon
-/// lies on another, with a stick from the icon to the middle of its slice and its percent beside it in the slice's color.
+/// A donut of one side's parent categories. Each slice's icon sits on a circle around the ring, evenly spaced in the slices'
+/// order so no icon lies on another, with a stick from the icon to the middle of its slice and its percent beside it in the
+/// slice's color.
 /// VoiceOver reads each icon as the category's name and its share. With nothing above zero it is an empty ring.
 struct CategoryDonut: View {
     let breakdown: CategoryBreakdown
@@ -94,7 +95,7 @@ struct CategoryDonut: View {
     /// stick runs from its icon to the middle of its slice on the ring, which ends at `ringEnd`.
     private func placedLabels(center: CGPoint, iconCircle: CGFloat, ringEnd: CGFloat) -> [Label] {
         let arcs = placedSlices
-        let angles = Self.spreadApart(arcs.map(\.angle), minimumGap: (iconRadius * 2 + 6) / iconCircle)
+        let angles = Self.evenlySpaced(arcs.map(\.angle))
         return zip(arcs, angles).map { arc, angle in
             let icon = point(from: center, distance: iconCircle, angle: angle)
             // The percent sits outward from its icon, clear of the icon by its own half-size in that direction.
@@ -109,24 +110,16 @@ struct CategoryDonut: View {
         }
     }
 
-    /// Each angle moved the least it can, so that neighbouring angles around the circle are at least `minimumGap` apart.
-    private static func spreadApart(_ angles: [Double], minimumGap: Double) -> [Double] {
-        guard angles.count > 1 else { return angles }
-        let turn = 2 * Double.pi
-        var spread = angles
-        for _ in 0..<120 {
-            for index in spread.indices {
-                let next = (index + 1) % spread.count
-                let gap = (spread[next] - spread[index]).truncatingRemainder(dividingBy: turn) + turn
-                let apart = gap.truncatingRemainder(dividingBy: turn)
-                if apart < minimumGap {
-                    let shift = (minimumGap - apart) / 2
-                    spread[index] -= shift
-                    spread[next] += shift
-                }
-            }
-        }
-        return spread
+    /// The icons' angles: evenly spaced around the circle, in the slices' clockwise order, and turned as a whole so that on
+    /// average each icon sits near its slice. Evenly spaced icons never lie on one another, and they stay in the donut's order.
+    private static func evenlySpaced(_ middles: [Double]) -> [Double] {
+        guard middles.count > 1 else { return middles }
+        let count = Double(middles.count)
+        let step = 2 * Double.pi / count
+        let turn = middles.enumerated()
+            .map { index, middle in middle - Double(index) * step }
+            .reduce(0, +) / count
+        return middles.indices.map { turn + Double($0) * step }
     }
 
     private static func label(_ name: String, share: Double) -> String {
