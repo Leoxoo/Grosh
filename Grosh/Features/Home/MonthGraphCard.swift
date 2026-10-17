@@ -5,15 +5,15 @@ import SwiftUI
 /// running total of the month the strip picks beside the Average of the months before it, or the same month last year
 /// while the "vs last year" switch, which both tabs share, is on. A month the strip no longer offers, once the only
 /// transaction that counted in it is gone, gives way to this month. Its amounts show even while the Total is hidden.
-/// Use inside a `List`.
+/// It reads only what the month picked needs from the store (``MonthGraphHistory``). Use inside a `List`.
 struct HomeMonthGraph: View {
     /// Remembers across launches whether both tabs compare their month with Last year.
     static let comparesWithLastYearKey = "home.monthGraph.comparesWithLastYear"
 
     let today: CalendarDay
 
-    @Query(Transaction.notDeleted) private var transactions: [Transaction]
-    @Query private var recurringTransactions: [RecurringTransaction]
+    @Query(MonthGraphHistory.earliestCounted) private var earliest: [Transaction]
+    @Query(MonthGraphHistory.forgiven) private var forgiven: [Transaction]
     /// The month the card shows, picked in the strip. Every launch starts on this month.
     @State private var period = Period.month(CalendarMonth(.today))
     /// The tab the card shows.
@@ -21,7 +21,8 @@ struct HomeMonthGraph: View {
     @AppStorage(Self.comparesWithLastYearKey) private var comparesWithLastYear = false
 
     var body: some View {
-        let months = MonthGraph.months(of: transactions, today: today)
+        let firstDay = MonthGraphHistory.firstDay(earliest: earliest, forgiven: forgiven)
+        let months = MonthGraph.months(from: firstDay, today: today)
         Section {
             PeriodStrip(periods: months, selection: $period, current: currentPeriod, today: today)
                 // The strip pads its own tabs, and sits above the card rather than on it.
@@ -31,19 +32,9 @@ struct HomeMonthGraph: View {
                     period.showCurrentPeriod(currentPeriod, unlessOfferedBy: months)
                 }
         }
-        MonthGraphCard(
-            spent: graph(for: .spent),
-            income: graph(for: .income),
-            side: $side,
+        HomeMonthGraphCard(
+            month: month, firstDay: firstDay, forgiven: forgiven, today: today, side: $side,
             comparesWithLastYear: $comparesWithLastYear
-        )
-    }
-
-    /// The graph of `side`'s tab for the month picked, compared as the "vs last year" switch is set.
-    private func graph(for side: SpentOrIncome) -> MonthGraph {
-        MonthGraph(
-            side, of: transactions, recurring: recurringTransactions, in: month, today: today,
-            comparingWith: comparesWithLastYear ? .lastYear : .average
         )
     }
 
@@ -56,6 +47,53 @@ struct HomeMonthGraph: View {
     private var month: CalendarMonth {
         guard case .month(let month) = period else { return CalendarMonth(today) }
         return month
+    }
+}
+
+/// The card of the month picked in Home's strip, made from the transactions of the months its graphs sum, read from the
+/// store for that month alone.
+private struct HomeMonthGraphCard: View {
+    let month: CalendarMonth
+    /// The first day anything counts on the Month graph, or `nil` when nothing does.
+    let firstDay: CalendarDay?
+    /// Every forgiven Loan and Debt, which count on the day they were forgiven, whatever month that is.
+    let forgiven: [Transaction]
+    let today: CalendarDay
+    @Binding var side: SpentOrIncome
+    @Binding var comparesWithLastYear: Bool
+
+    @Query private var transactions: [Transaction]
+    @Query private var recurringTransactions: [RecurringTransaction]
+
+    init(
+        month: CalendarMonth, firstDay: CalendarDay?, forgiven: [Transaction], today: CalendarDay,
+        side: Binding<SpentOrIncome>, comparesWithLastYear: Binding<Bool>
+    ) {
+        self.month = month
+        self.firstDay = firstDay
+        self.forgiven = forgiven
+        self.today = today
+        _side = side
+        _comparesWithLastYear = comparesWithLastYear
+        _transactions = Query(MonthGraphHistory.transactions(for: month))
+    }
+
+    var body: some View {
+        let history = transactions + forgiven
+        MonthGraphCard(
+            spent: graph(for: .spent, of: history),
+            income: graph(for: .income, of: history),
+            side: $side,
+            comparesWithLastYear: $comparesWithLastYear
+        )
+    }
+
+    /// The graph of `side`'s tab for the month, compared as the "vs last year" switch is set.
+    private func graph(for side: SpentOrIncome, of history: [Transaction]) -> MonthGraph {
+        MonthGraph(
+            side, of: history, countingFrom: firstDay, recurring: recurringTransactions, in: month, today: today,
+            comparingWith: comparesWithLastYear ? .lastYear : .average
+        )
     }
 }
 

@@ -22,4 +22,16 @@ enum AmountEstimate {
         let total = recent.reduce(0) { $0 + abs($1.amountCents) }
         return Int((Double(total) / Double(recent.count)).rounded())
     }
+
+    /// Every transaction filed under `category` or its subcategories, Recently Deleted ones included: all that
+    /// ``cents(among:for:currencyCode:)`` can count for it, read from the category's own transactions rather than
+    /// the whole store.
+    static func history(for category: Category) -> [Transaction] {
+        ([category] + (category.children ?? [])).flatMap { $0.transactions ?? [] }
+    }
+
+    /// ``cents(among:for:currencyCode:)`` over the category's own ``history(for:)``.
+    static func cents(for category: Category, currencyCode: String) -> Int? {
+        cents(among: history(for: category), for: category, currencyCode: currencyCode)
+    }
 }

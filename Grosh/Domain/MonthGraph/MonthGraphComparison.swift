@@ -26,10 +26,13 @@ enum MonthGraphComparison {
         }
     }
 
-    /// The comparison of `side` through the end of each day of `month`, the 1st first, from `counted`, everything that
-    /// counts on the Month graph; or `nil` when no month counts toward it.
-    func dailyTotals(_ side: SpentOrIncome, of counted: [CountedAmount], for month: CalendarMonth) -> [DailyTotal]? {
-        let months = self.months(side, of: counted, for: month)
+    /// The comparison of `side` through the end of each day of `month`, the 1st first, from `counted`, which holds at
+    /// least what counts in the months it compares with; or `nil` when no month counts toward it. `firstDay` is the
+    /// first day anything counts on the Month graph, on either tab, or `nil` when nothing does.
+    func dailyTotals(
+        _ side: SpentOrIncome, of counted: [CountedAmount], countingFrom firstDay: CalendarDay?, for month: CalendarMonth
+    ) -> [DailyTotal]? {
+        let months = self.months(side, of: counted, countingFrom: firstDay, for: month)
         guard !months.isEmpty else { return nil }
         let monthsCents = months.map { earlier in
             counted.dailyTotals(side, in: earlier, through: earlier.lastDay).map { $0.total.cents }
@@ -44,11 +47,11 @@ enum MonthGraphComparison {
 
     /// The months whose mean the comparison of `side` is for `month`, from `counted`.
     private func months(
-        _ side: SpentOrIncome, of counted: [CountedAmount], for month: CalendarMonth
+        _ side: SpentOrIncome, of counted: [CountedAmount], countingFrom firstDay: CalendarDay?, for month: CalendarMonth
     ) -> [CalendarMonth] {
         switch self {
         case .average:
-            guard let firstDay = counted.firstDay else { return [] }
+            guard let firstDay else { return [] }
             let firstMonth = CalendarMonth(firstDay)
             return (1...Self.averageMonthCount).map { month.adding(months: -$0) }.filter { $0 >= firstMonth }
         case .lastYear:

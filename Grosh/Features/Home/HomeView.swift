@@ -8,15 +8,18 @@ struct HomeView: View {
     static let isTotalHiddenKey = "home.isTotalHidden"
 
     @Query(Wallet.unarchived) private var wallets: [Wallet]
+    /// What the Total and the wallets' balances add up, read from the store at once.
+    @Query(Transaction.notDeleted) private var transactions: [Transaction]
     @AppStorage(Self.isTotalHiddenKey) private var isTotalHidden = false
 
     private var today: CalendarDay { .today }
 
     var body: some View {
+        let balances = WalletBalances(transactions, asOf: today)
         NavigationStack {
             List {
                 Section {
-                    TotalBalanceView(total: Wallet.total(of: wallets, asOf: today), isHidden: $isTotalHidden)
+                    TotalBalanceView(total: balances.total(of: wallets), isHidden: $isTotalHidden)
                 }
 
                 Section {
@@ -24,7 +27,7 @@ struct HomeView: View {
                         NavigationLink("Add a wallet") { WalletListView() }
                     }
                     ForEach(wallets) { wallet in
-                        WalletRow(wallet: wallet, today: today)
+                        WalletRow(wallet: wallet, today: today, balances: balances)
                     }
                 } header: {
                     HStack {

@@ -12,15 +12,14 @@ struct MonthGraphProjection {
     let dailyTotals: [DailyTotal]
 
     /// What `recurring` still has due for `side` in `month` as it stands on `today`, on top of `todaysTotal`, or `nil`
-    /// when `month` isn't the current month or nothing is due for the tab. `history` is what a varying Bill's estimate
-    /// is averaged over.
+    /// when `month` isn't the current month or nothing is due for the tab.
     init?(
-        _ side: SpentOrIncome, of recurring: [RecurringTransaction], history: [Transaction],
+        _ side: SpentOrIncome, of recurring: [RecurringTransaction],
         in month: CalendarMonth, today: CalendarDay, todaysTotal: Money
     ) {
         guard month == CalendarMonth(today) else { return nil }
         let scheduled = recurring
-            .scheduledOccurrences(selection: .total, today: today, through: month.lastDay, history: history)
+            .scheduledOccurrences(selection: .total, today: today, through: month.lastDay)
             .filter { $0.countedAmount?.side == side }
         guard !scheduled.isEmpty else { return nil }
         self.scheduled = scheduled

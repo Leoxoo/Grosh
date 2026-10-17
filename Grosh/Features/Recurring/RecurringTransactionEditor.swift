@@ -47,8 +47,6 @@ private struct RecurringForm: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
-    /// Every transaction, which a varying Bill's estimate is averaged over.
-    @Query private var transactions: [Transaction]
 
     @State private var draft: RecurringDraft
     @State private var entry: AmountEntry
@@ -80,7 +78,7 @@ private struct RecurringForm: View {
     /// The estimate a varying Bill starts at: the average of its category's history, or `nil` when there is none.
     private var estimateCents: Int? {
         guard draft.estimatesAmount, let category = draft.category else { return nil }
-        return AmountEstimate.cents(among: transactions, for: category, currencyCode: currencyCode)
+        return AmountEstimate.cents(for: category, currencyCode: currencyCode)
     }
 
     /// The draft with the amounts the keypad comes to. A total of zero is no total.

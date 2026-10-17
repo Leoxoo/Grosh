@@ -39,6 +39,32 @@ struct TransactionFilter: Equatable {
 
     /// Whether `transaction` passes the search and every filter that is set.
     func matches(_ transaction: Transaction) -> Bool {
+        Search(self).matches(transaction)
+    }
+
+    /// The search text trimmed and read as an amount once, for checking many transactions against the filter.
+    fileprivate struct Search {
+        let filter: TransactionFilter
+        let query: String
+        let amount: AmountQuery?
+
+        init(_ filter: TransactionFilter) {
+            self.filter = filter
+            query = filter.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            amount = query.isEmpty ? nil : AmountQuery(query)
+        }
+
+        func matches(_ transaction: Transaction) -> Bool {
+            filter.passesFilters(transaction)
+                && (query.isEmpty
+                    || transaction.note.localizedStandardContains(query)
+                    || transaction.category?.name.localizedStandardContains(query) == true
+                    || amount?.matches(Money(cents: transaction.amountCents)) == true)
+        }
+    }
+
+    /// Whether `transaction` passes every filter that is set, search text aside.
+    private func passesFilters(_ transaction: Transaction) -> Bool {
         guard dateRange.contains(transaction.day) else { return false }
         if excludedOnly, !transaction.isExcludedFromReport { return false }
         let enteredCents = abs(transaction.amountCents)
@@ -48,11 +74,7 @@ struct TransactionFilter: Equatable {
         if let category, transaction.category !== category, transaction.category?.parent !== category { return false }
         if let card, transaction.card !== card { return false }
         if let type, transaction.category?.type != type { return false }
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        return query.isEmpty
-            || transaction.note.localizedStandardContains(query)
-            || transaction.category?.name.localizedStandardContains(query) == true
-            || AmountQuery(query)?.matches(transaction.amount) == true
+        return true
     }
 
     /// Whether there is search text to look for.
@@ -79,8 +101,14 @@ struct TransactionFilter: Equatable {
     /// archived ones included; otherwise the list holds the matching ones among ``transactions(in:from:)`` on `days`
     /// (the selected period).
     func listed(from all: [Transaction], selection: WalletSelection, on days: DayRange) -> [Transaction] {
+        listed(from: all, selected: transactions(in: selection, from: all), on: days)
+    }
+
+    /// ``listed(from:selection:on:)`` with the selection's transactions at hand already: `selected`, as
+    /// ``transactions(in:from:)`` picks them from `all`.
+    func listed(from all: [Transaction], selected: [Transaction], on days: DayRange) -> [Transaction] {
         if isSearching { return all.matching(self) }
-        return transactions(in: selection, from: all).filter { days.contains($0.day) }.matching(self)
+        return selected.filter { days.contains($0.day) }.matching(self)
     }
 
     /// The transactions the Transactions tab steps through period by period, before the period and the other filters
@@ -88,13 +116,23 @@ struct TransactionFilter: Equatable {
     /// place of `selection`), otherwise `selection`'s. The period strip reaches back to the first of them.
     func transactions(in selection: WalletSelection, from all: [Transaction]) -> [Transaction] {
         let selection = wallet.map(WalletSelection.wallet) ?? selection
-        return all.filter(selection.includes)
+        // A wallet is asked once whether it belongs, rather than once for each of its transactions.
+        var includesWallet: [ObjectIdentifier?: Bool] = [:]
+        return all.filter { transaction in
+            let wallet = transaction.wallet
+            let key = wallet.map(ObjectIdentifier.init)
+            if let known = includesWallet[key] { return known }
+            let includes = selection.includesWallet(wallet)
+            includesWallet[key] = includes
+            return includes
+        }
     }
 }
 
 extension Sequence where Element == Transaction {
     /// The transactions that pass `filter`.
     func matching(_ filter: TransactionFilter) -> [Transaction] {
-        self.filter(filter.matches)
+        let search = TransactionFilter.Search(filter)
+        return self.filter(search.matches)
     }
 }

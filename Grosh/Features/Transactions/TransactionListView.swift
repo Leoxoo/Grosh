@@ -49,10 +49,10 @@ struct TransactionListView: View {
         let selected = selected
         let periods = strip(for: selected)
         let shownDays = period.days(today: today)
-        let shown = filter.listed(from: transactions, selection: walletSelection, on: shownDays)
+        let shown = filter.listed(from: transactions, selected: selected, on: shownDays)
         // Future's Scheduled rows are listed by day, and only while nothing is searched, filtered or being selected.
         let scheduled: [ScheduledOccurrence] = period == .future && grouping == .day && !filter.isOn && !isSelecting
-            ? recurringTransactions.scheduledOccurrences(selection: walletSelection, today: today, history: transactions)
+            ? recurringTransactions.scheduledOccurrences(selection: walletSelection, today: today)
             : []
         // The rows highlighted: the chosen ones while selecting, otherwise the one whose detail is showing.
         let highlighted = isSelecting ? chosen : Set([selectedTransaction].compactMap { $0 })
