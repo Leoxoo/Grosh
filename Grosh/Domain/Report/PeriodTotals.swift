@@ -42,3 +42,13 @@ extension Sequence where Element == Transaction {
         return compactMap { $0.countedAmount(in: selection) }.filter { days.contains($0.day) }
     }
 }
+
+extension Sequence where Element == Transaction {
+    /// The days a Report screen's period covers, as its Steps and Daily average count them: the period's days through
+    /// today, where All time reaches back to the first transaction of `selection`.
+    func reportDays(of period: Period, in selection: WalletSelection, today: CalendarDay) -> DayRange {
+        let days = period.days(today: today)
+        let firstTransaction = filter(selection.includes).firstDay
+        return DayRange(first: days.first ?? firstTransaction ?? today, last: days.last ?? today)
+    }
+}

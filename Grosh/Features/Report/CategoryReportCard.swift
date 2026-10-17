@@ -14,22 +14,30 @@ struct CategoryReportCard: View {
         .padding(.vertical, 4)
     }
 
-    /// One side: its name and total, in its color, over its donut.
+    /// One side, a link to its details: its name and total, in its color, over its donut.
     private func tile(_ breakdown: CategoryBreakdown) -> some View {
-        VStack(spacing: 12) {
-            VStack(spacing: 2) {
-                Text(breakdown.side.title)
+        NavigationLink(value: ReportScreen.details(.side(breakdown.side))) {
+            VStack(spacing: 12) {
+                VStack(spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text(breakdown.side.title)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                    }
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                Text(breakdown.total.formatted())
-                    .font(.title3.bold())
-                    .monospacedDigit()
-                    .foregroundStyle(breakdown.side.color)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    Text(breakdown.total.formatted())
+                        .font(.title3.bold())
+                        .monospacedDigit()
+                        .foregroundStyle(breakdown.side.color)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                CategoryDonut(breakdown: breakdown)
             }
-            CategoryDonut(breakdown: breakdown)
+            .frame(maxWidth: .infinity)
+            .contentShape(.rect)
         }
-        .frame(maxWidth: .infinity)
+        .buttonStyle(.plain)
     }
 }

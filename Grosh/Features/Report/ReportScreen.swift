@@ -8,10 +8,13 @@ enum ReportScreen: Hashable {
     /// Which details screen.
     enum Details: Hashable {
         case netIncome
+        case side(SpentOrIncome)
     }
 
     case details(Details)
     case step(Details, span: DayRange, walletSelection: WalletSelection)
+    /// One parent category of a side, listing its transactions over the days the screen it was opened from showed.
+    case category(SpentOrIncome, Category, days: DayRange, walletSelection: WalletSelection)
 }
 
 /// The screen a ``ReportScreen`` names. It is pushed onto the Report's stack, so the details it opens can push more.
@@ -28,6 +31,8 @@ struct ReportDestination: View {
             DetailsScreen(details: details, walletSelection: $walletSelection, timeRange: $timeRange, period: $period)
         case .step(let details, let span, let selection):
             StepSpanScreen(details: details, span: span, walletSelection: selection)
+        case .category(let side, let category, let days, let selection):
+            CategoryTransactionsView(side: side, category: category, days: days, walletSelection: selection)
         }
     }
 }
@@ -62,6 +67,8 @@ private struct DetailsScreen: View {
         switch details {
         case .netIncome:
             NetIncomeDetailsView(walletSelection: $walletSelection, timeRange: $timeRange, period: $period)
+        case .side(let side):
+            SideDetailsView(side: side, walletSelection: $walletSelection, timeRange: $timeRange, period: $period)
         }
     }
 }
