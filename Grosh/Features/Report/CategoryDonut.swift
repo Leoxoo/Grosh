@@ -101,7 +101,8 @@ struct CategoryDonut: View {
     /// stick runs from its icon to the middle of its slice on the ring, which ends at `ringEnd`.
     private func placedLabels(center: CGPoint, iconCircle: CGFloat, ringEnd: CGFloat) -> [Label] {
         let arcs = placedSlices
-        let angles = Self.evenlySpaced(arcs.map(\.angle))
+        // Two icons' centres are kept a little more than an icon's width apart.
+        let angles = Self.packedAround(arcs.map(\.angle), minimumGap: (iconRadius * 2 + 2) / iconCircle)
         return zip(arcs, angles).map { arc, angle in
             let icon = point(from: center, distance: iconCircle, angle: angle)
             // The percent sits outward from its icon, clear of the icon by its own half-size in that direction.
@@ -126,8 +127,55 @@ struct CategoryDonut: View {
         }
     }
 
-    /// The icons' angles: evenly spaced around the circle, in the slices' clockwise order, and turned as a whole so that on
-    /// average each icon sits near its slice. Evenly spaced icons never lie on one another, and they stay in the donut's order.
+    /// The icons' angles: each icon on its own slice's centre, pushed only as far as a collision needs, by the least `minimumGap`
+    /// that keeps two icons apart. The icons keep the donut's order. The pass starts where the slices leave the widest gap, so
+    /// it wraps there.
+    private static func packedAround(_ middles: [Double], minimumGap gap: Double) -> [Double] {
+        let count = middles.count
+        guard count > 1 else { return middles }
+        let turn = 2 * Double.pi
+        // The gap from each slice's centre to the next, around the circle; the pass starts after the widest.
+        var start = 0
+        var widest = -Double.infinity
+        for index in 0..<count {
+            let next = (index + 1) % count
+            let between = (middles[next] - middles[index] + turn).truncatingRemainder(dividingBy: turn)
+            if between > widest {
+                widest = between
+                start = next
+            }
+        }
+        // The centres in order from `start`, unwound so that each lies after the one before it.
+        var desired: [Double] = []
+        for step in 0..<count {
+            var angle = middles[(start + step) % count]
+            if let previous = desired.last {
+                while angle < previous { angle += turn }
+            }
+            desired.append(angle)
+        }
+        // Pushed forward, so that each icon clears the one before it.
+        var forward = desired
+        for index in 1..<count {
+            forward[index] = max(desired[index], forward[index - 1] + gap)
+        }
+        guard forward[count - 1] - forward[0] + gap <= turn else {
+            return evenlySpaced(middles)
+        }
+        // Pulled back toward their centres, as far as the icons after each one allow.
+        var settled = forward
+        for index in stride(from: count - 2, through: 0, by: -1) {
+            settled[index] = min(forward[index], settled[index + 1] - gap)
+        }
+        let pulled = settled[count - 1] - settled[0] + gap <= turn ? settled : forward
+        var result = middles
+        for step in 0..<count {
+            result[(start + step) % count] = pulled[step]
+        }
+        return result
+    }
+
+    /// The fallback when the icons can't all fit around the circle: evenly spaced, in the slices' order.
     private static func evenlySpaced(_ middles: [Double]) -> [Double] {
         guard middles.count > 1 else { return middles }
         let count = Double(middles.count)
