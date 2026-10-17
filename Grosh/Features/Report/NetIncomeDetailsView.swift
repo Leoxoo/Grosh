@@ -32,7 +32,11 @@ struct NetIncomeDetailsView: View {
 
             Section {
                 ForEach(rows) { row in
-                    NavigationLink(value: ReportScreen.step(.netIncome, span: row.step.days, walletSelection: walletSelection)) {
+                    NavigationLink(
+                        value: ReportScreen.stepTransactions(
+                            side: nil, title: row.title, days: row.step.days, walletSelection: walletSelection
+                        )
+                    ) {
                         StepTotalsRow(title: row.title, totals: row.totals)
                     }
                 }

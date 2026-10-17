@@ -122,7 +122,11 @@ struct SideDetailsView: View {
 
         Section {
             ForEach(rows) { row in
-                NavigationLink(value: ReportScreen.step(.side(side), span: row.step.days, walletSelection: walletSelection)) {
+                NavigationLink(
+                    value: ReportScreen.stepTransactions(
+                        side: side, title: row.title, days: row.step.days, walletSelection: walletSelection
+                    )
+                ) {
                     LabeledContent(row.title) {
                         Text(row.total(of: side).formatted())
                             .monospacedDigit()
