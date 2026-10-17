@@ -44,6 +44,12 @@ struct PeriodStrip: View {
             }
         }
         .onAppear { scrollToSelection() }
+        // A screen pushed onto a stack lays its strip out mid-transition, so the first scroll can land short of the trailing
+        // end. Scrolling again once the transition has settled puts the selected tab in view.
+        .task {
+            try? await Task.sleep(for: .milliseconds(400))
+            scrollToSelection()
+        }
         // A wallet with a different history moves the selected tab along the strip.
         .onChange(of: periods) { scrollToSelection() }
         .onChange(of: selection) { scrollToSelection(animated: true) }
@@ -107,10 +113,15 @@ struct PeriodStrip: View {
     }
 
     /// Scrolls the selected tab to the center, stopping at the ends. Animated, it moves in one half-second ease however
-    /// far away the tab is.
+    /// far away the tab is. The last tab is scrolled to the trailing end instead, so it is never cut off by the end of the
+    /// strip, and the strip's own trailing padding shows past it.
     private func scrollToSelection(animated: Bool = false) {
         withAnimation(animated ? .easeInOut(duration: 0.5) : nil) {
-            position.scrollTo(id: selection, anchor: .center)
+            if selection == periods.last {
+                position.scrollTo(edge: .trailing)
+            } else {
+                position.scrollTo(id: selection, anchor: .center)
+            }
         }
     }
 }

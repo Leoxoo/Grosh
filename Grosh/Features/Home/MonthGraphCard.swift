@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// Home's Month graph: the month strip, then one card with a Spent tab and an Income tab. The tab shown draws the
+/// Home's Month graph: the month strip, with a link to the Report, then one card with a Spent tab and an Income tab. The tab shown draws the
 /// running total of the month the strip picks beside the Average of the months before it, or the same month last year
 /// while the "vs last year" switch, which both tabs share, is on. A month the strip no longer offers, once the only
 /// transaction that counted in it is gone, gives way to this month. Its amounts show even while the Total is hidden.
@@ -11,11 +11,13 @@ struct HomeMonthGraph: View {
     static let comparesWithLastYearKey = "home.monthGraph.comparesWithLastYear"
 
     let today: CalendarDay
+    /// The month the card shows, picked in the strip. Home holds it, since the Report opens on it.
+    @Binding var period: Period
+    /// Whether the Report is open, which "See reports" turns on. Home presents the Report, outside this list row.
+    @Binding var isShowingReport: Bool
 
     @Query(MonthGraphHistory.earliestCounted) private var earliest: [Transaction]
     @Query(MonthGraphHistory.forgiven) private var forgiven: [Transaction]
-    /// The month the card shows, picked in the strip. Every launch starts on this month.
-    @State private var period = Period.month(CalendarMonth(.today))
     /// The tab the card shows.
     @State private var side = SpentOrIncome.spent
     @AppStorage(Self.comparesWithLastYearKey) private var comparesWithLastYear = false
@@ -24,6 +26,12 @@ struct HomeMonthGraph: View {
         let firstDay = MonthGraphHistory.firstDay(earliest: earliest, forgiven: forgiven)
         let months = MonthGraph.months(from: firstDay, today: today)
         Section {
+            HStack {
+                Spacer()
+                Button("See reports") { isShowingReport = true }
+                    .font(.subheadline)
+            }
+            .listRowBackground(Color.clear)
             PeriodStrip(periods: months, selection: $period, current: currentPeriod, today: today)
                 // The strip pads its own tabs, and sits above the card rather than on it.
                 .listRowInsets(EdgeInsets())
@@ -92,8 +100,8 @@ private struct HomeMonthGraphCard: View {
     /// The graph of `side`'s tab for the month, compared as the "vs last year" switch is set.
     private func graph(for side: SpentOrIncome, of counted: [CountedAmount]) -> MonthGraph {
         MonthGraph(
-            side, of: counted, countingFrom: firstDay, recurring: recurringTransactions, in: month, today: today,
-            comparingWith: comparesWithLastYear ? .lastYear : .average
+            side, of: counted, countingFrom: firstDay, recurring: recurringTransactions, in: .month(month),
+            today: today, comparingWith: comparesWithLastYear ? .lastYear : .average
         )
     }
 }
@@ -126,7 +134,7 @@ struct MonthGraphCard: View {
             }
             .padding(.vertical, 4)
             // A day of another month isn't on this month's chart.
-            .onChange(of: graph.month) { scrubbedDay = nil }
+            .onChange(of: graph.span) { scrubbedDay = nil }
         }
     }
 
@@ -188,7 +196,9 @@ extension SpentOrIncome {
 
 #Preview {
     List {
-        HomeMonthGraph(today: .today)
+        HomeMonthGraph(
+            today: .today, period: .constant(.month(CalendarMonth(.today))), isShowingReport: .constant(false)
+        )
     }
     .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
 }

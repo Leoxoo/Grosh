@@ -18,15 +18,17 @@ struct MonthGraphLegend: View {
                     entry("\(graph.comparison.name)", color: MonthGraphChart.comparisonColor)
                 }
                 Spacer(minLength: 0)
-                Toggle("vs last year", isOn: $comparesWithLastYear)
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                    .fixedSize()
-                    // Greyed out but left as set, so it applies again on a month with Last year.
-                    .disabled(!graph.isLastYearAvailable)
+                if graph.offersLastYear {
+                    Toggle("vs last year", isOn: $comparesWithLastYear)
+                        .toggleStyle(.switch)
+                        .controlSize(.mini)
+                        .fixedSize()
+                        // Greyed out but left as set, so it applies again on a month with Last year.
+                        .disabled(!graph.isLastYearAvailable)
+                }
             }
             if let expected = graph.expectedByMonthEnd {
-                entry("Scheduled · Expected by month end \(expected.formatted())", color: graph.side.color, dotted: true)
+                entry("Scheduled · Expected by \(graph.endName) \(expected.formatted())", color: graph.side.color, dotted: true)
             }
         }
         .font(.caption)

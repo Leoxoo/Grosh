@@ -110,13 +110,13 @@ struct MonthGraphChart: View {
 
     /// The days named along the bottom: every seventh day from the 1st.
     private var labeledDays: [CalendarDay] {
-        stride(from: 1, through: graph.month.dayCount, by: 7).map { graph.month.day($0) }
+        stride(from: 1, through: graph.span.dayCount, by: 7).map { graph.span.day($0) }
     }
 
     /// The most Occurrences the popup lists on any one day, which the room above the plot is kept for, so the plot
     /// stays put as the marker moves.
     private var mostScheduledOnADay: Int {
-        (1...graph.month.dayCount).map { graph.popup(on: graph.month.day($0)).scheduled.count }.max() ?? 0
+        (1...graph.span.dayCount).map { graph.popup(on: graph.span.day($0)).scheduled.count }.max() ?? 0
     }
 
     /// From zero, or below it when refunds take Spent under zero, to the highest total of any line, and at least one

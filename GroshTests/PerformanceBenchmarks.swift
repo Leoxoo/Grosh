@@ -161,7 +161,7 @@ struct PerformanceBenchmarks {
             let history = try context.fetch(MonthGraphHistory.transactions(for: month)) + forgiven
             let counted = history.compactMap(\.countedAmount)
             for side in SpentOrIncome.allCases {
-                _ = MonthGraph(side, of: counted, countingFrom: firstDay, recurring: recurring, in: month, today: today)
+                _ = MonthGraph(side, of: counted, countingFrom: firstDay, recurring: recurring, in: .month(month), today: today)
             }
         }
     }

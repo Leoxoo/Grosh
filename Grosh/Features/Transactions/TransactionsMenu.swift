@@ -20,22 +20,7 @@ struct TransactionsMenu: View {
         Menu("More", systemImage: "ellipsis.circle") {
             Section {
                 Menu {
-                    Picker("Time Range", selection: presetSelection) {
-                        ForEach(TimeRange.presets, id: \.self) { range in
-                            Text(range.title).tag(Optional(range))
-                        }
-                    }
-                    .pickerStyle(.inline)
-
-                    Button {
-                        isPickingCustomRange = true
-                    } label: {
-                        if case .custom = timeRange {
-                            Label("Custom…", systemImage: "checkmark")
-                        } else {
-                            Text("Custom…")
-                        }
-                    }
+                    TimeRangeChoices(timeRange: $timeRange) { isPickingCustomRange = true }
                 } label: {
                     Label("Time Range", systemImage: "calendar")
                     Text(timeRange.title)
@@ -56,23 +41,13 @@ struct TransactionsMenu: View {
                 Button("Adjust Balance", systemImage: "plusminus") { isAdjustingBalance = true }
             }
         }
-        .sheet(isPresented: $isPickingCustomRange) {
-            CustomRangeEditor(days: timeRange.customRangeStart(today: .today)) { timeRange = .custom($0) }
-        }
+        .customRangeEditor($timeRange, isPresented: $isPickingCustomRange)
         .sheet(isPresented: $isTransferring) {
             TransferEditor(viewedWallet: viewedWallet)
         }
         .sheet(isPresented: $isAdjustingBalance) {
             AdjustBalanceEditor(viewedWallet: viewedWallet)
         }
-    }
-
-    /// The preset the time range is, or `nil` for a custom range, so the picker checks none of them.
-    private var presetSelection: Binding<TimeRange?> {
-        Binding(
-            get: { TimeRange.presets.contains(timeRange) ? timeRange : nil },
-            set: { if let range = $0 { timeRange = range } }
-        )
     }
 
     private var viewsByCategory: Binding<Bool> {

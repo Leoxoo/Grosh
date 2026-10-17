@@ -33,6 +33,28 @@ struct MonthGraphFixture {
         return transaction
     }
 
+    /// A Loan (`.loan`, money lent) or Debt (`.debt`, money borrowed) of `cents`, saved as the Add sheet's Debt/Loan tab
+    /// saves it: left in the report, so only its category keeps it off the cards.
+    @discardableResult
+    func lendOrBorrow(_ role: LockedRole, _ cents: Int, on day: CalendarDay) throws -> Transaction {
+        var draft = TransactionDraft(type: .debtLoan, day: day)
+        draft.wallet = checking
+        draft.amount = Money(cents: cents)
+        draft.category = try context.lockedCategory(role)
+        draft.withName = "Pasha"
+        return try Transaction.create(draft, in: context)
+    }
+
+    /// Forgives what is outstanding on `loanOrDebt` on `day`, under Other Expense for a Loan or Other Income for a Debt.
+    func forgive(_ loanOrDebt: Transaction, on day: CalendarDay) throws {
+        try Forgiveness.record(ForgiveDraft(forgiving: loanOrDebt, on: day, in: context), in: context)
+    }
+
+    /// Every transaction in the store, those in Recently Deleted included.
+    func transactions() throws -> [Transaction] {
+        try context.fetch(FetchDescriptor<Transaction>())
+    }
+
     /// The card for `side` showing `month`, this month unless another is given, compared with `choice`, as Home makes
     /// it: from what it reads from the store for that month (``MonthGraphHistory``) and every Recurring transaction,
     /// those in Recently Deleted included. Saves first, as the app has by the time Home reads.
@@ -45,8 +67,8 @@ struct MonthGraphFixture {
         let history = try context.fetch(MonthGraphHistory.transactions(for: month))
             + context.fetch(MonthGraphHistory.forgiven)
         return try MonthGraph(
-            side, of: history.compactMap(\.countedAmount), countingFrom: firstDay(), recurring: recurring, in: month,
-            today: today, comparingWith: choice
+            side, of: history.compactMap(\.countedAmount), countingFrom: firstDay(), recurring: recurring,
+            in: .month(month), today: today, comparingWith: choice
         )
     }
 
