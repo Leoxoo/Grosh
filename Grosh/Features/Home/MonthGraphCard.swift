@@ -100,7 +100,7 @@ struct MonthGraphCard: View {
             }
             .padding(.vertical, 4)
             // A day of another month isn't on this month's chart.
-            .onChange(of: graph.month) { scrubbedDay = nil }
+            .onChange(of: graph.span) { scrubbedDay = nil }
         }
     }
 

@@ -14,8 +14,11 @@ struct SideDetailsView: View {
 
     /// Whether the Breakdown or the Trend is shown, chosen with the segmented control.
     @State private var shows = Shows.breakdown
+    /// Whether the comparison card compares with Last year, which Home's Month graph shares.
+    @AppStorage(HomeMonthGraph.comparesWithLastYearKey) private var comparesWithLastYear = false
 
     @Query(Transaction.notDeleted) private var transactions: [Transaction]
+    @Query private var recurringTransactions: [RecurringTransaction]
 
     /// The two segments of the screen below its total.
     private enum Shows: Hashable {
@@ -47,6 +50,16 @@ struct SideDetailsView: View {
                     }
                 }
                 .padding(.vertical, 4)
+            }
+
+            if timeRange.hasComparisonCard {
+                PeriodComparisonCard(
+                    graph: MonthGraph(
+                        side, of: transactions, recurring: recurringTransactions, in: period, today: today,
+                        comparingWith: comparesWithLastYear ? .lastYear : .average, selection: walletSelection
+                    ),
+                    comparesWithLastYear: $comparesWithLastYear
+                )
             }
 
             Section {

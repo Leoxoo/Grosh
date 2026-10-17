@@ -189,6 +189,24 @@ _Avoid_: Report this month
 The Month graph tab for money going out: the month's Expense-category transactions in the wallets counted in the Total, less refunds, plus what was forgiven on Loans that month. Its counterpart, the Income tab, adds up Income-category transactions and what was forgiven on Debts.
 _Avoid_: Expenses, Expense (that is a Category type)
 
+**Report**:
+The full-screen summary opened from Home's Month graph: for the Wallet selector's choice and a period, its opening and ending balances, its Net income and its Category report. Its period never reaches past today.
+
+**Net income**:
+Income less Spent for a period: what came in less what went out, not counting transfers, Starting balances, Loan and Debt payments, or anything excluded from report.
+
+**Category report**:
+The Report's card splitting Income and Spent into their parent categories, as donuts: the five largest each get a slice, and the rest share one Everything else slice.
+
+**Breakdown** / **Trend**:
+The two views of Income or Spent details: Breakdown lists the parent categories with their shares, and Trend bars each Step of the period.
+
+**Everything else**:
+The one slice of a Category report donut that holds every parent category beyond the five largest.
+
+**Step**:
+One bar or row of Net income and Trend: a day, week, month, quarter or year of the period, cut at the period's edges and at today. A Day or Week range splits into days, a Month into weeks, a Quarter or Year into months, and All time or a custom range by its length.
+
 **Average**:
 The gray line a Month graph tab compares its month with unless Last year is on: the mean of the running totals of up to three complete months before the month shown. Months before the month of the first transaction that counts are left out; a later month with nothing that counts is zero.
 
