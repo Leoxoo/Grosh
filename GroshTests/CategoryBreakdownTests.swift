@@ -82,6 +82,24 @@ struct CategoryBreakdownTests {
         #expect(describe(spent.slices).map(\.1) == [700_00, 600_00, 500_00, 400_00, 300_00, 300_00])
     }
 
+    /// The expanded details' donut gives every parent category its own slice, not just the five largest.
+    @Test func everyParentGetsItsOwnSliceWhenAllAreAsked() throws {
+        try store.record(-700_00, "Food & Beverage", on: day(2026, 10, 1))
+        try store.record(-600_00, "Products", on: day(2026, 10, 1))
+        try store.record(-500_00, "Bills & Utilities", on: day(2026, 10, 1))
+        try store.record(-400_00, "Personal Transport", on: day(2026, 10, 1))
+        try store.record(-300_00, "Other Transport", on: day(2026, 10, 1))
+        try store.record(-200_00, "Clothing", on: day(2026, 10, 1))
+        try store.record(-100_00, "Health & Fitness", on: day(2026, 10, 1))
+
+        let all = try breakdown(.spent).donutSlices(ownSliceLimit: Int.max)
+        #expect(describe(all).map(\.0) == [
+            "Food & Beverage", "Products", "Bills & Utilities", "Personal Transport", "Other Transport", "Shopping",
+            "Health & Fitness",
+        ])
+        #expect(describe(all).map(\.1) == [700_00, 600_00, 500_00, 400_00, 300_00, 200_00, 100_00])
+    }
+
     @Test func fiveOrFewerParentsGetNoEverythingElse() throws {
         try store.record(-400_00, "Food & Beverage", on: day(2026, 10, 1))
         try store.record(-300_00, "Products", on: day(2026, 10, 1))

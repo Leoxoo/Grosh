@@ -36,9 +36,8 @@ struct CategoryBreakdown {
     /// Every parent category with anything counted toward the side, largest first. One whose total isn't above zero, such
     /// as one whose refunds outweigh what was spent, is listed after the ones above it.
     let categories: [CategoryTotal]
-    /// The donut's slices, largest first. Only categories above zero get one: the largest `ownSliceCount` each get their
-    /// own, and the rest of them share one Everything else slice.
-    let slices: [Slice]
+    /// The categories above zero, largest first: those that get a donut slice.
+    private let aboveZero: [CategoryTotal]
     /// What the categories above zero add up to, which every share is of.
     private let shareBase: Int
 
@@ -57,17 +56,28 @@ struct CategoryBreakdown {
                     : lhs.category.name < rhs.category.name
             }
         let aboveZero = categories.filter { $0.total.cents > 0 }
-        var slices = aboveZero.prefix(Self.ownSliceCount).map(Slice.category)
-        let smaller = aboveZero.dropFirst(Self.ownSliceCount)
-        if !smaller.isEmpty {
-            slices.append(.everythingElse(Money(cents: smaller.reduce(0) { $0 + $1.total.cents })))
-        }
 
         self.side = side
         self.total = Money(cents: categories.reduce(0) { $0 + $1.total.cents })
         self.categories = categories
-        self.slices = slices
+        self.aboveZero = aboveZero
         self.shareBase = aboveZero.reduce(0) { $0 + $1.total.cents }
+    }
+
+    /// The donut's slices with `ownSliceLimit` parent categories each getting a slice of their own, largest first. The rest
+    /// of the categories above zero share one Everything else slice. Only categories above zero get a slice.
+    func donutSlices(ownSliceLimit: Int) -> [Slice] {
+        var slices = aboveZero.prefix(ownSliceLimit).map(Slice.category)
+        let smaller = aboveZero.dropFirst(ownSliceLimit)
+        if !smaller.isEmpty {
+            slices.append(.everythingElse(Money(cents: smaller.reduce(0) { $0 + $1.total.cents })))
+        }
+        return slices
+    }
+
+    /// The donut's slices as the Report shows them: the largest `ownSliceCount` categories, and Everything else.
+    var slices: [Slice] {
+        donutSlices(ownSliceLimit: Self.ownSliceCount)
     }
 
     /// The share of the categories above zero that `amount` is, as a fraction from 0 to 1; zero for an amount that isn't

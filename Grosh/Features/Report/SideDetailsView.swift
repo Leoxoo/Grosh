@@ -93,8 +93,9 @@ struct SideDetailsView: View {
     private func breakdown(counted: [CountedAmount], days: DayRange) -> some View {
         let breakdown = CategoryBreakdown(side: side, of: counted)
         Section {
-            CategoryDonut(breakdown: breakdown)
-                .frame(maxWidth: 240)
+            // The details show every parent category, not only the five largest the Report's donut does.
+            CategoryDonut(breakdown: breakdown, ownSliceLimit: Int.max)
+                .frame(maxWidth: 300)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
         }
