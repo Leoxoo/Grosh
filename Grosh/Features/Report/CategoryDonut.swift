@@ -25,11 +25,11 @@ struct CategoryDonut: View {
         GeometryReader { proxy in
             let side = min(proxy.size.width, proxy.size.height)
             let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
-            // The circle the icons sit on leaves room outside it for each icon and its percent.
-            let iconCircle = max(side / 2 - iconRadius - gap - percentWidth, stickLength + 16)
+            // The circle the icons sit on leaves room outside it for each icon, its percent, and its stick.
+            let iconCircle = max(side / 2 - iconRadius - gap - percentWidth - 2, stickLength + 16)
             let radius = max(iconCircle - stickLength, 14)
-            let ringWidth = max(8, radius * 0.3)
-            let labels = placedLabels(center: center, iconCircle: iconCircle, ringEnd: radius - ringWidth / 2)
+            let ringWidth = max(10, radius * 0.45)
+            let labels = placedLabels(center: center, iconCircle: iconCircle, ringEnd: radius)
             ZStack {
                 ring(radius: radius, ringWidth: ringWidth)
                 Canvas { context, _ in
@@ -100,11 +100,17 @@ struct CategoryDonut: View {
             let icon = point(from: center, distance: iconCircle, angle: angle)
             // The percent sits outward from its icon, clear of the icon by its own half-size in that direction.
             let reach = iconRadius + gap + abs(sin(angle)) * percentWidth / 2 + abs(cos(angle)) * 6
+            // The stick lands on the slice's own outer edge, at the point of its arc nearest the icon, so it never crosses the ring.
+            let halfArc = (arc.end - arc.start) * Double.pi * 0.8
+            var offset = (angle - arc.angle).truncatingRemainder(dividingBy: 2 * Double.pi)
+            if offset > Double.pi { offset -= 2 * Double.pi }
+            if offset < -Double.pi { offset += 2 * Double.pi }
+            let landing = arc.angle + min(max(offset, -halfArc), halfArc)
             return Label(
                 slice: arc.slice, color: arc.color,
                 percent: breakdown.share(of: arc.amount).formatted(.percent.precision(.fractionLength(0))),
                 icon: icon,
-                ringEnd: point(from: center, distance: ringEnd, angle: arc.angle),
+                ringEnd: point(from: center, distance: ringEnd, angle: landing),
                 percentCenter: point(from: icon, distance: reach, angle: angle)
             )
         }
