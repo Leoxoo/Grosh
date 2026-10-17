@@ -52,24 +52,8 @@ struct NetIncomeDetailsView: View {
     /// The Steps of the period as shown, each with its title and totals: what counts in each.
     private func stepRows(counted: [CountedAmount], today: CalendarDay) -> [StepRow] {
         let days = transactions.reportDays(of: period, in: walletSelection, today: today)
-        let steps = Step.steps(for: timeRange, over: days, today: today)
-        return steps.map { step in
-            StepRow(
-                step: step, title: step.title(),
-                totals: PeriodTotals(of: counted.filter { step.contains($0.day) })
-            )
-        }
+        return StepRow.rows(of: counted, for: timeRange, over: days, today: today)
     }
-
-}
-
-/// One Step of a details screen: its span, its name, and what counts toward Income and Spent in it.
-struct StepRow: Identifiable {
-    let step: Step
-    let title: String
-    let totals: PeriodTotals
-
-    var id: Step { step }
 }
 
 /// A Step's name over its Income, Spent and Net, the row a details screen lists the Steps by.

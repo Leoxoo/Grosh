@@ -1,8 +1,10 @@
+import Charts
 import SwiftData
 import SwiftUI
 
-/// Income or Spent details: the period's total for the side and its Daily average, a donut of the side's parent categories,
-/// and every parent category largest first with its share. Tapping a category lists its transactions in the period. It
+/// Income or Spent details: the period's total for the side and its Daily average, then either its Breakdown (a donut of
+/// its parent categories and every parent category largest first, with its share) or its Trend (a bar per Step and a row
+/// per Step). Tapping a category lists its transactions in the period; tapping a Step opens that Step's span alone. It
 /// shares the Report's wallet selection, time range and period.
 struct SideDetailsView: View {
     let side: SpentOrIncome
@@ -10,7 +12,16 @@ struct SideDetailsView: View {
     @Binding var timeRange: TimeRange
     @Binding var period: Period
 
+    /// Whether the Breakdown or the Trend is shown, chosen with the segmented control.
+    @State private var shows = Shows.breakdown
+
     @Query(Transaction.notDeleted) private var transactions: [Transaction]
+
+    /// The two segments of the screen below its total.
+    private enum Shows: Hashable {
+        case breakdown
+        case trend
+    }
 
     var body: some View {
         let today = CalendarDay.today
@@ -18,7 +29,6 @@ struct SideDetailsView: View {
         let counted = transactions.counted(in: walletSelection, during: period, today: today)
         let totals = PeriodTotals(of: counted)
         let total = side == .income ? totals.income : totals.spent
-        let breakdown = CategoryBreakdown(side: side, of: counted)
         List {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
@@ -40,22 +50,19 @@ struct SideDetailsView: View {
             }
 
             Section {
-                CategoryDonut(breakdown: breakdown)
-                    .frame(maxWidth: 240)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+                Picker("Shows", selection: $shows) {
+                    Text("Breakdown").tag(Shows.breakdown)
+                    Text("Trend").tag(Shows.trend)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
             }
 
-            Section {
-                ForEach(breakdown.categories, id: \.category) { row in
-                    NavigationLink(
-                        value: ReportScreen.category(side, row.category, days: days, walletSelection: walletSelection)
-                    ) {
-                        CategoryBreakdownRow(
-                            category: row.category, total: row.total, share: breakdown.share(of: row.total)
-                        )
-                    }
-                }
+            switch shows {
+            case .breakdown:
+                breakdown(counted: counted, days: days)
+            case .trend:
+                trend(counted: counted, days: days, today: today)
             }
         }
         .roundedSectionsListStyle()
@@ -67,6 +74,49 @@ struct SideDetailsView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+    }
+
+    @ViewBuilder
+    private func breakdown(counted: [CountedAmount], days: DayRange) -> some View {
+        let breakdown = CategoryBreakdown(side: side, of: counted)
+        Section {
+            CategoryDonut(breakdown: breakdown)
+                .frame(maxWidth: 240)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+        }
+
+        Section {
+            ForEach(breakdown.categories, id: \.category) { row in
+                NavigationLink(
+                    value: ReportScreen.category(side, row.category, days: days, walletSelection: walletSelection)
+                ) {
+                    CategoryBreakdownRow(
+                        category: row.category, total: row.total, share: breakdown.share(of: row.total)
+                    )
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func trend(counted: [CountedAmount], days: DayRange, today: CalendarDay) -> some View {
+        let rows = StepRow.rows(of: counted, for: timeRange, over: days, today: today)
+        Section {
+            SideTrendChart(side: side, rows: rows)
+                .padding(.vertical, 8)
+        }
+
+        Section {
+            ForEach(rows) { row in
+                NavigationLink(value: ReportScreen.step(.side(side), span: row.step.days, walletSelection: walletSelection)) {
+                    LabeledContent(row.title) {
+                        Text(row.total(of: side).formatted())
+                            .monospacedDigit()
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -90,5 +140,35 @@ private struct CategoryBreakdownRow: View {
                     .monospacedDigit()
             }
         }
+    }
+}
+
+/// One bar per Step, in the side's color, the bar's height its total. The rows under it name the Steps.
+private struct SideTrendChart: View {
+    let side: SpentOrIncome
+    let rows: [StepRow]
+
+    var body: some View {
+        Chart {
+            ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                BarMark(x: .value("Step", index), y: .value("Total", row.total(of: side).cents))
+                    .foregroundStyle(side.color)
+            }
+            RuleMark(y: .value("Zero", 0))
+                .foregroundStyle(.secondary.opacity(0.4))
+        }
+        .chartXAxis(.hidden)
+        .chartYAxis {
+            AxisMarks(position: .leading) { value in
+                AxisValueLabel {
+                    if let cents = value.as(Int.self) {
+                        Text(Money(cents: cents).formatted())
+                            .font(.caption2)
+                    }
+                }
+            }
+        }
+        .frame(height: 180)
+        .accessibilityHidden(true)
     }
 }
