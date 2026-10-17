@@ -38,6 +38,11 @@ struct NetIncomeCard: View {
                 AmountBar(side: .income, amount: totals.income, largest: largest)
                 AmountBar(side: .spent, amount: totals.spent, largest: largest)
             }
+
+            NavigationLink(value: ReportScreen.details(.netIncome)) {
+                Text("See details")
+                    .font(.subheadline)
+            }
         }
         .padding(.vertical, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
