@@ -44,7 +44,7 @@ struct CategoryReportCard: View {
             .buttonStyle(.plain)
 
             // A short stick keeps the donut small enough for two to sit side by side, with icons and percents clear of each other.
-            CategoryDonut(breakdown: breakdown, stickLength: 18)
+            CategoryDonut(breakdown: breakdown, stickLength: 18, percentsBelowIcons: true)
         }
         .frame(maxWidth: .infinity)
     }

@@ -13,6 +13,9 @@ struct CategoryDonut: View {
     var minimumShare: Double = 0
     /// How far the icons' circle sits outside the ring's outer edge: room for the stick. A small donut takes a shorter one.
     var stickLength: CGFloat = 38
+    /// Whether each percent sits above or below its icon, rather than beside it. A donut in a narrow column takes this, since
+    /// the percent then needs no room beside the icon, and the donut can be bigger.
+    var percentsBelowIcons = false
 
     /// The icon's radius.
     private let iconRadius: CGFloat = 11
@@ -20,13 +23,16 @@ struct CategoryDonut: View {
     private let gap: CGFloat = 4
     /// The room a percent takes beside its icon, wide enough for "100%".
     private let percentWidth: CGFloat = 28
+    /// The room a percent takes above or below its icon.
+    private let percentHeight: CGFloat = 12
 
     var body: some View {
         GeometryReader { proxy in
             let side = min(proxy.size.width, proxy.size.height)
             let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
             // The circle the icons sit on leaves room outside it for each icon, its percent, and its stick.
-            let iconCircle = max(side / 2 - iconRadius - gap - percentWidth - 2, stickLength + 16)
+            let percentRoom = percentsBelowIcons ? percentHeight : percentWidth
+            let iconCircle = max(side / 2 - iconRadius - gap - percentRoom - 2, stickLength + 16)
             let radius = max(iconCircle - stickLength, 14)
             let ringWidth = max(10, radius * 0.45)
             let labels = placedLabels(center: center, iconCircle: iconCircle, ringEnd: radius)
@@ -106,12 +112,16 @@ struct CategoryDonut: View {
             if offset > Double.pi { offset -= 2 * Double.pi }
             if offset < -Double.pi { offset += 2 * Double.pi }
             let landing = arc.angle + min(max(offset, -halfArc), halfArc)
+            // Below an icon in the lower half of the donut and above one in the upper half, so the percent stays clear of its stick.
+            let percentCenter = percentsBelowIcons
+                ? CGPoint(x: icon.x, y: icon.y + (cos(angle) > 0 ? -1 : 1) * (iconRadius + gap + percentHeight / 2))
+                : point(from: icon, distance: reach, angle: angle)
             return Label(
                 slice: arc.slice, color: arc.color,
                 percent: breakdown.share(of: arc.amount).formatted(.percent.precision(.fractionLength(0))),
                 icon: icon,
                 ringEnd: point(from: center, distance: ringEnd, angle: landing),
-                percentCenter: point(from: icon, distance: reach, angle: angle)
+                percentCenter: percentCenter
             )
         }
     }
