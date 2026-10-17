@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// The Report's Category report card: each side, Spent then Income, with its total for the period and, under it, a donut of
-/// that side's parent categories at full width so the icons, sticks and percents have room. Tapping a side's header opens its
-/// details.
+/// The Report's Category report card: Spent and Income side by side, each with its total for the period and, under it, a
+/// small donut of that side's parent categories. Tapping a side's header opens its details.
 struct CategoryReportCard: View {
     let income: CategoryBreakdown
     let spent: CategoryBreakdown
@@ -11,7 +10,7 @@ struct CategoryReportCard: View {
     let onOpen: (SpentOrIncome) -> Void
 
     var body: some View {
-        VStack(spacing: 28) {
+        HStack(alignment: .top, spacing: 12) {
             side(spent)
             side(income)
         }
@@ -20,7 +19,7 @@ struct CategoryReportCard: View {
 
     /// One side: its name and total, in its color, which opens its details, over its donut.
     private func side(_ breakdown: CategoryBreakdown) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             Button {
                 onOpen(breakdown.side)
             } label: {
@@ -37,16 +36,16 @@ struct CategoryReportCard: View {
                         .monospacedDigit()
                         .foregroundStyle(breakdown.side.color)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                        .minimumScaleFactor(0.6)
                 }
                 .frame(maxWidth: .infinity)
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
 
-            CategoryDonut(breakdown: breakdown)
-                .frame(maxWidth: 300)
-                .frame(maxWidth: .infinity)
+            // A short stick keeps the donut small enough for two to sit side by side, with icons and percents clear of each other.
+            CategoryDonut(breakdown: breakdown, stickLength: 14)
         }
+        .frame(maxWidth: .infinity)
     }
 }

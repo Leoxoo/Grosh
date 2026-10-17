@@ -94,7 +94,7 @@ struct SideDetailsView: View {
         let breakdown = CategoryBreakdown(side: side, of: counted)
         Section {
             // The details show every parent category, not only the five largest the Report's donut does.
-            CategoryDonut(breakdown: breakdown, ownSliceLimit: Int.max)
+            CategoryDonut(breakdown: breakdown, ownSliceLimit: Int.max, minimumShare: 0.02)
                 .frame(maxWidth: 300)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)

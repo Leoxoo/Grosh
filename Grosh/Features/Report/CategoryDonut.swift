@@ -8,6 +8,10 @@ struct CategoryDonut: View {
     /// How many parent categories get a slice of their own before the rest share Everything else: the top five on the Report,
     /// and every parent in the details.
     var ownSliceLimit = CategoryBreakdown.ownSliceCount
+    /// The smallest share of the side a category can be and still get a slice of its own; smaller ones share Everything else.
+    var minimumShare: Double = 0
+    /// How far the icons' circle sits outside the ring's outer edge: room for the stick. A small donut takes a shorter one.
+    var stickLength: CGFloat = 38
 
     /// The icon's radius.
     private let iconRadius: CGFloat = 11
@@ -15,8 +19,6 @@ struct CategoryDonut: View {
     private let gap: CGFloat = 4
     /// The room a percent takes beside its icon, wide enough for "100%".
     private let percentWidth: CGFloat = 28
-    /// How far the icons' circle sits outside the ring's outer edge: room for the stick.
-    private let stickLength: CGFloat = 38
 
     var body: some View {
         GeometryReader { proxy in
@@ -92,7 +94,7 @@ struct CategoryDonut: View {
     /// stick runs from its icon to the middle of its slice on the ring, which ends at `ringEnd`.
     private func placedLabels(center: CGPoint, iconCircle: CGFloat, ringEnd: CGFloat) -> [Label] {
         let arcs = placedSlices
-        let angles = Self.spreadApart(arcs.map(\.angle), minimumGap: (iconRadius * 2 + 4) / iconCircle)
+        let angles = Self.spreadApart(arcs.map(\.angle), minimumGap: (iconRadius * 2 + 6) / iconCircle)
         return zip(arcs, angles).map { arc, angle in
             let icon = point(from: center, distance: iconCircle, angle: angle)
             // The percent sits outward from its icon, clear of the icon by its own half-size in that direction.
@@ -112,7 +114,7 @@ struct CategoryDonut: View {
         guard angles.count > 1 else { return angles }
         let turn = 2 * Double.pi
         var spread = angles
-        for _ in 0..<60 {
+        for _ in 0..<120 {
             for index in spread.indices {
                 let next = (index + 1) % spread.count
                 let gap = (spread[next] - spread[index]).truncatingRemainder(dividingBy: turn) + turn
@@ -168,7 +170,7 @@ struct CategoryDonut: View {
     /// Every slice with its arc, the slices largest first, clockwise from the top. A sliver's gap to its neighbours is
     /// half a degree on each side, so neighbouring slices read as separate.
     private var placedSlices: [PlacedSlice] {
-        let slices = breakdown.donutSlices(ownSliceLimit: ownSliceLimit)
+        let slices = breakdown.donutSlices(ownSliceLimit: ownSliceLimit, minimumShare: minimumShare)
         let amounts = slices.map { $0.amount.cents }
         let sum = amounts.reduce(0, +)
         guard sum > 0 else { return [] }

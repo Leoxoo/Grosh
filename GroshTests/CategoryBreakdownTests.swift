@@ -100,6 +100,18 @@ struct CategoryBreakdownTests {
         #expect(describe(all).map(\.1) == [700_00, 600_00, 500_00, 400_00, 300_00, 200_00, 100_00])
     }
 
+    /// A category under 2% of the side is folded into Everything else in the details, along with the rest; one at exactly
+    /// 2% keeps its own slice.
+    @Test func aCategoryUnderTwoPercentJoinsEverythingElse() throws {
+        try store.record(-970_00, "Food & Beverage", on: day(2026, 10, 1))
+        try store.record(-20_00, "Products", on: day(2026, 10, 1))
+        try store.record(-10_00, "Health & Fitness", on: day(2026, 10, 1))
+
+        let all = try breakdown(.spent).donutSlices(ownSliceLimit: Int.max, minimumShare: 0.02)
+        #expect(describe(all).map(\.0) == ["Food & Beverage", "Products", "Everything else"])
+        #expect(describe(all).map(\.1) == [970_00, 20_00, 10_00])
+    }
+
     @Test func fiveOrFewerParentsGetNoEverythingElse() throws {
         try store.record(-400_00, "Food & Beverage", on: day(2026, 10, 1))
         try store.record(-300_00, "Products", on: day(2026, 10, 1))

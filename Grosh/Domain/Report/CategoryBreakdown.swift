@@ -64,13 +64,17 @@ struct CategoryBreakdown {
         self.shareBase = aboveZero.reduce(0) { $0 + $1.total.cents }
     }
 
-    /// The donut's slices with `ownSliceLimit` parent categories each getting a slice of their own, largest first. The rest
-    /// of the categories above zero share one Everything else slice. Only categories above zero get a slice.
-    func donutSlices(ownSliceLimit: Int) -> [Slice] {
-        var slices = aboveZero.prefix(ownSliceLimit).map(Slice.category)
-        let smaller = aboveZero.dropFirst(ownSliceLimit)
-        if !smaller.isEmpty {
-            slices.append(.everythingElse(Money(cents: smaller.reduce(0) { $0 + $1.total.cents })))
+    /// The donut's slices, largest first. Up to `ownSliceLimit` categories above zero, each at least `minimumShare` of the
+    /// categories above zero, get a slice of their own. Every other category above zero, the ones too small to be shown on
+    /// their own and those past the limit, shares one Everything else slice.
+    func donutSlices(ownSliceLimit: Int, minimumShare: Double = 0) -> [Slice] {
+        let large = aboveZero.filter { share(of: $0.total) >= minimumShare }
+        let own = Array(large.prefix(ownSliceLimit))
+        let ownCategories = Set(own.map(\.category))
+        let rest = aboveZero.filter { !ownCategories.contains($0.category) }
+        var slices = own.map(Slice.category)
+        if !rest.isEmpty {
+            slices.append(.everythingElse(Money(cents: rest.reduce(0) { $0 + $1.total.cents })))
         }
         return slices
     }
