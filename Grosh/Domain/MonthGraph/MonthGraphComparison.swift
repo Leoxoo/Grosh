@@ -26,11 +26,14 @@ enum MonthGraphComparison {
         }
     }
 
-    /// The comparison of `side` through the end of each day of `period`, the first day first, from `counted`, everything
-    /// that counts on the Month graph; or `nil` when no period counts toward it.
-    func dailyTotals(_ side: SpentOrIncome, of counted: [CountedAmount], for period: Period) -> [DailyTotal]? {
+    /// The comparison of `side` through the end of each day of `period`, the first day first, from `counted`, which holds
+    /// at least what counts in the periods it compares with; or `nil` when no period counts toward it. `firstDay` is the
+    /// first day anything counts on the Month graph, on either tab, or `nil` when nothing does.
+    func dailyTotals(
+        _ side: SpentOrIncome, of counted: [CountedAmount], countingFrom firstDay: CalendarDay?, for period: Period
+    ) -> [DailyTotal]? {
         guard let span = GraphSpan(period) else { return nil }
-        let spans = earlierSpans(side, of: counted, for: period)
+        let spans = earlierSpans(side, of: counted, countingFrom: firstDay, for: period)
         guard !spans.isEmpty else { return nil }
         let spansCents = spans.map { earlier in
             counted.dailyTotals(side, in: earlier, through: earlier.last).map { $0.total.cents }
@@ -44,10 +47,12 @@ enum MonthGraphComparison {
     }
 
     /// The earlier periods whose mean the comparison of `side` is for `period`, from `counted`.
-    private func earlierSpans(_ side: SpentOrIncome, of counted: [CountedAmount], for period: Period) -> [GraphSpan] {
+    private func earlierSpans(
+        _ side: SpentOrIncome, of counted: [CountedAmount], countingFrom firstDay: CalendarDay?, for period: Period
+    ) -> [GraphSpan] {
         switch self {
         case .average:
-            guard let firstDay = counted.firstDay, let timeRange = period.timeRange,
+            guard let firstDay, let timeRange = period.timeRange,
                   let firstCountedStart = GraphSpan(timeRange.period(containing: firstDay))?.first
             else { return [] }
             var spans: [GraphSpan] = []

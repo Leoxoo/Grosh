@@ -4,7 +4,7 @@ import SwiftUI
 /// Search across all time and every wallet, archived ones included: note text, category name or amount, narrowed
 /// by the filters. Each result opens its detail. Use inside a `NavigationStack`.
 struct TransactionSearchView: View {
-    @Query(Transaction.notDeleted) private var transactions: [Transaction]
+    @NotDeletedTransactions private var transactions: [Transaction]
     @State private var filter = TransactionFilter()
     @State private var isSearchPresented = true
 

@@ -53,10 +53,12 @@ struct SideDetailsView: View {
             }
 
             if timeRange.hasComparisonCard {
+                let countedEver = transactions.compactMap { $0.countedAmount(in: walletSelection) }
                 PeriodComparisonCard(
                     graph: MonthGraph(
-                        side, of: transactions, recurring: recurringTransactions, in: period, today: today,
-                        comparingWith: comparesWithLastYear ? .lastYear : .average, selection: walletSelection
+                        side, of: countedEver, countingFrom: countedEver.firstDay, recurring: recurringTransactions,
+                        in: period, today: today, comparingWith: comparesWithLastYear ? .lastYear : .average,
+                        selection: walletSelection
                     ),
                     comparesWithLastYear: $comparesWithLastYear
                 )

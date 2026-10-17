@@ -18,11 +18,20 @@ nonisolated enum CroppedPhoto {
         return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }
 
-    /// The image a stored crop holds, or `nil` if the data isn't an image.
+    /// The image a stored crop holds, or `nil` if the data isn't an image. The same data gives back the same image, so
+    /// a list showing one Card image or Subscription icon on many rows decodes it once rather than for every row.
     static func image(from data: Data) -> CGImage? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
-        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+        let key = data as NSData
+        if let image = decoded.object(forKey: key) { return image }
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary)
+        else { return nil }
+        decoded.setObject(image, forKey: key)
+        return image
     }
+
+    /// The images of the crops decoded lately, by their data. The system empties it when memory runs low.
+    private nonisolated(unsafe) static let decoded = NSCache<NSData, CGImage>()
 
     /// The image a stored crop holds, shrunk to `height` points tall on a screen of `scale` pixels per point, its width
     /// keeping the image's proportions. Drawn at its own size it is exactly that tall and sharp, so no layout needs to

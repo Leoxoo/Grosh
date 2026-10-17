@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 import Testing
 @testable import Grosh
@@ -91,5 +92,33 @@ struct WalletBalanceTests {
 
     @Test func totalOfNoWalletsIsZero() {
         #expect(Wallet.total(of: [], asOf: today) == Money(cents: 0))
+    }
+
+    /// Home and the Wallet selector add every balance up in one pass over the shared ledger entries.
+    @Test func balancesAddedUpAtOnceMatchEachWalletsOwn() throws {
+        let checking = wallet("Checking")
+        let cash = wallet("Cash")
+        let brokerage = wallet("Brokerage")
+        brokerage.includeInTotal = false
+        let empty = wallet("Empty")
+        record(100_00, on: CalendarDay(year: 2026, month: 9, day: 1), in: checking)
+        record(-12_76, on: today, in: checking)
+        record(-20_00, on: CalendarDay(year: 2026, month: 10, day: 10), in: checking)
+        record(25_50, on: today, in: cash)
+        record(5_000_00, on: today, in: brokerage)
+        let deleted = Transaction(amount: Money(cents: -9_00), day: today, wallet: nil, category: nil)
+        context.insert(deleted)
+        deleted.wallet = cash
+        deleted.deletedAt = .now
+        try context.save()
+
+        let balances = WalletBalances(NotDeletedTransactions.Store.of(context).entries, asOf: today)
+
+        for wallet in [checking, cash, brokerage, empty] {
+            #expect(balances.balance(of: wallet) == wallet.balance(asOf: today))
+        }
+        let wallets = [checking, cash, brokerage, empty]
+        #expect(balances.total(of: wallets) == Wallet.total(of: wallets, asOf: today))
+        #expect(balances.total(of: wallets) == Money(cents: 112_74))
     }
 }

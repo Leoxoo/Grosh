@@ -15,12 +15,12 @@ struct PeriodSummary: Equatable {
 extension PeriodSummary {
     /// The summary of `period` for a set of transactions, such as every transaction of the selected wallet.
     /// `transactions` must reach back before the period, since the Opening balance is built from them.
-    init(of transactions: [Transaction], in period: Period, today: CalendarDay) {
+    init(of transactions: some Sequence<some DatedAmount>, in period: Period, today: CalendarDay) {
         let days = period.days(today: today)
         var opening = 0
         var ending = 0
         for transaction in transactions {
-            let day = transaction.day
+            let day = CalendarDay(rawValue: transaction.dayRaw)
             if let first = days.first, day < first {
                 opening += transaction.amountCents
             }

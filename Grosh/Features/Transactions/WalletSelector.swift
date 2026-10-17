@@ -8,6 +8,7 @@ struct WalletSelector: View {
     let today: CalendarDay
 
     @Query(Wallet.unarchived) private var wallets: [Wallet]
+    @NotDeletedTransactions private var transactions: [Transaction]
     @State private var isChoosing = false
 
     var body: some View {
@@ -31,7 +32,7 @@ struct WalletSelector: View {
                 SelectWalletSheet(selection: $selection, today: today)
             }
 
-            Text(selection.balance(asOf: today, wallets: wallets).formatted())
+            Text(WalletBalances($transactions, asOf: today).balance(of: selection, wallets: wallets).formatted())
                 .font(.title2.bold())
                 .monospacedDigit()
                 .contentTransition(.numericText())
