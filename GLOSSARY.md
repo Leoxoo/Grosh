@@ -189,36 +189,36 @@ _Avoid_: Report this month
 Money going out in a period: its Expense-category transactions that count in the report, less refunds, plus what was forgiven on Loans. Its counterpart, **Income**, adds up Income-category transactions and what was forgiven on Debts. The Month graph counts the wallets in the Total; the Report counts the Wallet selector's choice.
 _Avoid_: Expenses, Expense (that is a Category type)
 
-**Net income**:
-Income less Spent over a period.
-_Avoid_: Profit, savings, difference (that is the change in balance, which counts every transaction)
-
 **Report**:
-The screen, opened from Home's Month graph, that sums up a period for the Wallet selector's choice: its Opening and Ending balances, its Net income, and its Category report. It only looks back: none of its periods reaches past today.
-_Avoid_: Statistics, analytics
+The full-screen summary opened from Home's Month graph: for the Wallet selector's choice and a period, its opening and ending balances, its Net income and its Category report. Its period never reaches past today.
+
+**Net income**:
+Income less Spent for a period: what came in less what went out, not counting transfers, Starting balances, Loan and Debt payments, or anything excluded from report.
 
 **Category report**:
-The Report's card showing a period's Income and Spent as two donuts, one slice per parent category with its subcategories folded in.
+The Report's card splitting Income and Spent into their parent categories, as donuts: the five largest each get a slice, and the rest share one Everything else slice.
 
-**Breakdown**:
-The part of an Income or Spent detail that splits a period's total by parent category: a donut of the five largest, the rest as one **Everything else** slice, and a list of every parent category with its amount and share.
-_Avoid_: Others (too close to the Other Income and Other Expense categories)
+**Breakdown** / **Trend**:
+The two views of Income or Spent details: Breakdown lists the parent categories with their shares, and Trend bars each Step of the period.
 
-**Trend**:
-The part of an Income or Spent detail, and the whole of the Net income detail, that splits a period into Steps and shows the total of each.
+**Everything else**:
+The one slice of a Category report donut that holds every parent category beyond the five largest.
 
 **Step**:
-How long each bar of a Trend covers. One size smaller than the time range (a week's days, a month's weeks, a quarter's or a year's months); for all time and a custom range it follows the length: days up to a month, weeks up to three months, months up to a year, quarters up to three years, then years.
-_Avoid_: Bucket, interval, period (that is the whole span shown)
+One bar or row of Net income and Trend: a day, week, month, quarter or year of the period, cut at the period's edges and at today. A Day or Week range splits into days, a Month into weeks, a Quarter or Year into months, and All time or a custom range by its length.
 
 **Average**:
-The gray line a running total is compared with unless Last year is on: the mean of the running totals of up to three complete periods of the same length before the one shown (months on Home; weeks, months, quarters or years in the Report). Periods before the one holding the first transaction that counts are left out; a later one with nothing that counts is zero.
+The gray line a Month graph tab compares its period with unless Last year is on: the mean of the running totals of up to three complete periods of the same length before the period shown. On Home the period is a month; on the Income and Spent details' comparison card it is a week, month, quarter or year. Periods before the one holding the first transaction that counts are left out; a later one with nothing that counts is zero.
 
 **Last year**:
 The gray line a Month graph tab shows in place of the Average while its "vs last year" switch is on: the same month 12 months before the month shown. It is there only when that month holds something that counts for the tab; otherwise the switch is greyed out and the tab shows the Average, keeping the switch as it was. One switch serves both tabs, remembered between launches.
 
+**Daily average**:
+A period's total divided by the days it covers: through today in the current period, every day of a past one. Income and Spent details show it, except on the Day range.
+
 **Expected by month end**:
-Today's total on a Month graph tab plus what the Recurring transactions still have due through the month's last day: what the month ends at if nothing unscheduled is spent or earned. The graph's projection is not a Scheduled row: it takes every Occurrence left in the month, and changes no balance, report or transaction.
+On the Income and Spent details the same line reads "Expected by week end", "quarter end" or "year end".
+Today's total on a Month graph tab plus what the Recurring transactions still have due through the period's last day: what the month ends at if nothing unscheduled is spent or earned. The graph's projection is not a Scheduled row: it takes every Occurrence left in the month, and changes no balance, report or transaction.
 
 ### Feedback
 

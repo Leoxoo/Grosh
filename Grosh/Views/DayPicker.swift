@@ -7,10 +7,16 @@ struct DayPicker: View {
     @Binding var day: CalendarDay
     /// When set, the first day that can be picked.
     var earliest: CalendarDay?
+    /// When set, the last day that can be picked.
+    var latest: CalendarDay?
 
     var body: some View {
-        if let earliest {
-            DatePicker(title, selection: $day.date, in: earliest.date()..., displayedComponents: .date)
+        if earliest != nil || latest != nil {
+            DatePicker(
+                title, selection: $day.date,
+                in: (earliest?.date() ?? .distantPast)...(latest?.date() ?? .distantFuture),
+                displayedComponents: .date
+            )
         } else {
             DatePicker(title, selection: $day.date, displayedComponents: .date)
         }

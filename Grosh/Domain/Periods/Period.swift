@@ -103,7 +103,7 @@ extension CalendarDay {
     }
 }
 
-private extension CalendarDay {
+extension CalendarDay {
     /// The day as the strip writes it: two-digit day and month in `locale`'s order and with its separators, then the
     /// year unless `withYear` is false. `10/06/2026` in the US, `06/10/2026` in the UK.
     nonisolated func numericTitle(_ locale: Locale, withYear: Bool = true) -> String {

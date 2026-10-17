@@ -19,3 +19,12 @@ extension CalendarDay {
         return CalendarDay(moved, in: calendar)
     }
 }
+
+extension CalendarDay {
+    /// The day `months` months after this one, on the same day of the month, or the last day of a shorter month.
+    nonisolated func adding(months: Int) -> CalendarDay {
+        let calendar = Calendar.utcGregorian
+        let later = calendar.date(byAdding: .month, value: months, to: date(in: calendar)) ?? date(in: calendar)
+        return CalendarDay(later, in: calendar)
+    }
+}
