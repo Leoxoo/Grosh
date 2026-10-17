@@ -114,6 +114,16 @@ struct CategoryBreakdownTests {
         #expect(spent.categories.map(\.total.cents) == [250_00])
     }
 
+    /// A Debt forgiven counts as income under the category its forgiven amount is filed under, Other Income.
+    @Test func aForgivenDebtCountsAsIncomeUnderOtherIncome() throws {
+        let debt = try store.lendOrBorrow(.debt, 80_00, on: day(2026, 9, 25))
+        try store.forgive(debt, on: day(2026, 10, 7))
+
+        let income = try breakdown(.income)
+        #expect(income.categories.map(\.category.name) == ["Other Income"])
+        #expect(income.categories.map(\.total.cents) == [80_00])
+    }
+
     // MARK: Shares
 
     /// Percents are of what the categories above zero add up to, so the Breakdown's percents total 100%.

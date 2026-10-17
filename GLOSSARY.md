@@ -208,13 +208,17 @@ The one slice of a Category report donut that holds every parent category beyond
 One bar or row of Net income and Trend: a day, week, month, quarter or year of the period, cut at the period's edges and at today. A Day or Week range splits into days, a Month into weeks, a Quarter or Year into months, and All time or a custom range by its length.
 
 **Average**:
-The gray line a Month graph tab compares its month with unless Last year is on: the mean of the running totals of up to three complete months before the month shown. Months before the month of the first transaction that counts are left out; a later month with nothing that counts is zero.
+The gray line a Month graph tab compares its period with unless Last year is on: the mean of the running totals of up to three complete periods of the same length before the period shown. On Home the period is a month; on the Income and Spent details' comparison card it is a week, month, quarter or year. Periods before the one holding the first transaction that counts are left out; a later one with nothing that counts is zero.
 
 **Last year**:
 The gray line a Month graph tab shows in place of the Average while its "vs last year" switch is on: the same month 12 months before the month shown. It is there only when that month holds something that counts for the tab; otherwise the switch is greyed out and the tab shows the Average, keeping the switch as it was. One switch serves both tabs, remembered between launches.
 
+**Daily average**:
+A period's total divided by the days it covers: through today in the current period, every day of a past one. Income and Spent details show it, except on the Day range.
+
 **Expected by month end**:
-Today's total on a Month graph tab plus what the Recurring transactions still have due through the month's last day: what the month ends at if nothing unscheduled is spent or earned. The graph's projection is not a Scheduled row: it takes every Occurrence left in the month, and changes no balance, report or transaction.
+On the Income and Spent details the same line reads "Expected by week end", "quarter end" or "year end".
+Today's total on a Month graph tab plus what the Recurring transactions still have due through the period's last day: what the month ends at if nothing unscheduled is spent or earned. The graph's projection is not a Scheduled row: it takes every Occurrence left in the month, and changes no balance, report or transaction.
 
 ### Feedback
 

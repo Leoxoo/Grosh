@@ -1,16 +1,5 @@
 import SwiftUI
 
-extension TimeRange {
-    /// Whether an Income or Spent details screen shows the comparison card: only for a week, month, quarter or year. A
-    /// day, All time and a custom range have no period to compare with.
-    var hasComparisonCard: Bool {
-        switch self {
-        case .week, .month, .quarter, .year: true
-        case .day, .all, .custom: false
-        }
-    }
-}
-
 /// The comparison card of Income and Spent details, between the totals and the Breakdown | Trend control. Collapsed, it shows
 /// the Average's running total at the same point in the period (today for the current period, the end of a past one) with a
 /// Show button. Shown, it draws the side's running total for the Wallet selector's choice against the gray Average, with

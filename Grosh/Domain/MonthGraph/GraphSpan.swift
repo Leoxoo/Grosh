@@ -45,9 +45,7 @@ struct GraphSpan: Equatable {
 
     /// Which day of the span `day` is, 1 for the first, or `0` when it falls before the span.
     func number(of day: CalendarDay) -> Int {
-        let calendar = Calendar.utcGregorian
-        let between = calendar.dateComponents([.day], from: first.date(in: calendar), to: day.date(in: calendar)).day ?? 0
-        return between + 1
+        DayRange(first: first, last: day).dayCount ?? 0
     }
 
     func contains(_ day: CalendarDay) -> Bool {
@@ -66,6 +64,17 @@ extension Period {
         case .quarter: .quarter
         case .year: .year
         case .all, .custom, .future: nil
+        }
+    }
+}
+
+extension TimeRange {
+    /// Whether an Income or Spent details screen shows the comparison card: only for a week, month, quarter or year. A
+    /// day, All time and a custom range have no period to compare with.
+    var hasComparisonCard: Bool {
+        switch self {
+        case .week, .month, .quarter, .year: true
+        case .day, .all, .custom: false
         }
     }
 }

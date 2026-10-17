@@ -14,7 +14,7 @@ struct CategoryTransactions {
         for transaction in transactions {
             guard let counted = transaction.countedAmount(in: selection),
                   counted.side == side,
-                  (counted.category.parent ?? counted.category) == parent,
+                  counted.category.parentOrSelf == parent,
                   days.contains(counted.day) else { continue }
             listed.append(transaction)
             cents += counted.amount.cents

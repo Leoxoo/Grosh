@@ -96,8 +96,8 @@ struct StepTests {
         #expect(steps.allSatisfy { $0.unit == .year })
     }
 
-    /// The length rule: days for up to 31 days, weeks for under 3 months, months for under 12, quarters for under 3 years,
-    /// and years beyond. A span is under a length when it ends before that length from its first day.
+    /// The length rule: days for up to 31 days, weeks for under 3 months, months for up to 12 months, quarters for up to 3
+    /// years, and years beyond that.
     @Test func theLengthRuleChangesAtEachLimit() {
         #expect(Step.unit(for: DayRange(first: day(2026, 10, 1), last: day(2026, 10, 31))) == .day)
         #expect(Step.unit(for: DayRange(first: day(2026, 10, 1), last: day(2026, 11, 1))) == .week)
@@ -105,9 +105,10 @@ struct StepTests {
         #expect(Step.unit(for: DayRange(first: day(2026, 1, 1), last: day(2026, 3, 31))) == .month)
         #expect(Step.unit(for: DayRange(first: day(2026, 7, 1), last: day(2026, 9, 30))) == .month)
         #expect(Step.unit(for: DayRange(first: day(2026, 1, 1), last: day(2026, 12, 30))) == .month)
-        #expect(Step.unit(for: DayRange(first: day(2026, 1, 1), last: day(2026, 12, 31))) == .quarter)
-        #expect(Step.unit(for: DayRange(first: day(2026, 1, 1), last: day(2028, 12, 30))) == .quarter)
-        #expect(Step.unit(for: DayRange(first: day(2026, 1, 1), last: day(2028, 12, 31))) == .year)
+        #expect(Step.unit(for: DayRange(first: day(2026, 1, 1), last: day(2026, 12, 31))) == .month)
+        #expect(Step.unit(for: DayRange(first: day(2026, 1, 1), last: day(2027, 1, 1))) == .quarter)
+        #expect(Step.unit(for: DayRange(first: day(2026, 1, 1), last: day(2028, 12, 31))) == .quarter)
+        #expect(Step.unit(for: DayRange(first: day(2026, 1, 1), last: day(2029, 1, 1))) == .year)
     }
 
     // MARK: Coverage

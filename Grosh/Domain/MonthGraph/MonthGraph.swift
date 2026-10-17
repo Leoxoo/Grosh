@@ -1,3 +1,5 @@
+import Foundation
+
 /// One tab of the Month graph, Spent or Income, for a period as it stands on a day: everything the tab draws and says,
 /// worked out here so the tab only draws it.
 ///
@@ -129,12 +131,12 @@ struct MonthGraph {
     /// How the period's end is named in the legend and the popup: "month end", "week end" and so on.
     var endName: String {
         switch period {
-        case .day: "day end"
-        case .week: "week end"
-        case .month: "month end"
-        case .quarter: "quarter end"
-        case .year: "year end"
-        case .all, .custom, .future: "end"
+        case .day: String(localized: "day end")
+        case .week: String(localized: "week end")
+        case .month: String(localized: "month end")
+        case .quarter: String(localized: "quarter end")
+        case .year: String(localized: "year end")
+        case .all, .custom, .future: String(localized: "end")
         }
     }
 

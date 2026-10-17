@@ -1,3 +1,8 @@
+extension Category {
+    /// The parent category this one rolls up into, or the category itself when it is a parent.
+    var parentOrSelf: Category { parent ?? self }
+}
+
 /// One parent category's total for a side of the Report: what counts toward the side under the category, its
 /// subcategories included.
 struct CategoryTotal {
@@ -41,7 +46,7 @@ struct CategoryBreakdown {
     init(side: SpentOrIncome, of counted: [CountedAmount]) {
         var centsByParent: [Category: Int] = [:]
         for amount in counted where amount.side == side {
-            let parent = amount.category.parent ?? amount.category
+            let parent = amount.category.parentOrSelf
             centsByParent[parent, default: 0] += amount.amount.cents
         }
         let categories = centsByParent

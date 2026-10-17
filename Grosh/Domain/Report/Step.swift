@@ -65,15 +65,15 @@ extension Step {
     }
 
     /// The unit a span of All time or a custom range is split by, by its length: days for up to 31 days, weeks for under 3
-    /// months, months for under 12, quarters for under 3 years, and years beyond that. A span is under a length when the
-    /// day after its last falls before that length from its first day, so a span of exactly 3 months splits into months.
+    /// months, months for up to 12 months, quarters for up to 3 years, and years beyond that. The 3-month limit is exclusive,
+    /// so a span of exactly 3 months splits into its months, as Q3/2025 does on the Trend.
     static func unit(for span: DayRange) -> Unit {
         guard let first = span.first, let last = span.last else { return .year }
-        if dayCount(from: first, through: last) <= 31 { return .day }
+        if (DayRange(first: first, last: last).dayCount ?? 0) <= 31 { return .day }
         let end = last.adding(days: 1)
         if end < first.adding(months: 3) { return .week }
-        if end < first.adding(months: 12) { return .month }
-        if end < first.adding(months: 36) { return .quarter }
+        if end <= first.adding(months: 12) { return .month }
+        if end <= first.adding(months: 36) { return .quarter }
         return .year
     }
 
@@ -104,20 +104,5 @@ extension Step {
         case .year:
             CalendarDay(year: day.year, month: 12, day: 31)
         }
-    }
-
-    private static func dayCount(from first: CalendarDay, through last: CalendarDay) -> Int {
-        let calendar = Calendar.utcGregorian
-        let between = calendar.dateComponents([.day], from: first.date(in: calendar), to: last.date(in: calendar)).day ?? 0
-        return between + 1
-    }
-}
-
-private extension CalendarDay {
-    /// The day `months` months after this one, on the same day of the month, or the last day of a shorter month.
-    func adding(months: Int) -> CalendarDay {
-        let calendar = Calendar.utcGregorian
-        let later = calendar.date(byAdding: .month, value: months, to: date(in: calendar)) ?? date(in: calendar)
-        return CalendarDay(later, in: calendar)
     }
 }
