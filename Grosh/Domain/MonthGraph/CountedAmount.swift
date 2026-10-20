@@ -46,14 +46,23 @@ extension Transaction {
     /// category, as long as it counts in the report. An Expense reimbursed in full counts nothing, and one reimbursed
     /// beyond its amount counts the extra as Income under `otherIncome`, on the Expense's own day. A report reads Other
     /// Income from the store once, with `otherCategory(.income)`, and hands it to every transaction.
+    ///
+    /// Money paid back into another wallet (ADR-0010) counts where it happened: in the Total the Expense counts its net
+    /// less those paybacks (``Transaction/totalViewNetCents``) and the payback itself counts nothing
+    /// (``Transaction/isHiddenInTotal``), while a single wallet's report counts the Expense net of what came into that
+    /// wallet and a payback into it as money in, under the Reimbursement category.
     func countedAmount(in selection: WalletSelection = .total, otherIncome: Category) -> CountedAmount? {
         guard selection.includes(self), !isInRecentlyDeleted else { return nil }
         if let forgiveness {
             return CountedAmount(forgiveness.reportAmount, filedUnder: forgiveness.category, on: forgiveness.day)
         }
         guard countsInReport else { return nil }
-        if category?.type == .expense, amountCents < 0, netCents >= 0 {
-            guard netCents > 0 else { return nil }
+        let inTotal = selection == .total
+        if inTotal, isHiddenInTotal { return nil }
+        let cents = inTotal ? totalViewNetCents : netCents
+        let net = Money(cents: cents, currencyCode: amount.currencyCode)
+        if category?.type == .expense, amountCents < 0, cents >= 0 {
+            guard cents > 0 else { return nil }
             return CountedAmount(net, filedUnder: otherIncome, on: day)
         }
         return CountedAmount(net, filedUnder: category, on: day)

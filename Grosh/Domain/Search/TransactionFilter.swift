@@ -119,21 +119,36 @@ struct TransactionFilter: Equatable {
     /// archived ones included; otherwise the list holds the matching ones among ``transactions(in:from:)`` on `days`
     /// (the selected period).
     func listed(from all: [Transaction], selection: WalletSelection, on days: DayRange) -> [Transaction] {
-        listed(from: all, selected: transactions(in: selection, from: all.map(LedgerEntry.init)), on: days)
+        listed(
+            from: all, selected: transactions(in: selection, from: all.map(LedgerEntry.init)), on: days,
+            hidingPaybacksIn: self.selection(replacing: selection)
+        )
     }
 
     /// ``listed(from:selection:on:)`` with the selection's transactions at hand already: `selected`, as
-    /// ``transactions(in:from:)`` picks them from the ledger entries of `all`.
-    func listed(from all: [Transaction], selected: [LedgerEntry], on days: DayRange) -> [Transaction] {
+    /// ``transactions(in:from:)`` picks them from the ledger entries of `all`. In the Total (`hidingPaybacksIn`) the
+    /// money paid back into another wallet is left out, as its Expense shows it in its net (ADR-0010); searching still
+    /// finds it.
+    func listed(
+        from all: [Transaction], selected: [LedgerEntry], on days: DayRange,
+        hidingPaybacksIn selection: WalletSelection? = nil
+    ) -> [Transaction] {
         if isSearching { return all.matching(self) }
-        return selected.filter { days.contains(CalendarDay(rawValue: $0.dayRaw)) }.map(\.transaction).matching(self)
+        let inDays = selected.filter { days.contains(CalendarDay(rawValue: $0.dayRaw)) }.map(\.transaction)
+        let shown = selection == WalletSelection.total ? inDays.filter { !$0.isHiddenInTotal } : inDays
+        return shown.matching(self)
+    }
+
+    /// What the list shows: the wallet filter's wallet when one is set, otherwise `selection`.
+    func selection(replacing selection: WalletSelection) -> WalletSelection {
+        wallet.map(WalletSelection.wallet) ?? selection
     }
 
     /// The transactions the Transactions tab steps through period by period, before the period and the other filters
     /// narrow them: the wallet filter's wallet when one is set (any wallet, archived or left out of the Total, in
     /// place of `selection`), otherwise `selection`'s. The period strip reaches back to the first of them.
     func transactions<Entry: DatedAmount>(in selection: WalletSelection, from all: [Entry]) -> [Entry] {
-        let selection = wallet.map(WalletSelection.wallet) ?? selection
+        let selection = self.selection(replacing: selection)
         // A wallet is asked once whether it belongs, rather than once for each of its transactions.
         var includesWallet: [ObjectIdentifier?: Bool] = [:]
         return all.filter { transaction in

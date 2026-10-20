@@ -16,7 +16,7 @@ nonisolated struct EstimateReminder: PendingReminder {
 }
 
 /// Every Estimated transaction, which the Home bell and the reminders track until their real amounts are entered.
-struct EstimatedAmounts: ReminderSource {
+struct EstimatedAmounts: TransactionReminderSource {
     /// The Estimated transactions, in no particular order.
     let open: [Transaction]
 

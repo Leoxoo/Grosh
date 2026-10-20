@@ -1,17 +1,22 @@
 import Foundation
 import SwiftData
 
-/// A notification on a reminder day: what the Loan and Debt reminders and the Estimated-amount reminders have in common.
+/// A notification on a reminder day: what the Loan and Debt reminders, the Estimated-amount reminders and the Owes me
+/// reminders have in common.
 nonisolated protocol PendingReminder: Hashable, Sendable {
     /// Marks the pending notifications of this sort, so replacing them leaves any other alone.
     static var identifierPrefix: String { get }
-    /// The transaction it reminds of.
+    /// The category the notification is posted in, which is what a notification action hangs off, or `nil` for none.
+    static var categoryIdentifier: String? { get }
+    /// The record it reminds of: a transaction, or an Expected reimbursement.
     var original: PersistentIdentifier { get }
     var day: CalendarDay { get }
     /// When the notification arrives.
     var arrival: ReminderArrival { get set }
     var title: String { get }
     var body: String { get }
+    /// What an action on the notification needs to know, kept in the notification itself.
+    var userInfo: [String: String] { get }
 }
 
 extension PendingReminder {
@@ -19,6 +24,10 @@ extension PendingReminder {
     func isSameReminder(as other: Self) -> Bool {
         original == other.original && day == other.day
     }
+
+    nonisolated static var categoryIdentifier: String? { nil }
+
+    nonisolated var userInfo: [String: String] { [:] }
 }
 
 /// A notification on the reminder day of an open Loan or Debt, saying who it is with and what is outstanding.
@@ -56,18 +65,21 @@ protocol ReminderScheduler {
     func replacePending<Reminder: PendingReminder>(_ reminders: [Reminder]) async
 }
 
-/// What the Home bell and the notifications remind of, made from the transactions it is fetched from.
+/// What the Home bell and the notifications remind of.
 protocol ReminderSource {
     associatedtype Reminder: PendingReminder
 
+    /// The notifications that should be pending: one for each reminder day `today` or later, the soonest first.
+    func reminders(from today: CalendarDay) -> [Reminder]
+}
+
+/// A ``ReminderSource`` made from the transactions it is fetched from.
+protocol TransactionReminderSource: ReminderSource {
     /// Every transaction it is made from. A source made from them stays current, since a change to one changes what
     /// this fetches.
     static var transactions: FetchDescriptor<Transaction> { get }
 
     init(_ transactions: [Transaction])
-
-    /// The notifications that should be pending: one for each reminder day `today` or later, the soonest first.
-    func reminders(from today: CalendarDay) -> [Reminder]
 }
 
 extension ReminderSource {
@@ -101,7 +113,7 @@ extension ReminderSource {
     }
 }
 
-extension DebtsAndLoans: ReminderSource {
+extension DebtsAndLoans: TransactionReminderSource {
     /// The open Loans and Debts whose reminder day is `today` or earlier, the earliest first: what the Home bell
     /// lists. A settled one is never due.
     func due(on today: CalendarDay) -> [LoanOrDebt] {

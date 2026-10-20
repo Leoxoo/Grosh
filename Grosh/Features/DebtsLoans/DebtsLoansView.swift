@@ -2,17 +2,35 @@ import SwiftData
 import SwiftUI
 
 /// Account → Debts & Loans: the open Loans and Debts (who with, what is outstanding, the due date) and the settled
-/// ones. Each opens its transaction detail, where payments are recorded.
+/// ones. Each opens its transaction detail, where payments are recorded. Owes me has its own sections: the Expected
+/// reimbursements still open, headed by what is outstanding and "+1 open" for those with no amount, and the settled ones.
+/// Each opens its own detail.
 struct DebtsLoansView: View {
     @Query(DebtsAndLoans.transactions) private var transactions: [Transaction]
+    @Query(ExpectedReimbursements.all) private var expectations: [ExpectedReimbursement]
 
     var body: some View {
         let list = DebtsAndLoans(transactions)
+        let owesMe = ExpectedReimbursements(expectations)
         List {
             if !list.open.isEmpty {
                 Section("Open") {
                     ForEach(list.open) { loanOrDebt in
                         LoanOrDebtLink(loanOrDebt: loanOrDebt)
+                    }
+                }
+            }
+            if !owesMe.open.isEmpty {
+                Section {
+                    ForEach(owesMe.open) { expectation in
+                        ExpectedReimbursementLink(expectation: expectation)
+                    }
+                } header: {
+                    HStack {
+                        Text("Owes Me")
+                        Spacer()
+                        Text(owesMe.totals.summary)
+                            .monospacedDigit()
                     }
                 }
             }
@@ -23,17 +41,37 @@ struct DebtsLoansView: View {
                     }
                 }
             }
+            if !owesMe.settled.isEmpty {
+                Section("Owes Me · Settled") {
+                    ForEach(owesMe.settled) { expectation in
+                        ExpectedReimbursementLink(expectation: expectation)
+                    }
+                }
+            }
         }
         .overlay {
-            if list.open.isEmpty && list.settled.isEmpty {
+            if list.open.isEmpty && list.settled.isEmpty && owesMe.open.isEmpty && owesMe.settled.isEmpty {
                 ContentUnavailableView(
                     "No Debts or Loans",
                     systemImage: "person.2",
-                    description: Text("Add a Loan or a Debt on the Debt/Loan tab of Add Transaction.")
+                    description: Text("Add a Loan or a Debt on the Debt/Loan tab of Add Transaction, or + Owes me on an expense's With.")
                 )
             }
         }
         .navigationTitle("Debts & Loans")
+    }
+}
+
+/// An Expected reimbursement that opens its detail.
+private struct ExpectedReimbursementLink: View {
+    let expectation: ExpectedReimbursement
+
+    var body: some View {
+        NavigationLink {
+            ExpectedReimbursementDetailView(expectation: expectation)
+        } label: {
+            ExpectedReimbursementRow(expectation: expectation, today: .today)
+        }
     }
 }
 

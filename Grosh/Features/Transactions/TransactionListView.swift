@@ -29,6 +29,12 @@ struct TransactionListView: View {
 
     private var today: CalendarDay { .today }
 
+    /// Which amount the rows and totals show: in the Total with no wallet filter, an Expense's net less what was paid back
+    /// into other wallets there (ADR-0010); in a wallet, its own net.
+    private var listed: ListedAmount {
+        filter.selection(replacing: walletSelection) == .total ? .netInTotal : .net
+    }
+
     /// The selected wallet's transactions, or the wallet filter's when one is set, as ledger entries.
     private var selected: [LedgerEntry] {
         filter.transactions(in: walletSelection, from: $transactions)
@@ -49,7 +55,10 @@ struct TransactionListView: View {
         let selected = selected
         let periods = strip(for: selected)
         let shownDays = period.days(today: today)
-        let shown = filter.listed(from: transactions, selected: selected, on: shownDays)
+        let shown = filter.listed(
+            from: transactions, selected: selected, on: shownDays,
+            hidingPaybacksIn: filter.selection(replacing: walletSelection)
+        )
         // Future's Scheduled rows are listed by day, and only while nothing is searched, filtered or being selected.
         let scheduled: [ScheduledOccurrence] = period == .future && grouping == .day && !filter.isOn && !isSelecting
             ? recurringTransactions.scheduledOccurrences(selection: walletSelection, today: today)
@@ -77,10 +86,10 @@ struct TransactionListView: View {
             switch grouping {
             case .day:
                 TransactionDaySections(
-                    transactions: shown, scheduled: scheduled, isSelected: { highlighted.contains($0) }
+                    transactions: shown, scheduled: scheduled, isSelected: { highlighted.contains($0) }, listed: listed
                 ) { row($0) }
             case .category:
-                ForEach(TransactionCategoryGroup.groups(of: shown)) { group in
+                ForEach(TransactionCategoryGroup.groups(of: shown, listed: listed)) { group in
                     Section {
                         GroupedForEach(group.transactions, isSelected: { highlighted.contains($0) }) {
                             row($0, showsDay: true)
@@ -167,11 +176,13 @@ struct TransactionListView: View {
         // The Total with no wallet filter lists every wallet; a selected wallet or a wallet filter lists one.
         let showsWalletIcon = walletSelection == .total && filter.wallet == nil
         if isSelecting {
-            TransactionRow(transaction: transaction, showsDay: showsDay, showsWalletIcon: showsWalletIcon)
+            TransactionRow(transaction: transaction, showsDay: showsDay, showsWalletIcon: showsWalletIcon, listed: listed)
                 .tag(transaction)
         } else {
             NavigationLink(value: transaction) {
-                TransactionRow(transaction: transaction, showsDay: showsDay, showsWalletIcon: showsWalletIcon)
+                TransactionRow(
+                    transaction: transaction, showsDay: showsDay, showsWalletIcon: showsWalletIcon, listed: listed
+                )
             }
         }
     }

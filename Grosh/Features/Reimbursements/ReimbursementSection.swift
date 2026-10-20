@@ -93,29 +93,39 @@ extension View {
 }
 
 /// What the Reimbursements of an Expense leave of it, shown as `= −$20` beside its original amount: green when it was
-/// paid back more than it cost. Shows nothing for a transaction without Reimbursements.
+/// paid back more than it cost. In the Total (`listed`) it also takes off what was paid back into other wallets there
+/// (ADR-0010). Shows nothing for a transaction without Reimbursements.
 struct ReimbursementNetText: View {
     let transaction: Transaction
+    var listed = ListedAmount.net
 
     var body: some View {
-        if transaction.reimbursedCents > 0 {
-            Text(verbatim: "= " + transaction.net.signedFormatted())
-                .monospacedDigit()
-                .foregroundStyle(transaction.netCents > 0 ? transaction.net.tint : .secondary)
+        // Read from the stored figures first, so a row that was never paid back reads nothing else.
+        if transaction.reimbursedCents > 0 || (listed == .netInTotal && transaction.hasPaybacksElsewhere) {
+            let net = listed == .netInTotal ? transaction.totalViewNet : transaction.net
+            if net.cents != transaction.amountCents {
+                Text(verbatim: "= " + net.signedFormatted())
+                    .monospacedDigit()
+                    .foregroundStyle(net.cents > 0 ? net.tint : .secondary)
+            }
         }
     }
 }
 
 /// An Expense's Reimbursements as its row lists them under the title: `+20, +10, +3`. They are cut with "…" only when
-/// they don't fit. Shows nothing for a transaction without Reimbursements.
+/// they don't fit. In a wallet's own list (not the Total) it adds what was paid back into other wallets: `+20 to Cash`
+/// (ADR-0010). Shows nothing for a transaction without Reimbursements.
 struct ReimbursementEntriesText: View {
     let transaction: Transaction
+    var listed = ListedAmount.net
 
     var body: some View {
-        // Read from the stored total first, so a row without Reimbursements never reads them.
+        // Read from the stored figures first, so a row without Reimbursements never reads them.
         let summary = transaction.reimbursedCents > 0 ? transaction.reimbursementSummary() : ""
-        if !summary.isEmpty {
-            Text(summary)
+        let elsewhere = listed == .net && transaction.hasPaybacksElsewhere ? transaction.elsewhereSummary() : ""
+        let text = [summary, elsewhere].filter { !$0.isEmpty }.joined(separator: ", ")
+        if !text.isEmpty {
+            Text(text)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

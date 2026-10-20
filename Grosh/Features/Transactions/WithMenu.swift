@@ -30,7 +30,9 @@ struct WithField: View {
 /// most lately first. Tapping a name chooses them; a Loan or Debt (`picksOne`) takes one Person and closes the menu,
 /// anything else takes several, each tap choosing or un-choosing. When what was typed isn't the name of anyone in
 /// Previous, "Add *Name*" makes that Person (or brings back a hidden one of that name), with an optional phone number.
-/// Swiping a name offers Hide, which leaves them out of Previous and keeps their history (ADR-0009).
+/// Swiping a name offers Hide, which leaves them out of Previous and keeps their history. Below Previous, a Contacts
+/// section lists the user's contacts matching what was typed, once they allow it; picking one links the Person to it
+/// (``WithContactsSection``, ADR-0009).
 struct WithMenu: View {
     @Binding var people: [Person]
     let picksOne: Bool
@@ -41,6 +43,7 @@ struct WithMenu: View {
     @State private var query = ""
     @State private var phone = ""
     @State private var errorMessage: String?
+    @State private var contacts = ContactsInWith()
 
     private func isChosen(_ person: Person) -> Bool {
         people.contains { $0 === person }
@@ -86,10 +89,11 @@ struct WithMenu: View {
                         }
                     }
                 }
+                WithContactsSection(contacts: contacts, typed: query, pick: pick)
             }
             .searchable(text: $query, prompt: "Search or add a name")
             .overlay {
-                if previous.isEmpty && chosenElsewhere.isEmpty && query.isEmpty {
+                if previous.isEmpty && chosenElsewhere.isEmpty && contacts.results.isEmpty && query.isEmpty {
                     ContentUnavailableView {
                         Label("No One Yet", systemImage: "person.2")
                     } description: {
@@ -107,6 +111,14 @@ struct WithMenu: View {
                 }
             }
             .errorAlert("Couldn't Update People", message: $errorMessage)
+            .task { await contacts.open(in: context) }
+            .task(id: query) { await contacts.search(query) }
+            .onReceive(ContactsInWith.changed) { _ in
+                Task {
+                    await contacts.refreshPeople(in: context)
+                    await contacts.search(query)
+                }
+            }
         }
         #if os(macOS)
         .frame(minWidth: 340, minHeight: 400)
@@ -137,16 +149,29 @@ struct WithMenu: View {
 
     private func add(_ name: String) {
         do {
-            let person = try Person.add(named: name, phone: phone, in: context)
-            if !isChosen(person) {
-                people.choose(person, picksOne: picksOne)
-            }
-            query = ""
-            phone = ""
-            if picksOne { dismiss() }
+            finishAdding(try Person.add(named: name, phone: phone, in: context))
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Picking a contact: `phone` is the number the user chose when the contact has several.
+    private func pick(_ contact: Contact, phone: String?) {
+        do {
+            finishAdding(try Person.add(contact, phone: phone, in: context))
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Chooses a Person just added or picked, and clears what was typed.
+    private func finishAdding(_ person: Person) {
+        if !isChosen(person) {
+            people.choose(person, picksOne: picksOne)
+        }
+        query = ""
+        phone = ""
+        if picksOne { dismiss() }
     }
 
     private func hide(_ person: Person) {

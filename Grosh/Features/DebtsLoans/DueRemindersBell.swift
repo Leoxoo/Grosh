@@ -2,8 +2,8 @@ import SwiftData
 import SwiftUI
 
 extension View {
-    /// Adds the Home bell to the toolbar: it shows whether any Loan, Debt or estimated amount is due, and opens the
-    /// list of due ones. Use inside the tab's `NavigationStack`.
+    /// Adds the Home bell to the toolbar: it shows whether any Loan, Debt, Owes me or estimated amount is due, and
+    /// opens the list of due ones. Use inside the tab's `NavigationStack`.
     func dueRemindersBell() -> some View {
         modifier(DueRemindersBell())
     }
@@ -14,11 +14,13 @@ extension View {
 private struct DueRemindersBell: ViewModifier {
     @Query(DebtsAndLoans.transactions) private var transactions: [Transaction]
     @Query(EstimatedAmounts.transactions) private var estimates: [Transaction]
+    @Query(ExpectedReimbursements.all) private var expectations: [ExpectedReimbursement]
     @State private var isShowingList = false
 
     func body(content: Content) -> some View {
         let dueCount = DebtsAndLoans(transactions).due(on: .today).count
             + EstimatedAmounts(estimates).due(on: .today).count
+            + ExpectedReimbursements(expectations).due(on: .today).count
         content
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
@@ -31,11 +33,13 @@ private struct DueRemindersBell: ViewModifier {
     }
 }
 
-/// The open Loans and Debts whose reminder day has come, the earliest first, then the estimated amounts waiting for
-/// their real figures. A Loan or Debt opens its transaction detail; an estimate opens its amount editor.
+/// The open Loans and Debts whose reminder day has come, the earliest first, then the Owes me whose reminder day has
+/// come, then the estimated amounts waiting for their real figures. A Loan or Debt opens its transaction detail, an Owes
+/// me its own detail; an estimate opens its amount editor.
 private struct DueRemindersList: View {
     @Query(DebtsAndLoans.transactions) private var transactions: [Transaction]
     @Query(EstimatedAmounts.transactions) private var estimates: [Transaction]
+    @Query(ExpectedReimbursements.all) private var expectations: [ExpectedReimbursement]
     @Environment(\.dismiss) private var dismiss
     /// The estimate whose amount editor is open, while it is.
     @State private var estimateBeingEntered: Transaction?
@@ -44,6 +48,7 @@ private struct DueRemindersList: View {
         let today = CalendarDay.today
         let due = DebtsAndLoans(transactions).due(on: today)
         let estimatesDue = EstimatedAmounts(estimates).due(on: today)
+        let owedDue = ExpectedReimbursements(expectations).due(on: today)
         NavigationStack {
             List {
                 ForEach(due) { loanOrDebt in
@@ -51,6 +56,13 @@ private struct DueRemindersList: View {
                         TransactionDetailView(transaction: loanOrDebt.original)
                     } label: {
                         LoanOrDebtRow(loanOrDebt: loanOrDebt, today: today)
+                    }
+                }
+                ForEach(owedDue) { expectation in
+                    NavigationLink {
+                        ExpectedReimbursementDetailView(expectation: expectation)
+                    } label: {
+                        ExpectedReimbursementRow(expectation: expectation, today: today)
                     }
                 }
                 ForEach(estimatesDue) { estimate in
@@ -63,11 +75,11 @@ private struct DueRemindersList: View {
                 }
             }
             .overlay {
-                if due.isEmpty && estimatesDue.isEmpty {
+                if due.isEmpty && owedDue.isEmpty && estimatesDue.isEmpty {
                     ContentUnavailableView(
                         "No Due Reminders",
                         systemImage: "bell",
-                        description: Text("A Loan, Debt or estimated amount shows here once its reminder date comes.")
+                        description: Text("A Loan, Debt, Owes me or estimated amount shows here once its reminder date comes.")
                     )
                 }
             }

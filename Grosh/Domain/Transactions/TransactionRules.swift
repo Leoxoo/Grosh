@@ -34,6 +34,7 @@ extension Transaction {
         card = draft.offersCard ? draft.card : nil
         note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
         setPeople(draft.people)
+        setExpectations(draft.owes)
         isExcludedFromReport = draft.isExcludedFromReport
         reminderDay = draft.offersReminder ? draft.reminderDay : nil
     }

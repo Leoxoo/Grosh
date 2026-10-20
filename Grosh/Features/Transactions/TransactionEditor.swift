@@ -146,6 +146,9 @@ private struct TransactionForm: View {
         Section {
             DisclosureGroup("Add more details", isExpanded: $isShowingDetails) {
                 WithField(people: $draft.people, picksOne: draft.requiresWith)
+                if draft.offersOwesMe || !draft.owes.isEmpty {
+                    OwesMeField(draft: $draft)
+                }
                 Toggle("Exclude from report", isOn: $draft.isExcludedFromReport)
                 if draft.offersReminder {
                     ReminderField(day: $draft.reminderDay)

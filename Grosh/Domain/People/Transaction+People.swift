@@ -19,10 +19,15 @@ extension Transaction {
             unique.append(person)
         }
         people = unique
-        withName = orderedPeople.map(\.name).joined(separator: Self.withSeparator)
+        refreshWithName()
         for person in unique {
             person.markUsed(at: date)
         }
+    }
+
+    /// Makes ``withName`` the names of the people in With again, after a name changed (ADR-0009). Doesn't save.
+    func refreshWithName() {
+        withName = orderedPeople.map(\.name).joined(separator: Self.withSeparator)
     }
 }
 

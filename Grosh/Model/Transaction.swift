@@ -65,6 +65,17 @@ final class Transaction {
     /// deposit for good leaves it on the Expense.
     @Relationship(deleteRule: .nullify, inverse: \Reimbursement.movedFrom)
     var movedIntoReimbursements: [Reimbursement]? = []
+    /// On an Expense, what the people in With are yet to pay back (ADR-0010). They count in no balance or report, and
+    /// go with the Expense: to Recently Deleted and back, and for good.
+    @Relationship(deleteRule: .cascade, inverse: \ExpectedReimbursement.expense)
+    var expectations: [ExpectedReimbursement]? = []
+    /// On an Expense, whether money was ever paid back into another wallet against it (ADR-0010). Only an Expense with
+    /// it set reads its paybacks to work out its net in the Total (``totalViewNetCents``), so the rest never walk a
+    /// relationship. Set when the first payback is recorded and never cleared, so it can read true for an Expense whose
+    /// paybacks are gone, which only costs a look.
+    var hasPaybacksElsewhere: Bool = false
+    /// On a payback recorded into another wallet, the Expected reimbursement it was paid against.
+    var paidExpectation: ExpectedReimbursement?
 
     init(
         amount: Money,

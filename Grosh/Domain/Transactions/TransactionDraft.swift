@@ -43,10 +43,29 @@ struct TransactionDraft {
     }
     var card: Card?
     var note = ""
-    var day: CalendarDay
+    /// Moving it moves the reminder of every + Owes me that still sits a week after it.
+    var day: CalendarDay {
+        didSet {
+            guard day != oldValue else { return }
+            let before = ExpectedReimbursement.defaultReminderDay(expenseOn: oldValue)
+            let after = ExpectedReimbursement.defaultReminderDay(expenseOn: day)
+            for index in owes.indices where owes[index].reminderDay == before {
+                owes[index].reminderDay = after
+            }
+        }
+    }
     /// The people in With, in the order they were chosen (ADR-0009). A Loan or Debt takes exactly one; anything else
-    /// takes any number.
-    var people: [Person] = []
+    /// takes any number. Taking someone out drops the new + Owes me they had; one already saved stays, and saving is
+    /// refused until it is removed or they are back (``validateExpectations()``).
+    var people: [Person] = [] {
+        didSet {
+            owes.removeAll { entry in
+                entry.existing == nil && !people.contains(where: { $0 === entry.person })
+            }
+        }
+    }
+    /// The + Owes me of an Expense, one for each Person who is yet to pay part of it back (ADR-0010).
+    var owes: [OwesMeDraft] = []
     var isExcludedFromReport = false
     /// The day a Loan or Debt reminds the user of it, or `nil` for no reminder. Only kept on the Debt/Loan tab.
     var reminderDay: CalendarDay?
@@ -61,6 +80,10 @@ struct TransactionDraft {
     private(set) var cardRuleExemption: CardRuleExemption?
     /// Set when editing a Loan or Debt that has payments or was forgiven: what they hold in place.
     private(set) var paymentLock: PaymentLock?
+    /// Set when editing an Expense: the expectations it had, so removing one that has payments can be refused.
+    private(set) var originalExpectations: [ExpectedReimbursement] = []
+    /// Set when editing an Expense that was paid back into another wallet: the wallet it has to stay in.
+    private(set) var walletKeptByPaybacks: Wallet?
 
     /// What the payments on a Loan or Debt, or its Forgiven mark, hold in place while it is edited: the wallet and
     /// category (so the type) they were recorded against, and an amount no lower than what has been paid. Payments in
@@ -88,6 +111,9 @@ struct TransactionDraft {
         isSplitPart = transaction.isSplitPart
         cardRuleExemption = transaction.cardRuleExemption
         reminderDay = transaction.reminderDay
+        originalExpectations = transaction.orderedExpectations
+        owes = originalExpectations.compactMap(OwesMeDraft.init(editing:))
+        walletKeptByPaybacks = transaction.hasPaybacksElsewhere ? transaction.wallet : nil
         let deletedPayments = transaction.paymentsInRecentlyDeleted
         if let context = transaction.modelContext, let loanOrDebt = try? LoanOrDebt(transaction, in: context),
            !loanOrDebt.payments.isEmpty || transaction.isForgiven || !deletedPayments.isEmpty {
@@ -180,6 +206,7 @@ extension TransactionDraft {
         guard card != nil || !requiresCard else { throw TransactionRuleError.missingCard }
         guard !isMissingWith else { throw TransactionRuleError.missingWith }
         guard !(requiresWith && people.count > 1) else { throw TransactionRuleError.tooManyWith }
+        try validateExpectations()
     }
 
     /// Whether this is a Loan or Debt with payments or forgiven, whose wallet, type and category can't change.
