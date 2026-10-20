@@ -25,6 +25,9 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 OUT = Path(__file__).with_name("catalog-seed.json")
+# Hand-fixed issuer pages, {card id: url}, for cards whose CardPin url has moved. Kept apart
+# from the seed so that rebuilding the seed from a fresh CSV doesn't undo the fixes.
+URL_OVERRIDES = Path(__file__).with_name("url-overrides.json")
 
 # CardPin's issuer codes, as people would write them.
 ISSUER_NAMES = {
@@ -97,7 +100,8 @@ def number(text: str) -> float | int:
     return int(value) if value.is_integer() else value
 
 
-def build(rows: list[dict[str, str]]) -> list[dict]:
+def build(rows: list[dict[str, str]], url_overrides: dict[str, str] | None = None) -> list[dict]:
+    url_overrides = url_overrides or {}
     cards: dict[str, dict] = {}
     for row in rows:
         # A card with several sign-up offers has several rows that differ only in
@@ -123,6 +127,13 @@ def build(rows: list[dict[str, str]]) -> list[dict]:
         }
     catalog = sorted(cards.values(), key=lambda card: card["id"])
     ids = [card["id"] for card in catalog]
+    unknown = sorted(set(url_overrides) - set(ids))
+    if unknown:
+        sys.exit(f"url-overrides.json names cards that aren't in the CSV: {unknown}")
+    for card in catalog:
+        if card["id"] in url_overrides:
+            card["sourceUrl"] = url_overrides[card["id"]]
+            card["sourceHost"] = urlparse(card["sourceUrl"]).netloc
     duplicates = {i for i in ids if ids.count(i) > 1}
     if duplicates:
         sys.exit(f"Two cards share an id, so one would overwrite the other: {sorted(duplicates)}")
@@ -133,7 +144,8 @@ def main() -> None:
     if len(sys.argv) != 2:
         sys.exit(__doc__)
     with open(sys.argv[1], newline="", encoding="utf-8") as file:
-        catalog = build(list(csv.DictReader(file)))
+        overrides = json.loads(URL_OVERRIDES.read_text(encoding="utf-8")) if URL_OVERRIDES.exists() else {}
+        catalog = build(list(csv.DictReader(file)), overrides)
     document = {
         "seededFrom": "CardPin raw_import.csv (MIT)",
         "cards": catalog,

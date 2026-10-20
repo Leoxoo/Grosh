@@ -53,6 +53,31 @@ python3 -m unittest discover -s tools/rewards-catalog      # offline tests
 - **Exit code 1 only if more than 25% of cards are `failed` or `gone`.** `refused`, `robots` and `needs-browser` are expected outcomes to report, not signs that the run broke.
 - Not built yet: a headless browser for `needs-browser` pages.
 
+### One page at a time
+
+Pages are fetched one at a time, never in parallel. Each card's result prints as it finishes, and `fetch-state.json` is saved after every page, so stopping a run loses nothing. Pick what to fetch:
+
+```
+fetch.py --only ID [ID ...]   # specific cards
+fetch.py --issuer chase       # one issuer
+fetch.py --missing            # never fetched: resumes an interrupted run
+fetch.py --retry              # last fetch failed or found the page gone
+```
+
+A card whose `sourceUrl` changed since it was fetched is picked up by `--missing` and `--retry` too. A wrong or moved page URL is fixed in `url-overrides.json` (`{card id: url}`); `build_seed.py` applies it, so rebuilding the seed keeps the fix.
+
+### Fetch status after retries (2026-10-20, 166 cards)
+
+| Result | Cards | Notes |
+|---|---|---|
+| Read | 127 | Real rate text, for example "Earn unlimited 3% cash back on food and fun". |
+| `needs-browser` | 15 | American Express (some), BofA Atmos, Amazon cards, AAA, U.S. Bank SkyPass. |
+| `failed` | 12 | Timeouts: the United cards (theexplorercard.com), E*TRADE (2 Morgan Stanley cards), PenFed (3), Air France. Retrying here didn't help; try `--retry` from your own network. |
+| `refused` | 11 | LATAM, LifeMiles, Amtrak, Best Western, Virgin, Expedia. |
+| `gone` | 1 | `barclays-carnival-world-mastercard`: Barclays removed the page and I found no official replacement, so it needs a URL from you. |
+
+The 3 earlier `gone` pages (two TD, one Walmart) now fetch from corrected URLs. The Walmart OnePay card uses OnePay's help article, not a Synchrony or Walmart product page.
+
 ### First full run (2026-10-20, 166 cards)
 
 | Result | Cards | Notes |

@@ -240,15 +240,27 @@
     "url": "https://www.alaskaair.com/atmosrewards/content/credit-cards"
   },
   "bank-of-america-business-advantage-customized-cash": {
-    "lastStatus": "failed",
+    "changedAt": "2026-10-20",
+    "finalUrl": "https://business.bankofamerica.com/en/credit-cards/business-advantage-customized-cash-rewards",
+    "hash": "eedd752a83d4cb3fe2d51039fec119dcbba5ce785a4368d0a811846b1a4bda2f",
+    "lastStatus": "ok",
+    "textChars": 58374,
     "url": "https://www.bankofamerica.com/smallbusiness/credit-cards/products/cash-rewards-business-credit-card"
   },
   "bank-of-america-business-advantage-travel-rewards": {
-    "lastStatus": "failed",
+    "changedAt": "2026-10-20",
+    "finalUrl": "https://business.bankofamerica.com/en/credit-cards/business-advantage-travel-rewards",
+    "hash": "e80c19d1da50fd576a0b6a9b79efe03e9a59e82097a0f62822bfc06ce0e6cc69",
+    "lastStatus": "ok",
+    "textChars": 58063,
     "url": "https://www.bankofamerica.com/smallbusiness/credit-cards/products/travel-rewards-business-credit-card"
   },
   "bank-of-america-business-advantage-unlimited-cash": {
-    "lastStatus": "failed",
+    "changedAt": "2026-10-20",
+    "finalUrl": "https://business.bankofamerica.com/en/credit-cards/business-advantage-unlimited-cash-rewards",
+    "hash": "4677ebd2de8514477285d053e1968d6c8feab6e11738cbe3239e947d5bf60999",
+    "lastStatus": "ok",
+    "textChars": 57180,
     "url": "https://www.bankofamerica.com/smallbusiness/credit-cards/products/unlimited-cash-rewards-business-credit-card"
   },
   "bank-of-america-customized-cash-rewards": {
@@ -268,7 +280,11 @@
     "url": "https://www.bankofamerica.com/credit-cards/products/spirit-airlines-credit-card/"
   },
   "bank-of-america-platinum-plus": {
-    "lastStatus": "failed",
+    "changedAt": "2026-10-20",
+    "finalUrl": "https://business.bankofamerica.com/en/credit-cards/platinum-plus",
+    "hash": "f10100dbd56ef54fb426acb910f770067113af33dd63192d000dbf624a5a356d",
+    "lastStatus": "ok",
+    "textChars": 49761,
     "url": "https://www.bankofamerica.com/smallbusiness/credit-cards/products/platinum-plus-business-credit-card"
   },
   "bank-of-america-premium-rewards": {
@@ -320,11 +336,15 @@
     "url": "https://www.aarp.org/membership/benefits/finance/aarp-travel-rewards-mastercard-from-barclays/"
   },
   "barclays-breeze": {
-    "lastStatus": "failed",
+    "changedAt": "2026-10-20",
+    "finalUrl": "https://cards.barclaycardus.com/banking/cards/breeze-airways/",
+    "hash": "fab9bd435cd5d53de9c19dc39e51c670c280e999ab9583612941c2edf280925d",
+    "lastStatus": "ok",
+    "textChars": 8254,
     "url": "https://cards.barclaycardus.com/banking/cards/breeze-airways/"
   },
   "barclays-carnival-world-mastercard": {
-    "lastStatus": "failed",
+    "lastStatus": "gone",
     "url": "https://cards.barclaycardus.com/banking/cards/carnival-world-mastercard/"
   },
   "barclays-emirates-skywards-premium-world-elite": {
@@ -360,7 +380,11 @@
     "url": "https://cards.barclaycardus.com/banking/credit-card/hawaiian-airlines/child/hawaiian-hcl-inflight-landing-page/"
   },
   "barclays-hawaiian-airlines-world-elite-business": {
-    "lastStatus": "failed",
+    "changedAt": "2026-10-20",
+    "finalUrl": "https://cards.barclaycardus.com/banking/credit-card/hawaiian-airlines/combo-app/hawaiian-bha-boh---combo-app/",
+    "hash": "57c21b55d17c28976442054a0221dbc9c65acd4346afdff51f7971d3f412ed2d",
+    "lastStatus": "ok",
+    "textChars": 2889,
     "url": "https://cards.barclaycardus.com/banking/credit-card/hawaiian-airlines/combo-app/hawaiian-bha-boh---combo-app/"
   },
   "barclays-jetblue": {
@@ -524,7 +548,7 @@
     "url": "https://creditcards.chase.com/travel-credit-cards/aircanada/aeroplan"
   },
   "chase-amazon-prime": {
-    "lastStatus": "failed",
+    "lastStatus": "needs-browser",
     "url": "https://www.amazon.com/dp/BT00LN946S"
   },
   "chase-british-airways-signature": {
@@ -568,7 +592,11 @@
     "url": "https://creditcards.chase.com/cash-back-credit-cards/freedom/unlimited"
   },
   "chase-iberia-signature": {
-    "lastStatus": "failed",
+    "changedAt": "2026-10-20",
+    "finalUrl": "https://creditcards.chase.com/travel-credit-cards/avios/iberia",
+    "hash": "4bfa910c3ca1c3b0e4b996dec781d4bceb5e0b584a8a49384ce22f8e8bc17510",
+    "lastStatus": "ok",
+    "textChars": 23580,
     "url": "https://creditcards.chase.com/travel-credit-cards/avios/iberia"
   },
   "chase-ihg-premier": {
@@ -596,7 +624,11 @@
     "url": "https://creditcards.chase.com/travel-credit-cards/ihg-rewards-club/traveler"
   },
   "chase-ink-business-cash": {
-    "lastStatus": "failed",
+    "changedAt": "2026-10-20",
+    "finalUrl": "https://creditcards.chase.com/business-credit-cards/ink/cash",
+    "hash": "781196c8c695ec772477e34155f62df7a9da00ed554cd42f1cf7388c57ed35a8",
+    "lastStatus": "ok",
+    "textChars": 34028,
     "url": "https://creditcards.chase.com/business-credit-cards/ink/cash"
   },
   "chase-ink-business-preferred": {
@@ -608,7 +640,11 @@
     "url": "https://creditcards.chase.com/business-credit-cards/ink/business-preferred"
   },
   "chase-ink-business-premier": {
-    "lastStatus": "failed",
+    "changedAt": "2026-10-20",
+    "finalUrl": "https://creditcards.chase.com/business-credit-cards/ink/premier",
+    "hash": "37817129ad8dc59b183f8fe9d97ddf704cf2376526f7b7b041fafa575c16c1de",
+    "lastStatus": "ok",
+    "textChars": 26295,
     "url": "https://creditcards.chase.com/business-credit-cards/ink/premier"
   },
   "chase-ink-business-unlimited": {
@@ -751,7 +787,7 @@
     "changedAt": "2026-10-20",
     "finalUrl": "https://creditcards.aa.com/credit-cards/citi-business-card-american-airlines-direct/",
     "hash": "235f09e38a281582ead315e52c845f7fa2fc35cf7dd4366fb74ab1ba588dc7b2",
-    "lastStatus": "failed",
+    "lastStatus": "ok",
     "textChars": 8735,
     "url": "https://creditcards.aa.com/credit-cards/citi-business-card-american-airlines-direct/"
   },
@@ -780,7 +816,11 @@
     "url": "https://creditcards.aa.com/citi-mileup-card-american-airlines-direct/"
   },
   "citi-aadvantage-platinum-select-world-elite": {
-    "lastStatus": "failed",
+    "changedAt": "2026-10-20",
+    "finalUrl": "https://creditcards.aa.com/credit-cards/citi-platinum-card-american-airlines-direct/",
+    "hash": "7c8ea42d9fa84d2aaba8d3f3b160f926a8b64e724ea166c7202fe14d7b470773",
+    "lastStatus": "ok",
+    "textChars": 7721,
     "url": "https://creditcards.aa.com/credit-cards/citi-platinum-card-american-airlines-direct/"
   },
   "citi-at-t-points-plus": {
@@ -916,7 +956,7 @@
     "url": "https://www.penfed.org/credit-cards/power-cash-rewards-visa"
   },
   "synchrony-amazon-prime-store-card": {
-    "lastStatus": "failed",
+    "lastStatus": "needs-browser",
     "url": "https://www.amazon.com/Synchrony-Bank-Amazon-com-Store-Card/dp/B008A0GNA8"
   },
   "synchrony-cathay-pacific": {
@@ -928,7 +968,11 @@
     "url": "https://pay.cathaypacific.com/en_US/offers/uscreditcard.html"
   },
   "synchrony-verizon-visa": {
-    "lastStatus": "failed",
+    "changedAt": "2026-10-20",
+    "finalUrl": "https://www.verizon.com/financial-services/verizon-visa-card/",
+    "hash": "c43c9693396bdd079ec04a1a8f9938830c40d0eed5d28e2c8c8c5f59df0e4e92",
+    "lastStatus": "ok",
+    "textChars": 7824,
     "url": "https://www.verizon.com/financial-services/verizon-visa-card/"
   },
   "synchrony-virgin-red-rewards": {
@@ -936,16 +980,28 @@
     "url": "https://www.virgin.com/en-us/virgin-red/rewards-credit-card"
   },
   "synchrony-walmart-onepay-cashrewards": {
-    "lastStatus": "gone",
-    "url": "https://www.walmart.com/cp/onepay-cashrewards-mastercard/9569366376"
+    "changedAt": "2026-10-20",
+    "finalUrl": "https://www.onepay.com/help-center/articles/about-the-onepay-credit-card",
+    "hash": "6fa7d396e5692cb575c4ff55e0b0c18aafa949a41c7cb3a63092fb8d3c77d487",
+    "lastStatus": "ok",
+    "textChars": 8208,
+    "url": "https://www.onepay.com/help-center/articles/about-the-onepay-credit-card"
   },
   "td-bank-cash": {
-    "lastStatus": "gone",
-    "url": "https://www.td.com/us/en/personal-banking/credit-cards/cash-credit-card"
+    "changedAt": "2026-10-20",
+    "finalUrl": "https://www.td.com/us/en/personal-banking/credit-cards/cash-card",
+    "hash": "748762bb6330a2536ab1f3cd4ea5c8408b856e9668af54122bef4daf79ada2f9",
+    "lastStatus": "ok",
+    "textChars": 17517,
+    "url": "https://www.td.com/us/en/personal-banking/credit-cards/cash-card"
   },
   "td-bank-double-up": {
-    "lastStatus": "gone",
-    "url": "https://www.td.com/us/en/personal-banking/credit-cards/double-up-credit-card"
+    "changedAt": "2026-10-20",
+    "finalUrl": "https://www.td.com/us/en/personal-banking/credit-cards/cashdoubleup",
+    "hash": "239f17af045f840ee038b39f64b785d9972cc4badd43d85b9af51c7d57b3ba94",
+    "lastStatus": "ok",
+    "textChars": 13707,
+    "url": "https://www.td.com/us/en/personal-banking/credit-cards/cashdoubleup"
   },
   "u-s-bank-altitude-connect": {
     "changedAt": "2026-10-20",

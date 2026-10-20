@@ -2112,8 +2112,8 @@
       "rewardProgram": null,
       "baseEarnRate": 1,
       "discontinued": false,
-      "sourceUrl": "https://www.walmart.com/cp/onepay-cashrewards-mastercard/9569366376",
-      "sourceHost": "www.walmart.com",
+      "sourceUrl": "https://www.onepay.com/help-center/articles/about-the-onepay-credit-card",
+      "sourceHost": "www.onepay.com",
       "verified": false
     },
     {
@@ -2127,7 +2127,7 @@
       "rewardProgram": null,
       "baseEarnRate": 1,
       "discontinued": false,
-      "sourceUrl": "https://www.td.com/us/en/personal-banking/credit-cards/cash-credit-card",
+      "sourceUrl": "https://www.td.com/us/en/personal-banking/credit-cards/cash-card",
       "sourceHost": "www.td.com",
       "verified": false
     },
@@ -2142,7 +2142,7 @@
       "rewardProgram": null,
       "baseEarnRate": 2,
       "discontinued": false,
-      "sourceUrl": "https://www.td.com/us/en/personal-banking/credit-cards/double-up-credit-card",
+      "sourceUrl": "https://www.td.com/us/en/personal-banking/credit-cards/cashdoubleup",
       "sourceHost": "www.td.com",
       "verified": false
     },

@@ -4,9 +4,13 @@
     python3 tools/rewards-catalog/fetch.py
     python3 tools/rewards-catalog/fetch.py --issuer chase --limit 5
     python3 tools/rewards-catalog/fetch.py --only chase-sapphire-preferred
+    python3 tools/rewards-catalog/fetch.py --retry      # just the ones that failed last time
+    python3 tools/rewards-catalog/fetch.py --missing    # pick up where an interrupted run stopped
 
-reads catalog-seed.json, fetches every card's sourceUrl (once per distinct URL),
-and keeps two things:
+reads catalog-seed.json and fetches each chosen card's sourceUrl, one page at a time
+(once per distinct URL). It prints each card's result as it finishes and saves
+fetch-state.json after every page, so a run can be stopped and resumed at any point.
+It keeps two things:
 
     fetch-state.json   committed: per card, the hash of the page's visible text,
                        so a run on any machine can tell whether a page changed.
@@ -339,8 +343,14 @@ def write_json(path: Path, value) -> None:
     path.write_text(json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def run(cards: list[dict], state: dict, cache: Path, get, throttle: Throttle, today: str) -> RunSummary:
-    """Fetch the given cards' pages, update `state` and `cache` in place, and say what happened."""
+def run(
+    cards: list[dict], state: dict, cache: Path, get, throttle: Throttle, today: str, after_each=None
+) -> RunSummary:
+    """Fetch the given cards' pages one at a time, update `state` and `cache` in place, and say what happened.
+
+    `after_each(outcomes)` is called as soon as each page is done, with the outcomes of the
+    cards that share it, so the caller can show progress and save `state` before the next page.
+    """
     robots = Robots(get, throttle)
     summary = RunSummary()
     by_url: dict[str, list[dict]] = {}
@@ -353,8 +363,10 @@ def run(cards: list[dict], state: dict, cache: Path, get, throttle: Throttle, to
         known = all(state.get(c["id"], {}).get("hash") and (cache / c["id"] / "latest.txt").exists() for c in sharing)
         validators = read_json(cache / sharing[0]["id"] / "http.json", {}) if known else {}
         page = fetch_page(url, get, robots, throttle, validators)
-        for card in sharing:
-            summary.outcomes.append(_record(card, url, page, state, cache, today))
+        outcomes = [_record(card, url, page, state, cache, today) for card in sharing]
+        summary.outcomes.extend(outcomes)
+        if after_each:
+            after_each(outcomes)
     return summary
 
 
@@ -420,12 +432,35 @@ def report(summary: RunSummary, total_cards: int) -> str:
     return "\n".join(lines) + "\n"
 
 
-def select(cards: list[dict], only: list[str], issuer: str, limit: int | None) -> list[dict]:
-    chosen = [
-        card
-        for card in cards
-        if (not only or card["id"] in only) and (not issuer or issuer.lower() in card["issuer"].lower())
-    ]
+RETRYABLE = ("failed", "gone")
+
+
+def select(
+    cards: list[dict],
+    only: list[str],
+    issuer: str,
+    limit: int | None,
+    state: dict | None = None,
+    missing: bool = False,
+    retry: bool = False,
+) -> list[dict]:
+    """The cards to fetch. `missing` keeps those never fetched and `retry` those whose last fetch
+    failed or found the page gone; with both, a card qualifies under either."""
+    state = state or {}
+    chosen = []
+    for card in cards:
+        if only and card["id"] not in only:
+            continue
+        if issuer and issuer.lower() not in card["issuer"].lower():
+            continue
+        if missing or retry:
+            entry = state.get(card["id"])
+            wanted = (missing and entry is None) or (retry and entry is not None and entry["lastStatus"] in RETRYABLE)
+            # A card whose page moved in the seed since it was fetched needs a fresh look too.
+            wanted = wanted or (entry is not None and entry.get("url") != card["sourceUrl"])
+            if not wanted:
+                continue
+        chosen.append(card)
     return chosen[:limit] if limit else chosen
 
 
@@ -434,23 +469,37 @@ def main() -> int:
     parser.add_argument("--only", nargs="+", default=[], metavar="ID", help="fetch just these card ids")
     parser.add_argument("--issuer", default="", help="fetch just cards whose issuer contains this text")
     parser.add_argument("--limit", type=int, help="fetch at most this many cards")
+    parser.add_argument("--missing", action="store_true", help="only cards never fetched (resumes an interrupted run)")
+    parser.add_argument("--retry", action="store_true", help="only cards whose last fetch failed or found the page gone")
     parser.add_argument("--delay", type=float, default=DELAY_SECONDS, help="seconds between requests to one host")
     args = parser.parse_args()
 
     cards = read_json(SEED, {"cards": []})["cards"]
-    chosen = select(cards, args.only, args.issuer, args.limit)
+    state = read_json(STATE, {})
+    chosen = select(cards, args.only, args.issuer, args.limit, state, args.missing, args.retry)
     if not chosen:
         sys.exit("No cards match.")
-    state = read_json(STATE, {})
-    summary = run(chosen, state, CACHE, http_get, Throttle(args.delay), date.today().isoformat())
-    write_json(STATE, state)
+
+    done = 0
+
+    def checkpoint(outcomes: list[CardOutcome]) -> None:
+        # Saved after every page, so stopping a run at any point loses nothing already fetched.
+        nonlocal done
+        write_json(STATE, state)
+        for outcome in outcomes:
+            done += 1
+            note = f"  {outcome.detail}" if outcome.detail else ""
+            print(f"[{done}/{len(chosen)}] {outcome.status:<13} {outcome.card_id}{note}", flush=True)
+
+    summary = run(chosen, state, CACHE, http_get, Throttle(args.delay), date.today().isoformat(), checkpoint)
 
     text = report(summary, len(chosen))
     CACHE.mkdir(parents=True, exist_ok=True)
     (CACHE / "report.md").write_text(text, encoding="utf-8")
     print(text)
 
-    if summary.failure_rate > FAILURE_LIMIT:
+    # A --retry run holds only cards that already failed, so its failure rate says nothing about the run.
+    if not args.retry and summary.failure_rate > FAILURE_LIMIT:
         print(f"{summary.failure_rate:.0%} of cards failed to fetch (limit {FAILURE_LIMIT:.0%}).", file=sys.stderr)
         return 1
     return 0

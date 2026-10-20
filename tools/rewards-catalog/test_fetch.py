@@ -212,6 +212,13 @@ class RunTests(unittest.TestCase):
         self.assertEqual(self.statuses(summary), {"a": "refused", "b": "gone", "c": "gone"})
         self.assertAlmostEqual(summary.failure_rate, 2 / 3)
 
+    def test_each_page_is_reported_as_soon_as_it_is_done(self):
+        seen = []
+        fetch.run(self.cards, self.state, self.cache, self.web, throttle(), "2026-10-20",
+                  after_each=lambda outcomes: seen.append(([o.card_id for o in outcomes], sorted(self.state))))
+        # "a" has its own page; "b" and "c" share one. State already holds each page's cards when called.
+        self.assertEqual(seen, [(["a"], ["a"]), (["b", "c"], ["a", "b", "c"])])
+
     def test_report_lists_each_group(self):
         self.web.route("https://x.test/a", page(status=403))
         text = fetch.report(self.go(), len(self.cards))
@@ -222,15 +229,38 @@ class RunTests(unittest.TestCase):
 
 class SelectTests(unittest.TestCase):
     CARDS = [
-        {"id": "chase-a", "issuer": "Chase"},
-        {"id": "chase-b", "issuer": "Chase"},
-        {"id": "citi-a", "issuer": "Citi"},
+        {"id": "chase-a", "issuer": "Chase", "sourceUrl": "https://x.test/a"},
+        {"id": "chase-b", "issuer": "Chase", "sourceUrl": "https://x.test/b"},
+        {"id": "citi-a", "issuer": "Citi", "sourceUrl": "https://x.test/c"},
+        {"id": "citi-b", "issuer": "Citi", "sourceUrl": "https://x.test/new-b"},
     ]
+    STATE = {
+        "chase-a": {"url": "https://x.test/a", "lastStatus": "ok"},
+        "chase-b": {"url": "https://x.test/b", "lastStatus": "failed"},
+        "citi-b": {"url": "https://x.test/b", "lastStatus": "ok"},
+    }
+
+    def ids(self, **kwargs) -> list[str]:
+        args = {"only": [], "issuer": "", "limit": None, **kwargs}
+        return [c["id"] for c in fetch.select(self.CARDS, args.pop("only"), args.pop("issuer"), args.pop("limit"), **args)]
 
     def test_filters(self):
-        self.assertEqual([c["id"] for c in fetch.select(self.CARDS, [], "chase", None)], ["chase-a", "chase-b"])
-        self.assertEqual([c["id"] for c in fetch.select(self.CARDS, ["citi-a"], "", None)], ["citi-a"])
-        self.assertEqual(len(fetch.select(self.CARDS, [], "", 2)), 2)
+        self.assertEqual(self.ids(issuer="chase"), ["chase-a", "chase-b"])
+        self.assertEqual(self.ids(only=["citi-a"]), ["citi-a"])
+        self.assertEqual(len(self.ids(limit=2)), 2)
+
+    def test_missing_picks_up_cards_never_fetched(self):
+        self.assertEqual(self.ids(state=self.STATE, missing=True), ["citi-a", "citi-b"])
+
+    def test_retry_picks_up_failures(self):
+        self.assertEqual(self.ids(state=self.STATE, retry=True), ["chase-b", "citi-b"])
+
+    def test_missing_and_retry_together(self):
+        self.assertEqual(self.ids(state=self.STATE, missing=True, retry=True), ["chase-b", "citi-a", "citi-b"])
+
+    def test_a_card_whose_page_moved_is_refetched(self):
+        # citi-b was fetched from /b but the seed now says /new-b.
+        self.assertIn("citi-b", self.ids(state=self.STATE, retry=True))
 
 
 if __name__ == "__main__":
