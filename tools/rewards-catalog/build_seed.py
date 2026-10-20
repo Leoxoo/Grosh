@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+"""Build the rewards catalog's seed from CardPin's raw_import.csv.
+
+    python3 tools/rewards-catalog/build_seed.py raw_import.csv
+
+reads CardPin's CSV (MIT, https://github.com/strike007-3000/cardpin) and writes
+tools/rewards-catalog/catalog-seed.json beside this script.
+
+The seed keeps only facts about each card: who issues it, its fee, its flat
+earn rate and the issuer page to re-check. It drops everything we have no right
+or reason to ship: the imageUrl column (hotlinked from offeroptimist.com, and
+the art is the issuers'), CardPin's cardId (someone else's key), and the
+sign-up bonus, credits and offer columns (stale within months).
+
+Every card comes out unverified. A card becomes verified only when the refresh
+pipeline (PIPELINE.md) has read its issuer page and a person has accepted what
+it found.
+"""
+
+import csv
+import json
+import re
+import sys
+from pathlib import Path
+from urllib.parse import urlparse
+
+OUT = Path(__file__).with_name("catalog-seed.json")
+
+# CardPin's issuer codes, as people would write them.
+ISSUER_NAMES = {
+    "AMERICAN_EXPRESS": "American Express",
+    "BANK_OF_AMERICA": "Bank of America",
+    "BARCLAYS": "Barclays",
+    "CHASE": "Chase",
+    "CAPITAL_ONE": "Capital One",
+    "CITI": "Citi",
+    "COMENITY": "Comenity",
+    "DISCOVER": "Discover",
+    "FIRST": "First Bankcard",
+    "FNBO": "FNBO",
+    "PENFED": "PenFed",
+    "SYNCHRONY": "Synchrony",
+    "TD": "TD Bank",
+    "US_BANK": "U.S. Bank",
+    "WELLS_FARGO": "Wells Fargo",
+    "WEB_BANK": "WebBank",
+}
+
+NETWORK_NAMES = {
+    "AMERICAN_EXPRESS": "American Express",
+    "DISCOVER": "Discover",
+    "MASTERCARD": "Mastercard",
+    "VISA": "Visa",
+}
+
+
+# Programs whose own name for what you earn is "miles". Every other program is
+# "points": hotels, banks, and airlines that say points (JetBlue, Southwest, Spirit,
+# Aeroplan, Avios, Virgin, Breeze). Labels follow how each program calls its currency
+# today; they are a display unit, so a wrong one is cosmetic, not a wrong rate.
+MILES_PROGRAMS = frozenset({
+    "ALASKA", "AMERICAN", "ANA", "AVIANCA", "CAPITAL_ONE", "CATHAY_PACIFIC", "DELTA",
+    "EMIRATES", "FLYING_BLUE", "FRONTIER", "HAWAIIAN", "KOREAN", "LATAM", "LUFTHANSA", "UNITED",
+})
+POINTS_PROGRAMS = frozenset({
+    "AEROPLAN", "AMERICAN_EXPRESS", "AMTRAK", "AVIOS", "BANK_OF_AMERICA", "BARCLAYS",
+    "BEST_WESTERN", "BREEZE", "CARNIVAL", "CHASE", "CHOICE", "CITI", "EXPEDIA", "HILTON",
+    "HYATT", "IHG", "JETBLUE", "MARRIOTT", "PENFED", "SOUTHWEST", "SPIRIT", "US_BANK",
+    "VIRGIN", "WELLS_FARGO", "WYNDHAM",
+})
+
+
+def reward_kind(currency: str) -> str:
+    """What the card's flat earn rate is measured in: "cashback", "points" or "miles".
+
+    CardPin's `currency` column is "USD" for a cash-back card and otherwise names a
+    reward program. A program this script has never seen stops the run instead of
+    defaulting to a guess, because the seed is meant to be rerun: a new CSV that
+    brings a 42nd program should make someone classify it, not slip through mislabeled.
+    """
+    if currency == "USD":
+        return "cashback"
+    if currency in MILES_PROGRAMS:
+        return "miles"
+    if currency in POINTS_PROGRAMS:
+        return "points"
+    raise ValueError(f"Unknown reward program {currency!r}: add it to MILES_PROGRAMS or POINTS_PROGRAMS")
+
+
+def slug(text: str) -> str:
+    # "+" is part of a card's identity (One Key vs. One Key+), so spell it out first.
+    return re.sub(r"[^a-z0-9]+", "-", text.lower().replace("+", " plus ")).strip("-")
+
+
+def number(text: str) -> float | int:
+    value = float(text)
+    return int(value) if value.is_integer() else value
+
+
+def build(rows: list[dict[str, str]]) -> list[dict]:
+    cards: dict[str, dict] = {}
+    for row in rows:
+        # A card with several sign-up offers has several rows that differ only in
+        # the offer columns we drop, so the first row of each card is enough.
+        source_id = row["cardId"]
+        if source_id in cards:
+            continue
+        issuer = ISSUER_NAMES[row["issuer"]]
+        cards[source_id] = {
+            "id": slug(f'{issuer} {row["name"]}'),
+            "name": row["name"],
+            "issuer": issuer,
+            "network": NETWORK_NAMES[row["network"]],
+            "isBusiness": row["isBusiness"] == "true",
+            "annualFee": number(row["annualFee"]),
+            "rewardKind": reward_kind(row["currency"]),
+            "rewardProgram": None if row["currency"] == "USD" else row["currency"],
+            "baseEarnRate": number(row["universalCashbackPercent"]),
+            "discontinued": row["discontinued"] == "true",
+            "sourceUrl": row["url"],
+            "sourceHost": urlparse(row["url"]).netloc,
+            "verified": False,
+        }
+    catalog = sorted(cards.values(), key=lambda card: card["id"])
+    ids = [card["id"] for card in catalog]
+    duplicates = {i for i in ids if ids.count(i) > 1}
+    if duplicates:
+        sys.exit(f"Two cards share an id, so one would overwrite the other: {sorted(duplicates)}")
+    return catalog
+
+
+def main() -> None:
+    if len(sys.argv) != 2:
+        sys.exit(__doc__)
+    with open(sys.argv[1], newline="", encoding="utf-8") as file:
+        catalog = build(list(csv.DictReader(file)))
+    document = {
+        "seededFrom": "CardPin raw_import.csv (MIT)",
+        "cards": catalog,
+    }
+    OUT.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"Wrote {len(catalog)} cards to {OUT}")
+
+
+if __name__ == "__main__":
+    main()
