@@ -20,6 +20,9 @@ nonisolated struct ExpectedReimbursementReminder: PendingReminder {
         /// What is outstanding in cents; missing for an open amount.
         static let amountCents = "amountCents"
         static let currencyCode = "currencyCode"
+        /// Present on a Debt's reminder, where the user owes the Person rather than the Person the user; missing
+        /// otherwise.
+        static let youOwe = "youOwe"
     }
 
     /// The Expected reimbursement it reminds of.

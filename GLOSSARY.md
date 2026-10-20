@@ -137,6 +137,14 @@ _Avoid_: Repayment (that is money paid back against a Debt), refund (that is mon
 The part of an Expense that one Person is yet to pay back ("Owes me"), made with + Owes me on each Person chosen in With, with an optional amount: left blank it is an open amount, shown as `?`, and left out of totals and flagged ("+1 open"). It is a record of its own beside the Expense and never changes any wallet's balance, the transaction list or any report; the Expense stays at its full amount until money comes back. It is listed in Debts & Loans with its own detail, goes to Recently Deleted and back with its Expense, and an edit to the Expense that would break it (making it Income, taking the Person out of With, costing less than what is owed) is refused. It has a Reminder, on by default for a week after the Expense. Record payment turns what comes back into a Reimbursement (or, into another wallet, a Reimbursement into another wallet); an expectation with an amount closes itself once payments cover it, and an open amount is closed by hand. **Forgive** marks it Forgiven and settled, with no accounting effect (ADR-0004, ADR-0010).
 _Avoid_: IOU, split bill, Loan (that is money lent outside an Expense)
 
+**Show by people**:
+The way Debts & Loans lists one row per Person instead of one per Loan, Debt and Expected reimbursement; **Show by Loan/Debt** is the list as it was, and the choice is remembered. A row shows what the Person owes the user (their Loans plus their Expected reimbursements, combined) and what the user owes them (their Debts) apart, never netted and one amount per currency; an Expected reimbursement with no amount is flagged ("+1 open") and left out of both. People with something outstanding come first, then a Settled section; a hidden Person is listed while anything is outstanding with them. Opening a Person lists their Loans, Debts and Owes me, each opening its own detail (ADR-0009, ADR-0010).
+_Avoid_: Contacts list, address book
+
+**Text them**:
+Texting a Person about what is owed, from the Text button on their row in Show by people (shown only when they have a phone number) or from the "Text them" action on a reminder notification. It opens the Messages compose sheet to the Person, with a message naming the outstanding amount in the app's money formatting; the user taps Send, and nothing is ever sent without that tap. The number is the linked contact's current one while the contact resolves, otherwise the Person's stored phone. Where texting is unavailable (the simulator, an iPad without Messages) the message can be copied or shared instead.
+_Avoid_: Nudge, chase
+
 **Balance adjustment**:
 A transaction that records the difference between a wallet's recorded balance and its real balance. Its category is the reason (interest earned, stock sold, fees, lost transactions), and it counts in reports like any other transaction. It never needs a Card.
 _Avoid_: Correction, reconcile

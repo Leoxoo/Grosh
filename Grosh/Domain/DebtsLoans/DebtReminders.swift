@@ -31,8 +31,13 @@ extension PendingReminder {
 }
 
 /// A notification on the reminder day of an open Loan or Debt, saying who it is with and what is outstanding.
+///
+/// Like the Owes me reminder it is posted in a ``categoryIdentifier`` and carries a ``userInfo``, which is what its
+/// "Text them" action needs (``TextReminder``).
 nonisolated struct DebtReminder: PendingReminder {
     static let identifierPrefix = "grosh.debt-reminder."
+    /// What a notification action registers against.
+    static let categoryIdentifier: String? = "grosh.debt"
 
     /// The Loan or Debt it reminds of.
     let original: PersistentIdentifier
@@ -42,7 +47,20 @@ nonisolated struct DebtReminder: PendingReminder {
     let outstanding: Money
     /// A Loan (they owe the user) or a Debt (the user owes them).
     let kind: LoanOrDebtKind
+    /// The phone number of the Person it is with, when they have one.
+    var phone: String?
     var arrival = ReminderArrival.onItsDay
+
+    var userInfo: [String: String] {
+        typealias Key = ExpectedReimbursementReminder.InfoKey
+        var info = [
+            Key.person: withName, Key.amountCents: String(outstanding.cents),
+            Key.currencyCode: outstanding.currencyCode,
+        ]
+        if let phone { info[Key.phone] = phone }
+        if kind == .debt { info[Key.youOwe] = "true" }
+        return info
+    }
 }
 
 /// When a reminder's notification arrives.
@@ -126,10 +144,10 @@ extension DebtsAndLoans: TransactionReminderSource {
     func reminders(from today: CalendarDay) -> [DebtReminder] {
         open.compactMap { loanOrDebt in
             guard let day = loanOrDebt.original.reminderDay, day >= today else { return nil }
+            let person = loanOrDebt.original.orderedPeople.first
             return DebtReminder(
-                original: loanOrDebt.original.persistentModelID, day: day,
-                withName: loanOrDebt.original.orderedPeople.first?.name ?? "",
-                outstanding: loanOrDebt.outstanding, kind: loanOrDebt.kind
+                original: loanOrDebt.original.persistentModelID, day: day, withName: person?.name ?? "",
+                outstanding: loanOrDebt.outstanding, kind: loanOrDebt.kind, phone: person?.phone
             )
         }
         .sorted { $0.day < $1.day }
