@@ -196,7 +196,7 @@ struct DebtsAndLoansByPersonTests {
 
         #expect(everyone.open.map(\.person.name) == ["Ben", "Dana", "Zoe"])
         #expect(everyone.settled.map(\.person.name) == ["Alex", "Cleo"])
-        #expect(everyone.settled.allSatisfy(\.isSettled))
+        #expect(everyone.settled.allSatisfy { $0.isSettled })
         #expect(everyone.open.allSatisfy { !$0.isSettled })
     }
 

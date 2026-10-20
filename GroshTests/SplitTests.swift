@@ -228,7 +228,7 @@ struct SplitTests {
         #expect(part.category == draft.original.category)
         #expect(part.day == today)
         #expect(part.note == "Brunch")
-        #expect(part.withName == "Anna")
+        #expect(part.people.map(\.name) == ["Anna"])
     }
 
     @Test func theOriginalKeepsItsIdentityCreatedAtAndRecurringAttachment() throws {

@@ -120,7 +120,7 @@ struct CategorySeedingTests {
         try CategorySeeder.restoreMissingDefaults(in: context)
 
         #expect(try allCategories().count == 84)
-        #expect(try allCategories().filter(\.isLocked).count == 9)
+        #expect(try allCategories().filter(\.isLocked).count == 10)
         #expect(try category(named: "Food & Beverage")?.symbolName == "fork.knife")
     }
 

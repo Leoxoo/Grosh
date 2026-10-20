@@ -313,7 +313,7 @@ struct AddTransactionTests {
         #expect(duplicate.category == (try store.category("Loan", .debtLoan)))
         #expect(duplicate.card == original.card)
         #expect(duplicate.note == "Rent help")
-        #expect(duplicate.withName == "Pasha")
+        #expect(duplicate.people.map(\.name) == ["Pasha"])
         #expect(!duplicate.isExcludedFromReport)
         #expect(duplicate.day == today)
     }
@@ -336,7 +336,7 @@ struct AddTransactionTests {
 
         #expect(editing.day == CalendarDay(year: 2026, month: 5, day: 27))
         #expect(editing.amount == Money(cents: 10_000))
-        #expect(editing.withName == "Pasha")
+        #expect(editing.people.map(\.name) == ["Pasha"])
     }
 
     @Test func savingAnEditChangesTheTransactionButKeepsItsPlaceWithinTheDay() throws {
