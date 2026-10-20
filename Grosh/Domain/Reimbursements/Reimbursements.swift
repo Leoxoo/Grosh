@@ -32,6 +32,8 @@ nonisolated enum ReimbursementRuleError: Error, Equatable {
     case missingAmount
     /// Only an Expense can be paid back.
     case notAnExpense
+    /// Only money that came in can be moved into an Expense.
+    case notADeposit
 }
 
 extension ReimbursementRuleError: LocalizedError {
@@ -39,6 +41,7 @@ extension ReimbursementRuleError: LocalizedError {
         switch self {
         case .missingAmount: String(localized: "Enter an amount above zero.")
         case .notAnExpense: String(localized: "Only an Expense can be reimbursed.")
+        case .notADeposit: String(localized: "Only money that came in can be moved into an Expense.")
         }
     }
 }

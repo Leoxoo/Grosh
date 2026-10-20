@@ -15,6 +15,8 @@ struct TransactionDetailView: View {
     @State private var isEnteringAmount = false
     /// What the Loan or Debt section opened, while it is open.
     @State private var loanOrDebtAction: LoanOrDebtAction?
+    /// What the Reimbursement section opened, while it is open.
+    @State private var reimbursementAction: ReimbursementAction?
 
     var body: some View {
         Group {
@@ -42,6 +44,7 @@ struct TransactionDetailView: View {
             EstimatedAmountEditor(transaction: transaction)
         }
         .loanOrDebtSheets(for: transaction, action: $loanOrDebtAction)
+        .reimbursementSheets(for: transaction, action: $reimbursementAction)
     }
 
     private var details: some View {
@@ -69,6 +72,8 @@ struct TransactionDetailView: View {
             BalanceChangeSection(transaction: transaction)
 
             LoanOrDebtSection(transaction: transaction, action: $loanOrDebtAction)
+
+            ReimbursementSection(transaction: transaction, action: $reimbursementAction)
 
             Section {
                 fields
@@ -146,8 +151,12 @@ private struct TransactionDetailHeader: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(transaction.categoryName)
                     .font(.headline)
-                AmountText(amount: transaction.amount)
-                    .font(.title.bold())
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    AmountText(amount: transaction.amount)
+                        .font(.title.bold())
+                    ReimbursementNetText(transaction: transaction)
+                        .font(.title3)
+                }
                 Text(transaction.day.date().formatted(date: .complete, time: .omitted))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
