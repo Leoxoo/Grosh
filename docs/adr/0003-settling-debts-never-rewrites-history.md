@@ -1,3 +1,5 @@
+> Superseded in part by [ADR 0008](0008-reimbursements-are-stored-on-the-expense.md): a Reimbursement lands in the wallet on the Expense's own day, so the original is no longer the amount every balance uses.
+>
 > Superseded in part by [ADR 0004](0004-forgiving-marks-the-original-instead-of-adding-transactions.md): forgiving no longer adds transactions.
 
 # Settling a Debt or Loan never rewrites the original transaction
