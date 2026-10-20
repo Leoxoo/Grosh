@@ -17,7 +17,8 @@ struct PeriodGraphTests {
     private func graph(
         _ side: SpentOrIncome = .spent, _ period: Period, selection: WalletSelection = .total
     ) throws -> MonthGraph {
-        let counted = try store.transactions().compactMap { $0.countedAmount(in: selection) }
+        let otherIncome = try store.otherIncome()
+        let counted = try store.transactions().compactMap { $0.countedAmount(in: selection, otherIncome: otherIncome) }
         return MonthGraph(
             side, of: counted, countingFrom: counted.firstDay, recurring: [], in: period, today: today,
             comparingWith: .average, selection: selection

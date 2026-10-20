@@ -9,6 +9,8 @@ struct TransactionDaySections<Row: View>: View {
     var scheduled: [ScheduledOccurrence] = []
     /// Whether a transaction's row is highlighted. Only Mac draws the highlight, in the row's group.
     var isSelected: (Transaction) -> Bool = { _ in false }
+    /// What each day's total adds up: the net, or on a Card's statement what the Card was charged.
+    var listed = ListedAmount.net
     @ViewBuilder let row: (Transaction) -> Row
 
     var body: some View {
@@ -24,17 +26,19 @@ struct TransactionDaySections<Row: View>: View {
                     }
                 }
             } header: {
-                TransactionDayHeader(day: day)
+                TransactionDayHeader(day: day, listed: listed)
             }
         }
     }
 }
 
 /// A day's date with its day number big, the weekday and the month and year stacked small beside it, and the day's
-/// net total. At the largest text sizes the total moves under the date so neither is cut short. A day with
+/// total. At the largest text sizes the total moves under the date so neither is cut short. A day with
 /// only Scheduled rows has no total.
 struct TransactionDayHeader: View {
     let day: TransactionDay
+    /// What the total adds up: the net, or on a Card's statement what the Card was charged.
+    var listed = ListedAmount.net
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -59,7 +63,7 @@ struct TransactionDayHeader: View {
         .textCase(nil)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(date.formatted(.dateTime.weekday(.wide).day().month(.wide).year()))
-        .accessibilityValue(hasTransactions ? day.net.signedFormatted() : "")
+        .accessibilityValue(hasTransactions ? day.total(listed).signedFormatted() : "")
     }
 
     private func dateLabel(_ date: Date) -> some View {
@@ -81,7 +85,7 @@ struct TransactionDayHeader: View {
     }
 
     private var total: some View {
-        AmountText(amount: day.net, showsPlusSign: true, showsColor: false)
+        AmountText(amount: day.total(listed), showsPlusSign: true, showsColor: false)
             .font(.subheadline.weight(.semibold))
     }
 }

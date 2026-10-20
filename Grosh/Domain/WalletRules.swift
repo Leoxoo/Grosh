@@ -80,7 +80,7 @@ extension Wallet {
     func balance(asOf today: CalendarDay) -> Money {
         let cents = (transactions ?? []).notDeleted
             .filter { $0.dayRaw <= today.rawValue }
-            .reduce(0) { $0 + $1.amountCents }
+            .reduce(0) { $0 + $1.netCents }
         return Money(cents: cents, currencyCode: currencyCode)
     }
 
@@ -108,7 +108,7 @@ struct WalletBalances {
         var centsByWallet: [ObjectIdentifier: Int] = [:]
         for transaction in transactions where transaction.dayRaw <= today.rawValue {
             guard let wallet = transaction.wallet else { continue }
-            centsByWallet[ObjectIdentifier(wallet), default: 0] += transaction.amountCents
+            centsByWallet[ObjectIdentifier(wallet), default: 0] += transaction.netCents
         }
         self.centsByWallet = centsByWallet
     }

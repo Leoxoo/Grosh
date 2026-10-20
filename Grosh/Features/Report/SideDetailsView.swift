@@ -27,9 +27,17 @@ struct SideDetailsView: View {
     }
 
     var body: some View {
+        OtherIncomeReader { otherIncome in
+            content(otherIncome: otherIncome)
+        }
+    }
+
+    /// The details, with Other Income read once for everything it counts.
+    @ViewBuilder
+    private func content(otherIncome: Category) -> some View {
         let today = CalendarDay.today
         let days = transactions.reportDays(of: period, in: walletSelection, today: today)
-        let counted = transactions.counted(in: walletSelection, during: period, today: today)
+        let counted = transactions.counted(in: walletSelection, during: period, today: today, otherIncome: otherIncome)
         let totals = PeriodTotals(of: counted)
         let total = side == .income ? totals.income : totals.spent
         List {
@@ -53,7 +61,9 @@ struct SideDetailsView: View {
             }
 
             if timeRange.hasComparisonCard {
-                let countedEver = transactions.compactMap { $0.countedAmount(in: walletSelection) }
+                let countedEver = transactions.compactMap {
+                    $0.countedAmount(in: walletSelection, otherIncome: otherIncome)
+                }
                 PeriodComparisonCard(
                     graph: MonthGraph(
                         side, of: countedEver, countingFrom: countedEver.firstDay, recurring: recurringTransactions,

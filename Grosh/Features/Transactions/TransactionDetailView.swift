@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// One transaction with all its fields, its Related transactions, and Edit, Duplicate and Delete.
+/// One transaction with all its fields, its Related transactions, and Edit, Duplicate, Split and Delete.
 /// Use inside a `NavigationStack`.
 struct TransactionDetailView: View {
     let transaction: Transaction
@@ -12,9 +12,12 @@ struct TransactionDetailView: View {
     /// The editor Edit opened, while it is open.
     @State private var editing: TransactionEditFlow?
     @State private var isDuplicating = false
+    @State private var isSplitting = false
     @State private var isEnteringAmount = false
     /// What the Loan or Debt section opened, while it is open.
     @State private var loanOrDebtAction: LoanOrDebtAction?
+    /// What the Reimbursement section opened, while it is open.
+    @State private var reimbursementAction: ReimbursementAction?
 
     var body: some View {
         Group {
@@ -38,14 +41,23 @@ struct TransactionDetailView: View {
         .sheet(isPresented: $isDuplicating) {
             TransactionEditor(mode: .duplicate(transaction))
         }
+        .sheet(isPresented: $isSplitting) {
+            SplitSheet(transaction: transaction)
+        }
         .sheet(isPresented: $isEnteringAmount) {
             EstimatedAmountEditor(transaction: transaction)
         }
         .loanOrDebtSheets(for: transaction, action: $loanOrDebtAction)
+        .reimbursementSheets(for: transaction, action: $reimbursementAction)
     }
 
     private var details: some View {
-        List {
+        // Worked out once for the whole screen: on a linked Expense or Income, whether it is a part of a Split reads the
+        // store.
+        let isSplitPart = transaction.isSplitPart
+        let editFlow = transaction.editFlow(isSplitPart: isSplitPart)
+        let canBeDuplicated = transaction.canBeDuplicated(editFlow: editFlow)
+        return List {
             Section {
                 TransactionDetailHeader(transaction: transaction)
             }
@@ -70,16 +82,24 @@ struct TransactionDetailView: View {
 
             LoanOrDebtSection(transaction: transaction, action: $loanOrDebtAction)
 
+            ReimbursementSection(transaction: transaction, action: $reimbursementAction)
+
             Section {
                 fields
             }
 
-            RelatedTransactionsSection(transaction: transaction)
+            RelatedTransactionsSection(transaction: transaction, isSplitPart: isSplitPart)
 
             Section {
-                if transaction.canBeDuplicated {
+                if canBeDuplicated {
                     Button("Duplicate", systemImage: "plus.square.on.square") {
                         isDuplicating = true
+                    }
+                    .fullWidthRowButton()
+                }
+                if transaction.canBeSplit(editFlow: editFlow) {
+                    Button("Split", systemImage: "square.split.2x1") {
+                        isSplitting = true
                     }
                     .fullWidthRowButton()
                 }
@@ -88,7 +108,7 @@ struct TransactionDetailView: View {
                 }
                 .fullWidthRowButton()
             } footer: {
-                if transaction.canBeDuplicated {
+                if canBeDuplicated {
                     Text("Duplicate opens a new transaction with the same details, dated today.")
                 }
             }
@@ -99,7 +119,7 @@ struct TransactionDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         #endif
         .toolbar {
-            if let editFlow = transaction.editFlow {
+            if let editFlow {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Edit") { editing = editFlow }
                 }
@@ -146,8 +166,12 @@ private struct TransactionDetailHeader: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(transaction.categoryName)
                     .font(.headline)
-                AmountText(amount: transaction.amount)
-                    .font(.title.bold())
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    AmountText(amount: transaction.amount)
+                        .font(.title.bold())
+                    ReimbursementNetText(transaction: transaction)
+                        .font(.title3)
+                }
                 Text(transaction.day.date().formatted(date: .complete, time: .omitted))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)

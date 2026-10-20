@@ -77,6 +77,12 @@ struct TransactionFilter: Equatable {
         return true
     }
 
+    /// The total a list of `transactions` shows: their net total, or with a Card filter on the Card's total, which counts
+    /// what the Card was charged (``Sequence/charged``) rather than the net.
+    func total(of transactions: [Transaction]) -> Money {
+        card == nil ? transactions.net : transactions.charged
+    }
+
     /// Whether there is search text to look for.
     var isSearching: Bool {
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

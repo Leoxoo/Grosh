@@ -62,7 +62,7 @@ struct CardTransactionsView: View {
                         .monospacedDigit()
                 }
                 LabeledContent {
-                    AmountText(amount: (shown + added).net, showsPlusSign: true, showsColor: false)
+                    AmountText(amount: (shown + added).charged, showsPlusSign: true, showsColor: false)
                         .fontWeight(.semibold)
                 } label: {
                     Text(period.isStatement ? "Statement total" : "Total")
@@ -88,11 +88,12 @@ struct CardTransactionsView: View {
                 }
             }
 
-            TransactionDaySections(transactions: shown) { transaction in
+            // A statement shows what the Card was charged, Reimbursements not counted, so it reconciles with the Card.
+            TransactionDaySections(transactions: shown, listed: .charged) { transaction in
                 NavigationLink {
                     TransactionDetailView(transaction: transaction)
                 } label: {
-                    TransactionRow(transaction: transaction)
+                    TransactionRow(transaction: transaction, listed: .charged)
                 }
             }
 
@@ -142,7 +143,7 @@ private struct LeadInTransactionRow: View {
             NavigationLink {
                 TransactionDetailView(transaction: transaction)
             } label: {
-                TransactionRow(transaction: transaction, showsDay: true)
+                TransactionRow(transaction: transaction, showsDay: true, listed: .charged)
                     .opacity(0.55)
             }
         }

@@ -13,7 +13,17 @@ struct StepTransactionsView: View {
     @Query(Transaction.notDeleted) private var transactions: [Transaction]
 
     var body: some View {
-        let listed = PeriodTransactions(side: side, of: transactions, in: walletSelection, days: days)
+        OtherIncomeReader { otherIncome in
+            content(otherIncome: otherIncome)
+        }
+    }
+
+    /// The list, with Other Income read once for everything it counts.
+    @ViewBuilder
+    private func content(otherIncome: Category) -> some View {
+        let listed = PeriodTransactions(
+            side: side, of: transactions, in: walletSelection, days: days, otherIncome: otherIncome
+        )
         List {
             Section {
                 HStack {

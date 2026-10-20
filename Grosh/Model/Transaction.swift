@@ -47,6 +47,17 @@ final class Transaction {
     var recurring: RecurringTransaction?
     /// On a forgiven Loan or Debt, the category the forgiven amount counts under in reports.
     var forgivenCategory: Category?
+    /// On an Expense, what its Reimbursements add up to in cents: zero when it has none. Kept beside them, so a balance
+    /// reads a transaction's net (``netCents``) without reading its Reimbursements one transaction at a time.
+    /// ``recountReimbursements()`` keeps it in step whenever one is added, edited, removed or moved.
+    var reimbursedCents: Int = 0
+    /// On an Expense, the money paid back against it. They go with it: to Recently Deleted and back, and for good.
+    @Relationship(deleteRule: .cascade, inverse: \Reimbursement.expense)
+    var reimbursements: [Reimbursement]? = []
+    /// On a deposit moved into an Expense, the Reimbursement it became. Restoring the deposit removes it; removing the
+    /// deposit for good leaves it on the Expense.
+    @Relationship(deleteRule: .nullify, inverse: \Reimbursement.movedFrom)
+    var movedIntoReimbursements: [Reimbursement]? = []
 
     init(
         amount: Money,

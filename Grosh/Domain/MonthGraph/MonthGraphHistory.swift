@@ -38,7 +38,8 @@ enum MonthGraphHistory {
         FetchDescriptor(predicate: #Predicate { $0.deletedAt == nil && $0.forgivenCents != nil })
     }
 
-    /// The earliest transaction that counts its own amount on the Month graph, as ``Transaction/countedAmount`` has it:
+    /// The earliest transaction that counts its own amount on the Month graph, as
+    /// ``Transaction/countedAmount(in:otherIncome:)`` has it:
     /// outside Recently Deleted, paid from a wallet counted in the Total, counting in the report, and filed under an
     /// Expense or Income category that isn't a transfer half. A Loan or Debt is filed under a Debt/Loan category, so a
     /// forgiven one is never it: see ``firstDay(earliest:forgiven:)``.
@@ -74,7 +75,7 @@ enum MonthGraphHistory {
 
     /// The first day anything counts on the Month graph, on either tab, or `nil` when nothing does: the earlier of the
     /// ``earliestCounted`` transaction's day and the day of the first forgiveness that counts.
-    static func firstDay(earliest: [Transaction], forgiven: [Transaction]) -> CalendarDay? {
-        (earliest + forgiven).compactMap(\.countedAmount).firstDay
+    static func firstDay(earliest: [Transaction], forgiven: [Transaction], otherIncome: Category) -> CalendarDay? {
+        (earliest + forgiven).compactMap { $0.countedAmount(otherIncome: otherIncome) }.firstDay
     }
 }

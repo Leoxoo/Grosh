@@ -278,10 +278,12 @@ extension Transaction {
 
     /// Brings a transaction deleted on its own back from Recently Deleted, linked as before. One deleted with its
     /// wallet comes back only with the wallet, one whose wallet is in the bin waits for the wallet, and a payment
-    /// whose Loan or Debt was forgiven since waits for it to be un-forgiven. Saves.
+    /// whose Loan or Debt was forgiven since waits for it to be un-forgiven. A deposit moved into an Expense takes its
+    /// Reimbursement back off the Expense (``takeBackMovedInReimbursements()``). Saves.
     func restore() throws {
         if let restoreBlocker { throw restoreBlocker }
         deletedAt = nil
+        takeBackMovedInReimbursements()
         try modelContext?.save()
     }
 

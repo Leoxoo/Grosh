@@ -36,6 +36,18 @@ struct GroshCSVExportTests {
         try GroshCSVExport.csv(in: context)
     }
 
+    /// The export's rows, each as its fields by column name.
+    private func exportedRows() throws -> [[String: String]] {
+        let records = MoneyLoverCSV.records(in: try exported())
+        let names = records[0].fields
+        return records.dropFirst().map { Dictionary(uniqueKeysWithValues: zip(names, $0.fields)) }
+    }
+
+    /// The imported transaction whose note is `note`, which a test then splits or reimburses.
+    private func transaction(noted note: String) throws -> Transaction {
+        try #require(try context.fetch(Transaction.notDeleted).first { $0.note == note })
+    }
+
     private func wallet(_ name: String) throws -> Wallet {
         try #require(try context.fetch(FetchDescriptor<Wallet>()).first { $0.name == name })
     }
@@ -54,11 +66,11 @@ struct GroshCSVExportTests {
         ))
 
         #expect(try exported() == groshExport(
-            "1,10/06/2026,Outgoing transfer,-250.00,USD,Checking (Navy Federal),To savings,,,1,,,1,,,,",
-            "2,10/06/2026,Incoming transfer,250.00,USD,Savings,To savings,,,1,,,1,,,,",
-            "3,10/06/2026,Starting balance,0.00,USD,Savings,,,,1,,,,,,,",
-            "4,10/05/2026,Café,-3.50,USD,Checking (Navy Federal),\"Coffee, large\",Sam,Road trip,,,Chase,,,,,",
-            "5,10/05/2026,Starting balance,0.00,USD,Checking (Navy Federal),,,,1,,,,,,,"
+            "1,10/06/2026,Outgoing transfer,-250.00,USD,Checking (Navy Federal),To savings,,,1,,,1,,,,,,",
+            "2,10/06/2026,Incoming transfer,250.00,USD,Savings,To savings,,,1,,,1,,,,,,",
+            "3,10/06/2026,Starting balance,0.00,USD,Savings,,,,1,,,,,,,,,",
+            "4,10/05/2026,Café,-3.50,USD,Checking (Navy Federal),\"Coffee, large\",Sam,Road trip,,,Chase,,,,,,,",
+            "5,10/05/2026,Starting balance,0.00,USD,Checking (Navy Federal),,,,1,,,,,,,,,"
         ))
     }
 
@@ -73,6 +85,56 @@ struct GroshCSVExportTests {
         let links = try MoneyLoverCSV.rows(in: exported()).map(\.link)
         // Debt Collection, the transfer's halves, two Starting balances, the Loan, and Cash's Starting balance.
         #expect(links == ["1", "2", "2", "", "", "1", ""])
+    }
+
+    @Test func everyPartOfASplitNamesTheRowOfTheOriginalItWasSplitFrom() throws {
+        try importing(moneyLoverExport("1,10/05/2026,Café,-60,USD,Checking,Dinner,,,,"))
+        let dinner = try transaction(noted: "Dinner")
+        var draft = SplitDraft(splitting: dinner)
+        for cents in [20_00, 10_00] {
+            var part = draft.newPart()
+            part.amount = Money(cents: cents)
+            draft.addPart(part)
+        }
+        try dinner.split(draft, in: context)
+
+        let rows = try exportedRows().filter { $0["Category"] == "Café" }
+        let original = try #require(rows.first { $0["Amount"] == "-30.00" })
+        let parts = rows.filter { $0["Amount"] != "-30.00" }
+        #expect(original["Split from"] == "")
+        #expect(parts.compactMap { $0["Amount"] }.sorted() == ["-10.00", "-20.00"])
+        #expect(parts.allSatisfy { $0["Split from"] == original["Id"] })
+        #expect(rows.allSatisfy { $0["Linked"] == original["Linked"] && $0["Linked"] != "" })
+    }
+
+    @Test func aLinkThatIsNotASplitHasNoSplitFrom() throws {
+        try importing(moneyLoverExport(
+            "1,10/08/2026,Debt Collection,50,USD,Cash,,Sam,,,",
+            "2,10/06/2026,Outgoing transfer,-250,USD,Checking,,,,,",
+            "3,10/06/2026,Incoming transfer,250,USD,Savings,,,,,",
+            "4,10/05/2026,Loan,-50,USD,Cash,,Sam,,,"
+        ))
+
+        #expect(try exportedRows().allSatisfy { $0["Split from"] == "" })
+    }
+
+    @Test func anExpensesReimbursementsAreListedByDayWithoutChangingItsAmount() throws {
+        try importing(moneyLoverExport(
+            "1,10/03/2026,Café,-60,USD,Checking,Dinner,,,,",
+            "2,10/03/2026,Café,-4,USD,Checking,Coffee,,,,"
+        ))
+        let dinner = try transaction(noted: "Dinner")
+        for (cents, day) in [(20_00, 6), (10_00, 4)] {
+            let draft = ReimbursementDraft(amount: Money(cents: cents), day: CalendarDay(year: 2026, month: 10, day: day))
+            try Reimbursement.add(draft, to: dinner, in: context)
+        }
+
+        let rows = try exportedRows().filter { $0["Category"] == "Café" }
+        let dinnerRow = try #require(rows.first { $0["Note"] == "Dinner" })
+        let coffeeRow = try #require(rows.first { $0["Note"] == "Coffee" })
+        #expect(dinnerRow["Amount"] == "-60.00")
+        #expect(dinnerRow["Reimbursement"] == "10.00 10/04/2026; 20.00 10/06/2026")
+        #expect(coffeeRow["Reimbursement"] == "")
     }
 
     @Test func fieldsHoldingCommasQuotesOrLineBreaksAreQuoted() throws {
@@ -114,12 +176,12 @@ struct GroshCSVExportTests {
 
     @Test func aGroshExportIsRestoredAsItWasExported() throws {
         let export = groshExport(
-            "1,10/06/2026,Outgoing transfer,-250.00,USD,Checking,To savings,,,1,,,1,,,,",
-            "2,10/06/2026,Incoming transfer,250.00,USD,Savings,To savings,,,1,,,1,,,,",
-            "3,10/06/2026,Starting balance,500.00,USD,Savings,,,,1,,,,,,,",
-            "4,10/05/2026,Café,-3.50,USD,Checking,\"Coffee, large\",Sam,Road trip,,,Chase,,,,,",
-            "5,10/05/2026,Café,-2.00,USD,Checking,#chase espresso,,,,,,,,,,",
-            "6,10/05/2026,Starting balance,1000.00,USD,Checking,,,,1,,,,,,,"
+            "1,10/06/2026,Outgoing transfer,-250.00,USD,Checking,To savings,,,1,,,1,,,,,,",
+            "2,10/06/2026,Incoming transfer,250.00,USD,Savings,To savings,,,1,,,1,,,,,,",
+            "3,10/06/2026,Starting balance,500.00,USD,Savings,,,,1,,,,,,,,,",
+            "4,10/05/2026,Café,-3.50,USD,Checking,\"Coffee, large\",Sam,Road trip,,,Chase,,,,,,,",
+            "5,10/05/2026,Café,-2.00,USD,Checking,#chase espresso,,,,,,,,,,,,",
+            "6,10/05/2026,Starting balance,1000.00,USD,Checking,,,,1,,,,,,,,,"
         )
 
         let summary = try importing(export)
@@ -133,9 +195,9 @@ struct GroshCSVExportTests {
 
     @Test func aForgivenLoanKeepsItsForgivenMarkThroughExportAndRestore() throws {
         let export = groshExport(
-            "1,10/08/2026,Debt Collection,30.00,USD,Cash,,Sam,,1,,,1,,,,",
-            "2,10/05/2026,Loan,-50.00,USD,Cash,,Sam,,1,,,1,20.00,10/09/2026,Friends & Lover,\"Birthday, late\"",
-            "3,10/05/2026,Starting balance,100.00,USD,Cash,,,,1,,,,,,,"
+            "1,10/08/2026,Debt Collection,30.00,USD,Cash,,Sam,,1,,,1,,,,,,",
+            "2,10/05/2026,Loan,-50.00,USD,Cash,,Sam,,1,,,1,20.00,10/09/2026,Friends & Lover,\"Birthday, late\",,",
+            "3,10/05/2026,Starting balance,100.00,USD,Cash,,,,1,,,,,,,,,"
         )
 
         try importing(export)

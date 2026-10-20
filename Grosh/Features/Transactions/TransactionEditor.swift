@@ -211,7 +211,7 @@ private struct TransactionForm: View {
 }
 
 /// Names used before that match what's typed in the With field, to pick with one tap.
-private struct WithNameSuggestions: View {
+struct WithNameSuggestions: View {
     let typed: String
     let onPick: (String) -> Void
 

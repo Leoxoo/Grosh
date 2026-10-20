@@ -134,10 +134,10 @@ struct NotDeletedTransactionsTests {
         var ledgerChanged = false
         withObservationTracking { _ = store.entries } onChange: { ledgerChanged = true }
         coffee.amountCents = -7_50
-        #expect(store.entries.map(\.amountCents) == [-5_00])
+        #expect(store.entries.map(\.netCents) == [-5_00])
         try context.save()
         #expect(ledgerChanged)
-        #expect(store.entries.map(\.amountCents) == [-7_50])
+        #expect(store.entries.map(\.netCents) == [-7_50])
 
         coffee.wallet = savings
         coffee.day = today.adding(days: -3)

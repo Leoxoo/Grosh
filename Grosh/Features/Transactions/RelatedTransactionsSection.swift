@@ -2,15 +2,24 @@ import SwiftData
 import SwiftUI
 
 /// The transaction detail's Related transactions: every transaction sharing its link, such as the other half of
-/// a transfer. Each opens its own detail. Shows nothing when there are none. Use inside a `List`.
+/// a transfer or the other parts of a Split, which add Undo split. Each opens its own detail. Shows nothing when
+/// there are none. Use inside a `List`.
 struct RelatedTransactionsSection: View {
     let transaction: Transaction
+    /// Whether the transaction is a part of a Split (``Transaction/isSplitPart``), as the detail worked it out.
+    let isSplitPart: Bool
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+    @State private var isConfirmingUndoSplit = false
+    @State private var errorMessage: String?
 
     /// Every transaction sharing the link, this one included, so one linked later shows straight away.
     @Query private var linked: [Transaction]
 
-    init(transaction: Transaction) {
+    init(transaction: Transaction, isSplitPart: Bool) {
         self.transaction = transaction
+        self.isSplitPart = isSplitPart
         _linked = Query(transaction.linkedTransactions)
     }
 
@@ -25,7 +34,33 @@ struct RelatedTransactionsSection: View {
                         RelatedTransactionRow(transaction: other)
                     }
                 }
+                if isSplitPart {
+                    Button("Undo Split", systemImage: "arrow.uturn.backward") {
+                        isConfirmingUndoSplit = true
+                    }
+                    .confirmationDialog(
+                        "Undo this split?", isPresented: $isConfirmingUndoSplit, titleVisibility: .visible
+                    ) {
+                        Button("Undo Split", role: .destructive, action: undoSplit)
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("The parts merge back into the original, which takes the sum of their amounts.")
+                    }
+                    .errorAlert("Couldn't Undo Split", message: $errorMessage)
+                }
             }
+        }
+    }
+
+    /// Merges the split back, then leaves this transaction's detail if it was one of the parts merged away.
+    private func undoSplit() {
+        let id = transaction.persistentModelID
+        do {
+            if try transaction.undoSplit(in: context).persistentModelID != id {
+                dismiss()
+            }
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }
