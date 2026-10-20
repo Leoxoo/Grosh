@@ -112,7 +112,8 @@ struct ReimbursementEntriesText: View {
     let transaction: Transaction
 
     var body: some View {
-        let summary = transaction.reimbursementSummary()
+        // Read from the stored total first, so a row without Reimbursements never reads them.
+        let summary = transaction.reimbursedCents > 0 ? transaction.reimbursementSummary() : ""
         if !summary.isEmpty {
             Text(summary)
                 .font(.caption)

@@ -270,7 +270,8 @@ struct SplitTests {
         let coffee = try record(25_00)
         func spent() throws -> Money {
             try PeriodTotals(
-                of: allTransactions(), in: .total, period: .month(CalendarMonth(today)), today: today
+                of: allTransactions(), in: .total, period: .month(CalendarMonth(today)), today: today,
+                otherIncome: context.otherCategory(.income)
             ).spent
         }
         let balanceBefore = balance()
@@ -399,6 +400,16 @@ struct SplitTests {
         #expect(!coffee.isEstimated)
     }
 
+    @Test func splittingWithoutChangingTheTotalKeepsAnEstimatedAmountEstimated() throws {
+        let coffee = try record(25_00)
+        coffee.isEstimated = true
+
+        try split(coffee, off: [10_00, 5_00])
+
+        #expect(coffee.isEstimated)
+        #expect(coffee.amountCents == -10_00)
+    }
+
     // MARK: Required fields
 
     @Test func aSplitWithoutAnyPartIsRefused() throws {
@@ -497,6 +508,32 @@ struct SplitTests {
         #expect(overpaid.isDebtWriteOff)
         #expect(!overpaid.isSplitPart)
         #expect(overpaid.editFlow == nil)
+    }
+
+    @Test func theLinksOfEveryLoanAndDebtReadOnceTellPartsFromWriteOffs() throws {
+        var draft = TransactionDraft(type: .debtLoan, day: today)
+        draft.wallet = checking
+        draft.amount = Money(cents: 100_00)
+        draft.category = try context.lockedCategory(.debt)
+        draft.withName = "Anna"
+        let debt = try Transaction.create(draft, in: context)
+        var payment = try DebtPaymentDraft(settling: debt, on: today, in: context)
+        payment.amount = Money(cents: 120_00)
+        let overpaid = try #require(try DebtPayment.record(payment, in: context).overpayment)
+        let coffee = try record(25_00)
+        let part = try #require(try split(coffee, off: [10_00]).first)
+        // A Debt in Recently Deleted still holds its link.
+        try debt.delete(.onlySelected, in: context)
+
+        let links = try Transaction.loanOrDebtLinks(in: context)
+
+        #expect(links == Set([debt.linkID].compactMap { $0 }))
+        #expect(overpaid.isDebtWriteOff(loanOrDebtLinks: links) && overpaid.isDebtWriteOff)
+        #expect(!overpaid.isSplitPart(loanOrDebtLinks: links) && !overpaid.isSplitPart)
+        for transaction in [coffee, part] {
+            #expect(transaction.isSplitPart(loanOrDebtLinks: links) && transaction.isSplitPart)
+            #expect(!transaction.isDebtWriteOff(loanOrDebtLinks: links) && !transaction.isDebtWriteOff)
+        }
     }
 
     @Test func aPartCanBeSplitAgainAndJoinsTheSameSplit() throws {

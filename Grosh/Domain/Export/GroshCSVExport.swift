@@ -21,21 +21,27 @@ enum GroshCSVExport {
     static func csv(in context: ModelContext) throws -> String {
         var descriptor = Transaction.notDeleted
         descriptor.sortBy = Transaction.listOrder
-        return try csv(of: context.fetch(descriptor).inListOrder())
+        return try csv(
+            of: context.fetch(descriptor).inListOrder(), loanOrDebtLinks: Transaction.loanOrDebtLinks(in: context)
+        )
     }
 
     /// `transactions` in the order given, one row each, with MoneyLover's line endings. Rows are numbered from 1 in
     /// the `Id` column. Linked transactions share a number in the `Linked` column, numbered from 1 in the order the
     /// file first lists each link, so the same data always gives the same file. A transaction with no wallet or
     /// category has nothing to file it under, so it is left out. A part of a Split names the row of the Split's
-    /// original, its oldest part, in `Split from`; the original itself leaves it empty.
-    static func csv(of transactions: [Transaction]) -> String {
+    /// original, its oldest part (`splitOriginal`), in `Split from`; the original itself leaves it
+    /// empty. `loanOrDebtLinks` (``Transaction/loanOrDebtLinks(in:)``) tells a part of a Split from what a Loan or Debt
+    /// writes off.
+    static func csv(of transactions: [Transaction], loanOrDebtLinks: Set<UUID>) -> String {
         let filed = transactions.filter { $0.wallet != nil && $0.category != nil }
-        var originals: [UUID: (createdAt: Date, row: Int)] = [:]
-        for (index, transaction) in filed.enumerated() where transaction.isSplitPart {
-            guard let id = transaction.linkID else { continue }
-            if let original = originals[id], original.createdAt <= transaction.createdAt { continue }
-            originals[id] = (transaction.createdAt, index + 1)
+        var partsByLink: [UUID: [Transaction]] = [:]
+        for transaction in filed where transaction.isSplitPart(loanOrDebtLinks: loanOrDebtLinks) {
+            if let link = transaction.linkID { partsByLink[link, default: []].append(transaction) }
+        }
+        let rowNumbers = Dictionary(uniqueKeysWithValues: filed.enumerated().map { (ObjectIdentifier($1), $0 + 1) })
+        let originals = partsByLink.compactMapValues { parts in
+            parts.splitOriginal.flatMap { rowNumbers[ObjectIdentifier($0)] }
         }
         var links: [UUID: Int] = [:]
         var lines = [header.map(field).joined(separator: ",")]
@@ -49,7 +55,7 @@ enum GroshCSVExport {
             }
             let day = transaction.day
             let forgiveness = transaction.forgiveness
-            let original: Int? = transaction.linkID.flatMap { originals[$0]?.row }
+            let original: Int? = transaction.linkID.flatMap { originals[$0] }
             let splitFrom: String = original.map { $0 == lines.count ? "" : String($0) } ?? ""
             let reimbursement: String = transaction.orderedReimbursements
                 .map { "\(Money(cents: $0.amountCents).decimalString) \(date($0.day))" }

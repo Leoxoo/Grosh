@@ -135,6 +135,20 @@ struct ReimbursementBalanceTests {
         #expect(try entry().netCents == -60_00)
     }
 
+    /// Loading every transaction for the balances reads each one's net without reading its Reimbursements, which would
+    /// fault them in one transaction at a time: what they add up to is stored on the transaction itself.
+    @Test func whatTheReimbursementsAddUpToIsStoredOnTheTransaction() throws {
+        let dinner = try reimbursedDinner()
+        let entry = try payBack(15_00, to: dinner)
+        let reimbursedBy35 = FetchDescriptor<Transaction>(predicate: #Predicate { $0.reimbursedCents == 35_00 })
+
+        #expect(try context.fetch(reimbursedBy35) == [dinner])
+
+        try entry.delete()
+        #expect(try context.fetch(reimbursedBy35).isEmpty)
+        #expect(dinner.reimbursedCents == 20_00)
+    }
+
     // MARK: Cards
 
     @Test func aCardStatementTotalIgnoresReimbursementsWhileTheWalletBalanceDoesNot() throws {
@@ -148,6 +162,21 @@ struct ReimbursementBalanceTests {
         #expect(shown.charged == Money(cents: -60_00))
         #expect(shown.net == Money(cents: -40_00))
         #expect(checking.balance(asOf: today) == Money(cents: -40_00))
+    }
+
+    @Test func aCardStatementsDayTotalsKeepWhatTheCardWasChargedWhileOtherListsCountTheNet() throws {
+        let chase = try addCard()
+        let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 10, 3))
+        let coffee = try store.record(-4_00, "Café", on: day(2026, 10, 3))
+        dinner.card = chase
+        coffee.card = chase
+        try payBack(20_00, to: dinner)
+
+        let days = TransactionDay.days(of: chase.transactions(in: chase.period(containing: today)))
+
+        #expect(days.map { $0.total(.charged) } == [Money(cents: -64_00)])
+        #expect(days.map { $0.total(.net) } == [Money(cents: -44_00)])
+        #expect(days.map(\.net) == days.map { $0.total(.net) })
     }
 
     @Test func aStatementPeriodsLeadInTransactionsKeepTheirOriginalAmount() throws {

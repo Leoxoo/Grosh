@@ -13,7 +13,9 @@ struct SplitSheet: View {
 
     @State private var draft: SplitDraft
     /// The part the editor is open on, while it is open.
-    @State private var editing: SplitTarget?
+    @State private var editing: SplitPartRef?
+    /// Whether the editor is open on a part about to be added.
+    @State private var isAddingPart = false
     @State private var errorMessage: String?
 
     init(transaction: Transaction) {
@@ -45,7 +47,7 @@ struct SplitSheet: View {
                             draft.removePart(at: index)
                         }
                     }
-                    Button("Add Part", systemImage: "plus") { editing = .new }
+                    Button("Add Part", systemImage: "plus") { isAddingPart = true }
                 }
 
                 if !draft.reimbursements.isEmpty {
@@ -69,8 +71,15 @@ struct SplitSheet: View {
         #if os(macOS)
         .frame(minWidth: 420, idealWidth: 460, minHeight: 480, idealHeight: 560)
         #endif
-        .sheet(item: $editing) { target in
-            editor(for: target)
+        .sheet(item: $editing) { part in
+            editor(for: part)
+        }
+        .sheet(isPresented: $isAddingPart) {
+            SplitPartEditor(
+                title: "New Part", part: draft.newPart(), type: partType, capacity: draft.original.amount.cents
+            ) {
+                draft.addPart($0)
+            }
         }
         .errorAlert("Couldn't Split Transaction", message: $errorMessage)
     }
@@ -111,7 +120,7 @@ struct SplitSheet: View {
                     Text("Choose a part").tag(SplitPartRef?.none)
                     Text("This transaction").tag(SplitPartRef?.some(.original))
                     ForEach(draft.parts.indices, id: \.self) { part in
-                        Text("\(draft.parts[part].category?.name ?? String(localized: "Uncategorized")), \(draft.parts[part].amount.formatted())")
+                        Text("\(draft.parts[part].categoryName), \(draft.parts[part].amount.formatted())")
                             .tag(SplitPartRef?.some(.part(part)))
                     }
                 } label: {
@@ -131,23 +140,19 @@ struct SplitSheet: View {
         }
     }
 
+    /// The type every part's category is of: the transaction's own.
+    private var partType: CategoryType { transaction.category?.type ?? .expense }
+
     @ViewBuilder
-    private func editor(for target: SplitTarget) -> some View {
-        let type = transaction.category?.type ?? .expense
-        switch target {
+    private func editor(for part: SplitPartRef) -> some View {
+        switch part {
         case .original:
-            SplitPartEditor(title: "This Transaction", part: draft.original, type: type, capacity: nil) {
+            SplitPartEditor(title: "This Transaction", part: draft.original, type: partType, capacity: nil) {
                 draft.original = $0
-            }
-        case .new:
-            SplitPartEditor(
-                title: "New Part", part: draft.newPart(), type: type, capacity: draft.original.amount.cents
-            ) {
-                draft.addPart($0)
             }
         case .part(let index):
             SplitPartEditor(
-                title: "Edit Part", part: draft.parts[index], type: type,
+                title: "Edit Part", part: draft.parts[index], type: partType,
                 capacity: draft.original.amount.cents + draft.parts[index].amount.cents
             ) {
                 draft.replacePart(at: index, with: $0)
@@ -165,16 +170,13 @@ struct SplitSheet: View {
     }
 }
 
-/// Which part of the split the editor is open on.
-private enum SplitTarget: Hashable, Identifiable {
-    /// The transaction being split, which keeps what the other parts leave.
-    case original
-    /// A part about to be added.
-    case new
-    /// The added part at this index.
-    case part(Int)
-
+extension SplitPartRef: Identifiable {
     var id: Self { self }
+}
+
+private extension SplitPart {
+    /// The category's name, or "Uncategorized" before one is chosen, as a transaction's row names it.
+    var categoryName: String { Category.name(of: category) }
 }
 
 /// A part with its category, date, note and amount. The amount is red while it is not above zero.
@@ -185,7 +187,7 @@ private struct SplitPartRow: View {
         HStack(spacing: 12) {
             CategoryIcon(category: part.category)
             VStack(alignment: .leading, spacing: 2) {
-                Text(part.category?.name ?? String(localized: "Uncategorized"))
+                Text(part.categoryName)
                     .lineLimit(1)
                 Text(part.day.date().formatted(date: .abbreviated, time: .omitted))
                     .font(.caption)

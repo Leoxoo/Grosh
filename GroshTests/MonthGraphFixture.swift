@@ -50,6 +50,11 @@ struct MonthGraphFixture {
         try Forgiveness.record(ForgiveDraft(forgiving: loanOrDebt, on: day, in: context), in: context)
     }
 
+    /// The Other Income category, which a report reads once and counts an Expense paid back beyond its amount under.
+    func otherIncome() throws -> Grosh.Category {
+        try context.otherCategory(.income)
+    }
+
     /// Every transaction in the store, those in Recently Deleted included.
     func transactions() throws -> [Transaction] {
         try context.fetch(FetchDescriptor<Transaction>())
@@ -66,8 +71,10 @@ struct MonthGraphFixture {
         let recurring = try context.fetch(FetchDescriptor<RecurringTransaction>())
         let history = try context.fetch(MonthGraphHistory.transactions(for: month))
             + context.fetch(MonthGraphHistory.forgiven)
+        let otherIncome = try otherIncome()
         return try MonthGraph(
-            side, of: history.compactMap(\.countedAmount), countingFrom: firstDay(), recurring: recurring,
+            side, of: history.compactMap { $0.countedAmount(otherIncome: otherIncome) }, countingFrom: firstDay(),
+            recurring: recurring,
             in: .month(month), today: today, comparingWith: choice
         )
     }
@@ -81,7 +88,8 @@ struct MonthGraphFixture {
     /// The first day anything counts on the Month graph, as Home reads it from the store.
     private func firstDay() throws -> CalendarDay? {
         try MonthGraphHistory.firstDay(
-            earliest: context.fetch(MonthGraphHistory.earliestCounted), forgiven: context.fetch(MonthGraphHistory.forgiven)
+            earliest: context.fetch(MonthGraphHistory.earliestCounted), forgiven: context.fetch(MonthGraphHistory.forgiven),
+            otherIncome: otherIncome()
         )
     }
 }

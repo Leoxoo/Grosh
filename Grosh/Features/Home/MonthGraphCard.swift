@@ -23,7 +23,15 @@ struct HomeMonthGraph: View {
     @AppStorage(Self.comparesWithLastYearKey) private var comparesWithLastYear = false
 
     var body: some View {
-        let firstDay = MonthGraphHistory.firstDay(earliest: earliest, forgiven: forgiven)
+        OtherIncomeReader { otherIncome in
+            content(otherIncome: otherIncome)
+        }
+    }
+
+    /// The strip and the card, with Other Income read once for everything they count.
+    @ViewBuilder
+    private func content(otherIncome: Category) -> some View {
+        let firstDay = MonthGraphHistory.firstDay(earliest: earliest, forgiven: forgiven, otherIncome: otherIncome)
         let months = MonthGraph.months(from: firstDay, today: today)
         Section {
             HStack {
@@ -41,7 +49,7 @@ struct HomeMonthGraph: View {
                 }
         }
         HomeMonthGraphCard(
-            month: month, firstDay: firstDay, forgiven: forgiven, today: today, side: $side,
+            month: month, firstDay: firstDay, forgiven: forgiven, today: today, otherIncome: otherIncome, side: $side,
             comparesWithLastYear: $comparesWithLastYear
         )
     }
@@ -67,6 +75,8 @@ private struct HomeMonthGraphCard: View {
     /// Every forgiven Loan and Debt, which count on the day they were forgiven, whatever month that is.
     let forgiven: [Transaction]
     let today: CalendarDay
+    /// What an Expense paid back beyond its amount counts its extra under.
+    let otherIncome: Category
     @Binding var side: SpentOrIncome
     @Binding var comparesWithLastYear: Bool
 
@@ -75,12 +85,13 @@ private struct HomeMonthGraphCard: View {
 
     init(
         month: CalendarMonth, firstDay: CalendarDay?, forgiven: [Transaction], today: CalendarDay,
-        side: Binding<SpentOrIncome>, comparesWithLastYear: Binding<Bool>
+        otherIncome: Category, side: Binding<SpentOrIncome>, comparesWithLastYear: Binding<Bool>
     ) {
         self.month = month
         self.firstDay = firstDay
         self.forgiven = forgiven
         self.today = today
+        self.otherIncome = otherIncome
         _side = side
         _comparesWithLastYear = comparesWithLastYear
         _transactions = Query(MonthGraphHistory.transactions(for: month))
@@ -88,7 +99,7 @@ private struct HomeMonthGraphCard: View {
 
     var body: some View {
         // What counts is worked out once for both tabs.
-        let counted = (transactions + forgiven).compactMap(\.countedAmount)
+        let counted = (transactions + forgiven).compactMap { $0.countedAmount(otherIncome: otherIncome) }
         MonthGraphCard(
             spent: graph(for: .spent, of: counted),
             income: graph(for: .income, of: counted),

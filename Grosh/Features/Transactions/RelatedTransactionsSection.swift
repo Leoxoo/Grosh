@@ -6,6 +6,8 @@ import SwiftUI
 /// there are none. Use inside a `List`.
 struct RelatedTransactionsSection: View {
     let transaction: Transaction
+    /// Whether the transaction is a part of a Split (``Transaction/isSplitPart``), as the detail worked it out.
+    let isSplitPart: Bool
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
@@ -15,8 +17,9 @@ struct RelatedTransactionsSection: View {
     /// Every transaction sharing the link, this one included, so one linked later shows straight away.
     @Query private var linked: [Transaction]
 
-    init(transaction: Transaction) {
+    init(transaction: Transaction, isSplitPart: Bool) {
         self.transaction = transaction
+        self.isSplitPart = isSplitPart
         _linked = Query(transaction.linkedTransactions)
     }
 
@@ -31,7 +34,7 @@ struct RelatedTransactionsSection: View {
                         RelatedTransactionRow(transaction: other)
                     }
                 }
-                if transaction.isSplitPart {
+                if isSplitPart {
                     Button("Undo Split", systemImage: "arrow.uturn.backward") {
                         isConfirmingUndoSplit = true
                     }

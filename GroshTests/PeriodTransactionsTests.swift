@@ -17,7 +17,9 @@ struct PeriodTransactionsTests {
         try store.record(1_500_00, "Salary", .income, on: day(2026, 10, 5))
         try store.record(-20_00, "Café", on: day(2026, 10, 20))
 
-        let spent = PeriodTransactions(side: .spent, of: try store.transactions(), in: .total, days: october)
+        let spent = try PeriodTransactions(
+            side: .spent, of: store.transactions(), in: .total, days: october, otherIncome: store.otherIncome()
+        )
         #expect(spent.transactions.count == 1)
         #expect(spent.total == Money(cents: 40_00))
     }
@@ -27,7 +29,9 @@ struct PeriodTransactionsTests {
         try store.record(-40_00, "Café", on: day(2026, 10, 3))
         try store.record(1_500_00, "Salary", .income, on: day(2026, 10, 5))
 
-        let both = PeriodTransactions(side: nil, of: try store.transactions(), in: .total, days: october)
+        let both = try PeriodTransactions(
+            side: nil, of: store.transactions(), in: .total, days: october, otherIncome: store.otherIncome()
+        )
         #expect(both.transactions.count == 2)
         #expect(both.total == Money(cents: 1_460_00))
     }
@@ -36,7 +40,9 @@ struct PeriodTransactionsTests {
         try store.record(-10_00, "Café", on: day(2026, 10, 2))
         try store.record(-30_00, "Café", on: day(2026, 10, 9))
 
-        let listed = PeriodTransactions(side: .spent, of: try store.transactions(), in: .total, days: october)
+        let listed = try PeriodTransactions(
+            side: .spent, of: store.transactions(), in: .total, days: october, otherIncome: store.otherIncome()
+        )
         #expect(listed.transactions.map(\.day) == [day(2026, 10, 9), day(2026, 10, 2)])
     }
 }

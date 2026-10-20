@@ -154,12 +154,14 @@ struct PerformanceBenchmarks {
             let month = CalendarMonth(today).adding(months: -30)
             let recurring = try context.fetch(FetchDescriptor<RecurringTransaction>())
             let forgiven = try context.fetch(MonthGraphHistory.forgiven)
+            let otherIncome = try context.otherCategory(.income)
             let firstDay = MonthGraphHistory.firstDay(
-                earliest: try context.fetch(MonthGraphHistory.earliestCounted), forgiven: forgiven
+                earliest: try context.fetch(MonthGraphHistory.earliestCounted), forgiven: forgiven,
+                otherIncome: otherIncome
             )
             _ = MonthGraph.months(from: firstDay, today: today)
             let history = try context.fetch(MonthGraphHistory.transactions(for: month)) + forgiven
-            let counted = history.compactMap(\.countedAmount)
+            let counted = history.compactMap { $0.countedAmount(otherIncome: otherIncome) }
             for side in SpentOrIncome.allCases {
                 _ = MonthGraph(side, of: counted, countingFrom: firstDay, recurring: recurring, in: .month(month), today: today)
             }

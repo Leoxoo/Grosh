@@ -34,6 +34,8 @@ nonisolated enum ReimbursementRuleError: Error, Equatable {
     case notAnExpense
     /// Only money that came in can be moved into an Expense.
     case notADeposit
+    /// Only money that came into the Expense's own wallet can be moved into it.
+    case otherWallet
 }
 
 extension ReimbursementRuleError: LocalizedError {
@@ -42,6 +44,7 @@ extension ReimbursementRuleError: LocalizedError {
         case .missingAmount: String(localized: "Enter an amount above zero.")
         case .notAnExpense: String(localized: "Only an Expense can be reimbursed.")
         case .notADeposit: String(localized: "Only money that came in can be moved into an Expense.")
+        case .otherWallet: String(localized: "Only money that came into the Expense's own wallet can be moved into it.")
         }
     }
 }
@@ -58,9 +61,10 @@ extension Transaction {
         (reimbursements ?? []).sorted { ($0.dayRaw, $0.createdAt) < ($1.dayRaw, $1.createdAt) }
     }
 
-    /// What its Reimbursements add up to in cents: zero when it has none.
-    var reimbursedCents: Int {
-        (reimbursements ?? []).reduce(0) { $0 + $1.amountCents }
+    /// Adds its Reimbursements up again into ``reimbursedCents``, after one is added, edited, removed or moved to
+    /// another transaction. Doesn't save.
+    func recountReimbursements() {
+        reimbursedCents = (reimbursements ?? []).reduce(0) { $0 + $1.amountCents }
     }
 
     /// What the transaction adds to or takes from its wallet in cents: its amount plus its Reimbursements. Balances, lists
@@ -81,6 +85,7 @@ extension Reimbursement {
         context.insert(reimbursement)
         reimbursement.expense = expense
         reimbursement.apply(draft)
+        expense.recountReimbursements()
         try context.save()
         return reimbursement
     }
@@ -89,16 +94,24 @@ extension Reimbursement {
     func update(with draft: ReimbursementDraft) throws {
         try draft.validate()
         apply(draft)
+        expense?.recountReimbursements()
         try modelContext?.save()
     }
 
     /// Removes the entry from its Expense, whose net falls back by its amount. Saves.
     func delete() throws {
         guard let context = modelContext else { return }
-        // Taken off the Expense first, so the Expense is among what the save changes.
+        removeFromExpense()
+        try context.save()
+    }
+
+    /// ``delete()`` without the save, for a caller that saves once after more changes.
+    func removeFromExpense() {
+        guard let context = modelContext else { return }
+        let expense = expense
         expense?.reimbursements?.removeAll { $0 === self }
         context.delete(self)
-        try context.save()
+        expense?.recountReimbursements()
     }
 
     private func apply(_ draft: ReimbursementDraft) {

@@ -155,6 +155,13 @@ extension Transaction {
     /// (``isSplitPart``).
     var isDebtWriteOff: Bool { isLinkedExpenseOrIncome && sharesLinkWithLoanOrDebt }
 
+    /// ``isDebtWriteOff``, with the links of every Loan and Debt read once beforehand
+    /// (``Transaction/loanOrDebtLinks(in:)``).
+    func isDebtWriteOff(loanOrDebtLinks: Set<UUID>) -> Bool {
+        guard isLinkedExpenseOrIncome, let link = linkID else { return false }
+        return loanOrDebtLinks.contains(link)
+    }
+
     /// Links `payment`, a Debt Collection (for a Loan) or Repayment (for a Debt) recorded without one, such as by an
     /// import, so it counts against this Loan or Debt and they show as each other's Related transactions. Only the
     /// links change. Saves.

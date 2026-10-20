@@ -20,9 +20,17 @@ struct ReportView: View {
     }
 
     var body: some View {
+        OtherIncomeReader { otherIncome in
+            content(otherIncome: otherIncome)
+        }
+    }
+
+    /// The Report, with Other Income read once for everything it counts.
+    @ViewBuilder
+    private func content(otherIncome: Category) -> some View {
         let today = CalendarDay.today
         let selected = transactions.filter(walletSelection.includes)
-        let counted = transactions.counted(in: walletSelection, during: period, today: today)
+        let counted = transactions.counted(in: walletSelection, during: period, today: today, otherIncome: otherIncome)
         let summary = PeriodSummary(of: selected, in: period, today: today)
         NavigationStack(path: $path) {
             List {

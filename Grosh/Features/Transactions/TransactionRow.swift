@@ -2,13 +2,16 @@ import SwiftUI
 
 /// One transaction as every list shows it: category icon and name, note, Estimated and Forgiven badges, the Card's
 /// symbol or image, the wallet icon, and the amount in color. A forgiven Loan or Debt keeps its true amount. An Expense
-/// that was paid back keeps its original amount, lists its Reimbursements under the title and shows its net.
+/// that was paid back keeps its original amount, lists its Reimbursements under the title and shows its net, except on
+/// a Card's statement, which shows only what the Card was charged.
 struct TransactionRow: View {
     let transaction: Transaction
     /// Shows the transaction's day, for lists not grouped by day.
     var showsDay = false
     /// Shows the paying wallet's icon in gray, for lists that mix wallets. A list of one wallet turns it off.
     var showsWalletIcon = true
+    /// Whether the row shows a paid-back Expense's net beside its amount, or only what its Card was charged.
+    var listed = ListedAmount.net
 
     var body: some View {
         HStack(spacing: 12) {
@@ -33,7 +36,9 @@ struct TransactionRow: View {
             VStack(alignment: .trailing, spacing: 4) {
                 HStack(spacing: 6) {
                     AmountText(amount: transaction.amount)
-                    ReimbursementNetText(transaction: transaction)
+                    if listed == .net {
+                        ReimbursementNetText(transaction: transaction)
+                    }
                 }
                 HStack(spacing: 6) {
                     if transaction.isEstimated {
@@ -107,7 +112,12 @@ struct ForgivenBadge: View {
 
 extension Transaction {
     /// The category's name, or "Uncategorized" for a transaction filed under none.
-    var categoryName: String {
+    var categoryName: String { Category.name(of: category) }
+}
+
+extension Category {
+    /// `category`'s name, or "Uncategorized" for none.
+    static func name(of category: Category?) -> String {
         category?.name ?? String(localized: "Uncategorized")
     }
 }

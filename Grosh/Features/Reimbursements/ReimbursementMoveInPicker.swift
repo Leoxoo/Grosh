@@ -1,9 +1,9 @@
 import SwiftData
 import SwiftUI
 
-/// Picks an existing deposit to move into an Expense as a Reimbursement: any money that came in, in any wallet, outside
-/// Recently Deleted, newest first. Tapping one makes its amount, day and note an entry on the Expense, sends it to
-/// Recently Deleted, and closes the picker.
+/// Picks an existing deposit to move into an Expense as a Reimbursement: money that came into the Expense's own wallet,
+/// outside Recently Deleted, newest first (``Transaction/reimbursementMoveInBlocker(into:loanOrDebtLinks:)``). Tapping
+/// one makes its amount, day and note an entry on the Expense, sends it to Recently Deleted, and closes the picker.
 struct ReimbursementMoveInPicker: View {
     /// The Expense that was paid back.
     let expense: Transaction
@@ -15,10 +15,16 @@ struct ReimbursementMoveInPicker: View {
     @State private var errorMessage: String?
 
     private var candidates: [Transaction] {
-        transactions.filter(\.canBeMovedIntoReimbursement).matching(filter).inListOrder()
+        // Read once for the whole list, rather than once for each linked Income in it.
+        let loanOrDebtLinks = (try? Transaction.loanOrDebtLinks(in: context)) ?? []
+        return transactions
+            .filter { $0.canBeMovedIntoReimbursement(of: expense, loanOrDebtLinks: loanOrDebtLinks) }
+            .matching(filter)
+            .inListOrder()
     }
 
     var body: some View {
+        let candidates = candidates
         NavigationStack {
             Group {
                 if candidates.isEmpty {
@@ -28,7 +34,7 @@ struct ReimbursementMoveInPicker: View {
                         ContentUnavailableView(
                             "No Transactions to Move In",
                             systemImage: "tray",
-                            description: Text("Money that came in, such as a deposit, appears here.")
+                            description: Text("Money that came into this wallet, such as a deposit, appears here.")
                         )
                     }
                 } else {
@@ -36,9 +42,7 @@ struct ReimbursementMoveInPicker: View {
                         Button {
                             moveIn(transaction)
                         } label: {
-                            TransactionRow(
-                                transaction: transaction, showsDay: true, showsWalletIcon: filter.wallet == nil
-                            )
+                            TransactionRow(transaction: transaction, showsDay: true, showsWalletIcon: false)
                         }
                         .buttonStyle(.plain)
                     }

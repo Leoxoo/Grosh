@@ -52,7 +52,12 @@ struct TransactionDetailView: View {
     }
 
     private var details: some View {
-        List {
+        // Worked out once for the whole screen: on a linked Expense or Income, whether it is a part of a Split reads the
+        // store.
+        let isSplitPart = transaction.isSplitPart
+        let editFlow = transaction.editFlow(isSplitPart: isSplitPart)
+        let canBeDuplicated = transaction.canBeDuplicated(editFlow: editFlow)
+        return List {
             Section {
                 TransactionDetailHeader(transaction: transaction)
             }
@@ -83,16 +88,16 @@ struct TransactionDetailView: View {
                 fields
             }
 
-            RelatedTransactionsSection(transaction: transaction)
+            RelatedTransactionsSection(transaction: transaction, isSplitPart: isSplitPart)
 
             Section {
-                if transaction.canBeDuplicated {
+                if canBeDuplicated {
                     Button("Duplicate", systemImage: "plus.square.on.square") {
                         isDuplicating = true
                     }
                     .fullWidthRowButton()
                 }
-                if transaction.canBeSplit {
+                if transaction.canBeSplit(editFlow: editFlow) {
                     Button("Split", systemImage: "square.split.2x1") {
                         isSplitting = true
                     }
@@ -103,7 +108,7 @@ struct TransactionDetailView: View {
                 }
                 .fullWidthRowButton()
             } footer: {
-                if transaction.canBeDuplicated {
+                if canBeDuplicated {
                     Text("Duplicate opens a new transaction with the same details, dated today.")
                 }
             }
@@ -114,7 +119,7 @@ struct TransactionDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         #endif
         .toolbar {
-            if let editFlow = transaction.editFlow {
+            if let editFlow {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Edit") { editing = editFlow }
                 }

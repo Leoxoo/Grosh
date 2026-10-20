@@ -12,3 +12,20 @@ extension Sequence where Element == Transaction {
         Money(cents: reduce(0) { $0 + $1.amountCents })
     }
 }
+
+/// Which amount a list shows for each transaction and adds up: its net, Reimbursements counted, as every list shows it;
+/// or what its Card was charged, as a Card's statement shows it, so the statement reconciles with the Card (ADR 0008).
+nonisolated enum ListedAmount: Sendable {
+    case net
+    case charged
+}
+
+extension Sequence where Element == Transaction {
+    /// What the transactions come to together, as `listed`: ``net`` or ``charged``.
+    func total(_ listed: ListedAmount) -> Money {
+        switch listed {
+        case .net: net
+        case .charged: charged
+        }
+    }
+}

@@ -1,5 +1,3 @@
-import SwiftData
-
 /// One of the Month graph's two tabs: Spent, for money going out, or Income, for money coming in.
 nonisolated enum SpentOrIncome: CaseIterable, Sendable {
     case spent
@@ -38,21 +36,17 @@ extension CountedAmount {
 }
 
 extension Transaction {
-    /// What the transaction counts on the Month graph, or `nil` when it counts toward neither tab: its amount in the
-    /// Total. Home's Month graph counts this way.
-    var countedAmount: CountedAmount? {
-        countedAmount(in: .total)
-    }
-
-    /// What the transaction counts toward Spent or Income in `selection`, or `nil` when it counts toward neither. Only
-    /// the wallets `selection` holds count, and nothing in Recently Deleted does.
+    /// What the transaction counts toward Spent or Income in `selection` (the Total unless another is given), or `nil`
+    /// when it counts toward neither. Only the wallets `selection` holds count, and nothing in Recently Deleted does.
+    /// Home's Month graph counts the Total.
     ///
     /// A forgiven Loan or Debt counts what was forgiven, on the day it was forgiven and under the category that amount
     /// is filed under (ADR-0004). Its own Exclude from report flag doesn't matter: a Loan or Debt starts excluded, and is
     /// never income or spending itself. Any other transaction counts its net (``Transaction/netCents``) by its
     /// category, as long as it counts in the report. An Expense reimbursed in full counts nothing, and one reimbursed
-    /// beyond its amount counts the extra as Income under Other Income, on the Expense's own day.
-    func countedAmount(in selection: WalletSelection) -> CountedAmount? {
+    /// beyond its amount counts the extra as Income under `otherIncome`, on the Expense's own day. A report reads Other
+    /// Income from the store once, with `otherCategory(.income)`, and hands it to every transaction.
+    func countedAmount(in selection: WalletSelection = .total, otherIncome: Category) -> CountedAmount? {
         guard selection.includes(self), !isInRecentlyDeleted else { return nil }
         if let forgiveness {
             return CountedAmount(forgiveness.reportAmount, filedUnder: forgiveness.category, on: forgiveness.day)
@@ -60,7 +54,7 @@ extension Transaction {
         guard countsInReport else { return nil }
         if category?.type == .expense, amountCents < 0, netCents >= 0 {
             guard netCents > 0 else { return nil }
-            return CountedAmount(net, filedUnder: try? modelContext?.otherCategory(.income), on: day)
+            return CountedAmount(net, filedUnder: otherIncome, on: day)
         }
         return CountedAmount(net, filedUnder: category, on: day)
     }

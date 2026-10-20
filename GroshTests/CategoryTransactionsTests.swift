@@ -15,7 +15,8 @@ struct CategoryTransactionsTests {
 
     private func listed(_ parent: String, _ side: SpentOrIncome = .spent) throws -> CategoryTransactions {
         try CategoryTransactions(
-            parent: store.category(parent), side: side, of: store.transactions(), in: .total, days: october
+            parent: store.category(parent), side: side, of: store.transactions(), in: .total, days: october,
+            otherIncome: store.otherIncome()
         )
     }
 
@@ -32,7 +33,10 @@ struct CategoryTransactionsTests {
         #expect(rows.total == Money(cents: 60_00))
 
         let breakdown = CategoryBreakdown(
-            side: .spent, of: try store.transactions().counted(in: .total, during: .custom(october), today: today)
+            side: .spent,
+            of: try store.transactions().counted(
+                in: .total, during: .custom(october), today: today, otherIncome: store.otherIncome()
+            )
         )
         let row = try #require(breakdown.categories.first { $0.category.name == "Bills & Utilities" })
         #expect(rows.total == row.total)

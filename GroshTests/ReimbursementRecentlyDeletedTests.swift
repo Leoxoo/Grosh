@@ -48,9 +48,10 @@ struct ReimbursementRecentlyDeletedTests {
         try dinner.delete(.onlySelected, in: context, at: deletedAt)
 
         #expect(checking.balance(asOf: today) == Money(cents: 0))
-        #expect(dinner.countedAmount == nil)
+        #expect(dinner.countedAmount(otherIncome: try store.otherIncome()) == nil)
         #expect(try PeriodTotals(
-            of: store.transactions(), in: .total, period: .month(CalendarMonth(today)), today: today
+            of: store.transactions(), in: .total, period: .month(CalendarMonth(today)), today: today,
+            otherIncome: store.otherIncome()
         ) == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
         #expect(try store.graph(.spent).headline == Money(cents: 0))
     }
@@ -64,7 +65,7 @@ struct ReimbursementRecentlyDeletedTests {
         #expect(!dinner.isInRecentlyDeleted)
         #expect(dinner.netCents == -25_00)
         #expect(checking.balance(asOf: today) == Money(cents: -25_00))
-        #expect(dinner.countedAmount?.amount == Money(cents: 25_00))
+        #expect(dinner.countedAmount(otherIncome: try store.otherIncome())?.amount == Money(cents: 25_00))
         #expect(try store.graph(.spent).headline == Money(cents: 25_00))
     }
 
