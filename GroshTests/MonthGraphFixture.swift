@@ -55,15 +55,33 @@ struct MonthGraphFixture {
         try context.fetch(FetchDescriptor<Transaction>())
     }
 
-    /// The card for `side` showing `month`, this month unless another is given, compared with `choice`, made from every
-    /// transaction and every Recurring transaction in the store, those in Recently Deleted included.
+    /// The card for `side` showing `month`, this month unless another is given, compared with `choice`, as Home makes
+    /// it: from what it reads from the store for that month (``MonthGraphHistory``) and every Recurring transaction,
+    /// those in Recently Deleted included. Saves first, as the app has by the time Home reads.
     func graph(
         _ side: SpentOrIncome, in month: CalendarMonth? = nil, comparingWith choice: MonthGraphComparison = .average
     ) throws -> MonthGraph {
+        let month = month ?? CalendarMonth(today)
+        try context.save()
         let recurring = try context.fetch(FetchDescriptor<RecurringTransaction>())
+        let history = try context.fetch(MonthGraphHistory.transactions(for: month))
+            + context.fetch(MonthGraphHistory.forgiven)
         return try MonthGraph(
-            side, of: transactions(), recurring: recurring, in: month ?? CalendarMonth(today), today: today,
-            comparingWith: choice
+            side, of: history.compactMap(\.countedAmount), countingFrom: firstDay(), recurring: recurring,
+            in: .month(month), today: today, comparingWith: choice
+        )
+    }
+
+    /// The months Home's strip offers, from what it reads from the store (``MonthGraphHistory``). Saves first.
+    func strip() throws -> [Period] {
+        try context.save()
+        return try MonthGraph.months(from: firstDay(), today: today)
+    }
+
+    /// The first day anything counts on the Month graph, as Home reads it from the store.
+    private func firstDay() throws -> CalendarDay? {
+        try MonthGraphHistory.firstDay(
+            earliest: context.fetch(MonthGraphHistory.earliestCounted), forgiven: context.fetch(MonthGraphHistory.forgiven)
         )
     }
 }

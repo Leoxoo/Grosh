@@ -11,7 +11,7 @@ struct TransactionListView: View {
     /// The transaction whose detail is showing.
     @Binding var selectedTransaction: Transaction?
 
-    @Query(Transaction.notDeleted) private var transactions: [Transaction]
+    @NotDeletedTransactions private var transactions: [Transaction]
     @Query private var recurringTransactions: [RecurringTransaction]
     @State private var walletSelection = WalletSelection.total
     /// How long each period in the strip is, chosen in the "…" menu.
@@ -29,13 +29,13 @@ struct TransactionListView: View {
 
     private var today: CalendarDay { .today }
 
-    /// The selected wallet's transactions, or the wallet filter's when one is set.
-    private var selected: [Transaction] {
-        filter.transactions(in: walletSelection, from: transactions)
+    /// The selected wallet's transactions, or the wallet filter's when one is set, as ledger entries.
+    private var selected: [LedgerEntry] {
+        filter.transactions(in: walletSelection, from: $transactions)
     }
 
     /// The periods the strip offers for `selected`, back to its first day with data.
-    private func strip(for selected: [Transaction]) -> [Period] {
+    private func strip(for selected: [LedgerEntry]) -> [Period] {
         timeRange.periods(from: selected.firstDay, today: today)
     }
 
@@ -49,10 +49,10 @@ struct TransactionListView: View {
         let selected = selected
         let periods = strip(for: selected)
         let shownDays = period.days(today: today)
-        let shown = filter.listed(from: transactions, selection: walletSelection, on: shownDays)
+        let shown = filter.listed(from: transactions, selected: selected, on: shownDays)
         // Future's Scheduled rows are listed by day, and only while nothing is searched, filtered or being selected.
         let scheduled: [ScheduledOccurrence] = period == .future && grouping == .day && !filter.isOn && !isSelecting
-            ? recurringTransactions.scheduledOccurrences(selection: walletSelection, today: today, history: transactions)
+            ? recurringTransactions.scheduledOccurrences(selection: walletSelection, today: today)
             : []
         // The rows highlighted: the chosen ones while selecting, otherwise the one whose detail is showing.
         let highlighted = isSelecting ? chosen : Set([selectedTransaction].compactMap { $0 })

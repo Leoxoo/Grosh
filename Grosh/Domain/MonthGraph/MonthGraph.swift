@@ -55,31 +55,21 @@ struct MonthGraph {
     /// What `recurring` still has due for the tab this period, or `nil` in an earlier period or with nothing due.
     private let projection: MonthGraphProjection?
 
-    /// The tab for `side` showing `month`, the current month or an earlier one, as it stands on `today`, with what
-    /// `recurring` still has due this month, compared with `choice`, as the "vs last year" switch is set. Counts the
-    /// Total.
-    init(
-        _ side: SpentOrIncome, of transactions: [Transaction], recurring: [RecurringTransaction] = [],
-        in month: CalendarMonth, today: CalendarDay, comparingWith choice: MonthGraphComparison = .average
-    ) {
-        self.init(
-            side, of: transactions, recurring: recurring, in: .month(month), today: today, comparingWith: choice
-        )
-    }
-
     /// The tab for `side` showing `period`, as it stands on `today`, with what `recurring` still has due, compared with
-    /// `choice`, as the "vs last year" switch is set, for the transactions of `selection`.
+    /// `choice`, as the "vs last year" switch is set, for the transactions of `selection`. `counted` holds at least what
+    /// counts for `selection` in the periods the tab sums (the ``Transaction/countedAmount(in:)``s of its transactions,
+    /// worked out once for both tabs; Home reads only those of the months ``MonthGraphHistory`` names), and `firstDay`
+    /// is the first day anything counts, on either tab, or `nil` when nothing does.
     init(
-        _ side: SpentOrIncome, of transactions: [Transaction], recurring: [RecurringTransaction] = [],
-        in period: Period, today: CalendarDay, comparingWith choice: MonthGraphComparison = .average,
-        selection: WalletSelection = .total
+        _ side: SpentOrIncome, of counted: [CountedAmount], countingFrom firstDay: CalendarDay?,
+        recurring: [RecurringTransaction] = [], in period: Period, today: CalendarDay,
+        comparingWith choice: MonthGraphComparison = .average, selection: WalletSelection = .total
     ) {
         guard let span = GraphSpan(period) else {
             preconditionFailure("A Month graph shows a day, week, month, quarter or year")
         }
-        let counted = transactions.compactMap { $0.countedAmount(in: selection) }
         let dailyTotals = counted.dailyTotals(side, in: span, through: today)
-        let lastYear = MonthGraphComparison.lastYear.dailyTotals(side, of: counted, for: period)
+        let lastYear = MonthGraphComparison.lastYear.dailyTotals(side, of: counted, countingFrom: firstDay, for: period)
         self.isLastYearAvailable = lastYear != nil
         if choice == .lastYear, let lastYear {
             self.comparison = .lastYear
@@ -87,10 +77,12 @@ struct MonthGraph {
         } else {
             // A switch left on shows the Average while Last year isn't available, and Last year again once it is.
             self.comparison = .average
-            self.dailyComparisons = MonthGraphComparison.average.dailyTotals(side, of: counted, for: period)
+            self.dailyComparisons = MonthGraphComparison.average.dailyTotals(
+                side, of: counted, countingFrom: firstDay, for: period
+            )
         }
         self.projection = MonthGraphProjection(
-            side, of: recurring, history: transactions, in: span, selection: selection, today: today,
+            side, of: recurring, in: span, selection: selection, today: today,
             todaysTotal: dailyTotals.last?.total ?? Money(cents: 0)
         )
         self.side = side
@@ -171,12 +163,11 @@ struct MonthGraph {
 }
 
 extension MonthGraph {
-    /// The months the strip above the card offers, oldest first: from the month of the first transaction that counts
-    /// on the Month graph, on either tab, through `today`'s month, or `today`'s month alone when nothing counts.
-    /// Never Future.
-    static func months(of transactions: [Transaction], today: CalendarDay) -> [Period] {
-        let firstDay = transactions.compactMap(\.countedAmount).firstDay
-        return TimeRange.month.periods(from: firstDay, today: today).filter { $0 != .future }
+    /// The months the strip above the card offers, oldest first: from the month of `firstDay`, the first day anything
+    /// counts on the Month graph, on either tab, through `today`'s month, or `today`'s month alone when nothing counts
+    /// (`nil`). Never Future.
+    static func months(from firstDay: CalendarDay?, today: CalendarDay) -> [Period] {
+        TimeRange.month.periods(from: firstDay, today: today).filter { $0 != .future }
     }
 }
 

@@ -13,14 +13,29 @@ extension Transaction {
     /// import does) fall back to their saved identity, so their order never depends on the order the store hands
     /// them back in.
     func isListed(before other: Transaction) -> Bool {
-        for descriptor in Self.listOrder {
-            switch descriptor.compare(self, other) {
-            case .orderedAscending: return true
-            case .orderedDescending: return false
-            case .orderedSame: continue
-            }
-        }
-        return persistentModelID > other.persistentModelID
+        ListPosition(self).isListed(before: ListPosition(other))
+    }
+}
+
+/// What ``Transaction/listOrder`` sorts a transaction by, read once: a model's stored properties are slow to read, and
+/// a sort reads them for every comparison.
+private struct ListPosition {
+    let dayRaw: Int
+    let createdAt: Date
+    let transaction: Transaction
+
+    init(_ transaction: Transaction) {
+        dayRaw = transaction.dayRaw
+        createdAt = transaction.createdAt
+        self.transaction = transaction
+    }
+
+    /// Newest day first, then the most recently entered, then by saved identity, as ``Transaction/listOrder`` and
+    /// ``Transaction/isListed(before:)`` have it.
+    func isListed(before other: ListPosition) -> Bool {
+        if dayRaw != other.dayRaw { return dayRaw > other.dayRaw }
+        if createdAt != other.createdAt { return createdAt > other.createdAt }
+        return transaction.persistentModelID > other.transaction.persistentModelID
     }
 }
 
@@ -28,12 +43,6 @@ extension Sequence where Element == Transaction {
     /// The transactions in the order every transaction list shows them: newest day first and, within a day,
     /// the most recently entered first.
     func inListOrder() -> [Transaction] {
-        sorted { $0.isListed(before: $1) }
-    }
-
-    /// The earliest day any of the transactions is dated, or `nil` when there are none: where a period strip of them
-    /// starts.
-    var firstDay: CalendarDay? {
-        map(\.dayRaw).min().map(CalendarDay.init(rawValue:))
+        map(ListPosition.init).sorted { $0.isListed(before: $1) }.map(\.transaction)
     }
 }

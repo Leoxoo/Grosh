@@ -8,6 +8,8 @@ struct HomeView: View {
     static let isTotalHiddenKey = "home.isTotalHidden"
 
     @Query(Wallet.unarchived) private var wallets: [Wallet]
+    /// What the Total and the wallets' balances add up.
+    @NotDeletedTransactions private var transactions: [Transaction]
     @AppStorage(Self.isTotalHiddenKey) private var isTotalHidden = false
     /// The month Home's Month graph shows, which the Report opens on.
     @State private var monthPeriod = Period.month(CalendarMonth(.today))
@@ -17,10 +19,11 @@ struct HomeView: View {
     private var today: CalendarDay { .today }
 
     var body: some View {
+        let balances = WalletBalances($transactions, asOf: today)
         NavigationStack {
             List {
                 Section {
-                    TotalBalanceView(total: Wallet.total(of: wallets, asOf: today), isHidden: $isTotalHidden)
+                    TotalBalanceView(total: balances.total(of: wallets), isHidden: $isTotalHidden)
                 }
 
                 Section {
@@ -28,7 +31,7 @@ struct HomeView: View {
                         NavigationLink("Add a wallet") { WalletListView() }
                     }
                     ForEach(wallets) { wallet in
-                        WalletRow(wallet: wallet, today: today)
+                        WalletRow(wallet: wallet, today: today, balances: balances)
                     }
                 } header: {
                     HStack {

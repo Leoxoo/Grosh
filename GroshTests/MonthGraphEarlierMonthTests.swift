@@ -21,7 +21,7 @@ struct MonthGraphEarlierMonthTests {
     // MARK: The month strip
 
     @Test func withNoTransactionsTheStripHoldsOnlyThisMonth() throws {
-        #expect(try MonthGraph.months(of: store.transactions(), today: today) == [.month(month(2026, 10))])
+        #expect(try store.strip() == [.month(month(2026, 10))])
     }
 
     /// The Starting balance, the excluded transaction and the one in Recently Deleted count on neither card, so the
@@ -37,7 +37,7 @@ struct MonthGraphEarlierMonthTests {
         try store.record(-25_00, "Café", on: day(2026, 9, 5))
         try store.record(-100_00, "Rentals", on: day(2026, 11, 3))
 
-        let strip = try MonthGraph.months(of: store.transactions(), today: today)
+        let strip = try store.strip()
 
         #expect(strip == [.month(month(2026, 8)), .month(month(2026, 9)), .month(month(2026, 10))])
         #expect(strip.map { $0.title(today: today) } == ["08/2026", "Last month", "This month"])
@@ -52,7 +52,7 @@ struct MonthGraphEarlierMonthTests {
         var september = Period.month(month(2026, 9))
 
         try [coffee].delete(.onlySelected, in: context)
-        let strip = try MonthGraph.months(of: store.transactions(), today: today)
+        let strip = try store.strip()
         july.showCurrentPeriod(.month(month(2026, 10)), unlessOfferedBy: strip)
         september.showCurrentPeriod(.month(month(2026, 10)), unlessOfferedBy: strip)
 

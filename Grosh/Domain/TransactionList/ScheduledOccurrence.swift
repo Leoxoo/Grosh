@@ -57,14 +57,16 @@ extension Sequence where Element == RecurringTransaction {
     /// The Scheduled rows Future lists on `today` for the schedules paid from `selection`'s wallets, or with `lastDay`,
     /// every occurrence still to come through it (see ``RecurringTransaction/scheduledDays(today:through:)``): newest
     /// day first and, within a day, the most recently added schedule first, as the transactions on a day are listed.
-    /// `history` is what a varying Bill's estimate is averaged over.
+    /// A varying Bill's occurrences carry its estimate (``RecurringTransaction/startingAmount``).
     func scheduledOccurrences(
-        selection: WalletSelection, today: CalendarDay, through lastDay: CalendarDay? = nil, history: [Transaction]
+        selection: WalletSelection, today: CalendarDay, through lastDay: CalendarDay? = nil
     ) -> [ScheduledOccurrence] {
         filter { selection.includesWallet($0.wallet) }
             .flatMap { recurring -> [ScheduledOccurrence] in
-                let amount = recurring.startingAmount(among: history)
-                return recurring.scheduledDays(today: today, through: lastDay).map {
+                let days = recurring.scheduledDays(today: today, through: lastDay)
+                guard !days.isEmpty else { return [] }
+                let amount = recurring.startingAmount
+                return days.map {
                     ScheduledOccurrence(recurring: recurring, day: $0, amount: amount)
                 }
             }

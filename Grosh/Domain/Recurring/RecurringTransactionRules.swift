@@ -258,7 +258,8 @@ extension RecurringTransaction {
     func makeDueTransactions(through today: CalendarDay, in context: ModelContext) {
         guard isActive, wallet != nil, category != nil else { return }
         let due = schedule.occurrences(after: handledThrough, through: today)
-        let history = estimateHistory(in: context)
+        guard !due.isEmpty else { return }
+        let history = estimateHistory
         for day in due {
             makeTransaction(on: day, history: history, in: context)
         }
@@ -284,9 +285,14 @@ extension RecurringTransaction {
         )
     }
 
-    /// The transactions a varying Bill's estimate is averaged over, read once per run. Other Kinds read nothing.
-    private func estimateHistory(in context: ModelContext) -> [Transaction] {
-        estimatesAmount ? ((try? context.fetch(FetchDescriptor<Transaction>())) ?? []) : []
+    /// What its transactions start at now, as ``startingAmount(among:)`` works it out from ``estimateHistory``.
+    var startingAmount: Money { startingAmount(among: estimateHistory) }
+
+    /// The transactions a varying Bill's estimate is averaged over: those filed under its category or its
+    /// subcategories (``AmountEstimate/history(for:)``). Other Kinds read nothing.
+    var estimateHistory: [Transaction] {
+        guard estimatesAmount, let category else { return [] }
+        return AmountEstimate.history(for: category)
     }
 
     /// Makes the transaction for the occurrence on `day`, attached to this schedule, and inserts it. A Bill whose amount
@@ -323,7 +329,7 @@ extension RecurringTransaction {
     /// Makes a transaction on each of `days`, the occurrences the user picked from the start-date prompt, and saves.
     /// Nothing is made for an empty list.
     func makeTransactions(on days: [CalendarDay], in context: ModelContext) throws {
-        let history = estimateHistory(in: context)
+        let history = estimateHistory
         for day in days {
             makeTransaction(on: day, history: history, in: context)
         }
@@ -346,7 +352,7 @@ extension RecurringTransaction {
     /// saving nothing. Saves.
     func addTransactionNow(today: CalendarDay = .today, in context: ModelContext) throws {
         if let addBlocker { throw addBlocker }
-        makeTransaction(on: today, history: estimateHistory(in: context), in: context)
+        makeTransaction(on: today, history: estimateHistory, in: context)
         try context.save()
     }
 

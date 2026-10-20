@@ -4,10 +4,13 @@ import SwiftUI
 struct WalletRow: View {
     let wallet: Wallet
     let today: CalendarDay
+    /// Every wallet's balance today, added up at once, when the list has them; otherwise the row adds up the wallet's
+    /// own transactions.
+    var balances: WalletBalances?
     var showsTotalStatus = false
 
     var body: some View {
-        let balance = wallet.balance(asOf: today)
+        let balance = balances?.balance(of: wallet) ?? wallet.balance(asOf: today)
         HStack(spacing: 12) {
             SymbolCircle(symbolName: wallet.symbolName, color: wallet.color)
             VStack(alignment: .leading, spacing: 2) {
