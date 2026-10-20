@@ -22,10 +22,10 @@ extension PeriodSummary {
         for transaction in transactions {
             let day = CalendarDay(rawValue: transaction.dayRaw)
             if let first = days.first, day < first {
-                opening += transaction.amountCents
+                opening += transaction.netCents
             }
             if days.last.map({ day <= $0 }) ?? true {
-                ending += transaction.amountCents
+                ending += transaction.netCents
             }
         }
         self.init(openingBalance: Money(cents: opening), endingBalance: Money(cents: ending))

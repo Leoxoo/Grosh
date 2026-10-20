@@ -187,7 +187,7 @@ extension Transaction {
         guard isBalanceAdjustment, let wallet else { return nil }
         let recordedCents = (wallet.transactions ?? []).notDeleted
             .filter { $0 != self && isListed(before: $0) }
-            .reduce(0) { $0 + $1.amountCents }
+            .reduce(0) { $0 + $1.netCents }
         return (
             recorded: Money(cents: recordedCents, currencyCode: wallet.currencyCode),
             actual: Money(cents: recordedCents + amountCents, currencyCode: wallet.currencyCode)

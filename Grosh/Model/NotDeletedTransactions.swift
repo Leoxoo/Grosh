@@ -83,6 +83,26 @@ extension NotDeletedTransactions {
         }
 
         private static let entityName = Schema.entityName(for: Transaction.self)
+        private static let reimbursementEntityName = Schema.entityName(for: Reimbursement.self)
+
+        /// The transactions a save changed: those it inserted or updated, and the Expenses whose Reimbursements it inserted
+        /// or updated, since a net is part of the ledger entry. A Reimbursement removed from its Expense updates the Expense.
+        private func changedTransactions(_ changes: Changes, in context: ModelContext) -> [Transaction] {
+            var seen = Set<PersistentIdentifier>()
+            var transactions: [Transaction] = []
+            for identifier in changes.changed {
+                let transaction: Transaction?
+                switch identifier.entityName {
+                case Self.entityName: transaction = context.model(for: identifier) as? Transaction
+                case Self.reimbursementEntityName: transaction = (context.model(for: identifier) as? Reimbursement)?.expense
+                default: transaction = nil
+                }
+                if let transaction, seen.insert(transaction.persistentModelID).inserted {
+                    transactions.append(transaction)
+                }
+            }
+            return transactions
+        }
 
         /// Takes in what a save changed: each transaction saved outside Recently Deleted is among them, with its ledger
         /// entry read again, and each moved there or deleted isn't.
@@ -92,8 +112,8 @@ extension NotDeletedTransactions {
             var joining: [Transaction] = []
             var entries = self.entries
             var entriesChanged = false
-            for identifier in changes.changed where identifier.entityName == Self.entityName {
-                guard let transaction = context.model(for: identifier) as? Transaction else { continue }
+            for transaction in changedTransactions(changes, in: context) {
+                let identifier = transaction.persistentModelID
                 let position = positions[identifier]
                 if transaction.deletedAt != nil {
                     if position != nil { leaving.insert(identifier) }

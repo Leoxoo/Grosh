@@ -47,6 +47,9 @@ final class Transaction {
     var recurring: RecurringTransaction?
     /// On a forgiven Loan or Debt, the category the forgiven amount counts under in reports.
     var forgivenCategory: Category?
+    /// On an Expense, the money paid back against it. They go with it: to Recently Deleted and back, and for good.
+    @Relationship(deleteRule: .cascade, inverse: \Reimbursement.expense)
+    var reimbursements: [Reimbursement]? = []
 
     init(
         amount: Money,

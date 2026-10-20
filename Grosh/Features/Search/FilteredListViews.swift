@@ -46,7 +46,7 @@ struct FilterSummaryView: View {
                 }
             case .total:
                 LabeledContent(filter.totalTitle) {
-                    AmountText(amount: transactions.net, showsPlusSign: true, showsColor: false)
+                    AmountText(amount: filter.total(of: transactions), showsPlusSign: true, showsColor: false)
                         .fontWeight(.semibold)
                 }
             case .clearFilters:
@@ -72,7 +72,7 @@ struct FilterSummaryFigures: View {
                 )
                 SummaryFigure(
                     title: Text(verbatim: filter.totalTitle),
-                    value: AmountText(amount: transactions.net, showsPlusSign: true, showsColor: false)
+                    value: AmountText(amount: filter.total(of: transactions), showsPlusSign: true, showsColor: false)
                 )
             }
             if filter.hasFilters {

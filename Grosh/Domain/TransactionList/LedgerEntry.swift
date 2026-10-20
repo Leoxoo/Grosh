@@ -4,8 +4,8 @@ protocol DatedAmount {
     var wallet: Wallet? { get }
     /// The ``CalendarDay`` as `yyyymmdd`.
     var dayRaw: Int { get }
-    /// Signed effect on the wallet in cents.
-    var amountCents: Int { get }
+    /// Signed effect on the wallet in cents, its Reimbursements included (``Transaction/netCents``).
+    var netCents: Int { get }
 }
 
 extension Transaction: DatedAmount {}
@@ -18,18 +18,18 @@ struct LedgerEntry: DatedAmount {
     let transaction: Transaction
     let wallet: Wallet?
     let dayRaw: Int
-    let amountCents: Int
+    let netCents: Int
 
     init(_ transaction: Transaction) {
         self.transaction = transaction
         wallet = transaction.wallet
         dayRaw = transaction.dayRaw
-        amountCents = transaction.amountCents
+        netCents = transaction.netCents
     }
 
-    /// Whether `other` holds the same wallet, day and amount.
+    /// Whether `other` holds the same wallet, day and net amount.
     func hasSameFigures(as other: LedgerEntry) -> Bool {
-        wallet === other.wallet && dayRaw == other.dayRaw && amountCents == other.amountCents
+        wallet === other.wallet && dayRaw == other.dayRaw && netCents == other.netCents
     }
 }
 

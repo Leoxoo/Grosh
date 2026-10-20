@@ -84,7 +84,7 @@ struct CardTransactionsTests {
         let shown = chase.transactions(in: chase.period(containing: today))
 
         #expect(Set(shown) == [first, refund, excluded, last])
-        #expect(shown.net == Money(cents: -137_76))
+        #expect(shown.charged == Money(cents: -137_76))
     }
 
     @Test func steppingBackShowsThePreviousStatementsTransactions() throws {
@@ -96,7 +96,7 @@ struct CardTransactionsTests {
         let previous = chase.transactions(in: chase.period(containing: today).adding(-1))
 
         #expect(Set(previous) == [september, august])
-        #expect(previous.net == Money(cents: -60_00))
+        #expect(previous.charged == Money(cents: -60_00))
     }
 
     @Test func aCalendarMonthListsTheCardsTransactionsOfTheWholeMonth() throws {
@@ -108,7 +108,7 @@ struct CardTransactionsTests {
         let shown = debit.transactions(in: debit.period(containing: today))
 
         #expect(Set(shown) == [first, last])
-        #expect(shown.net == Money(cents: -42_76))
+        #expect(shown.charged == Money(cents: -42_76))
     }
 
     // MARK: Lead-in transactions
@@ -153,9 +153,9 @@ struct CardTransactionsTests {
         let current = chase.period(containing: today)
         let shown = chase.transactions(in: current)
 
-        #expect(shown.net == Money(cents: -12_76))
+        #expect(shown.charged == Money(cents: -12_76))
         let added = chase.leadInTransactions(in: current).filter { $0 == leadIn }
-        #expect((shown + added).net == Money(cents: -32_76))
+        #expect((shown + added).charged == Money(cents: -32_76))
     }
 
     // MARK: How far ‹ › step

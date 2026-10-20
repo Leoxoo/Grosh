@@ -47,14 +47,20 @@ extension Transaction {
     ///
     /// A forgiven Loan or Debt counts what was forgiven, on the day it was forgiven and under the category that amount
     /// is filed under (ADR-0004). Its own Exclude from report flag doesn't matter: a Loan or Debt starts excluded, and is
-    /// never income or spending itself. Any other transaction counts its own amount by its category, as long as it
-    /// counts in the report.
+    /// never income or spending itself. Any other transaction counts its net (``Transaction/netCents``) by its
+    /// category, as long as it counts in the report. An Expense reimbursed in full counts nothing, and one reimbursed
+    /// beyond its amount counts the extra as Income under Other Income, on the Expense's own day.
     func countedAmount(in selection: WalletSelection) -> CountedAmount? {
         guard selection.includes(self), !isInRecentlyDeleted else { return nil }
         if let forgiveness {
             return CountedAmount(forgiveness.reportAmount, filedUnder: forgiveness.category, on: forgiveness.day)
         }
-        return countsInReport ? CountedAmount(amount, filedUnder: category, on: day) : nil
+        guard countsInReport else { return nil }
+        if category?.type == .expense, amountCents < 0, netCents >= 0 {
+            guard netCents > 0 else { return nil }
+            return CountedAmount(net, filedUnder: try? modelContext?.otherCategory(.income), on: day)
+        }
+        return CountedAmount(net, filedUnder: category, on: day)
     }
 }
 
