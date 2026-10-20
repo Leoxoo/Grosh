@@ -114,6 +114,14 @@ _Avoid_: Move, payment
 Transactions that belong together and are shown to each other as "Related transactions", such as the two halves of a transfer. Editing one offers to update the other.
 _Avoid_: Connected, paired
 
+**Split**:
+Dividing one Expense or Income transaction into several real transactions, one per part, so the user can match a statement that charged it in pieces or file the pieces under different categories. The transaction the user splits from keeps its identity and always shows what is left, while each new part takes its own amount, category, day, note, With and Event; every part shares the wallet and Card. The total is free to change: if the parts no longer add up to the original, the wallet's balance moves by the difference. The parts are Linked transactions but independent: editing one never touches the others, and **Undo split** merges them back into one. Transfers, Balance adjustments, Starting balances, Loans, Debts and their payments, forgiven ones and Scheduled occurrences can't be split.
+_Avoid_: Divide, break up
+
+**Reimbursement**:
+Money someone paid back against an Expense, kept as an entry on that Expense (an amount, a day and an optional note) and never as a transaction of its own. An Expense can have any number. Its **net** is its amount plus its Reimbursements, shown on its row as `= +3` beside the original amount; the net lands in the Expense's own wallet, on the Expense's own day. The net, not the original amount, counts in balances, the transaction list and every report; only a Card's statement and Card filter total still use the original amount, because that is what the Card was charged. While the net is below zero it counts as Spent under the Expense's own category; at zero it counts as nothing; above zero the Expense counts nothing as Spent and the extra counts as Income under Other Income. Money paid into a different wallet is not a Reimbursement: the user records it as an ordinary transfer or income. Splitting an Expense that has Reimbursements asks which part each belongs to.
+_Avoid_: Repayment (that is money paid back against a Debt), refund (that is money back from the seller), payback
+
 **Balance adjustment**:
 A transaction that records the difference between a wallet's recorded balance and its real balance. Its category is the reason (interest earned, stock sold, fees, lost transactions), and it counts in reports like any other transaction. It never needs a Card.
 _Avoid_: Correction, reconcile
@@ -186,7 +194,7 @@ Home's card with a Spent tab and an Income tab, each naming its month's total so
 _Avoid_: Report this month
 
 **Spent**:
-Money going out in a period: its Expense-category transactions that count in the report, less refunds, plus what was forgiven on Loans. Its counterpart, **Income**, adds up Income-category transactions and what was forgiven on Debts. The Month graph counts the wallets in the Total; the Report counts the Wallet selector's choice.
+Money going out in a period: its Expense-category transactions that count in the report (net of their Reimbursements), less refunds, plus what was forgiven on Loans. Its counterpart, **Income**, adds up Income-category transactions and what was forgiven on Debts. The Month graph counts the wallets in the Total; the Report counts the Wallet selector's choice.
 _Avoid_: Expenses, Expense (that is a Category type)
 
 **Report**:
