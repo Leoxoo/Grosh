@@ -9,7 +9,8 @@ struct PersonDebtsLink: View {
 
     var body: some View {
         NavigationLink {
-            PersonDebtsLoansDetailView(person: entry.person)
+            PersonDebtsLoansDetailView(entry: entry)
+                .equatable()
         } label: {
             PersonDebtsRow(entry: entry, onText: onText)
         }
@@ -67,56 +68,59 @@ struct PersonDebtsRow: View {
 }
 
 /// What a Person in Show by people opens: the same figures as their row, then their Loans, Debts and Owes me, each its
-/// own section and each opening its own detail. It reads the lists itself, so a payment recorded in a detail is
-/// reflected when the user comes back.
+/// own section and each opening its own detail. Show by people hands it the Person's entry, a new one whenever the
+/// store changes, so a payment recorded in a detail is reflected when the user comes back.
 struct PersonDebtsLoansDetailView: View {
-    let person: Person
+    let entry: PersonDebtsAndLoans
 
-    @Query(DebtsAndLoans.transactions) private var transactions: [Transaction]
-    @Query(ExpectedReimbursements.all) private var expectations: [ExpectedReimbursement]
     /// The message being texted, while Text them is open.
     @State private var texting: TextReminder?
 
     var body: some View {
-        let entry = DebtsAndLoansByPerson(DebtsAndLoans(transactions), ExpectedReimbursements(expectations))
-            .entry(for: person)
         List {
-            if let entry {
-                Section {
-                    PersonDebtsRow(entry: entry) { texting = $0 }
-                }
-                if !entry.loans.isEmpty {
-                    Section("Loans") {
-                        ForEach(entry.loans) { loan in
-                            LoanOrDebtLink(loanOrDebt: loan)
-                        }
-                    }
-                }
-                if !entry.debts.isEmpty {
-                    Section("Debts") {
-                        ForEach(entry.debts) { debt in
-                            LoanOrDebtLink(loanOrDebt: debt)
-                        }
-                    }
-                }
-                if !entry.expectations.isEmpty {
-                    Section("Owes Me") {
-                        ForEach(entry.expectations) { expectation in
-                            ExpectedReimbursementLink(expectation: expectation)
-                        }
+            Section {
+                PersonDebtsRow(entry: entry) { texting = $0 }
+            }
+            if !entry.loans.isEmpty {
+                Section("Loans") {
+                    ForEach(entry.loans) { loan in
+                        LoanOrDebtLink(loanOrDebt: loan)
                     }
                 }
             }
-        }
-        .overlay {
-            if entry == nil {
-                ContentUnavailableView("Nothing Owed", systemImage: "person.2")
+            if !entry.debts.isEmpty {
+                Section("Debts") {
+                    ForEach(entry.debts) { debt in
+                        LoanOrDebtLink(loanOrDebt: debt)
+                    }
+                }
+            }
+            if !entry.expectations.isEmpty {
+                Section("Owes Me") {
+                    ForEach(entry.expectations) { expectation in
+                        ExpectedReimbursementLink(expectation: expectation)
+                    }
+                }
             }
         }
         .textThemSheet($texting)
-        .navigationTitle(person.name)
+        .navigationTitle(entry.person.name)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+    }
+}
+
+/// Debts & Loans hands the screen a newly made entry each time it redraws, and it redraws whenever the navigation stack
+/// does, which redrawing this screen makes it do. Compared field by field, a new entry always counted as a change, so
+/// the two kept redrawing each other and the app froze. It changes only when it shows something else: another Person,
+/// other figures, or other Loans, Debts or Owes me. Each row updates itself from its own Loan, Debt or Owes me.
+extension PersonDebtsLoansDetailView: Equatable {
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        let (old, new) = (lhs.entry, rhs.entry)
+        return old.person === new.person && old.owesYou == new.owesYou && old.youOwe == new.youOwe
+            && old.openAmountCount == new.openAmountCount && old.isSettled == new.isSettled
+            && old.loans.map(\.id) == new.loans.map(\.id) && old.debts.map(\.id) == new.debts.map(\.id)
+            && old.expectations.map(\.id) == new.expectations.map(\.id)
     }
 }
