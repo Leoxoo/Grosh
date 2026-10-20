@@ -47,6 +47,8 @@ struct TransactionDraft {
     /// Set when editing a balance adjustment, which never needs a Card and is never a Loan or Debt. Saving keeps
     /// the transaction one.
     private(set) var isBalanceAdjustment = false
+    /// Set when editing a part of a Split, which stays an Expense or Income, since the parts add up as one amount.
+    private(set) var isSplitPart = false
     /// Set when editing a transaction the Card rule doesn't apply to (``requiresCard``).
     private(set) var cardRuleExemption: CardRuleExemption?
     /// Set when editing a Loan or Debt that has payments or was forgiven: what they hold in place.
@@ -75,6 +77,7 @@ struct TransactionDraft {
         self.init(copying: transaction, day: transaction.day)
         eventName = transaction.eventName
         isBalanceAdjustment = transaction.isBalanceAdjustment
+        isSplitPart = transaction.isSplitPart
         cardRuleExemption = transaction.cardRuleExemption
         reminderDay = transaction.reminderDay
         let deletedPayments = transaction.paymentsInRecentlyDeleted
@@ -186,9 +189,10 @@ extension TransactionDraft {
     }
 
     /// The types the sheet offers, in order. A balance adjustment is only ever Expense or Income: its reason is a
-    /// category of the type its difference matches, never a Loan or Debt.
+    /// category of the type its difference matches, never a Loan or Debt. A part of a Split is never a Loan or Debt
+    /// either.
     var types: [CategoryType] {
-        isBalanceAdjustment ? [.expense, .income] : CategoryType.segments
+        isBalanceAdjustment || isSplitPart ? [.expense, .income] : CategoryType.segments
     }
 
     /// Whether the transaction can name a Card at all: every transaction but the two halves of a transfer.

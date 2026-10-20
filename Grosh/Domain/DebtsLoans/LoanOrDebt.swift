@@ -151,11 +151,9 @@ extension Transaction {
 
     /// Whether this is the ordinary expense or income a Loan or Debt adds beside a payment (``LoanOrDebt/addLinked``):
     /// what was paid above it, or a forgiven amount recorded before forgiving became a mark (ADR-0004). It shares the
-    /// Loan's or Debt's link, as no other expense or income does (a transfer half is filed under a transfer category).
-    var isDebtWriteOff: Bool {
-        guard linkID != nil, let category, !category.isTransferHalf else { return false }
-        return category.type == .expense || category.type == .income
-    }
+    /// Loan's or Debt's link; an expense or income on a link with no Loan or Debt is a part of a Split instead
+    /// (``isSplitPart``).
+    var isDebtWriteOff: Bool { isLinkedExpenseOrIncome && sharesLinkWithLoanOrDebt }
 
     /// Links `payment`, a Debt Collection (for a Loan) or Repayment (for a Debt) recorded without one, such as by an
     /// import, so it counts against this Loan or Debt and they show as each other's Related transactions. Only the
