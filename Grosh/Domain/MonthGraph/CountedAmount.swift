@@ -1,3 +1,5 @@
+import SwiftData
+
 /// One of the Month graph's two tabs: Spent, for money going out, or Income, for money coming in.
 nonisolated enum SpentOrIncome: CaseIterable, Sendable {
     case spent
