@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// One transaction as every list shows it: category icon and name, note, Estimated and Forgiven badges, the Card's
-/// symbol or image, the wallet icon, and the amount in color. A forgiven Loan or Debt keeps its true amount.
+/// symbol or image, the wallet icon, and the amount in color. A forgiven Loan or Debt keeps its true amount. An Expense
+/// that was paid back keeps its original amount, lists its Reimbursements under the title and shows its net.
 struct TransactionRow: View {
     let transaction: Transaction
     /// Shows the transaction's day, for lists not grouped by day.
@@ -26,10 +27,14 @@ struct TransactionRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
+                ReimbursementEntriesText(transaction: transaction)
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 4) {
-                AmountText(amount: transaction.amount)
+                HStack(spacing: 6) {
+                    AmountText(amount: transaction.amount)
+                    ReimbursementNetText(transaction: transaction)
+                }
                 HStack(spacing: 6) {
                     if transaction.isEstimated {
                         EstimatedBadge()
