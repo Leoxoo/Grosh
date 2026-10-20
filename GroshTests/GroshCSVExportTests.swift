@@ -102,7 +102,7 @@ struct GroshCSVExportTests {
         let original = try #require(rows.first { $0["Amount"] == "-30.00" })
         let parts = rows.filter { $0["Amount"] != "-30.00" }
         #expect(original["Split from"] == "")
-        #expect(parts.map { $0["Amount"] }.sorted() == ["-10.00", "-20.00"])
+        #expect(parts.compactMap { $0["Amount"] }.sorted() == ["-10.00", "-20.00"])
         #expect(parts.allSatisfy { $0["Split from"] == original["Id"] })
         #expect(rows.allSatisfy { $0["Linked"] == original["Linked"] && $0["Linked"] != "" })
     }
