@@ -90,7 +90,9 @@ struct TransactionDetailTests {
 
     @Test func aLinkedTransactionIsNeitherEditedNorDuplicatedHere() throws {
         try CategorySeeder.seedIfNeeded(in: context)
-        let forgiven = record("forgave Pasha", -40_00, in: checking, link: UUID())
+        let link = UUID()
+        record("Pasha", -100_00, in: checking, link: link).category = try context.lockedCategory(.loan)
+        let forgiven = record("forgave Pasha", -40_00, in: checking, link: link)
         forgiven.category = try context.lockedCategory(.otherExpense)
 
         #expect(forgiven.editFlow == nil)

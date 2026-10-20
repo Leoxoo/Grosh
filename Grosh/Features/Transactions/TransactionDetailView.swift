@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// One transaction with all its fields, its Related transactions, and Edit, Duplicate and Delete.
+/// One transaction with all its fields, its Related transactions, and Edit, Duplicate, Split and Delete.
 /// Use inside a `NavigationStack`.
 struct TransactionDetailView: View {
     let transaction: Transaction
@@ -12,6 +12,7 @@ struct TransactionDetailView: View {
     /// The editor Edit opened, while it is open.
     @State private var editing: TransactionEditFlow?
     @State private var isDuplicating = false
+    @State private var isSplitting = false
     @State private var isEnteringAmount = false
     /// What the Loan or Debt section opened, while it is open.
     @State private var loanOrDebtAction: LoanOrDebtAction?
@@ -37,6 +38,9 @@ struct TransactionDetailView: View {
         }
         .sheet(isPresented: $isDuplicating) {
             TransactionEditor(mode: .duplicate(transaction))
+        }
+        .sheet(isPresented: $isSplitting) {
+            SplitSheet(transaction: transaction)
         }
         .sheet(isPresented: $isEnteringAmount) {
             EstimatedAmountEditor(transaction: transaction)
@@ -80,6 +84,12 @@ struct TransactionDetailView: View {
                 if transaction.canBeDuplicated {
                     Button("Duplicate", systemImage: "plus.square.on.square") {
                         isDuplicating = true
+                    }
+                    .fullWidthRowButton()
+                }
+                if transaction.canBeSplit {
+                    Button("Split", systemImage: "square.split.2x1") {
+                        isSplitting = true
                     }
                     .fullWidthRowButton()
                 }

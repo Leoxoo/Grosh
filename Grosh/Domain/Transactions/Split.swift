@@ -1,0 +1,200 @@
+import Foundation
+import SwiftData
+
+/// One part of a Split being set up: what a part takes of its own. Every part shares the wallet and Card of the
+/// transaction split, so a part holds neither.
+struct SplitPart {
+    /// Entered positive; the category decides whether it adds to or takes from the wallet.
+    var amount: Money
+    var category: Category?
+    var day: CalendarDay
+    var note: String
+    var withName: String
+    var eventName: String
+
+    /// The part as `transaction` is now.
+    init(of transaction: Transaction) {
+        amount = Money(cents: abs(transaction.amountCents), currencyCode: transaction.amount.currencyCode)
+        category = transaction.category
+        day = transaction.day
+        note = transaction.note
+        withName = transaction.withName
+        eventName = transaction.eventName
+    }
+
+    /// Sets what this part holds on `transaction`: its amount (signed by its category), category, day, note, With and
+    /// Event.
+    fileprivate func apply(to transaction: Transaction) {
+        transaction.amountCents = amount.cents * (category?.sign ?? 1)
+        transaction.category = category
+        transaction.day = day
+        transaction.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        transaction.withName = withName.trimmingCharacters(in: .whitespacesAndNewlines)
+        transaction.eventName = eventName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+/// What the Split sheet holds before it is applied: the transaction being split as a part of its own, and the parts
+/// added to it. The transaction's amount is always what the other parts leave of the total; typing over it changes
+/// the total.
+struct SplitDraft {
+    /// What the transaction came to before it was split.
+    let was: Money
+    /// The transaction being split. Its `amount` is the remainder, which the draft keeps as parts are added, changed
+    /// and removed.
+    var original: SplitPart
+    /// The new parts, in the order they were added.
+    private(set) var parts: [SplitPart] = []
+
+    /// The transaction as it is, with no parts yet.
+    init(splitting transaction: Transaction) {
+        original = SplitPart(of: transaction)
+        was = original.amount
+    }
+
+    /// What the parts add up to: the original's remainder and every other part. It moves the wallet's balance when it
+    /// differs from ``was``.
+    var total: Money {
+        Money(cents: parts.reduce(original.amount.cents) { $0 + $1.amount.cents }, currencyCode: was.currencyCode)
+    }
+
+    /// How much the wallet's balance moves when the split is applied: zero while the parts sum to the original.
+    var walletChange: Money {
+        Money(cents: (original.category?.sign ?? 0) * (total.cents - was.cents), currencyCode: was.currencyCode)
+    }
+
+    /// A part to start from: a copy of the original, with no amount yet.
+    func newPart() -> SplitPart {
+        var part = original
+        part.amount = Money(cents: 0, currencyCode: was.currencyCode)
+        return part
+    }
+
+    /// Adds `part`, taking its amount off the original.
+    mutating func addPart(_ part: SplitPart) {
+        parts.append(part)
+        original.amount.cents -= part.amount.cents
+    }
+
+    /// Replaces the part at `index` with `part`; the original makes up the difference in amount.
+    mutating func replacePart(at index: Int, with part: SplitPart) {
+        original.amount.cents += parts[index].amount.cents - part.amount.cents
+        parts[index] = part
+    }
+
+    /// Removes the part at `index`, giving its amount back to the original.
+    mutating func removePart(at index: Int) {
+        original.amount.cents += parts.remove(at: index).amount.cents
+    }
+
+    /// Checks the draft against the split rules before anything is changed: at least one new part, every part (the
+    /// original too) with an amount above zero and a category.
+    func validate() throws {
+        let everyPart = [original] + parts
+        guard !parts.isEmpty else { throw SplitRuleError.noParts }
+        guard everyPart.allSatisfy({ $0.amount.cents > 0 }) else { throw SplitRuleError.missingAmount }
+        guard everyPart.allSatisfy({ $0.category != nil }) else { throw SplitRuleError.missingCategory }
+    }
+
+    /// Whether every required field is filled, so Split can be enabled.
+    var canSplit: Bool { (try? validate()) != nil }
+}
+
+/// Why a split can't be made or undone.
+nonisolated enum SplitRuleError: Error, Equatable {
+    /// Only an ordinary Expense or Income can be split (``Transaction/canBeSplit``).
+    case notSplittable
+    case noParts
+    /// Every part, and what is left on the original, must be above zero.
+    case missingAmount
+    case missingCategory
+    /// The transaction has no other part to merge back.
+    case notSplit
+}
+
+extension SplitRuleError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .notSplittable: String(localized: "Only an ordinary expense or income can be split.")
+        case .noParts: String(localized: "Add at least one part.")
+        case .missingAmount: String(localized: "Give every part an amount above zero, and leave some on the original.")
+        case .missingCategory: String(localized: "Choose a category for every part.")
+        case .notSplit: String(localized: "This transaction has no other parts to merge.")
+        }
+    }
+}
+
+extension Transaction {
+    /// Whether the transaction can be split: an ordinary Expense or Income, which is not a transfer half, a Loan or
+    /// Debt or one of their payments (or what they write off), a Starting balance, a Balance adjustment, or in Recently
+    /// Deleted. A part of a split can be split again.
+    var canBeSplit: Bool {
+        editFlow == .addSheet && category?.type.isUserManaged == true && !isBalanceAdjustment && !isInRecentlyDeleted
+    }
+
+    /// Whether this is an Expense or Income, not a transfer half, that shares a link: a part of a Split, or what a Loan
+    /// or Debt writes off beside a payment.
+    var isLinkedExpenseOrIncome: Bool {
+        guard linkID != nil, let category, !category.isTransferHalf else { return false }
+        return category.type.isUserManaged
+    }
+
+    /// Whether a Loan or Debt (even one in Recently Deleted) shares this transaction's link.
+    var sharesLinkWithLoanOrDebt: Bool {
+        guard let link = linkID, let context = modelContext else { return false }
+        let linked = FetchDescriptor<Transaction>(predicate: #Predicate { $0.linkID == link })
+        return ((try? context.fetch(linked)) ?? []).contains { $0.isLoanOrDebt }
+    }
+
+    /// Whether this is a part of a Split: an Expense or Income sharing a link with no Loan or Debt on it. It is edited
+    /// like any ordinary transaction, and nothing it holds is ever shared with the other parts.
+    var isSplitPart: Bool { isLinkedExpenseOrIncome && !sharesLinkWithLoanOrDebt }
+
+    /// Splits this transaction as `draft` has it, in `context`: it keeps its identity, creation time and Recurring
+    /// attachment and takes the draft's remainder and fields, and each new part is made as a copy in its wallet and
+    /// Card with its own fields. All the parts share a link, so they show as Related transactions. Returns the new
+    /// parts. Saves. Nothing changes when the transaction can't be split or the draft breaks a split rule.
+    @discardableResult
+    func split(_ draft: SplitDraft, in context: ModelContext) throws -> [Transaction] {
+        guard canBeSplit else { throw SplitRuleError.notSplittable }
+        try draft.validate()
+        let link = linkID ?? UUID()
+        // Typing a different amount over the original confirms an Estimated transaction, as editing it does.
+        let amountChanged = abs(amountCents) != draft.original.amount.cents
+        draft.original.apply(to: self)
+        linkID = link
+        if amountChanged {
+            clearEstimate()
+        }
+        let created = draft.parts.map { part -> Transaction in
+            let transaction = Transaction(amount: Money(cents: 0), day: part.day, wallet: nil, category: nil)
+            context.insert(transaction)
+            part.apply(to: transaction)
+            transaction.wallet = wallet
+            transaction.card = card
+            transaction.isExcludedFromReport = isExcludedFromReport
+            transaction.linkID = link
+            return transaction
+        }
+        try context.save()
+        return created
+    }
+
+    /// Undo split: merges every part of the split back into the oldest one, the original, which takes the sum of their
+    /// amounts and loses its link. The other parts are removed. A part in Recently Deleted is left where it is and
+    /// isn't counted. Returns the original. Saves. Throws when there is no other part to merge.
+    @discardableResult
+    func undoSplit(in context: ModelContext) throws -> Transaction {
+        let parts = try context.fetch(linkedTransactions)
+        guard isSplitPart, parts.contains(self), let original = parts.min(by: { $0.createdAt < $1.createdAt }),
+              parts.count > 1
+        else { throw SplitRuleError.notSplit }
+        original.amountCents = parts.reduce(0) { $0 + $1.amountCents }
+        original.linkID = nil
+        for part in parts where part != original {
+            context.delete(part)
+        }
+        try context.save()
+        return original
+    }
+}
