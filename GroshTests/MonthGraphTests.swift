@@ -25,7 +25,7 @@ struct MonthGraphTests {
         draft.wallet = checking
         draft.amount = Money(cents: cents)
         draft.category = try context.lockedCategory(role)
-        draft.withName = "Pasha"
+        draft.people = [try Person.add(named: "Pasha", in: context)]
         return try Transaction.create(draft, in: context)
     }
 

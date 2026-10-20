@@ -3,7 +3,7 @@ import SwiftUI
 /// The fields of a ``KeypadSheet`` that take focus: the amounts, typed on the keypad, and the text fields, which
 /// hide it.
 enum KeypadSheetField: Hashable {
-    case amount, secondAmount, note, withName, event
+    case amount, secondAmount, note, event
 }
 
 /// The shell of every sheet that types an amount on ``AmountKeypad``: a grouped form in its own navigation stack,

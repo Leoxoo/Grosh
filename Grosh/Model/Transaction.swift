@@ -9,7 +9,10 @@ final class Transaction {
     /// The ``CalendarDay`` as `yyyymmdd`.
     var dayRaw: Int = 0
     var note: String = ""
-    /// The person the transaction involved ("With").
+    /// The names of the transaction's ``people`` ("With"), joined with `; ` and ordered by name. A copy kept beside
+    /// them, so a list, a search or an export reads the With without reading the ``people`` relationship one
+    /// transaction at a time. ``setPeople(_:usedAt:)`` keeps it in step. Before ADR-0009 this was the With itself, a
+    /// typed name; ``Person/migrateWithNames(in:)`` turns those into people.
     var withName: String = ""
     var eventName: String = ""
     var isExcludedFromReport: Bool = false
@@ -47,6 +50,10 @@ final class Transaction {
     var recurring: RecurringTransaction?
     /// On a forgiven Loan or Debt, the category the forgiven amount counts under in reports.
     var forgivenCategory: Category?
+    /// The people in With (ADR-0009): any number, except on a Loan or Debt, which has exactly one. Unordered in the
+    /// store; ``orderedPeople`` lists them by name. Set them with ``setPeople(_:usedAt:)``, never directly, so
+    /// ``withName`` follows.
+    var people: [Person]? = []
     /// On an Expense, what its Reimbursements add up to in cents: zero when it has none. Kept beside them, so a balance
     /// reads a transaction's net (``netCents``) without reading its Reimbursements one transaction at a time.
     /// ``recountReimbursements()`` keeps it in step whenever one is added, edited, removed or moved.

@@ -49,8 +49,19 @@ One dated movement of money into or out of one wallet, filed under one category.
 _Avoid_: Entry, record, item
 
 **With**:
-The person a transaction involved, such as who the user ate with or who a Loan was given to. A name, not a contact.
-_Avoid_: Contact, member, payee
+The people a transaction involved, such as who the user ate with or who a Loan was given to. A transaction can be with several Persons, except a Loan or Debt, which is with exactly one. Typing a name in With makes the Person or reuses the one who has that name, ignoring case.
+_Avoid_: Member, payee
+
+**Person**:
+Someone a transaction involved: a name with an optional phone, a hidden flag and the date they were last used. People and places are the same thing, so a restaurant is a Person too. A Person can later be linked to an entry in the user's Contacts (ADR-0009).
+_Avoid_: Contact (that is the entry in the Contacts app a Person may be linked to), member, payee
+
+**Previous**:
+The section of the With menu that lists every Person who isn't hidden, the one used most recently first. Choosing a Person in With makes them the most recent.
+
+**Hide**:
+Swiping a name in Previous and choosing Hide leaves that Person out of Previous. Their name and their place on every transaction stay, so history never changes, and typing their name in With again brings them back.
+_Avoid_: Delete, archive (archived is for wallets and Cards)
 
 **Event**:
 A named occasion a transaction belonged to, such as a trip or a wedding.

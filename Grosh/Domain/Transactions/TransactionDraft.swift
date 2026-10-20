@@ -33,12 +33,20 @@ struct TransactionDraft {
     }
     /// Entered positive; the category decides whether it adds to or takes from the wallet.
     var amount = Money(cents: 0)
-    var category: Category?
+    /// Changing it to a Loan or a Debt keeps only the first of the people in With, since those are with one Person.
+    var category: Category? {
+        didSet {
+            if requiresWith, people.count > 1 {
+                people = [people[0]]
+            }
+        }
+    }
     var card: Card?
     var note = ""
     var day: CalendarDay
-    /// The person the transaction involved.
-    var withName = ""
+    /// The people in With, in the order they were chosen (ADR-0009). A Loan or Debt takes exactly one; anything else
+    /// takes any number.
+    var people: [Person] = []
     var isExcludedFromReport = false
     /// The day a Loan or Debt reminds the user of it, or `nil` for no reminder. Only kept on the Debt/Loan tab.
     var reminderDay: CalendarDay?
@@ -116,7 +124,7 @@ struct TransactionDraft {
         category = transaction.category
         card = transaction.card
         note = transaction.note
-        withName = transaction.withName
+        people = transaction.orderedPeople
         isExcludedFromReport = transaction.isExcludedFromReport
     }
 }
@@ -131,6 +139,8 @@ nonisolated enum TransactionRuleError: Error, Equatable {
     case missingCard
     /// A Loan or Debt must say who it is with.
     case missingWith
+    /// A Loan or Debt is with one Person, not several (ADR-0009).
+    case tooManyWith
     /// Only a wallet's Starting balance is edited as one.
     case notAStartingBalance
 }
@@ -142,7 +152,8 @@ extension TransactionRuleError: LocalizedError {
         case .missingAmount: String(localized: "Enter an amount above zero.")
         case .missingCategory: String(localized: "Choose a category.")
         case .missingCard: String(localized: "Choose the Card this expense was paid with.")
-        case .missingWith: String(localized: "Enter who you lent to or borrowed from in With.")
+        case .missingWith: String(localized: "Choose who you lent to or borrowed from in With.")
+        case .tooManyWith: String(localized: "A Loan or Debt is with one person. Choose one in With.")
         case .notAStartingBalance: String(localized: "Only a wallet's Starting balance can be edited here.")
         }
     }
@@ -168,6 +179,7 @@ extension TransactionDraft {
         }
         guard card != nil || !requiresCard else { throw TransactionRuleError.missingCard }
         guard !isMissingWith else { throw TransactionRuleError.missingWith }
+        guard !(requiresWith && people.count > 1) else { throw TransactionRuleError.tooManyWith }
     }
 
     /// Whether this is a Loan or Debt with payments or forgiven, whose wallet, type and category can't change.
@@ -178,14 +190,14 @@ extension TransactionDraft {
         type == .debtLoan
     }
 
-    /// Whether the transaction must say who it is with: a Loan or a Debt.
+    /// Whether the transaction must say who it is with, and with exactly one Person: a Loan or a Debt.
     var requiresWith: Bool {
         category?.isLoanOrDebt == true
     }
 
     /// Whether a Loan or Debt still says nobody in With.
     var isMissingWith: Bool {
-        requiresWith && withName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        requiresWith && people.isEmpty
     }
 
     /// The types the sheet offers, in order. A balance adjustment is only ever Expense or Income: its reason is a

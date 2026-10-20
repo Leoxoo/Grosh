@@ -82,7 +82,7 @@ struct LoanOrDebt {
         transaction.wallet = original.wallet
         transaction.category = category
         transaction.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        transaction.withName = original.withName
+        transaction.setPeople(original.orderedPeople)
         transaction.isExcludedFromReport = isExcludedFromReport
         transaction.linkID = link
         return transaction

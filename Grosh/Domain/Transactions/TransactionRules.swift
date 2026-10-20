@@ -33,7 +33,7 @@ extension Transaction {
         category = draft.category
         card = draft.offersCard ? draft.card : nil
         note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
-        withName = draft.withName.trimmingCharacters(in: .whitespacesAndNewlines)
+        setPeople(draft.people)
         isExcludedFromReport = draft.isExcludedFromReport
         reminderDay = draft.offersReminder ? draft.reminderDay : nil
     }

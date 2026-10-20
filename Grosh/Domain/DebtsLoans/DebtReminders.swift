@@ -28,6 +28,7 @@ nonisolated struct DebtReminder: PendingReminder {
     /// The Loan or Debt it reminds of.
     let original: PersistentIdentifier
     let day: CalendarDay
+    /// The name of the Person the Loan or Debt is with.
     let withName: String
     let outstanding: Money
     /// A Loan (they owe the user) or a Debt (the user owes them).
@@ -114,7 +115,8 @@ extension DebtsAndLoans: ReminderSource {
         open.compactMap { loanOrDebt in
             guard let day = loanOrDebt.original.reminderDay, day >= today else { return nil }
             return DebtReminder(
-                original: loanOrDebt.original.persistentModelID, day: day, withName: loanOrDebt.original.withName,
+                original: loanOrDebt.original.persistentModelID, day: day,
+                withName: loanOrDebt.original.orderedPeople.first?.name ?? "",
                 outstanding: loanOrDebt.outstanding, kind: loanOrDebt.kind
             )
         }

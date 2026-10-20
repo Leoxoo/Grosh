@@ -9,7 +9,8 @@ struct SplitPart {
     var category: Category?
     var day: CalendarDay
     var note: String
-    var withName: String
+    /// The people in With. A part is never a Loan or Debt, so it takes any number.
+    var people: [Person]
     var eventName: String
 
     /// The part as `transaction` is now.
@@ -18,7 +19,7 @@ struct SplitPart {
         category = transaction.category
         day = transaction.day
         note = transaction.note
-        withName = transaction.withName
+        people = transaction.orderedPeople
         eventName = transaction.eventName
     }
 
@@ -29,7 +30,7 @@ struct SplitPart {
         transaction.category = category
         transaction.day = day
         transaction.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        transaction.withName = withName.trimmingCharacters(in: .whitespacesAndNewlines)
+        transaction.setPeople(people)
         transaction.eventName = eventName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

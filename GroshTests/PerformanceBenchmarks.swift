@@ -286,6 +286,7 @@ enum BenchmarkStore {
         let archived = Wallet(name: "Old bank", sortOrder: 9)
         archived.isArchived = true
         context.insert(archived)
+        let people = try ["Sam", "Alex", "Jo"].map { try Person.add(named: $0, in: context) }
 
         let photoCard = Card(name: "Sapphire", kind: .credit, payingWallet: wallets[0])
         photoCard.imageData = cardPhoto()
@@ -332,11 +333,11 @@ enum BenchmarkStore {
             }
             if day.day == 10, random.next(in: 0...2) == 0 {
                 let loan = Grosh.Transaction(amount: Money(cents: -random.next(in: 2_000...50_000)), day: day, wallet: wallets[2], category: role(.loan))
-                loan.withName = ["Sam", "Alex", "Jo"][random.next(in: 0...2)]
                 loan.isExcludedFromReport = true
                 loan.linkID = UUID()
                 loan.reminderDay = day.adding(days: 30)
                 context.insert(loan)
+                loan.setPeople([people[random.next(in: 0...2)]])
                 count += 1
             }
             if count % 2_000 < 12 { try context.save() }

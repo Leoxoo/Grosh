@@ -107,7 +107,7 @@ private struct TransactionForm: View {
             }
 
             mainSection(fields)
-            detailsSection(fields)
+            detailsSection
         }
         .onChange(of: draft.type) {
             if draft.type == .debtLoan {
@@ -142,17 +142,10 @@ private struct TransactionForm: View {
         }
     }
 
-    private func detailsSection(_ fields: KeypadSheetFields) -> some View {
+    private var detailsSection: some View {
         Section {
             DisclosureGroup("Add more details", isExpanded: $isShowingDetails) {
-                TextField("With", text: $draft.withName)
-                    .focused(fields.focus, equals: .withName)
-                if fields.focus.wrappedValue == .withName {
-                    WithNameSuggestions(typed: draft.withName) { name in
-                        draft.withName = name
-                        fields.focus.wrappedValue = nil
-                    }
-                }
+                WithField(people: $draft.people, picksOne: draft.requiresWith)
                 Toggle("Exclude from report", isOn: $draft.isExcludedFromReport)
                 if draft.offersReminder {
                     ReminderField(day: $draft.reminderDay)
@@ -210,28 +203,10 @@ private struct TransactionForm: View {
     }
 }
 
-/// Names used before that match what's typed in the With field, to pick with one tap.
-struct WithNameSuggestions: View {
-    let typed: String
-    let onPick: (String) -> Void
-
-    @Environment(\.modelContext) private var context
-
-    var body: some View {
-        ForEach((try? Transaction.withNames(matching: typed, limit: 3, in: context)) ?? [], id: \.self) { name in
-            Button {
-                onPick(name)
-            } label: {
-                Label(name, systemImage: "person.crop.circle")
-            }
-        }
-    }
-}
-
 private extension TransactionDraft {
     /// Whether any of the "more details" are filled in, so they open already showing.
     var hasDetails: Bool {
-        type == .debtLoan || !withName.isEmpty || isExcludedFromReport || !eventName.isEmpty
+        type == .debtLoan || !people.isEmpty || isExcludedFromReport || !eventName.isEmpty
     }
 }
 
