@@ -47,6 +47,10 @@ struct SplitSheet: View {
                     }
                     Button("Add Part", systemImage: "plus") { editing = .new }
                 }
+
+                if !draft.reimbursements.isEmpty {
+                    reimbursementsSection
+                }
             }
             .navigationTitle("Split")
             #if os(iOS)
@@ -95,6 +99,35 @@ struct SplitSheet: View {
             } else {
                 Text("This transaction shows what the other parts leave of the total.")
             }
+        }
+    }
+
+    /// Each Reimbursement of the transaction with a picker for the part it goes to; Split waits until all are chosen.
+    private var reimbursementsSection: some View {
+        Section {
+            ForEach(draft.reimbursements.indices, id: \.self) { index in
+                let reimbursement = draft.reimbursements[index].reimbursement
+                Picker(selection: $draft.reimbursements[index].part) {
+                    Text("Choose a part").tag(SplitPartRef?.none)
+                    Text("This transaction").tag(SplitPartRef?.some(.original))
+                    ForEach(draft.parts.indices, id: \.self) { part in
+                        Text("\(draft.parts[part].category?.name ?? String(localized: "Uncategorized")), \(draft.parts[part].amount.formatted())")
+                            .tag(SplitPartRef?.some(.part(part)))
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(reimbursement.amount.formatted())
+                            .monospacedDigit()
+                        Text(reimbursement.day.date().formatted(date: .abbreviated, time: .omitted))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        } header: {
+            Text("Reimbursements")
+        } footer: {
+            Text("Choose the part each Reimbursement was paid back against.")
         }
     }
 

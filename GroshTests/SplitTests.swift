@@ -30,10 +30,34 @@ struct SplitTests {
         return try Transaction.create(draft, in: context)
     }
 
-    /// Splits `transaction`, adding a part for each of `cents`, filed under `categoryName` when one is given.
+    /// Adds a Reimbursement of `cents` to `expense`.
     @discardableResult
-    private func split(_ transaction: Transaction, off cents: [Int], into categoryName: String? = nil) throws -> [Transaction] {
+    private func payBack(_ cents: Int, to expense: Transaction) throws -> Reimbursement {
+        try Reimbursement.add(ReimbursementDraft(amount: Money(cents: cents), day: today), to: expense, in: context)
+    }
+
+    /// Assigns `reimbursement` to `part` in `draft`.
+    private func assign(_ reimbursement: Reimbursement, to part: SplitPartRef?, in draft: inout SplitDraft) throws {
+        let index = try #require(draft.reimbursements.firstIndex { $0.reimbursement === reimbursement })
+        draft.reimbursements[index].part = part
+    }
+
+    /// The part `draft` sends `reimbursement` to, `nil` while it is unassigned.
+    private func assignment(of reimbursement: Reimbursement, in draft: SplitDraft) -> SplitPartRef? {
+        draft.reimbursements.first { $0.reimbursement === reimbursement }?.part
+    }
+
+    /// Splits `transaction`, adding a part for each of `cents`, filed under `categoryName` when one is given, and
+    /// sending each Reimbursement in `sending` to its part.
+    @discardableResult
+    private func split(
+        _ transaction: Transaction, off cents: [Int], into categoryName: String? = nil,
+        sending reimbursements: [(Reimbursement, SplitPartRef)] = []
+    ) throws -> [Transaction] {
         var draft = SplitDraft(splitting: transaction)
+        for (reimbursement, part) in reimbursements {
+            try assign(reimbursement, to: part, in: &draft)
+        }
         for part in cents {
             var new = draft.newPart()
             new.amount = Money(cents: part)
@@ -613,5 +637,115 @@ struct SplitTests {
 
         #expect(try allTransactions() == [coffee])
         #expect(coffee.amountCents == -25_00)
+    }
+
+    // MARK: Reimbursements
+
+    @Test func anExpenseWithoutReimbursementsHasNothingToAssign() throws {
+        let coffee = try record(25_00)
+
+        #expect(SplitDraft(splitting: coffee).reimbursements.isEmpty)
+    }
+
+    @Test func saveWaitsUntilEveryReimbursementIsAssignedToAPart() throws {
+        let coffee = try record(25_00)
+        let first = try payBack(5_00, to: coffee)
+        let second = try payBack(3_00, to: coffee)
+        var draft = SplitDraft(splitting: coffee)
+        var part = draft.newPart()
+        part.amount = Money(cents: 10_00)
+        draft.addPart(part)
+
+        #expect(draft.reimbursements.count == 2)
+        #expect(!draft.canSplit)
+        #expect(throws: SplitRuleError.unassignedReimbursement) { try coffee.split(draft, in: context) }
+        #expect(coffee.linkID == nil)
+        #expect(try allTransactions().count == 1)
+
+        try assign(first, to: .part(0), in: &draft)
+        #expect(!draft.canSplit)
+        try assign(second, to: .original, in: &draft)
+        #expect(draft.canSplit)
+    }
+
+    @Test func splittingSendsEachReimbursementToThePartItWasAssignedTo() throws {
+        let coffee = try record(25_00)
+        let first = try payBack(5_00, to: coffee)
+        let second = try payBack(3_00, to: coffee)
+        let third = try payBack(2_00, to: coffee)
+        let balanceBefore = balance()
+
+        let parts = try split(
+            coffee, off: [10_00, 5_00], sending: [(first, .part(0)), (second, .original), (third, .part(0))]
+        )
+
+        #expect(coffee.orderedReimbursements == [second])
+        #expect(parts[0].orderedReimbursements == [first, third])
+        #expect(parts[1].orderedReimbursements.isEmpty)
+        #expect(first.expense == parts[0])
+        #expect(coffee.netCents == -7_00)
+        #expect(parts[0].netCents == -3_00)
+        #expect(parts[1].netCents == -5_00)
+        #expect(try context.fetchCount(FetchDescriptor<Reimbursement>()) == 3)
+        #expect(balance() == balanceBefore)
+    }
+
+    @Test func removingAPartUnassignsItsReimbursementsAndKeepsTheOthersOnTheirParts() throws {
+        let coffee = try record(25_00)
+        let onFirst = try payBack(1_00, to: coffee)
+        let onSecond = try payBack(2_00, to: coffee)
+        let onThird = try payBack(3_00, to: coffee)
+        let onOriginal = try payBack(4_00, to: coffee)
+        var draft = SplitDraft(splitting: coffee)
+        for cents in [10_00, 5_00, 3_00] {
+            var part = draft.newPart()
+            part.amount = Money(cents: cents)
+            draft.addPart(part)
+        }
+        try assign(onFirst, to: .part(0), in: &draft)
+        try assign(onSecond, to: .part(1), in: &draft)
+        try assign(onThird, to: .part(2), in: &draft)
+        try assign(onOriginal, to: .original, in: &draft)
+        #expect(draft.canSplit)
+
+        draft.removePart(at: 1)
+
+        #expect(assignment(of: onFirst, in: draft) == .part(0))
+        #expect(assignment(of: onSecond, in: draft) == nil)
+        #expect(assignment(of: onThird, in: draft) == .part(1))
+        #expect(assignment(of: onOriginal, in: draft) == .original)
+        #expect(!draft.canSplit)
+    }
+
+    @Test func undoSplitMovesEveryPartsReimbursementsBackOntoTheOriginal() throws {
+        let coffee = try record(25_00)
+        let first = try payBack(5_00, to: coffee)
+        let second = try payBack(3_00, to: coffee)
+        let third = try payBack(2_00, to: coffee)
+        let balanceBefore = balance()
+        let parts = try split(
+            coffee, off: [10_00, 5_00], sending: [(first, .part(0)), (second, .part(1)), (third, .original)]
+        )
+
+        try parts[1].undoSplit(in: context)
+
+        #expect(try allTransactions() == [coffee])
+        #expect(Set(coffee.orderedReimbursements) == [first, second, third])
+        #expect(coffee.netCents == -15_00)
+        #expect(try context.fetchCount(FetchDescriptor<Reimbursement>()) == 3)
+        #expect(balance() == balanceBefore)
+    }
+
+    @Test func aPartSplitAgainSendsItsReimbursementsToTheNewPart() throws {
+        let coffee = try record(25_00)
+        let reimbursement = try payBack(5_00, to: coffee)
+        let first = try #require(try split(coffee, off: [10_00], sending: [(reimbursement, .part(0))]).first)
+
+        let second = try #require(try split(first, off: [4_00], sending: [(reimbursement, .part(0))]).first)
+
+        #expect(reimbursement.expense == second)
+        #expect(first.orderedReimbursements.isEmpty)
+        try first.undoSplit(in: context)
+        #expect(coffee.orderedReimbursements == [reimbursement])
     }
 }
