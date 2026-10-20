@@ -52,7 +52,7 @@ nonisolated struct DebtReminder: PendingReminder {
     var arrival = ReminderArrival.onItsDay
 
     var userInfo: [String: String] {
-        typealias Key = ExpectedReimbursementReminder.InfoKey
+        typealias Key = TextReminder.InfoKey
         var info = [
             Key.person: withName, Key.amountCents: String(outstanding.cents),
             Key.currencyCode: outstanding.currencyCode,
@@ -83,21 +83,20 @@ protocol ReminderScheduler {
     func replacePending<Reminder: PendingReminder>(_ reminders: [Reminder]) async
 }
 
-/// What the Home bell and the notifications remind of.
+/// What the Home bell and the notifications remind of, made from the records it is fetched from.
 protocol ReminderSource {
     associatedtype Reminder: PendingReminder
+    /// What it is made from: transactions, or Expected reimbursements.
+    associatedtype Record: PersistentModel
+
+    /// Every record it is made from. A source made from them stays current, since a change to one changes what this
+    /// fetches.
+    static var records: FetchDescriptor<Record> { get }
+
+    init(_ records: [Record])
 
     /// The notifications that should be pending: one for each reminder day `today` or later, the soonest first.
     func reminders(from today: CalendarDay) -> [Reminder]
-}
-
-/// A ``ReminderSource`` made from the transactions it is fetched from.
-protocol TransactionReminderSource: ReminderSource {
-    /// Every transaction it is made from. A source made from them stays current, since a change to one changes what
-    /// this fetches.
-    static var transactions: FetchDescriptor<Transaction> { get }
-
-    init(_ transactions: [Transaction])
 }
 
 extension ReminderSource {
@@ -131,7 +130,9 @@ extension ReminderSource {
     }
 }
 
-extension DebtsAndLoans: TransactionReminderSource {
+extension DebtsAndLoans: ReminderSource {
+    static var records: FetchDescriptor<Transaction> { transactions }
+
     /// The open Loans and Debts whose reminder day is `today` or earlier, the earliest first: what the Home bell
     /// lists. A settled one is never due.
     func due(on today: CalendarDay) -> [LoanOrDebt] {
@@ -144,7 +145,7 @@ extension DebtsAndLoans: TransactionReminderSource {
     func reminders(from today: CalendarDay) -> [DebtReminder] {
         open.compactMap { loanOrDebt in
             guard let day = loanOrDebt.original.reminderDay, day >= today else { return nil }
-            let person = loanOrDebt.original.orderedPeople.first
+            let person = loanOrDebt.person
             return DebtReminder(
                 original: loanOrDebt.original.persistentModelID, day: day, withName: person?.name ?? "",
                 outstanding: loanOrDebt.outstanding, kind: loanOrDebt.kind, phone: person?.phone

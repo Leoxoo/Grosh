@@ -101,6 +101,24 @@ struct ReimbursementIntoOtherWalletTests {
         #expect(owed.status == .paidBack)
     }
 
+    /// Cents of one currency are never counted as another's: money that came into a wallet in another currency than the
+    /// Expense's can't be recorded against it, and nothing is made.
+    @Test func aWalletInAnotherCurrencyIsRefused() throws {
+        let alex = try fixture.person("Alex")
+        let dinner = try fixture.dinner(owing: [(alex, 30_00)])
+        let owed = try fixture.expectation(of: alex, on: dinner)
+        let euros = Wallet(name: "Euros")
+        euros.currencyCode = "EUR"
+        context.insert(euros)
+
+        #expect(throws: ExpectedReimbursementRuleError.otherCurrency) {
+            try fixture.pay(20_00, on: owed, into: euros)
+        }
+        #expect(owed.paid == Money(cents: 0))
+        #expect(!dinner.hasPaybacksElsewhere)
+        #expect(euros.transactions?.isEmpty ?? true)
+    }
+
     // MARK: Balances
 
     @Test func thePaybackCountsInItsWalletAndTheExpenseKeepsItsFullAmountInItsOwn() throws {

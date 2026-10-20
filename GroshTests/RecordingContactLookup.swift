@@ -35,7 +35,7 @@ final class RecordingContactLookup: ContactLookup {
 
     func search(_ typed: String) async -> [Contact] {
         calls.append(.search(typed))
-        return access.showsContacts ? book.matching(typed) : []
+        return access.showsContacts ? book.filter(nameContaining: typed, name: \.name) : []
     }
 
     func contacts(withIdentifiers identifiers: [String]) async -> [Contact] {

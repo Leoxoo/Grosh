@@ -31,9 +31,7 @@ extension Transaction {
 
     /// An amount paid back as a row lists it: "+20" or "+3.50". A whole amount drops its cents.
     static func paidBackText(_ cents: Int, locale: Locale = .current) -> String {
-        let fractionLength = cents % 100 == 0 ? 0 : 2
-        let amount = Decimal(cents) / 100
-        return "+" + amount.formatted(.number.precision(.fractionLength(fractionLength)).locale(locale))
+        "+" + Money(cents: cents).plainNumber(locale: locale)
     }
 }
 

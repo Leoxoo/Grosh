@@ -106,11 +106,13 @@ struct ExpectedReimbursementTests {
         let people = try fixture.owesMe().byPerson
 
         #expect(people.map(\.person) == [alex, sam])
-        #expect(people[0].open.count == 2)
-        #expect(people[0].totals.outstanding == [Money(cents: 35_00)])
-        #expect(people[0].totals.openAmountCount == 0)
-        #expect(people[1].totals.outstanding.isEmpty)
-        #expect(people[1].totals.openAmountCount == 1)
+        #expect(people[0].expectations.count == 2)
+        let alexOwes = ExpectationTotals(people[0].expectations)
+        #expect(alexOwes.outstanding == [Money(cents: 35_00)])
+        #expect(alexOwes.openAmountCount == 0)
+        let samOwes = ExpectationTotals(people[1].expectations)
+        #expect(samOwes.outstanding.isEmpty)
+        #expect(samOwes.openAmountCount == 1)
     }
 
     // MARK: No accounting effect

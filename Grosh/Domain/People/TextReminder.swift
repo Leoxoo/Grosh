@@ -34,6 +34,20 @@ struct TextReminder: Identifiable, Equatable {
 // MARK: Making one
 
 extension TextReminder {
+    /// The keys of a reminder notification's ``PendingReminder/userInfo`` that Text them reads
+    /// (``ExpectedReimbursementReminder``, ``DebtReminder``).
+    nonisolated enum InfoKey {
+        static let person = "person"
+        static let phone = "phone"
+        static let expense = "expense"
+        /// What is outstanding in cents; missing for an open amount.
+        static let amountCents = "amountCents"
+        static let currencyCode = "currencyCode"
+        /// Present on a Debt's reminder, where the user owes the Person rather than the Person the user; missing
+        /// otherwise.
+        static let youOwe = "youOwe"
+    }
+
     /// The text for a Person's row in Show by people: what they owe the user and what the user owes them.
     init(_ entry: PersonDebtsAndLoans) {
         self.init(
@@ -48,17 +62,16 @@ extension TextReminder {
     /// names, found in the store when they still are: their number and Contacts link as they are now win over what the
     /// notification was scheduled with. `nil` when the notification names no one.
     init?(userInfo: [String: String], person: Person? = nil) {
-        typealias Key = ExpectedReimbursementReminder.InfoKey
-        guard let name = userInfo[Key.person]?.nilIfBlank else { return nil }
-        let currency = userInfo[Key.currencyCode] ?? Money.defaultCurrencyCode
-        let amounts = userInfo[Key.amountCents].flatMap { Int($0) }
+        guard let name = userInfo[InfoKey.person]?.nilIfBlank else { return nil }
+        let currency = userInfo[InfoKey.currencyCode] ?? Money.defaultCurrencyCode
+        let amounts = userInfo[InfoKey.amountCents].flatMap { Int($0) }
             .map { [Money(cents: $0, currencyCode: currency)] } ?? []
-        let isDebt = userInfo[Key.youOwe] != nil
+        let isDebt = userInfo[InfoKey.youOwe] != nil
         self.init(
             personName: person?.name ?? name,
-            storedPhone: person?.phone?.nilIfBlank ?? userInfo[Key.phone]?.nilIfBlank,
+            storedPhone: person?.phone?.nilIfBlank ?? userInfo[InfoKey.phone]?.nilIfBlank,
             contactIdentifier: person?.contactIdentifier, owesYou: isDebt ? [] : amounts, youOwe: isDebt ? amounts : [],
-            expense: userInfo[Key.expense]?.nilIfBlank
+            expense: userInfo[InfoKey.expense]?.nilIfBlank
         )
     }
 }

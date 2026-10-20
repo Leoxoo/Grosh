@@ -15,11 +15,20 @@ extension PersonRuleError: LocalizedError {
     }
 }
 
-extension String {
+nonisolated extension String {
     /// The text trimmed, or `nil` when it holds nothing: a phone number or name typed into an optional field.
     var nilIfBlank: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+nonisolated extension Sequence {
+    /// The elements whose `name` contains what was typed (ignoring case and accents), in the order given, or all of them
+    /// while nothing is typed: how the With menu searches its Previous section and Contacts alike.
+    func filter(nameContaining typed: String, name: (Element) -> String) -> [Element] {
+        guard let query = typed.nilIfBlank else { return Array(self) }
+        return filter { name($0).localizedStandardContains(query) }
     }
 }
 
@@ -101,8 +110,7 @@ struct PeopleByName {
     mutating func reuseOrCreate(
         _ name: String, phone: String? = nil, lastUsedAt: Date = .now, in context: ModelContext
     ) -> Person? {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
+        guard let trimmed = name.nilIfBlank else { return nil }
         if let existing = person(named: trimmed) { return existing }
         let person = Person(name: trimmed, phone: phone?.nilIfBlank, lastUsedAt: lastUsedAt)
         context.insert(person)
@@ -122,10 +130,10 @@ struct PreviousPeople {
 
     /// `previous`, the people who aren't hidden most recently used first (``Person/previous``), narrowed by `typed`.
     init(_ previous: [Person], typed: String) {
-        let query = typed.trimmingCharacters(in: .whitespacesAndNewlines)
-        people = query.isEmpty ? previous : previous.filter { $0.name.localizedStandardContains(query) }
-        let key = Person.key(query)
-        addableName = query.isEmpty || previous.contains(where: { Person.key($0.name) == key }) ? nil : query
+        people = previous.filter(nameContaining: typed, name: \.name)
+        let query = typed.nilIfBlank
+        let key = query.map(Person.key)
+        addableName = previous.contains(where: { Person.key($0.name) == key }) ? nil : query
     }
 }
 

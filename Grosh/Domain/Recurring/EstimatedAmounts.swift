@@ -16,7 +16,7 @@ nonisolated struct EstimateReminder: PendingReminder {
 }
 
 /// Every Estimated transaction, which the Home bell and the reminders track until their real amounts are entered.
-struct EstimatedAmounts: TransactionReminderSource {
+struct EstimatedAmounts: ReminderSource {
     /// The Estimated transactions, in no particular order.
     let open: [Transaction]
 
@@ -25,6 +25,8 @@ struct EstimatedAmounts: TransactionReminderSource {
     static var transactions: FetchDescriptor<Transaction> {
         FetchDescriptor(predicate: #Predicate { $0.isEstimated && $0.deletedAt == nil })
     }
+
+    static var records: FetchDescriptor<Transaction> { transactions }
 
     init(_ transactions: some Sequence<Transaction>) {
         open = transactions.filter { $0.isEstimated && $0.deletedAt == nil }

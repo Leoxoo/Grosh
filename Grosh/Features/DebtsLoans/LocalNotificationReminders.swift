@@ -73,36 +73,17 @@ private extension PendingReminder {
 /// Keeps the pending notifications of one sort of reminder in step with the store: whenever a reminder day, a payment, a
 /// settlement or a confirmed amount changes what should be pending, they are replaced. The first reminder asks to send
 /// notifications.
-private struct ReminderSync<Source: TransactionReminderSource>: ViewModifier {
-    @Query private var transactions: [Transaction]
+private struct ReminderSync<Source: ReminderSource>: ViewModifier {
+    @Query private var records: [Source.Record]
     /// What the last sync handed over, so a reminder set for today after 09:00 arrives once.
     @State private var earlier: [Source.Reminder]?
 
     init(_ source: Source.Type) {
-        _transactions = Query(Source.transactions)
+        _records = Query(Source.records)
     }
 
     func body(content: Content) -> some View {
-        let source = Source(transactions)
-        let reminders = source.reminders(from: .today)
-        content
-            .task(id: reminders) {
-                await source.reschedule(at: .now, after: earlier, using: LocalNotificationReminders())
-                earlier = reminders
-            }
-    }
-}
-
-/// Keeps the pending Owes me notifications in step with the store: whenever an expectation is made, paid, closed,
-/// forgiven, removed or has its reminder changed, or its Expense goes to Recently Deleted or comes back, they are
-/// replaced. The reminders of the other sorts are not touched (each sort has its own identifier prefix).
-private struct ExpectedReimbursementReminderSync: ViewModifier {
-    @Query(ExpectedReimbursements.all) private var expectations: [ExpectedReimbursement]
-    /// What the last sync handed over, so a reminder set for today after 09:00 arrives once.
-    @State private var earlier: [ExpectedReimbursementReminder]?
-
-    func body(content: Content) -> some View {
-        let source = ExpectedReimbursements(expectations)
+        let source = Source(records)
         let reminders = source.reminders(from: .today)
         content
             .task(id: reminders) {
@@ -113,10 +94,11 @@ private struct ExpectedReimbursementReminderSync: ViewModifier {
 }
 
 extension View {
-    /// Keeps the Owes me reminders scheduled as local notifications in step with the store. Use once, at the app's top
-    /// level.
+    /// Keeps the Owes me reminders scheduled as local notifications in step with the store: whenever an expectation is
+    /// made, paid, closed, forgiven, removed or has its reminder changed, or its Expense goes to Recently Deleted or
+    /// comes back. Use once, at the app's top level.
     func syncsExpectedReimbursementReminders() -> some View {
-        modifier(ExpectedReimbursementReminderSync())
+        modifier(ReminderSync(ExpectedReimbursements.self))
     }
 
     /// Keeps the Loan and Debt reminders scheduled as local notifications in step with the store. Use once, at the

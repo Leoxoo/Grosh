@@ -46,8 +46,8 @@ struct PersonDebtsAndLoans: Identifiable {
         self.expectations = expectations
         let openLoans = loans.filter { !$0.isSettled }.map(\.outstanding)
         let expected = ExpectationTotals(expectations)
-        owesYou = Self.perCurrency(openLoans + expected.outstanding)
-        youOwe = Self.perCurrency(debts.filter { !$0.isSettled }.map(\.outstanding))
+        owesYou = (openLoans + expected.outstanding).totalsPerCurrency
+        youOwe = debts.filter { !$0.isSettled }.map(\.outstanding).totalsPerCurrency
         openAmountCount = expected.openAmountCount
         isSettled = loans.allSatisfy(\.isSettled) && debts.allSatisfy(\.isSettled) && !expectations.contains(where: \.isOpen)
     }
@@ -60,18 +60,6 @@ struct PersonDebtsAndLoans: Identifiable {
     /// taps.
     var canText: Bool {
         !isSettled && person.phone?.nilIfBlank != nil
-    }
-
-    /// `amounts` added up per currency, by currency code. A currency that adds up to nothing is left out.
-    private static func perCurrency(_ amounts: [Money]) -> [Money] {
-        var cents: [String: Int] = [:]
-        for amount in amounts {
-            cents[amount.currencyCode, default: 0] += amount.cents
-        }
-        return cents.keys.sorted().compactMap { code in
-            let total = cents[code] ?? 0
-            return total == 0 ? nil : Money(cents: total, currencyCode: code)
-        }
     }
 }
 
@@ -96,7 +84,7 @@ struct DebtsAndLoansByPerson {
         var owed: [ObjectIdentifier: [ExpectedReimbursement]] = [:]
 
         for loanOrDebt in debtsAndLoans.open + debtsAndLoans.settled {
-            guard let person = loanOrDebt.original.people?.first else { continue }
+            guard let person = loanOrDebt.person else { continue }
             let key = ObjectIdentifier(person)
             people[key] = person
             switch loanOrDebt.kind {

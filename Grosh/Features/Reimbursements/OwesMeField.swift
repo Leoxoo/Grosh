@@ -66,15 +66,13 @@ private struct OwesMeRow: View {
 
     /// The amount as the field shows it: no cents when whole, and blank for an open amount.
     private static func text(of amount: Money?) -> String {
-        guard let amount else { return "" }
-        let fractionLength = amount.cents % 100 == 0 ? 0 : 2
-        return amount.decimalValue.formatted(.number.precision(.fractionLength(fractionLength)))
+        amount?.plainNumber() ?? ""
     }
 
     /// What was typed as an amount: blank is an open amount, and anything that isn't an amount above zero comes to zero,
     /// which saving refuses (``ExpectedReimbursementRuleError/invalidAmount``).
     private static func amount(typed text: String, currencyCode: String) -> Money? {
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        guard text.nilIfBlank != nil else { return nil }
         let amount = Money(typedAmount: text, currencyCode: currencyCode)
         return amount.flatMap { $0.cents > 0 ? $0 : nil } ?? Money(cents: 0, currencyCode: currencyCode)
     }

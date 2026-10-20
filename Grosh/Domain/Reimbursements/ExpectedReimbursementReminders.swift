@@ -12,19 +12,6 @@ nonisolated struct ExpectedReimbursementReminder: PendingReminder {
     /// What a notification action registers against.
     static let categoryIdentifier: String? = "grosh.owes-me"
 
-    /// The keys of ``userInfo``.
-    enum InfoKey {
-        static let person = "person"
-        static let phone = "phone"
-        static let expense = "expense"
-        /// What is outstanding in cents; missing for an open amount.
-        static let amountCents = "amountCents"
-        static let currencyCode = "currencyCode"
-        /// Present on a Debt's reminder, where the user owes the Person rather than the Person the user; missing
-        /// otherwise.
-        static let youOwe = "youOwe"
-    }
-
     /// The Expected reimbursement it reminds of.
     let original: PersistentIdentifier
     let day: CalendarDay
@@ -39,17 +26,20 @@ nonisolated struct ExpectedReimbursementReminder: PendingReminder {
     var arrival = ReminderArrival.onItsDay
 
     var userInfo: [String: String] {
-        var info = [InfoKey.person: personName, InfoKey.expense: expense]
-        if let phone { info[InfoKey.phone] = phone }
+        typealias Key = TextReminder.InfoKey
+        var info = [Key.person: personName, Key.expense: expense]
+        if let phone { info[Key.phone] = phone }
         if let outstanding {
-            info[InfoKey.amountCents] = String(outstanding.cents)
-            info[InfoKey.currencyCode] = outstanding.currencyCode
+            info[Key.amountCents] = String(outstanding.cents)
+            info[Key.currencyCode] = outstanding.currencyCode
         }
         return info
     }
 }
 
 extension ExpectedReimbursements: ReminderSource {
+    static var records: FetchDescriptor<ExpectedReimbursement> { all }
+
     /// The notifications that should be pending: one for each open expectation whose reminder day is `today` or later,
     /// the soonest first. A settled one (paid back, closed or forgiven) has none, and neither has one whose Expense is in
     /// Recently Deleted; one whose day has passed is listed by the bell instead.

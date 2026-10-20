@@ -25,6 +25,8 @@ nonisolated enum ExpectedReimbursementRuleError: Error, Equatable {
     case walletLockedByPaybacks
     /// A part of a Split can't be paid back into another wallet: the parts are independent (ADR-0007).
     case splitPart
+    /// Money that came into a wallet in another currency than the Expense's can't be counted against it.
+    case otherCurrency
 }
 
 extension ExpectedReimbursementRuleError: LocalizedError {
@@ -52,6 +54,8 @@ extension ExpectedReimbursementRuleError: LocalizedError {
             String(localized: "Money was paid back into another wallet against this Expense, so it stays in its wallet.")
         case .splitPart:
             String(localized: "A part of a Split can't be paid back into another wallet.")
+        case .otherCurrency:
+            String(localized: "That wallet is in another currency than the expense. Choose a wallet in the same currency.")
         }
     }
 }
@@ -347,17 +351,29 @@ struct ExpectedReimbursements {
     /// Expectations paid back, closed or forgiven, the newest Expense first.
     let settled: [ExpectedReimbursement]
 
-    /// Every Expected reimbursement in the store. The ones of an Expense in Recently Deleted are left out by
-    /// ``init(_:)``, which reads the Expense's ``Transaction/deletedAt``, so a screen showing them follows the Expense
-    /// going to the bin and coming back.
+    /// Every Expected reimbursement in the store, with the Expense, the Person and the payments each one's status and
+    /// row read, so listing them reads no relationship one expectation at a time (docs/agents/architecture.md). The
+    /// ones of an Expense in Recently Deleted are left out by ``init(_:)``, which reads the Expense's
+    /// ``Transaction/deletedAt``, so a screen showing them follows the Expense going to the bin and coming back.
     static var all: FetchDescriptor<ExpectedReimbursement> {
-        FetchDescriptor()
+        var descriptor = FetchDescriptor<ExpectedReimbursement>()
+        descriptor.relationshipKeyPathsForPrefetching = [\.expense, \.person, \.reimbursements, \.paybacks]
+        return descriptor
     }
 
+    /// Sorts `expectations` into the open and the settled ones in one pass, working out each one's status once.
     init(_ expectations: some Sequence<ExpectedReimbursement>) {
-        let live = expectations.filter(\.isOfLiveExpense)
-        open = live.filter(\.isOpen).sorted { Self.isDue(before: $0, $1) }
-        settled = live.filter { !$0.isOpen }.sorted { Self.isNewer($0, than: $1) }
+        var open: [ListPosition] = []
+        var settled: [ListPosition] = []
+        for expectation in expectations where expectation.isOfLiveExpense {
+            if expectation.isOpen {
+                open.append(ListPosition(expectation))
+            } else {
+                settled.append(ListPosition(expectation))
+            }
+        }
+        self.open = open.sorted { $0.isDue(before: $1) }.map(\.expectation)
+        self.settled = settled.sorted { $1.isOlder(than: $0) }.map(\.expectation)
     }
 
     /// Every Expected reimbursement in `context`.
@@ -365,23 +381,34 @@ struct ExpectedReimbursements {
         self.init(try context.fetch(Self.all))
     }
 
-    /// Whether `first` comes before `second` among the open ones: a reminder day before none, an earlier reminder day
-    /// before a later one, and otherwise the older Expense first.
-    private static func isDue(before first: ExpectedReimbursement, _ second: ExpectedReimbursement) -> Bool {
-        switch (first.reminderDay, second.reminderDay) {
-        case let (firstDay?, secondDay?) where firstDay != secondDay: return firstDay < secondDay
-        case (.some, nil): return true
-        case (nil, .some): return false
-        default: return isOlder(first, than: second)
+    /// An expectation with what it is sorted by, read once before sorting rather than at every comparison.
+    private struct ListPosition {
+        let expectation: ExpectedReimbursement
+        let reminderDayRaw: Int?
+        let expenseDayRaw: Int
+        let createdAt: Date
+
+        init(_ expectation: ExpectedReimbursement) {
+            self.expectation = expectation
+            reminderDayRaw = expectation.reminderDayRaw
+            expenseDayRaw = expectation.expense?.dayRaw ?? 0
+            createdAt = expectation.createdAt
         }
-    }
 
-    private static func isOlder(_ first: ExpectedReimbursement, than second: ExpectedReimbursement) -> Bool {
-        (first.expense?.dayRaw ?? 0, first.createdAt) < (second.expense?.dayRaw ?? 0, second.createdAt)
-    }
+        /// Whether it comes before `other` among the open ones: a reminder day before none, an earlier reminder day
+        /// before a later one, and otherwise the older Expense first.
+        func isDue(before other: ListPosition) -> Bool {
+            switch (reminderDayRaw, other.reminderDayRaw) {
+            case let (mine?, theirs?) where mine != theirs: mine < theirs
+            case (.some, nil): true
+            case (nil, .some): false
+            default: isOlder(than: other)
+            }
+        }
 
-    private static func isNewer(_ first: ExpectedReimbursement, than second: ExpectedReimbursement) -> Bool {
-        isOlder(second, than: first)
+        func isOlder(than other: ListPosition) -> Bool {
+            (expenseDayRaw, createdAt) < (other.expenseDayRaw, other.createdAt)
+        }
     }
 
     /// What the open ones come to: the outstanding amounts and how many have no amount.
@@ -394,9 +421,9 @@ struct ExpectedReimbursements {
             .sorted { $0.reminderDay ?? today < $1.reminderDay ?? today }
     }
 
-    /// The expectations grouped by Person, for Show by people: each Person with their open and settled expectations and
-    /// what they still owe in each currency. People with something open come first, the one owing most first, then by
-    /// name. Read from the expectations at hand in one pass; nothing is fetched.
+    /// The expectations grouped by Person, for Show by people (``DebtsAndLoansByPerson``, which orders the people): each
+    /// Person with their open and then their settled expectations, the people in the order they first appear. Read from
+    /// the expectations at hand in one pass; nothing is fetched.
     var byPerson: [PersonExpectations] {
         var order: [ObjectIdentifier] = []
         var people: [ObjectIdentifier: Person] = [:]
@@ -413,7 +440,6 @@ struct ExpectedReimbursements {
         return order.compactMap { key in
             people[key].map { PersonExpectations(person: $0, expectations: grouped[key] ?? []) }
         }
-        .sorted { $0.isListed(before: $1) }
     }
 }
 
@@ -426,17 +452,9 @@ struct ExpectationTotals: Equatable {
     let openAmountCount: Int
 
     init(_ expectations: some Sequence<ExpectedReimbursement>) {
-        var cents: [String: Int] = [:]
-        var unknown = 0
-        for expectation in expectations where expectation.isOpen {
-            if let outstanding = expectation.outstanding {
-                cents[outstanding.currencyCode, default: 0] += outstanding.cents
-            } else {
-                unknown += 1
-            }
-        }
-        outstanding = cents.keys.sorted().map { Money(cents: cents[$0] ?? 0, currencyCode: $0) }
-        openAmountCount = unknown
+        let open = expectations.filter(\.isOpen)
+        outstanding = open.compactMap(\.outstanding).totalsPerCurrency
+        openAmountCount = open.count(where: \.hasOpenAmount)
     }
 }
 
@@ -447,24 +465,4 @@ struct PersonExpectations: Identifiable {
     let expectations: [ExpectedReimbursement]
 
     var id: PersistentIdentifier { person.persistentModelID }
-
-    /// The expectations with something still expected.
-    var open: [ExpectedReimbursement] { expectations.filter(\.isOpen) }
-
-    /// What the Person still owes, and how many open expectations have no amount.
-    var totals: ExpectationTotals { ExpectationTotals(expectations) }
-
-    /// Whether the Person is listed before `other`: someone owing something before someone owing nothing known, the one
-    /// owing more first (by their largest currency total), and otherwise by name.
-    fileprivate func isListed(before other: PersonExpectations) -> Bool {
-        let mine = totals
-        let theirs = other.totals
-        let myOpen = !mine.outstanding.isEmpty || mine.openAmountCount > 0
-        let theirOpen = !theirs.outstanding.isEmpty || theirs.openAmountCount > 0
-        if myOpen != theirOpen { return myOpen }
-        let myLargest = mine.outstanding.map(\.cents).max() ?? 0
-        let theirLargest = theirs.outstanding.map(\.cents).max() ?? 0
-        if myLargest != theirLargest { return myLargest > theirLargest }
-        return person.name.localizedStandardCompare(other.person.name) == .orderedAscending
-    }
 }

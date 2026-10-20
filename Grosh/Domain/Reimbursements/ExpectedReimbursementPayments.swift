@@ -29,12 +29,21 @@ enum RecordedPayment {
 }
 
 extension ExpectedReimbursement {
-    /// Checks a payment before anything is recorded: something must still be expected, the amount above zero, and the
-    /// Expense still an Expense that can be paid back.
+    /// Checks a payment before anything is recorded: something must still be expected, the amount above zero, the
+    /// Expense still an Expense that can be paid back, and the wallet in the Expense's currency.
     func validate(_ draft: ExpectationPaymentDraft) throws {
         guard isOpen else { throw ExpectedReimbursementRuleError.notOpen }
         guard draft.amount.cents > 0 else { throw ReimbursementRuleError.missingAmount }
         guard let expense, expense.canBeReimbursed else { throw ReimbursementRuleError.notAnExpense }
+        if let wallet = draft.wallet, wallet.currencyCode != currencyCode {
+            throw ExpectedReimbursementRuleError.otherCurrency
+        }
+    }
+
+    /// Whether money received into `wallet` is paid back elsewhere: a transaction in that wallet (ADR-0010) rather than
+    /// a Reimbursement on the Expense (ADR-0008).
+    func isElsewhere(_ wallet: Wallet?) -> Bool {
+        wallet != nil && wallet !== expense?.wallet
     }
 
     /// Records the payment against this expectation. In the Expense's own wallet it is a Reimbursement on the Expense:
@@ -46,7 +55,7 @@ extension ExpectedReimbursement {
     func recordPayment(_ draft: ExpectationPaymentDraft, in context: ModelContext) throws -> RecordedPayment {
         try validate(draft)
         guard let expense else { throw ReimbursementRuleError.notAnExpense }
-        guard let wallet = draft.wallet, wallet !== expense.wallet else {
+        guard isElsewhere(draft.wallet), let wallet = draft.wallet else {
             let entry = ReimbursementDraft(amount: draft.amount, day: draft.day, note: draft.note)
             return .onExpense(try Reimbursement.add(entry, to: expense, for: self, in: context))
         }
@@ -66,10 +75,7 @@ extension ExpectedReimbursement {
         let link = expense.linkID ?? UUID()
         expense.linkID = link
         expense.hasPaybacksElsewhere = true
-        let payback = Transaction(
-            amount: Money(cents: draft.amount.cents, currencyCode: wallet.currencyCode), day: draft.day,
-            wallet: nil, category: nil
-        )
+        let payback = Transaction(amount: draft.amount, day: draft.day, wallet: nil, category: nil)
         context.insert(payback)
         payback.wallet = wallet
         payback.category = category
@@ -112,8 +118,13 @@ extension Transaction {
     /// Whether this is a payback the Total list and report leave out, because its Expense, counted in the Total, shows
     /// it in its net (``totalViewNetCents``). A payback whose Expense is outside the Total (or in Recently Deleted)
     /// stays in the Total as the money in it is. Its own wallet's list and report show it.
+    ///
+    /// The Total list and report read this for every transaction, so it asks first whether it pays an expectation at
+    /// all: that is `nil` on all but paybacks, and reading it reads no other record.
     var isHiddenInTotal: Bool {
-        guard category?.lockedRole == .reimbursement, let expense = paidExpectation?.expense else { return false }
+        guard let expectation = paidExpectation, category?.lockedRole == .reimbursement,
+              let expense = expectation.expense
+        else { return false }
         return !expense.isInRecentlyDeleted && expense.wallet?.countsInTotal == true
     }
 

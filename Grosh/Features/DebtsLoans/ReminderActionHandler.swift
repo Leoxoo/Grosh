@@ -42,7 +42,7 @@ final class ReminderActionHandler: NSObject, UNUserNotificationCenterDelegate {
     /// Fills the inbox with the message for the Person `info` (a notification's user info) names, using their number and
     /// Contacts link as they are in the store now.
     private func openTextThem(_ info: [String: String]) {
-        let name = info[ExpectedReimbursementReminder.InfoKey.person] ?? ""
+        let name = info[TextReminder.InfoKey.person] ?? ""
         let people = (try? context.fetch(Person.everyone)) ?? []
         inbox.reminder = TextReminder(userInfo: info, person: PeopleByName(people).person(named: name))
     }

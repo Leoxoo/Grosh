@@ -38,15 +38,6 @@ nonisolated extension Contact {
     }
 }
 
-nonisolated extension Array where Element == Contact {
-    /// The contacts whose names contain what was typed (ignoring case and accents), in the order given, or all of them
-    /// while nothing is typed. The same match the With menu's Previous section makes (``PreviousPeople``).
-    func matching(_ typed: String) -> [Contact] {
-        let query = typed.trimmingCharacters(in: .whitespacesAndNewlines)
-        return query.isEmpty ? self : filter { $0.name.localizedStandardContains(query) }
-    }
-}
-
 /// What the user has allowed Grosh to read of their Contacts.
 nonisolated enum ContactsAccess: Hashable, Sendable {
     /// The user hasn't been asked yet.

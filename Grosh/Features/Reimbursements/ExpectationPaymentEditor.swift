@@ -33,15 +33,22 @@ struct ExpectationPaymentEditor: View {
         return result
     }
 
-    private var isOtherWallet: Bool {
-        draft.wallet != nil && draft.wallet !== expectation.expense?.wallet
+    /// Why the payment can't be recorded as it is, or `nil` when it can.
+    private var problem: Error? {
+        do {
+            try expectation.validate(draftToSave)
+            return nil
+        } catch {
+            return error
+        }
     }
 
     var body: some View {
+        let problem = self.problem
         KeypadSheet(
             title: Text("Record Payment"),
             entry: $entry,
-            canSave: (try? expectation.validate(draftToSave)) != nil,
+            canSave: problem == nil,
             save: save
         ) { fields in
             Section {
@@ -55,7 +62,9 @@ struct ExpectationPaymentEditor: View {
                 DayStepper(title: "Date", day: $draft.day)
                 fields.noteField($draft.note)
             } footer: {
-                if isOtherWallet {
+                if let problem = problem as? ExpectedReimbursementRuleError, problem == .otherCurrency {
+                    Text(problem.localizedDescription)
+                } else if expectation.isElsewhere(draft.wallet) {
                     Text("Recorded as money in that wallet, on the day you received it, linked to the expense. The expense shows its net in the Total.")
                 } else {
                     Text("Kept on the expense, which then counts what is left of it. No transaction is made.")

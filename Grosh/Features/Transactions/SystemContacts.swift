@@ -20,7 +20,7 @@ struct SystemContacts: ContactLookup {
 
     func search(_ typed: String) async -> [Contact] {
         guard access.showsContacts else { return [] }
-        return await ContactsReader.all().matching(typed)
+        return await ContactsReader.all().filter(nameContaining: typed, name: \.name)
     }
 
     func contacts(withIdentifiers identifiers: [String]) async -> [Contact] {
