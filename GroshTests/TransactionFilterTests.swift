@@ -65,10 +65,11 @@ struct TransactionFilterTests {
             record(-1_00, "cash tip", on: day(9, 6)),
         ]
 
-        let listed = TransactionFilter(card: amex).listed(from: all, selection: .total, on: month(9))
+        let filter = TransactionFilter(card: amex)
+        let listed = filter.listed(from: all, selection: .total, on: month(9))
 
         #expect(Set(listed.map(\.note)) == ["groceries", "lunch", "cashback"])
-        #expect(listed.net == Money(cents: -47_50))
+        #expect(filter.total(of: listed) == Money(cents: -47_50))
     }
 
     @Test func aParentCategoryFilterIncludesItsSubcategories() throws {
