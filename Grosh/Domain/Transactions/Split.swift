@@ -34,6 +34,18 @@ struct SplitPart {
     }
 }
 
+/// A part of a split being set up: the transaction being split, or a new part by its place in ``SplitDraft/parts``.
+enum SplitPartRef: Hashable {
+    case original
+    case part(Int)
+}
+
+/// A Reimbursement of the transaction being split and the part it goes to, `nil` until the user chooses.
+struct SplitReimbursement {
+    let reimbursement: Reimbursement
+    var part: SplitPartRef?
+}
+
 /// What the Split sheet holds before it is applied: the transaction being split as a part of its own, and the parts
 /// added to it. The transaction's amount is always what the other parts leave of the total; typing over it changes
 /// the total.
@@ -45,11 +57,14 @@ struct SplitDraft {
     var original: SplitPart
     /// The new parts, in the order they were added.
     private(set) var parts: [SplitPart] = []
+    /// The transaction's Reimbursements, each with the part it goes to. Empty when it has none.
+    var reimbursements: [SplitReimbursement]
 
-    /// The transaction as it is, with no parts yet.
+    /// The transaction as it is, with no parts yet and its Reimbursements not yet assigned.
     init(splitting transaction: Transaction) {
         original = SplitPart(of: transaction)
         was = original.amount
+        reimbursements = transaction.orderedReimbursements.map { SplitReimbursement(reimbursement: $0) }
     }
 
     /// What the parts add up to: the original's remainder and every other part. It moves the wallet's balance when it
@@ -82,18 +97,24 @@ struct SplitDraft {
         parts[index] = part
     }
 
-    /// Removes the part at `index`, giving its amount back to the original.
+    /// Removes the part at `index`, giving its amount back to the original. Its Reimbursements become unassigned, so the
+    /// user chooses again.
     mutating func removePart(at index: Int) {
         original.amount.cents += parts.remove(at: index).amount.cents
+        for position in reimbursements.indices {
+            guard case .part(let assigned)? = reimbursements[position].part, assigned >= index else { continue }
+            reimbursements[position].part = assigned == index ? nil : SplitPartRef.part(assigned - 1)
+        }
     }
 
     /// Checks the draft against the split rules before anything is changed: at least one new part, every part (the
-    /// original too) with an amount above zero and a category.
+    /// original too) with an amount above zero and a category, and every Reimbursement assigned to a part.
     func validate() throws {
         let everyPart = [original] + parts
         guard !parts.isEmpty else { throw SplitRuleError.noParts }
         guard everyPart.allSatisfy({ $0.amount.cents > 0 }) else { throw SplitRuleError.missingAmount }
         guard everyPart.allSatisfy({ $0.category != nil }) else { throw SplitRuleError.missingCategory }
+        guard reimbursements.allSatisfy({ $0.part != nil }) else { throw SplitRuleError.unassignedReimbursement }
     }
 
     /// Whether every required field is filled, so Split can be enabled.
@@ -108,6 +129,8 @@ nonisolated enum SplitRuleError: Error, Equatable {
     /// Every part, and what is left on the original, must be above zero.
     case missingAmount
     case missingCategory
+    /// Every Reimbursement must go to one of the parts.
+    case unassignedReimbursement
     /// The transaction has no other part to merge back.
     case notSplit
 }
@@ -119,6 +142,7 @@ extension SplitRuleError: LocalizedError {
         case .noParts: String(localized: "Add at least one part.")
         case .missingAmount: String(localized: "Give every part an amount above zero, and leave some on the original.")
         case .missingCategory: String(localized: "Choose a category for every part.")
+        case .unassignedReimbursement: String(localized: "Choose a part for every reimbursement.")
         case .notSplit: String(localized: "This transaction has no other parts to merge.")
         }
     }
@@ -153,7 +177,8 @@ extension Transaction {
     /// Splits this transaction as `draft` has it, in `context`: it keeps its identity, creation time and Recurring
     /// attachment and takes the draft's remainder and fields, and each new part is made as a copy in its wallet and
     /// Card with its own fields. All the parts share a link, so they show as Related transactions. Returns the new
-    /// parts. Saves. Nothing changes when the transaction can't be split or the draft breaks a split rule.
+    /// parts. A Reimbursement goes to the part the draft assigns it to; those assigned to the original stay. Saves.
+    /// Nothing changes when the transaction can't be split or the draft breaks a split rule.
     @discardableResult
     func split(_ draft: SplitDraft, in context: ModelContext) throws -> [Transaction] {
         guard canBeSplit else { throw SplitRuleError.notSplittable }
@@ -176,12 +201,17 @@ extension Transaction {
             transaction.linkID = link
             return transaction
         }
+        for entry in draft.reimbursements {
+            if case .part(let index)? = entry.part {
+                entry.reimbursement.expense = created[index]
+            }
+        }
         try context.save()
         return created
     }
 
     /// Undo split: merges every part of the split back into the oldest one, the original, which takes the sum of their
-    /// amounts and loses its link. The other parts are removed. A part in Recently Deleted is left where it is and
+    /// amounts and loses its link, and every part's Reimbursements. The other parts are removed. A part in Recently Deleted is left where it is and
     /// isn't counted. Returns the original. Saves. Throws when there is no other part to merge.
     @discardableResult
     func undoSplit(in context: ModelContext) throws -> Transaction {
@@ -192,6 +222,10 @@ extension Transaction {
         original.amountCents = parts.reduce(0) { $0 + $1.amountCents }
         original.linkID = nil
         for part in parts where part != original {
+            // Moved off first, so deleting the part doesn't take its Reimbursements with it.
+            for reimbursement in part.reimbursements ?? [] {
+                reimbursement.expense = original
+            }
             context.delete(part)
         }
         try context.save()
