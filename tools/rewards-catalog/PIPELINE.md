@@ -21,21 +21,69 @@ Each stage reads files and writes files, so any stage can be rerun alone and a f
 | Stage | Reads | Writes | Notes |
 |---|---|---|---|
 | **Seed** | CardPin CSV | `catalog-seed.json` | One-off. `build_seed.py`. Every card starts `verified: false`. |
-| **Fetch** | each card's `sourceUrl` | `cache/<id>/<date>.txt`, `.hash` | Conditional GET, robots.txt, rate limit, headless browser only for pages that need it. Stores the page's visible text, not the HTML. |
+| **Fetch** | each card's `sourceUrl` | `fetch-state.json` (committed), `cache/<id>/latest.txt`, `previous.txt` (not committed) | `fetch.py`, built. Details below. |
 | **Extract** | cached text | `candidates/<id>.json` | Turns text into rule candidates, each with a verbatim `quote` from the page. Skipped when the page's hash hasn't changed. |
 | **Validate** | candidates | pass/fail per candidate | Deterministic checks, below. A failing candidate is dropped, never "fixed". |
 | **Diff** | candidates vs. `catalog.json` | `report.md` | Classifies each card: unchanged, changed, new, page gone, extraction failed. |
 | **Review** | `report.md` | a PR | Only changes need eyes. Merging is the acceptance. |
 | **Publish** | accepted `catalog.json` | `rewards-catalog.json` | Versioned, sorted, byte-stable so the PR diff shows only real changes. |
 
+## The fetch stage (`fetch.py`)
+
+```
+python3 tools/rewards-catalog/fetch.py [--issuer chase] [--only ID ...] [--limit N]
+python3 -m unittest discover -s tools/rewards-catalog      # offline tests
+```
+
+- **Standard library only.** One page per distinct URL (cards that share a page, like the two Expedia cards, fetch once).
+- **Hashes the visible text**, not the HTML, so a changed script bundle or tracking id isn't a change. `fetch-state.json` holds each card's hash and is committed, so a run on any machine knows what changed; the page text lives in `cache/`, which isn't.
+- **Polite:** identifies itself in the User-Agent, obeys robots.txt, waits one second between requests to a host, retries server errors and dropped connections twice with a growing delay, and sends `If-None-Match` / `If-Modified-Since` when it has a cached copy.
+- **Each card ends in one status:**
+
+  | Status | Meaning |
+  |---|---|
+  | `new`, `unchanged`, `changed` | Page read. `changed` says how many lines differ, to tell a rate change from page churn. |
+  | `needs-browser` | Under 400 characters of text: a script builds the page, or a bot wall answered. |
+  | `refused` | 401, 403 or 429. |
+  | `robots` | robots.txt says no. |
+  | `gone` | 404 or 410. |
+  | `failed` | Network error, timeout, server error, or an unreadable robots.txt. |
+
+- **Failure never erases:** a card that didn't fetch keeps its last hash.
+- **Exit code 1 only if more than 25% of cards are `failed` or `gone`.** `refused`, `robots` and `needs-browser` are expected outcomes to report, not signs that the run broke.
+- Not built yet: a headless browser for `needs-browser` pages.
+
+### First full run (2026-10-20, 166 cards)
+
+| Result | Cards | Notes |
+|---|---|---|
+| Read | 112 | Pages include real rate text (for example "Earn unlimited 3% cash back on food and fun"). |
+| `failed` | 27 | Timeouts, connections closed without a reply, and truncated bodies. About 10 more were this sandbox refusing hosts it didn't list, which won't happen on your Mac. |
+| `needs-browser` | 13 | Alaska, AAA, American Express (some pages), Schwab, Rakuten, U.S. Bank SkyPass. |
+| `refused` | 11 | LATAM, Amtrak, Best Western, Expedia, LifeMiles, Virgin. |
+| `gone` | 3 | Two TD and one Walmart page moved: their `sourceUrl` needs fixing by hand. |
+
+- Asking for gzip made 10 issuers' pages arrive cut off mid-stream; asking for uncompressed pages fixed 9 of them, so the fetcher does that.
+- The failed, refused and needs-browser pages are the work left for fetching: retry later, find a better URL, or add a headless browser. The extract stage can start on the 112 pages that read fine.
+
 ## Why issuers' different sites are survivable
 
 Fetching is the same for everyone. The only issuer-specific work is turning a page into rules, and that is the part that breaks when a site is redesigned. Two ways to do it:
 
 1. **Per-issuer adapters** (CSS selectors, regexes). Precise and free to run, but 16 issuers means 16 things to repair after every redesign.
-2. **One generic extractor** (an LLM reading the page text, asked for structured rules). Survives redesigns, costs a little per changed page, and can hallucinate.
+2. **One generic extractor** (an LLM reading the page text, asked for structured rules). Survives redesigns and can hallucinate.
 
-**Plan: use the generic extractor, and make hallucination harmless with validation.** The hash check means a page is only extracted when it changed, so cost stays small. Adapters stay an option for a single issuer that the generic extractor keeps getting wrong.
+**Plan: use the generic extractor, running a local model through LM Studio, and make hallucination harmless with validation.** Adapters stay an option for a single issuer that the generic extractor keeps getting wrong.
+
+### Local model (LM Studio)
+
+- The extract stage talks to LM Studio's OpenAI-compatible server (default `http://localhost:1234/v1`, configurable). No API key, no cost per page, and page text never leaves the machine.
+- It requests structured output (`response_format` with a JSON schema) at temperature 0, so replies parse without cleanup.
+- Local models are weaker than hosted ones, so **validation carries more of the load**: expect more candidates to be dropped, and treat "extraction failed" as a normal outcome, not an error.
+- Long pages are split into chunks that fit the model's context window, and results are merged. Only pages whose hash changed are extracted.
+- The model is a setting, not code. Default: `k2-horizon-7b-uno-uncensored`. Small (7B) models drop and garble more, so before trusting it, run it on a handful of cached pages against hand-checked answers and see how often its candidates pass validation. Swap models by changing the setting.
+- Every candidate records the model id and prompt version that produced it, so a rerun with a different model is a visible diff.
+- Extraction runs on the maintainer's Mac, not in CI (hosted runners have no model). CI can still do fetch and change detection.
 
 ### Validation (what makes it trustworthy)
 
@@ -71,20 +119,21 @@ Rule   category, rate, unit (percent | per-dollar), capAmount, capPeriod
 - **Isolated per card.** One bad page logs an error and the run continues. The run exits non-zero only if the failure rate passes a threshold (say 25%), which means the pipeline itself broke, not one site.
 - **Polite.** Obey robots.txt, identify the tool in the User-Agent, one request per second per host, public pages only, no logins, no CAPTCHA workarounds.
 - **Cached.** The fetch stage stores page text and a hash, so extraction and validation can be rerun and debugged without hitting a site again.
-- **Pinned.** Extractor prompt and model are versioned in the repo. A prompt change is a reviewable diff, and its effect is visible by rerunning on cached pages.
+- **Pinned.** The extractor prompt is versioned in the repo, and the LM Studio model id is recorded with every candidate and in `report.md`. A prompt or model change is a reviewable diff, and its effect is visible by rerunning on cached pages.
 
 ## Cadence
 
 | When | What |
 |---|---|
-| Monthly (scheduled GitHub Action) | Full run: fetch every card, extract the changed ones, open a PR with `report.md`. |
+| Monthly, on the maintainer's Mac (LM Studio running) | Full run: fetch every card, extract the changed ones, open a PR with `report.md`. |
+| Monthly, in CI (optional) | Fetch and change detection only, no extraction. Opens an issue listing pages that changed, as a reminder to do the local run. |
 | Quarterly, a week before it starts | Re-run only cards with rotating rules, so the new quarter's categories are in before the quarter begins. |
-| On demand | `workflow_dispatch` for a single issuer or card. |
+| On demand | A command-line flag to run a single issuer or card. |
 
 ## Build order
 
 1. **Seed** (this step): `build_seed.py` produces `catalog-seed.json`.
-2. **Fetch and change detection only.** No extraction yet. "This issuer page changed" is already a useful, reliable signal, and it proves the fetching holds up on all 16 issuers.
+2. **Fetch and change detection only** (done). No extraction yet. "This issuer page changed" is already a useful, reliable signal, and it proves the fetching holds up on all 16 issuers.
 3. **Extract and validate** for the biggest issuers first (Chase, American Express, Citi, Capital One), and see how often the generic extractor passes validation.
 4. **Scheduled run and PR.**
 5. **App side.** Bundle `rewards-catalog.json`, add "start from catalog" to the Card editor, and add the user's category mapping. This step needs its own glossary terms and likely an ADR before code.
