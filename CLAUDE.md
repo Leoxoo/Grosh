@@ -1,3 +1,7 @@
+## Architecture and performance
+
+Every user has **the 16k store** (~16,000 transactions). Before writing or reviewing code that reads transactions, adds a computed property to a model, adds a screen or `@Query`, or touches balances, lists or reports, read `docs/agents/architecture.md`: where each component lives, where a screen gets its data, and the performance rules.
+
 ## Agent skills
 
 ### Issue tracker
