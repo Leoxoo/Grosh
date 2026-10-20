@@ -37,7 +37,7 @@ extension TextReminder {
     /// The text for a Person's row in Show by people: what they owe the user and what the user owes them.
     init(_ entry: PersonDebtsAndLoans) {
         self.init(
-            personName: entry.person.name, storedPhone: Self.usable(entry.person.phone),
+            personName: entry.person.name, storedPhone: entry.person.phone?.nilIfBlank,
             contactIdentifier: entry.person.contactIdentifier, owesYou: entry.owesYou, youOwe: entry.youOwe,
             expense: nil
         )
@@ -49,25 +49,17 @@ extension TextReminder {
     /// notification was scheduled with. `nil` when the notification names no one.
     init?(userInfo: [String: String], person: Person? = nil) {
         typealias Key = ExpectedReimbursementReminder.InfoKey
-        guard let name = userInfo[Key.person]?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
-            return nil
-        }
+        guard let name = userInfo[Key.person]?.nilIfBlank else { return nil }
         let currency = userInfo[Key.currencyCode] ?? Money.defaultCurrencyCode
         let amounts = userInfo[Key.amountCents].flatMap { Int($0) }
             .map { [Money(cents: $0, currencyCode: currency)] } ?? []
         let isDebt = userInfo[Key.youOwe] != nil
         self.init(
             personName: person?.name ?? name,
-            storedPhone: Self.usable(person?.phone) ?? Self.usable(userInfo[Key.phone]),
+            storedPhone: person?.phone?.nilIfBlank ?? userInfo[Key.phone]?.nilIfBlank,
             contactIdentifier: person?.contactIdentifier, owesYou: isDebt ? [] : amounts, youOwe: isDebt ? amounts : [],
-            expense: Self.usable(userInfo[Key.expense])
+            expense: userInfo[Key.expense]?.nilIfBlank
         )
-    }
-
-    /// `phone` trimmed, or `nil` when it holds nothing.
-    private static func usable(_ phone: String?) -> String? {
-        let trimmed = phone?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed?.isEmpty == false ? trimmed : nil
     }
 }
 

@@ -15,6 +15,14 @@ extension PersonRuleError: LocalizedError {
     }
 }
 
+extension String {
+    /// The text trimmed, or `nil` when it holds nothing: a phone number or name typed into an optional field.
+    var nilIfBlank: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
 extension Person {
     /// What two names are compared by: trimmed, ignoring case. Two people never share it (ADR-0009).
     static func key(_ name: String) -> String {
@@ -96,10 +104,7 @@ struct PeopleByName {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         if let existing = person(named: trimmed) { return existing }
-        let typedPhone = phone?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let person = Person(
-            name: trimmed, phone: typedPhone?.isEmpty == false ? typedPhone : nil, lastUsedAt: lastUsedAt
-        )
+        let person = Person(name: trimmed, phone: phone?.nilIfBlank, lastUsedAt: lastUsedAt)
         context.insert(person)
         byKey[Person.key(trimmed)] = person
         return person

@@ -59,7 +59,7 @@ struct PersonDebtsAndLoans: Identifiable {
     /// (``TextReminder``). The stored number decides, so no row reads Contacts; the live number is looked up when the user
     /// taps.
     var canText: Bool {
-        !isSettled && person.phone?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        !isSettled && person.phone?.nilIfBlank != nil
     }
 
     /// `amounts` added up per currency, by currency code. A currency that adds up to nothing is left out.
