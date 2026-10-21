@@ -124,10 +124,11 @@ struct ReimbursementRecentlyDeletedTests {
     @Test func deletingAReimbursementDoesNotDeleteItsExpense() throws {
         let dinner = try reimbursedDinner()
 
+        // The first entered: the $20, so the $60 dinner keeps the $15 paid back.
         try #require(dinner.orderedReimbursements.first).delete()
 
         #expect(!dinner.isInRecentlyDeleted)
         #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 1)
-        #expect(dinner.netCents == -40_00)
+        #expect(dinner.netCents == -45_00)
     }
 }
