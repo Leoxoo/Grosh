@@ -22,7 +22,7 @@ Each stage reads files and writes files, so any stage can be rerun alone and a f
 |---|---|---|---|
 | **Seed** | CardPin CSV | `catalog-seed.json` | One-off. `build_seed.py`. Every card starts `verified: false`. |
 | **Fetch** | each card's `sourceUrl` | `fetch-state.json` (committed), `cache/<id>/latest.txt`, `previous.txt` (not committed) | `fetch.py`, built. Details below. |
-| **Extract** | cached text | `candidates/<id>.json` | Turns text into rule candidates, each with a verbatim `quote` from the page. Skipped when the page's hash hasn't changed. |
+| **Extract** | cached text | `cache/candidates/<id>.json` (not committed) | `extract.py`, built, not yet run against a real model. Details below. |
 | **Validate** | candidates | pass/fail per candidate | Deterministic checks, below. A failing candidate is dropped, never "fixed". |
 | **Diff** | candidates vs. `catalog.json` | `report.md` | Classifies each card: unchanged, changed, new, page gone, extraction failed. |
 | **Review** | `report.md` | a PR | Only changes need eyes. Merging is the acceptance. |
@@ -108,6 +108,39 @@ Limits to know before the extract stage:
 - Asking for gzip made 10 issuers' pages arrive cut off mid-stream; asking for uncompressed pages fixed 9 of them, so the fetcher does that.
 - The failed, refused and needs-browser pages are the work left for fetching: retry later, find a better URL, or add a headless browser. The extract stage can start on the 112 pages that read fine.
 
+## The extract stage (`extract.py`)
+
+```
+python3 tools/rewards-catalog/extract.py --only capital-one-savor     # one card
+python3 tools/rewards-catalog/extract.py --issuer "capital one"       # one issuer
+python3 tools/rewards-catalog/extract.py                              # every fetched page
+```
+
+Start LM Studio's server (Developer tab, Start Server) with the model loaded first. Settings: `--base-url` / `LM_STUDIO_URL` (default `http://localhost:1234/v1`) and `--model` / `LM_STUDIO_MODEL` (default `k2-horizon-7b-uno-uncensored`). The script checks the server answers and lists the model before it starts.
+
+For each card it splits the cached page text into chunks of about 12,000 characters (repeating three lines between chunks), asks the model only about chunks that contain something rate-shaped (`3%`, `2X`, "per $1"), and writes `cache/candidates/<id>.json`: the accepted `rules`, the `rejected` proposals with the reason each failed, and the model id, prompt version and page hash. A card whose page, model and prompt are unchanged is skipped; `--force` redoes it.
+
+**Statuses:** `ok`; `no-rules` (the page states no rate for the card); `wrong-page` (the page doesn't name the card, so the model isn't asked at all); `failed` (the model's reply couldn't be read after one retry, so the result is incomplete and isn't treated as done).
+
+**Checks on every proposed rule** (`validate_rule`, none of which trusts the model):
+
+1. category is in the catalog list, unit is `percent` or `per-dollar`, the rate is a number above 0 and up to 10;
+2. the quote appears on the page word for word (ignoring case, spacing, curly quotes and ®/™ marks);
+3. the rate appears in the quote as a whole number (13% is not 3%), and the quote has a `%` for percent or points, miles or X for per-dollar;
+4. the quote uses a word for its category (for example "grocer", "restaurant", "all other"), which catches a rate filed under the wrong category;
+5. a cap needs an amount and a period, and both appear in the quote (`$6,000`, `6K` and `6000` match; "year" or "annual").
+
+A rule that fails any check is listed as rejected, never edited.
+
+**What I measured on the 138 fetched pages, without a model:** 8 are `wrong-page` (for example `u-s-bank-business-leverage`, `wells-fargo-attune`), 130 would be sent to the model, and that takes about 339 model calls: 50 pages need one call, 32 need two, and the three big Amex pages need 18 each. With a 7B model on a Mac expect a full run to take on the order of an hour or more; it can be stopped and resumed, since each card is saved as it finishes.
+
+**Not done, and worth knowing:**
+
+- It has never talked to a real model: the tests use a stand-in. The first run decides whether the prompt works. Try `--only capital-one-savor`, read its candidate file, and look at `rejected` to see why rules fail.
+- **Mixed pages.** Amex pages hold other cards' marketing. The prompt tells the model to take only this card's rates, but a quote about a different card would still pass the checks. Review Amex candidates by hand.
+- **Rotating categories** (Discover 5%, Freedom Flex) and their dates are not extracted; `validFrom` / `validTo` are still to do.
+- **Category words** are a guess at what a quote about a category says. Valid rules the list misses show up in `rejected` as "quote doesn't mention ...", and the fix is to add the word to `CATEGORIES`.
+
 ## Why issuers' different sites are survivable
 
 Fetching is the same for everyone. The only issuer-specific work is turning a page into rules, and that is the part that breaks when a site is redesigned. Two ways to do it:
@@ -176,7 +209,7 @@ Rule   category, rate, unit (percent | per-dollar), capAmount, capPeriod
 
 1. **Seed** (this step): `build_seed.py` produces `catalog-seed.json`.
 2. **Fetch and change detection only** (done). No extraction yet. "This issuer page changed" is already a useful, reliable signal, and it proves the fetching holds up on all 16 issuers.
-3. **Extract and validate** for the biggest issuers first (Chase, American Express, Citi, Capital One), and see how often the generic extractor passes validation.
+3. **Extract and validate** (built; waiting on a first run with a real model). Try the biggest issuers first (Chase, American Express, Citi, Capital One) and see how often the generic extractor passes validation.
 4. **Scheduled run and PR.**
 5. **App side.** Bundle `rewards-catalog.json`, add "start from catalog" to the Card editor, and add the user's category mapping. This step needs its own glossary terms and likely an ADR before code.
 
