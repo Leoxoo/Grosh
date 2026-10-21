@@ -247,7 +247,8 @@ struct DebtsAndLoansByPersonTests {
 
     // MARK: Text button
 
-    @Test func theTextButtonIsOnlyOnAPersonWhoHasAPhoneNumberAndOwesOrIsOwed() throws {
+    /// The message is copied or shared when there is no number to text, so a phone isn't needed for the button.
+    @Test func theTextButtonIsOnEveryoneWhoOwesOrIsOwedWithOrWithoutAPhone() throws {
         let alex = try fixture.person("Alex")
         let sam = try fixture.person("Sam")
         let kim = try fixture.person("Kim")
@@ -263,17 +264,8 @@ struct DebtsAndLoansByPersonTests {
         let withoutPhone = try #require(everyone.entry(for: sam))
         let settled = try #require(everyone.entry(for: kim))
         #expect(withPhone.canText)
-        #expect(!withoutPhone.canText)
+        #expect(withoutPhone.canText)
         #expect(!settled.canText)
-    }
-
-    @Test func aPhoneOfNothingButSpacesDoesNotOfferText() throws {
-        let alex = try fixture.person("Alex")
-        alex.phone = "   "
-        try record(.loan, 10_00, with: alex)
-
-        let entry = try #require(try listing().entry(for: alex))
-        #expect(!entry.canText)
     }
 
     // MARK: The remembered choice

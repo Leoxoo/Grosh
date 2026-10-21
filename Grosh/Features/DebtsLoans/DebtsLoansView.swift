@@ -7,7 +7,7 @@ import SwiftUI
 /// outstanding and "+1 open" for those with no amount, and the settled ones. Each opens its own detail.
 /// **Show by people**: one row per Person with what they owe the user (Loans plus Owes me) and what the user owes them
 /// (Debts), apart and never netted, the ones with something outstanding first and then Settled. A row opens the Person's
-/// Loans, Debts and Owes me, and has a Text button when the Person has a phone number (ADR-0009, ADR-0010).
+/// Loans, Debts and Owes me, and has a Text button while something is outstanding (ADR-0009, ADR-0010).
 struct DebtsLoansView: View {
     @Query(DebtsAndLoans.transactions) private var transactions: [Transaction]
     @Query(ExpectedReimbursements.all) private var expectations: [ExpectedReimbursement]

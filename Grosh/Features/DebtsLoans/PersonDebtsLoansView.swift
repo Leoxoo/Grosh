@@ -19,8 +19,7 @@ struct PersonDebtsLink: View {
 
 /// A Person as Show by people lists them: their name, what they owe the user (Loans plus Owes me) in green and what the
 /// user owes them (Debts) in red, one amount per currency and never netted, "+1 open" for Owes me with no amount, and
-/// Settled once nothing is outstanding. A Text button sits on the row when the Person has a phone number and something
-/// is outstanding.
+/// Settled once nothing is outstanding. A Text button sits on the row while something is outstanding.
 struct PersonDebtsRow: View {
     let entry: PersonDebtsAndLoans
     let onText: (TextReminder) -> Void

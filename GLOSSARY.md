@@ -142,7 +142,7 @@ The way Debts & Loans lists one row per Person instead of one per Loan, Debt and
 _Avoid_: Contacts list, address book
 
 **Text them**:
-Texting a Person about what is owed, from the Text button on their row in Show by people (shown only when they have a phone number) or from the "Text them" action on a reminder notification. It opens the Messages compose sheet to the Person, with a message naming the outstanding amount in the app's money formatting; the user taps Send, and nothing is ever sent without that tap. The number is the linked contact's current one while the contact resolves, otherwise the Person's stored phone. Where texting is unavailable (the simulator, an iPad without Messages) the message can be copied or shared instead.
+Texting a Person about what is owed, from the Text button on their row in Show by people (shown while anything is outstanding with them) or from the "Text them" action on a reminder notification. It prepares a message naming the outstanding amount in the app's money formatting, which the user sends themselves; nothing is ever sent for them. When the Person has a number and the device can text, it opens the Messages compose sheet to that number (the linked contact's current one while the contact resolves, otherwise the Person's stored phone), and the user taps Send. Otherwise, with no number or where texting is unavailable (the simulator, an iPad without Messages), the message is copied or shared.
 _Avoid_: Nudge, chase
 
 **Balance adjustment**:

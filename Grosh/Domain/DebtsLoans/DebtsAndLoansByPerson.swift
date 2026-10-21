@@ -55,12 +55,9 @@ struct PersonDebtsAndLoans: Identifiable {
     /// Whether something is flagged as an open amount ("+1 open").
     var hasOpenAmounts: Bool { openAmountCount > 0 }
 
-    /// Whether the row offers Text: the Person has a phone number and something is outstanding to text about
-    /// (``TextReminder``). The stored number decides, so no row reads Contacts; the live number is looked up when the user
-    /// taps.
-    var canText: Bool {
-        !isSettled && person.phone?.nilIfBlank != nil
-    }
+    /// Whether the row offers Text: something is outstanding to text about (``TextReminder``). No phone is needed: without
+    /// one, the message is copied or shared.
+    var canText: Bool { !isSettled }
 }
 
 /// Debts & Loans as Show by people lists it: every Person with a Loan, a Debt or an Expected reimbursement, the ones with
