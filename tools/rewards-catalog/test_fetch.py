@@ -1,6 +1,7 @@
 """Offline tests for fetch.py: python3 -m unittest discover -s tools/rewards-catalog"""
 
 import copy
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -66,6 +67,37 @@ class VisibleTextTests(unittest.TestCase):
         self.assertEqual(fetch.changed_line_count("a", "a"), 0)
 
 
+class EmbeddedTextTests(unittest.TestCase):
+    def test_reads_json_script_tags_and_meta_descriptions(self):
+        html = (
+            '<meta name="description" content="Earn 3X points at supermarkets"/>'
+            '<script type="application/ld+json">{"name": "Cash back on groceries", "value": "5% cash back", "id": "x1"}</script>'
+        )
+        self.assertEqual(
+            fetch.embedded_text(html).splitlines(),
+            ["Earn 3X points at supermarkets", "Cash back on groceries", "5% cash back"],
+        )
+
+    def test_reads_what_a_page_assigns_to_window(self):
+        html = '<script>window.__DATA__ = {"a": {"b": ["Earn 2% on gas"]}}; var x = {not: json};</script>'
+        self.assertEqual(fetch.embedded_text(html), "Earn 2% on gas")
+
+    def test_opens_json_that_is_inside_a_string_inside_json(self):
+        # Amex: window.__INITIAL_STATE__ = "<transit JSON, as a string>"
+        inner = json.dumps(["~#iM", ["bodyContent", "Earn 3% Cash Back at US supermarkets<sup>®</sup>."]])
+        html = f"<script>window.__INITIAL_STATE__ = {json.dumps(inner)};</script>"
+        self.assertEqual(fetch.embedded_text(html), "Earn 3% Cash Back at US supermarkets®.")
+
+    def test_keeps_only_prose(self):
+        junk = ["bodyContent", "https://x.test/a b", "sha256-" + "A" * 60 + " sha384-" + "B" * 60, "a { color: red }", "~#iM x"]
+        html = f'<script type="application/json">{json.dumps(["Plenty of words here", *junk, "Plenty of words here"])}</script>'
+        self.assertEqual(fetch.embedded_text(html), "Plenty of words here")
+
+    def test_a_script_that_is_not_json_is_ignored(self):
+        self.assertEqual(fetch.embedded_text("<script>window.x = function() { return 1 }</script>"), "")
+        self.assertEqual(fetch.embedded_text('<script type="application/json">not json</script>'), "")
+
+
 class ThrottleTests(unittest.TestCase):
     def test_waits_only_for_the_same_host(self):
         now, slept = [0.0], []
@@ -111,6 +143,19 @@ class FetchPageTests(unittest.TestCase):
 
     def test_a_shell_page_needs_a_browser(self):
         self.assertEqual(self.fetch(page("<div id=app></div>"))[0].status, "needs-browser")
+
+    def test_a_shell_page_with_embedded_data_is_read(self):
+        data = json.dumps(["Earn %d%% back on category number %d every month." % (n, n) for n in range(1, 30)])
+        result, _ = self.fetch(page(f'<div id=app></div><script type="application/json">{data}</script>'))
+        self.assertEqual(result.status, "ok")
+        self.assertTrue(result.embedded)
+        self.assertIn("Earn 7% back on category number 7", result.text)
+
+    def test_a_full_page_ignores_embedded_data(self):
+        data = json.dumps(["Some hidden sentence here."])
+        result, _ = self.fetch(page(BODY + f'<script type="application/json">{data}</script>'))
+        self.assertFalse(result.embedded)
+        self.assertNotIn("hidden", result.text)
 
     def test_error_statuses(self):
         self.assertEqual(self.fetch(page(status=403))[0].status, "refused")

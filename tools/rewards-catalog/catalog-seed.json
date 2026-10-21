@@ -252,8 +252,8 @@
       "rewardProgram": "AMERICAN_EXPRESS",
       "baseEarnRate": 1,
       "discontinued": true,
-      "sourceUrl": "https://global.americanexpress.com/card-benefits/view-all/amex-everyday",
-      "sourceHost": "global.americanexpress.com",
+      "sourceUrl": "https://www.americanexpress.com/us/credit-cards/card/amex-everyday/",
+      "sourceHost": "www.americanexpress.com",
       "verified": false
     },
     {

@@ -4,7 +4,7 @@
     python3 tools/rewards-catalog/fetch.py
     python3 tools/rewards-catalog/fetch.py --issuer chase --limit 5
     python3 tools/rewards-catalog/fetch.py --only chase-sapphire-preferred
-    python3 tools/rewards-catalog/fetch.py --retry      # just the ones that failed last time
+    python3 tools/rewards-catalog/fetch.py --retry      # just the ones that failed or came back thin last time
     python3 tools/rewards-catalog/fetch.py --missing    # pick up where an interrupted run stopped
 
 reads catalog-seed.json and fetches each chosen card's sourceUrl, one page at a time
@@ -110,6 +110,116 @@ def visible_text(html: str) -> str:
         line = " ".join(line.split())
         if line and (not lines or lines[-1] != line):
             lines.append(line)
+    return "\n".join(lines)
+
+
+META_DESCRIPTIONS = {"description", "og:description", "twitter:description"}
+EMBEDDED_CHARS_LIMIT = 200_000
+# `window.NAME = ` or `window.NAME = JSON.parse(`: where a page hands its content to its own scripts.
+_STATE_ASSIGNMENT = re.compile(r"window\.[\w$]+\s*=\s*(?:JSON\.parse\()?")
+# Markup, code and style rather than something a reader would read.
+_NOT_PROSE = re.compile(r"[{}]|=>|\bfunction\b|\bvar \w|^(?:https?:)?//|^[~#/.]")
+
+
+class _Embedded(HTMLParser):
+    """Collects the places a page keeps its content out of sight: meta descriptions and script bodies."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.descriptions: list[str] = []
+        self.scripts: list[tuple[str, str]] = []  # (type, body)
+        self._type: str | None = None
+        self._body: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list) -> None:
+        values = dict(attrs)
+        if tag == "meta" and (values.get("name") or values.get("property")) in META_DESCRIPTIONS:
+            if values.get("content"):
+                self.descriptions.append(values["content"])
+        elif tag == "script":
+            self._type, self._body = (values.get("type") or "").lower(), []
+
+    def handle_data(self, data: str) -> None:
+        if self._type is not None:
+            self._body.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "script" and self._type is not None:
+            self.scripts.append((self._type, "".join(self._body)))
+            self._type = None
+
+
+def _embedded_json(script_type: str, body: str):
+    """Every JSON value a script carries: the whole body of a JSON script, or what `window.X = ...` assigns."""
+    if script_type.endswith("json"):
+        try:
+            yield json.loads(body)
+        except ValueError:
+            pass
+        return
+    decoder = json.JSONDecoder()
+    for assignment in _STATE_ASSIGNMENT.finditer(body):
+        try:
+            yield decoder.raw_decode(body, assignment.end())[0]
+        except ValueError:
+            continue  # the assignment was code, not data
+
+
+def _strings(value, found: list[str], depth: int = 0) -> None:
+    """Every string in a JSON value, in order. A string that is itself JSON (as in Amex's state) is opened up."""
+    if depth > 30:
+        return
+    if isinstance(value, str):
+        if value[:1] in "[{" and len(value) > 2:
+            try:
+                _strings(json.loads(value), found, depth + 1)
+                return
+            except ValueError:
+                pass
+        found.append(value)
+    elif isinstance(value, list):
+        for item in value:
+            _strings(item, found, depth + 1)
+    elif isinstance(value, dict):
+        for item in value.values():
+            _strings(item, found, depth + 1)
+
+
+def _prose(text: str) -> str:
+    """The sentence a string holds, or "" if it is an id, a URL, a style or code."""
+    text = visible_text(text) if "<" in text else " ".join(text.split())
+    words = text.split()
+    # A 40-letter "word" is a hash, a token or a path, never something said to a reader.
+    if len(words) < 2 or len(text) > 1000 or max(map(len, words)) > 40 or _NOT_PROSE.search(text):
+        return ""
+    return text if sum(c.isalpha() for c in text) >= len(text) / 2 else ""
+
+
+def embedded_text(html: str) -> str:
+    """Text a page carries in its meta descriptions and in JSON its scripts use to build it.
+
+    Many issuer pages are built in the browser, so their visible text is nearly empty, yet their
+    sentences (and rates) arrive inside the HTML as data. Only prose is kept: strings of at least
+    two words that look like sentences, once, in the order the page gives them.
+    """
+    parser = _Embedded()
+    parser.feed(html)
+    parser.close()
+    found = list(parser.descriptions)
+    for script_type, body in parser.scripts:
+        for value in _embedded_json(script_type, body):
+            _strings(value, found)
+    lines: list[str] = []
+    seen: set[str] = set()
+    total = 0
+    for string in found:
+        line = _prose(string)
+        if line and line not in seen:
+            seen.add(line)
+            lines.append(line)
+            total += len(line)
+            if total > EMBEDDED_CHARS_LIMIT:
+                break
     return "\n".join(lines)
 
 
@@ -248,6 +358,7 @@ class PageResult:
     etag: str = ""
     last_modified: str = ""
     error: str = ""
+    embedded: bool = False  # the text includes what the page carried as data (embedded_text)
 
 
 def fetch_page(url: str, get, robots: Robots, throttle: Throttle, validators: dict[str, str]) -> PageResult:
@@ -287,12 +398,19 @@ def fetch_page(url: str, get, robots: Robots, throttle: Throttle, validators: di
             if content_type and "html" not in content_type and "text" not in content_type:
                 return PageResult("failed", error=f"not a web page ({content_type})")
             try:
-                text = visible_text(decode(response))
+                html = decode(response)
+                text = visible_text(html)
+                embedded = False
+                if len(text) < MIN_TEXT_CHARS:
+                    # A page built in the browser: look for its content in the data it ships with.
+                    data = embedded_text(html)
+                    text, embedded = (f"{text}\n{data}".strip(), True) if data else (text, False)
             except (OSError, EOFError, ValueError, zlib.error) as problem:
                 return PageResult("failed", error=f"unreadable reply: {problem}")
             return PageResult(
                 "ok" if len(text) >= MIN_TEXT_CHARS else "needs-browser",
                 text=text,
+                embedded=embedded and len(text) >= MIN_TEXT_CHARS,
                 final_url=response.url,
                 etag=response.headers.get("etag", ""),
                 last_modified=response.headers.get("last-modified", ""),
@@ -380,8 +498,9 @@ def _record(card: dict, url: str, page: PageResult, state: dict, cache: Path, to
         new_hash = text_hash(page.text)
         old_hash = entry.get("hash")
         latest = folder / "latest.txt"
+        via = "text from the page's embedded data" if page.embedded else ""
         if old_hash is None:
-            status, detail = "new", ""
+            status, detail = "new", via
         elif old_hash == new_hash:
             status, detail = "unchanged", ""
         else:
@@ -391,6 +510,7 @@ def _record(card: dict, url: str, page: PageResult, state: dict, cache: Path, to
                 detail = f"{changed_line_count(previous_text, page.text)} lines changed"
             else:
                 detail = "no earlier copy to compare"
+            detail = f"{detail}; {via}" if via else detail
             status = "changed"
         folder.mkdir(parents=True, exist_ok=True)
         latest.write_text(page.text, encoding="utf-8")
@@ -402,6 +522,7 @@ def _record(card: dict, url: str, page: PageResult, state: dict, cache: Path, to
             "finalUrl": page.final_url,
             "changedAt": today if status in ("new", "changed") else entry.get("changedAt", today),
             "lastStatus": "ok",
+            **({"embedded": True} if page.embedded else {}),
         }
         return CardOutcome(card_id, url, status, detail)
 
@@ -432,7 +553,7 @@ def report(summary: RunSummary, total_cards: int) -> str:
     return "\n".join(lines) + "\n"
 
 
-RETRYABLE = ("failed", "gone")
+RETRYABLE = ("failed", "gone", "needs-browser")
 
 
 def select(
@@ -445,7 +566,7 @@ def select(
     retry: bool = False,
 ) -> list[dict]:
     """The cards to fetch. `missing` keeps those never fetched and `retry` those whose last fetch
-    failed or found the page gone; with both, a card qualifies under either."""
+    failed, found the page gone or came back too thin; with both, a card qualifies under either."""
     state = state or {}
     chosen = []
     for card in cards:
@@ -470,7 +591,7 @@ def main() -> int:
     parser.add_argument("--issuer", default="", help="fetch just cards whose issuer contains this text")
     parser.add_argument("--limit", type=int, help="fetch at most this many cards")
     parser.add_argument("--missing", action="store_true", help="only cards never fetched (resumes an interrupted run)")
-    parser.add_argument("--retry", action="store_true", help="only cards whose last fetch failed or found the page gone")
+    parser.add_argument("--retry", action="store_true", help="only cards whose last fetch failed, found the page gone, or came back too thin")
     parser.add_argument("--delay", type=float, default=DELAY_SECONDS, help="seconds between requests to one host")
     args = parser.parse_args()
 

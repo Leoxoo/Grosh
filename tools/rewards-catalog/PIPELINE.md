@@ -70,13 +70,30 @@ A card whose `sourceUrl` changed since it was fetched is picked up by `--missing
 
 | Result | Cards | Notes |
 |---|---|---|
-| Read | 127 | Real rate text, for example "Earn unlimited 3% cash back on food and fun". |
-| `needs-browser` | 15 | American Express (some), BofA Atmos, Amazon cards, AAA, U.S. Bank SkyPass. |
+| Read | 138 | Real rate text, for example "Earn unlimited 3% cash back on food and fun". 9 of these come from embedded page data (below), marked `"embedded": true` in `fetch-state.json`. |
+| `needs-browser` | 4 | The two Schwab-branded Amex cards ("unable to authorize your request") and the two Amazon cards (a "continue shopping" check page). Bot walls, so a browser is unlikely to help; use the issuers' own pages instead. |
 | `failed` | 12 | Timeouts: the United cards (theexplorercard.com), E*TRADE (2 Morgan Stanley cards), PenFed (3), Air France. Retrying here didn't help; try `--retry` from your own network. |
 | `refused` | 11 | LATAM, LifeMiles, Amtrak, Best Western, Virgin, Expedia. |
 | `gone` | 1 | `barclays-carnival-world-mastercard`: Barclays removed the page and I found no official replacement, so it needs a URL from you. |
 
-The 3 earlier `gone` pages (two TD, one Walmart) now fetch from corrected URLs. The Walmart OnePay card uses OnePay's help article, not a Synchrony or Walmart product page.
+The 3 earlier `gone` pages (two TD, one Walmart) now fetch from corrected URLs. The Walmart OnePay card uses OnePay's help article, not a Synchrony or Walmart product page. Amex Everyday's URL pointed at a sign-in "Benefits Dashboard" and now uses its card page.
+
+### Pages built in the browser: embedded data, not a browser
+
+Many issuer pages ship almost no visible text, but carry their sentences (and rates) as data inside the HTML. When a page's visible text is under 400 characters, `fetch.py` also reads:
+
+- `<meta>` descriptions (`description`, `og:description`, `twitter:description`);
+- JSON script tags (`application/json`, `application/ld+json`, such as Next.js's `__NEXT_DATA__`);
+- JSON a script assigns to `window` (`window.X = {...}`), including JSON held inside a string, as Amex's `__INITIAL_STATE__` does.
+
+Only prose is kept: strings of two or more words that read as sentences, once each, up to 200,000 characters. This recovered AAA, Alaska Atmos and four Amex pages without a browser, in standard-library Python.
+
+Limits to know before the extract stage:
+
+- **Mixed content.** Amex's state holds marketing for many cards, so a card's page can contain other cards' rates. Extraction must keep only rules whose quote names the card, which is why "the page names the card" is a validation check.
+- **Wrong pages still read as "ok".** The embedded text of `american-express-green` is Amex's generic card listing (its page redirects there, so the Green card page has moved) and `american-express-rakuten` is the Rakuten shopping site's labels, not card terms. Both need correct URLs from you. A fetch that ends on a different page than it asked for should be flagged; not built yet.
+- **Hashes are noisier.** A page that flips between thin and full text changes its hash, and embedded data can include build ids. `changed` reports how many lines differ, to tell churn from a rate change.
+- **A headless browser** is now only worth building for what this can't reach. Nothing is left that clearly needs one: the 4 `needs-browser` pages are bot walls.
 
 ### First full run (2026-10-20, 166 cards)
 

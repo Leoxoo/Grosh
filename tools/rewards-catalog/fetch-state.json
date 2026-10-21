@@ -124,11 +124,21 @@
     "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-reserve/"
   },
   "american-express-everyday": {
-    "lastStatus": "needs-browser",
-    "url": "https://global.americanexpress.com/card-benefits/view-all/amex-everyday"
+    "changedAt": "2026-10-20",
+    "embedded": true,
+    "finalUrl": "https://www.americanexpress.com/us/credit-cards/card/amex-everyday/",
+    "hash": "88b91d6fa7a57e65ed736616b18e333b9a2f51280cd79daa2011133cd7e26d4b",
+    "lastStatus": "ok",
+    "textChars": 202218,
+    "url": "https://www.americanexpress.com/us/credit-cards/card/amex-everyday/"
   },
   "american-express-everyday-preferred": {
-    "lastStatus": "needs-browser",
+    "changedAt": "2026-10-20",
+    "embedded": true,
+    "finalUrl": "https://www.americanexpress.com/us/credit-cards/card/amex-everyday-preferred/",
+    "hash": "35e6e5abf28924a4fe763de2a01f0cede551f73f435eb379219632743b130d88",
+    "lastStatus": "ok",
+    "textChars": 202231,
     "url": "https://www.americanexpress.com/us/credit-cards/card/amex-everyday-preferred/"
   },
   "american-express-gold": {
@@ -140,7 +150,12 @@
     "url": "https://www.americanexpress.com/us/credit-cards/card/gold-card/"
   },
   "american-express-green": {
-    "lastStatus": "needs-browser",
+    "changedAt": "2026-10-20",
+    "embedded": true,
+    "finalUrl": "https://www.americanexpress.com/us/credit-cards/",
+    "hash": "5a5432da3bf9f4441a1603f2fa2503e610942d00f43b84b5acc1e775bdcf1798",
+    "lastStatus": "ok",
+    "textChars": 202372,
     "url": "https://www.americanexpress.com/us/credit-cards/card/green/"
   },
   "american-express-hilton-honors": {
@@ -216,7 +231,12 @@
     "url": "https://www.schwab.com/credit-cards/platinum-card"
   },
   "american-express-rakuten": {
-    "lastStatus": "needs-browser",
+    "changedAt": "2026-10-20",
+    "embedded": true,
+    "finalUrl": "https://www.rakuten.com/american-express-card",
+    "hash": "590edf92b664be30d737ba1e8931ee211198d842cb4a6affec57631f51788374",
+    "lastStatus": "ok",
+    "textChars": 9697,
     "url": "https://www.rakuten.com/american-express-card/"
   },
   "american-express-schwab-investor": {
@@ -228,15 +248,30 @@
     "url": "https://wwws.airfrance.us/information/flyingblue/carte-bancaire-partenaire"
   },
   "bank-of-america-atmos-rewards-ascent": {
-    "lastStatus": "needs-browser",
+    "changedAt": "2026-10-20",
+    "embedded": true,
+    "finalUrl": "https://www.alaskaair.com/atmosrewards/content/credit-cards",
+    "hash": "9e3019e2d353d1db7f65ab748a8c5108edf297177b99a084d116ade93f051e7a",
+    "lastStatus": "ok",
+    "textChars": 10706,
     "url": "https://www.alaskaair.com/atmosrewards/content/credit-cards"
   },
   "bank-of-america-atmos-rewards-business": {
-    "lastStatus": "needs-browser",
+    "changedAt": "2026-10-20",
+    "embedded": true,
+    "finalUrl": "https://www.alaskaair.com/atmosrewards/content/credit-cards",
+    "hash": "9e3019e2d353d1db7f65ab748a8c5108edf297177b99a084d116ade93f051e7a",
+    "lastStatus": "ok",
+    "textChars": 10706,
     "url": "https://www.alaskaair.com/atmosrewards/content/credit-cards"
   },
   "bank-of-america-atmos-rewards-summit": {
-    "lastStatus": "needs-browser",
+    "changedAt": "2026-10-20",
+    "embedded": true,
+    "finalUrl": "https://www.alaskaair.com/atmosrewards/content/credit-cards",
+    "hash": "9e3019e2d353d1db7f65ab748a8c5108edf297177b99a084d116ade93f051e7a",
+    "lastStatus": "ok",
+    "textChars": 10706,
     "url": "https://www.alaskaair.com/atmosrewards/content/credit-cards"
   },
   "bank-of-america-business-advantage-customized-cash": {
@@ -872,11 +907,21 @@
     "url": "https://www.citi.com/credit-cards/citi-strata-premier-credit-card"
   },
   "comenity-aaa-daily-advantage": {
-    "lastStatus": "needs-browser",
+    "changedAt": "2026-10-20",
+    "embedded": true,
+    "finalUrl": "https://www.ace.aaa.com/financial/aaa-credit-card.html",
+    "hash": "bdf1e139a6ba7972de89d5998f85f7a39f8eb00acdb8c954ec44499db1101b8c",
+    "lastStatus": "ok",
+    "textChars": 2143,
     "url": "https://www.ace.aaa.com/financial/aaa-credit-card.html"
   },
   "comenity-aaa-travel-advantage": {
-    "lastStatus": "needs-browser",
+    "changedAt": "2026-10-20",
+    "embedded": true,
+    "finalUrl": "https://www.ace.aaa.com/financial/aaa-credit-card.html",
+    "hash": "bdf1e139a6ba7972de89d5998f85f7a39f8eb00acdb8c954ec44499db1101b8c",
+    "lastStatus": "ok",
+    "textChars": 2143,
     "url": "https://www.ace.aaa.com/financial/aaa-credit-card.html"
   },
   "discover-discover-it": {
@@ -1068,7 +1113,11 @@
     "url": "https://www.usbank.com/credit-cards/shopper-cash-rewards-visa-signature-credit-card.html"
   },
   "u-s-bank-skypass": {
-    "lastStatus": "needs-browser",
+    "changedAt": "2026-10-20",
+    "finalUrl": "https://www.skypassvisa.com/credit/visaSignatureCard.do",
+    "hash": "3f0a7da1e3fa94f3a06d4d49fcafdc20a563cebfef08ad006110a4cbd0e400fb",
+    "lastStatus": "ok",
+    "textChars": 12370,
     "url": "https://www.skypassvisa.com/credit/visaSignatureCard.do"
   },
   "u-s-bank-skypass-blue": {
@@ -1080,7 +1129,11 @@
     "url": "https://www.skypassvisa.com/credit/visaSkyBlueCard.do"
   },
   "u-s-bank-skypass-business": {
-    "lastStatus": "needs-browser",
+    "changedAt": "2026-10-20",
+    "finalUrl": "https://www.skypassvisa.com/credit/visaBusinessCard.do",
+    "hash": "8d9237efd40b734203ab204d57132382240fe0e24a6997f620eeb7f564236a6c",
+    "lastStatus": "ok",
+    "textChars": 13690,
     "url": "https://www.skypassvisa.com/credit/visaBusinessCard.do"
   },
   "u-s-bank-skypass-select": {
