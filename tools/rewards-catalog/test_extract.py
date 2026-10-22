@@ -14,6 +14,7 @@ ROTATING = "Earn 5% cash back on gas stations from October 1 through December 31
 APPLE = "Get 2% Daily Cash back when you use Apple Card with Apple Pay."
 BOOKED = "Earn 5% cash back on hotels and rental cars booked through Bank Travel."
 EXCLUSION = "Earn unlimited 3% cash back at grocery stores (excluding superstores like Walmart and Target), on dining."
+FIRST_YEAR = "Earn 6% cash back in the category of your choice for the first year, then 3%."
 WALLETS = "Purchases made through mobile or digital wallets may not receive a higher percentage reward."
 GROCERY_QUOTE = "Earn 2X points on groceries at U.S. supermarkets on up to $6,000 per year in purchases."
 PAGE = "\n".join([
@@ -23,7 +24,7 @@ PAGE = "\n".join([
     GROCERY_QUOTE,
     "Earn 1% cash back on all other purchases.",
     "Earn unlimited 3% cash back at grocery stores (excluding superstores like Walmart® and Target®), on dining.",
-    APPLE, CHOICE, TOP, ROTATING, WALLETS,
+    APPLE, CHOICE, TOP, ROTATING, WALLETS, FIRST_YEAR,
     "Menu\nContact us\nPrivacy",
 ])
 PAGE_NORM = normalize(PAGE)
@@ -33,7 +34,7 @@ def rule(**overrides) -> dict:
     base = {
         "categories": ["dining"], "selection": "fixed", "picks": None, "hasOtherChoices": False,
         "rate": 3, "unit": "percent", "capAmount": None, "capPeriod": None, "requires": [],
-        "validFrom": None, "validTo": None, "conditions": [],
+        "validFrom": None, "validTo": None, "firstMonths": None, "conditions": [],
         "quote": "Earn unlimited 3% cash back on dining, entertainment and popular streaming services.",
     }
     return {**base, **overrides}
@@ -183,6 +184,50 @@ class RequiresAndDatesTests(unittest.TestCase):
         text = "Earn 5% on gas stations in the market during 2026."
         problem = validate_rule(rule(categories=["gas"], rate=5, quote=text, validFrom="2026-03-01"), normalize(text))
         self.assertIn("month march", problem)
+
+
+class FirstMonthsAndNeedsTests(unittest.TestCase):
+    def check(self, **overrides) -> str | None:
+        return validate_rule(choice_rule(**overrides), PAGE_NORM)
+
+    def test_a_first_period_must_be_in_the_quote(self):
+        year = dict(rate=6, quote=FIRST_YEAR)
+        self.assertIsNone(self.check(**year, firstMonths=12))
+        self.assertIn("first 6 months", self.check(**year, firstMonths=6))
+        self.assertIn("first 12 months", self.check(rate=3, quote=CHOICE, firstMonths=12))
+
+    def test_other_ways_to_say_first(self):
+        for text, months in (("Earn 6% in your choice category for the first 12 months.", 12),
+                             ("Earn 5% in your choice category during your first 6 months.", 6),
+                             ("Earn 5% in your choice category during the first 2 years.", 24),
+                             ("Earn 5% in your choice category for the first-year.", 12)):
+            rate = 6 if "6%" in text else 5
+            self.assertIsNone(validate_rule(choice_rule(rate=rate, quote=text, firstMonths=months), PAGE_NORM + ' ' + normalize(text)), text)
+
+    def test_firstMonths_must_be_a_sane_whole_number(self):
+        for bad in (0, -1, 61, 1.5, "12", True):
+            self.assertIn("firstMonths must be", self.check(rate=6, quote=FIRST_YEAR, firstMonths=bad), bad)
+
+    def test_needs_come_from_the_rule_not_the_model(self):
+        self.assertEqual(extract.needs_of(choice_rule()), ["choice-categories"])
+        self.assertEqual(extract.needs_of(choice_rule(firstMonths=12)), ["choice-categories", "account-opened"])
+        self.assertEqual(extract.needs_of(rule(requires=["apple-pay"])), ["pays-with-apple-pay"])
+        self.assertEqual(extract.needs_of(rule(requires=["activation"])), [])
+        self.assertEqual(extract.needs_of({"selection": "fixed", "requires": []}), [])
+        self.assertTrue(set(extract.needs_of(choice_rule(firstMonths=12, requires=["apple-pay"]))) <= set(extract.NEEDS))
+
+    def test_a_candidate_lists_every_question_its_rules_ask(self):
+        reply = [choice_rule(rate=6, quote=FIRST_YEAR, firstMonths=12), rule(), rule(categories=["everything-else"], rate=2,
+                 requires=["apple-pay"], quote=APPLE)]
+        result = extract_card(CARD, PAGE, "h", FakeModel(reply), "m")
+        self.assertEqual(result["needs"], ["account-opened", "choice-categories", "pays-with-apple-pay"])
+        by_rate = {r["rate"]: r for r in result["rules"]}
+        self.assertEqual((by_rate[6]["firstMonths"], by_rate[6]["needs"]), (12, ["choice-categories", "account-opened"]))
+
+    def test_hand_entered_rules_get_needs_too_even_without_the_field(self):
+        legacy = {k: v for k, v in choice_rule().items() if k != "firstMonths"}
+        result = manual_candidate(CARD, {"rules": [legacy]}, PAGE, "h")
+        self.assertEqual((result["needs"], result["rules"][0]["firstMonths"]), (["choice-categories"], None))
 
 
 class PageTextTests(unittest.TestCase):
@@ -387,6 +432,7 @@ class LMStudioTests(unittest.TestCase):
         fields = set(extract.RULE_SCHEMA["properties"])
         self.assertEqual(fields, set(extract.RULE_SCHEMA["required"]))
         self.assertEqual(fields, set(rule()))
+        self.assertNotIn("needs", fields)  # derived from the rule, never taken from the model
 
     def test_an_odd_reply_is_a_value_error(self):
         client, _ = self.client({"oops": 1})

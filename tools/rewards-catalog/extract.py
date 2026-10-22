@@ -40,7 +40,7 @@ import fetch  # noqa: E402
 
 CANDIDATES = fetch.CACHE / "candidates"
 MANUAL_RULES = Path(__file__).with_name("manual-rules.json")
-PROMPT_VERSION = "3"
+PROMPT_VERSION = "4"
 DEFAULT_URL = "http://localhost:1234/v1"
 DEFAULT_MODEL = "k2-horizon-7b-uno-uncensored"
 CHUNK_CHARS = 12_000
@@ -99,6 +99,15 @@ REQUIRES = {
     "issuer-booking": ("booked through", "booked with", "book through", "book with", "booking through",
                        "purchased through", "portal"),
 }
+# Questions only the cardholder can answer, with the wording the app can ask. A rule's `needs` is worked out
+# from the rule itself (needs_of), never taken from the model: a choose rule needs the category picked, a
+# rate for the first N months needs the date the card was opened, an Apple Pay rate needs to know whether
+# the cardholder pays that way. Not modeled yet: Bank of America's Preferred Rewards tier.
+NEEDS = {
+    "choice-categories": "Which category did you choose on this card?",
+    "account-opened": "When did you open this card?",
+    "pays-with-apple-pay": "Do you usually pay with Apple Pay?",
+}
 MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
           "november", "december")
 
@@ -116,11 +125,12 @@ RULE_SCHEMA = {
         "requires": {"type": "array", "items": {"type": "string", "enum": list(REQUIRES)}},
         "validFrom": {"type": ["string", "null"]},
         "validTo": {"type": ["string", "null"]},
+        "firstMonths": {"type": ["integer", "null"]},
         "quote": {"type": "string"},
         "conditions": {"type": "array", "items": {"type": "string"}},
     },
     "required": ["categories", "selection", "picks", "hasOtherChoices", "rate", "unit", "capAmount", "capPeriod",
-                 "requires", "validFrom", "validTo", "quote", "conditions"],
+                 "requires", "validFrom", "validTo", "firstMonths", "quote", "conditions"],
     "additionalProperties": False,
 }
 SCHEMA = {
@@ -241,6 +251,18 @@ def _date_problem(label: str, value, text: str) -> str | None:
     return None
 
 
+def _first_months_backed(months: int, text: str) -> bool:
+    """Whether the text speaks of a first period of that length: "first year", "first 12 months", "first 2 years"."""
+    if not re.search(r"(?<![a-z])first[ -]", text):
+        return False
+    if months == 12 and re.search(r"first[ -]year", text):
+        return True
+    numbers = numbers_in(text)
+    return (months in numbers and mentions(text, ("month",))) or (
+        months % 12 == 0 and months // 12 in numbers and mentions(text, ("year",))
+    )
+
+
 def check_condition(condition, page_norm: str | None) -> str | None:
     """Why a condition can't be kept, or None. Conditions are shown as the issuer wrote them, so each
     must be the issuer's own words (when the page is available to check against)."""
@@ -339,6 +361,12 @@ def validate_rule(rule, page_norm: str | None = None) -> str | None:
     for tag in requires:
         if not mentions(context, REQUIRES[tag]):
             return f"requires {tag}, but neither the quote nor a condition says so"
+    first = rule.get("firstMonths")
+    if first is not None:
+        if isinstance(first, bool) or not isinstance(first, int) or not 1 <= first <= 60:
+            return "firstMonths must be a whole number of months from 1 to 60"
+        if not _first_months_backed(first, context):
+            return f"the quote doesn't say the rate is for the first {first} months"
     valid_from, valid_to = rule.get("validFrom"), rule.get("validTo")
     problem = _date_problem("validFrom", valid_from, context) or _date_problem("validTo", valid_to, context)
     if problem:
@@ -372,6 +400,7 @@ Rules:
 - capAmount and capPeriod: only if that same sentence limits how much spending earns the rate (for "up to $6,000 per year": 6000 and "year"; the period is month, quarter, year, or cycle for a billing cycle). Otherwise null for both.
 - requires: only what the text says the rate needs. "apple-pay" (must pay with Apple Pay), "activation" (must activate or enroll), "issuer-booking" (must book through the issuer's travel site or portal). Otherwise [].
 - validFrom and validTo: for a rate that applies only in a stated period, its first and last day as YYYY-MM-DD, and only when the text names the months and the year (October through December 2026 is 2026-10-01 and 2026-12-31). Otherwise null.
+- firstMonths: only if the text says the rate applies just during an introductory period after the account is opened ("first year", "first 6 months"): the length in months (12 for "first year"). Otherwise null.
 - conditions: copy, word for word, each sentence in the text that excludes or restricts this one rate: excluded stores, a minimum, who qualifies. These are often in footnotes, which repeat the rate with its exclusions. Never paraphrase. Use [] if there are none.
 - cardConditions (at the top level, not in a rule): copy, word for word, each sentence that limits several of this card's rates at once, such as how stores get categorized or limits on digital wallets. Do not repeat them in a rule's conditions. Use [] if there are none.
 - Ignore sign-up bonuses, statement credits, APRs, fees, and what points are worth.
@@ -434,6 +463,18 @@ class LMStudio:
 # --- One card ---------------------------------------------------------------------------------
 
 
+def needs_of(rule: dict) -> list[str]:
+    """The questions the cardholder must answer for this rule to be worked out (NEEDS)."""
+    needs = []
+    if rule["selection"] == "choose":
+        needs.append("choice-categories")
+    if rule.get("firstMonths") is not None:
+        needs.append("account-opened")
+    if "apple-pay" in rule["requires"]:
+        needs.append("pays-with-apple-pay")
+    return needs
+
+
 def accepted_rule(proposal: dict, url: str, page_hash: str | None, verified: str) -> dict:
     """A rule as the candidate stores it. `verified` is "page" when its quote was found on the page and
     "manual" when a person entered it and the page could not confirm the quote."""
@@ -449,6 +490,8 @@ def accepted_rule(proposal: dict, url: str, page_hash: str | None, verified: str
         "requires": list(proposal["requires"]),
         "validFrom": proposal["validFrom"],
         "validTo": proposal["validTo"],
+        "firstMonths": proposal.get("firstMonths"),
+        "needs": needs_of(proposal),
         "conditions": [c.strip() for c in proposal["conditions"]],
         "verified": verified,
         "evidence": {"quote": proposal["quote"].strip(), "url": url, "pageHash": page_hash},
@@ -458,14 +501,14 @@ def accepted_rule(proposal: dict, url: str, page_hash: str | None, verified: str
 def _rule_key(rule: dict) -> tuple:
     return (
         tuple(rule["categories"]), rule["selection"], rule["picks"], float(rule["rate"]), rule["unit"],
-        rule["capAmount"], rule["capPeriod"], tuple(rule["requires"]), rule["validFrom"], rule["validTo"],
+        rule["capAmount"], rule["capPeriod"], tuple(rule["requires"]), rule["validFrom"], rule["validTo"], rule["firstMonths"],
     )
 
 
 def _empty_candidate(card: dict, model: str, prompt_version: str | None, page_hash: str | None, status: str) -> dict:
     return {
         "cardId": card["id"], "model": model, "promptVersion": prompt_version, "pageHash": page_hash,
-        "status": status, "cardConditions": [], "rules": [], "rejected": [],
+        "status": status, "needs": [], "cardConditions": [], "rules": [], "rejected": [],
     }
 
 
@@ -511,6 +554,7 @@ def extract_card(card: dict, text: str, page_hash: str, complete, model: str, ma
             elif condition.strip() not in candidate["cardConditions"]:
                 candidate["cardConditions"].append(condition.strip())
     candidate["rules"] = sorted(accepted.values(), key=lambda r: (r["categories"][0], -r["rate"]))
+    candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
     if failures:
         candidate["status"] = "failed"
     elif not accepted:
@@ -540,6 +584,7 @@ def manual_candidate(card: dict, entry: dict, text: str | None, page_hash: str |
     candidate["cardConditionsOnPage"] = page_norm is not None and all(
         normalize(c) in page_norm for c in candidate["cardConditions"]
     )
+    candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
     if not candidate["rules"]:
         candidate["status"] = "no-rules"
     return candidate

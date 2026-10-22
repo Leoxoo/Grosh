@@ -134,6 +134,7 @@ For each card it splits the cached page text into chunks of about 12,000 charact
 7. a rule where the cardholder chooses or the card picks (`selection` of `choose` or `top-spend`) needs a quote that says so ("of your choice", "top eligible category"), and every category it lists must be mentioned on the page;
 8. a `requires` tag (`apple-pay`, `activation`, `issuer-booking`) is accepted only if the quote or a condition has words that back it ("Apple Pay", "activate", "booked through");
 9. `validFrom` / `validTo` are accepted only if the quote or a condition gives that date's month and year, so a period can't be made up.
+10. `firstMonths` (a rate only for the first N months after opening, such as a first-year bonus) is accepted only if the quote or a condition says "first year", "first 12 months" or similar for that length.
 
 A rule that fails any check is listed as rejected, never edited. **Card-wide conditions** (`cardConditions`: sentences that limit several of a card's rates, such as Capital One's note that digital wallets may not earn the higher rate) must also be on the page word for word; one that isn't is dropped and listed under `rejected`, and the card's rules are kept.
 
@@ -148,6 +149,18 @@ A rule that fails any check is listed as rejected, never edited. **Card-wide con
 | Only for a stated period (rotating 5% categories) | `validFrom` / `validTo`, with `requires: ["activation"]` where the page says to activate |
 
 Not handled: relationship boosts (Bank of America Preferred Rewards), caps shared between categories, and rates at one named store (the catalog skips those). The page's own sentence about them can still ride along in `conditions`.
+
+### Questions only the cardholder can answer
+
+Some things about a rule depend on the person, not the card. The catalog doesn't guess them; each rule lists what it `needs`, and the app asks (a Settings screen or the card editor, still to be designed). `needs` is **worked out from the rule**, never taken from the model, and each card's candidate carries the union as `needs`.
+
+| Question id | A rule needs it when | What the app asks |
+|---|---|---|
+| `choice-categories` | `selection` is `choose` | Which category did you choose on this card? |
+| `account-opened` | `firstMonths` is set (a first-year rate) | When did you open this card? |
+| `pays-with-apple-pay` | `requires` has `apple-pay` | Do you usually pay with Apple Pay? |
+
+`top-spend` rules (Citi Custom Cash) need no answer, because Grosh can work out the top category from the user's own expenses in the statement period. Not modeled yet: Bank of America's Preferred Rewards tier (a percentage boost by tier, which the cached pages don't state). Bank of America's first-year 6% is supported by the schema (`firstMonths: 12`) but **not entered**: none of the pages we have states it, so there's no quote to take.
 
 ### Hand-entered cards and rules
 
@@ -209,7 +222,8 @@ Card   id, name, issuer, network, isBusiness, annualFee, rewardKind,
        verifiedAt, cardConditions[] (the issuer's sentences that limit several rates), rules[]
 Rule   categories[], selection (fixed | choose | top-spend), picks, hasOtherChoices,
        rate, unit (percent | per-dollar), capAmount, capPeriod (month | quarter | year | cycle),
-       requires[] (apple-pay | activation | issuer-booking), validFrom, validTo,
+       requires[] (apple-pay | activation | issuer-booking), validFrom, validTo, firstMonths,
+       needs[] (choice-categories | account-opened | pays-with-apple-pay; derived),
        conditions[] (the issuer's own sentences, verbatim), verified (page | manual),
        evidence { url, quote, pageHash }
 ```
