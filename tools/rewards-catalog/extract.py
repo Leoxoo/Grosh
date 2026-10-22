@@ -31,6 +31,7 @@ import os
 import re
 import sys
 import unicodedata
+import urllib.error
 import urllib.request
 from datetime import date
 from pathlib import Path
@@ -417,7 +418,11 @@ def parse_reply(content: str) -> tuple[list, list]:
     """The model's (rules, cardConditions), or ValueError if it did not reply with the shape we asked for."""
     content = content.strip()
     content = re.sub(r"^```(?:json)?\s*|\s*```$", "", content)
-    value = json.loads(content)
+    try:
+        value = json.loads(content)
+    except ValueError as problem:
+        # Say what the reply was, so a cut-off or chatty reply can be told from a bad schema.
+        raise ValueError(f"{problem}; the reply was {len(content)} characters and began {content[:150]!r}") from problem
     if not isinstance(value, dict) or not isinstance(value.get("rules"), list):
         raise ValueError('reply is not {"cardConditions": [...], "rules": [...]}')
     card_conditions = value.get("cardConditions", [])
@@ -452,8 +457,13 @@ class LMStudio:
             data=json.dumps(body).encode(),
             headers={"Content-Type": "application/json"},
         )
-        with self.urlopen(request, timeout=self.timeout) as reply:
-            data = json.load(reply)
+        try:
+            with self.urlopen(request, timeout=self.timeout) as reply:
+                data = json.load(reply)
+        except urllib.error.HTTPError as problem:
+            # LM Studio explains a refused request (a schema it can't use, no model loaded) in the body.
+            detail = problem.read(600).decode("utf-8", "replace").strip()
+            raise OSError(f"LM Studio answered HTTP {problem.code}: {detail}") from problem
         try:
             return data["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as problem:
@@ -524,14 +534,18 @@ def extract_card(card: dict, text: str, page_hash: str, complete, model: str, ma
     page_norm = normalize(text)
     accepted: dict[tuple, dict] = {}
     failures = 0
+    errors: list[str] = []
     for chunk in (c for c in chunk_lines(text, max_chars) if has_rates(c)):
         reply = None
         for _ in range(ATTEMPTS_PER_CHUNK):
             try:
                 reply = parse_reply(complete(build_messages(card, chunk)))
                 break
-            except (OSError, ValueError):
+            except (OSError, ValueError) as problem:
                 reply = None
+                message = f"{type(problem).__name__}: {problem}"[:700]
+                if message not in errors:
+                    errors.append(message)
         if reply is None:
             failures += 1
             continue
@@ -557,6 +571,7 @@ def extract_card(card: dict, text: str, page_hash: str, complete, model: str, ma
     candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
     if failures:
         candidate["status"] = "failed"
+        candidate["errors"] = errors
     elif not accepted:
         candidate["status"] = "no-rules"
     return candidate
@@ -662,6 +677,8 @@ def main() -> int:
             f"{len(candidate['rules'])} rules, {len(candidate['rejected'])} rejected",
             flush=True,
         )
+        for message in candidate.get("errors", [])[:2]:
+            print(f"        {message}", flush=True)
 
     print("\n" + ", ".join(f"{count} {status}" for status, count in sorted(counts.items())))
     return 1 if counts.get("failed", 0) / len(chosen) > fetch.FAILURE_LIMIT else 0

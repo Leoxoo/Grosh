@@ -357,6 +357,16 @@ class ExtractCardTests(unittest.TestCase):
         result = self.run_card(broken)
         self.assertEqual((result["status"], len(broken.asked)), ("failed", 2))
 
+    def test_a_failed_card_says_why(self):
+        result = self.run_card(FakeModel("I found some rates:"))
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(len(result["errors"]), 1)  # the same error twice is told once
+        self.assertIn("I found some rates:", result["errors"][0])
+        self.assertIn("characters and began", result["errors"][0])
+
+        refused = self.run_card(FakeModel(OSError("LM Studio answered HTTP 400: bad schema")))
+        self.assertEqual(refused["errors"], ["OSError: LM Studio answered HTTP 400: bad schema"])
+
     def test_an_unreachable_model_fails_the_card(self):
         self.assertEqual(self.run_card(FakeModel(OSError("refused")))["status"], "failed")
 
@@ -433,6 +443,18 @@ class LMStudioTests(unittest.TestCase):
         self.assertEqual(fields, set(extract.RULE_SCHEMA["required"]))
         self.assertEqual(fields, set(rule()))
         self.assertNotIn("needs", fields)  # derived from the rule, never taken from the model
+
+    def test_a_refused_request_carries_lm_studios_explanation(self):
+        import urllib.error
+
+        def refuse(request, timeout):
+            raise urllib.error.HTTPError(request.full_url, 400, "Bad Request", {}, io.BytesIO(b'{"error": "Invalid schema"}'))
+
+        client = extract.LMStudio("http://lm.test/v1", "m", urlopen=refuse)
+        with self.assertRaises(OSError) as raised:
+            client.complete([])
+        self.assertIn("HTTP 400", str(raised.exception))
+        self.assertIn("Invalid schema", str(raised.exception))
 
     def test_an_odd_reply_is_a_value_error(self):
         client, _ = self.client({"oops": 1})
