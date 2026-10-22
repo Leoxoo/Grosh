@@ -2,11 +2,12 @@
 import SwiftUI
 import UIKit
 
-/// The iPhone's own number pad typing an amount cents-first into `entry`, with a row on top holding AC on the left, the
-/// calculator's operators in green, and a button that puts the keyboard away. It is the system keyboard, so it looks,
-/// sounds and swipes away like any other; nothing of it is drawn by the app but the row on top. While `isShown`, it is
-/// up; when the keyboard goes away by any means (a swipe, another field taking focus, the button), `isShown` turns off.
-/// Takes no room of its own: put it in a view's background.
+/// The iPhone's own number pad typing an amount cents-first into `entry`, with a row of keys floating on top of it: AC
+/// on the left, the calculator's operators in green, and on the right `=` while there is a calculation to work out, or
+/// otherwise a key that puts the keyboard away. It is the system keyboard, so it looks, sounds and swipes away like any
+/// other; nothing of it is drawn by the app but the row on top. While `isShown`, it is up; when the keyboard goes away
+/// by any means (a swipe, another field taking focus, the key), `isShown` turns off. Takes no room of its own: put it in
+/// a view's background.
 struct SystemNumberPad: UIViewRepresentable {
     @Binding var entry: AmountEntry
     @Binding var isShown: Bool
@@ -14,13 +15,12 @@ struct SystemNumberPad: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
 
     func makeUIView(context: Context) -> NumberPadInput {
-        let input = NumberPadInput()
-        input.coordinator = context.coordinator
-        return input
+        NumberPadInput(coordinator: context.coordinator)
     }
 
     func updateUIView(_ input: NumberPadInput, context: Context) {
         context.coordinator.parent = self
+        input.showCalculation(entry.isCalculation)
         if isShown, !input.isFirstResponder {
             // Not while SwiftUI is still updating the screen that holds it.
             DispatchQueue.main.async { input.becomeFirstResponder() }
@@ -36,12 +36,11 @@ struct SystemNumberPad: UIViewRepresentable {
             self.parent = parent
         }
 
-        func press(_ key: KeypadKey) {
-            parent.entry.press(key)
-        }
-
-        func hide() {
-            parent.isShown = false
+        func perform(_ action: OperationsRow.Action) {
+            switch action {
+            case .press(let key): parent.entry.press(key)
+            case .hide: parent.isShown = false
+            }
         }
 
         func didHide() {
@@ -53,86 +52,104 @@ struct SystemNumberPad: UIViewRepresentable {
 
 /// What the number pad types into: an invisible view that takes the keyboard's keys and hands them to the entry.
 final class NumberPadInput: UIView, UIKeyInput {
-    var coordinator: SystemNumberPad.Coordinator?
+    private let coordinator: SystemNumberPad.Coordinator
+    private let row: UIHostingController<OperationsRow>
     var keyboardType: UIKeyboardType = .numberPad
 
-    private lazy var accessory: UIView = {
-        let host = UIHostingController(rootView: OperationsRow { [weak self] action in
-            switch action {
-            case .press(let key): self?.coordinator?.press(key)
-            case .hide: self?.coordinator?.hide()
-            }
-        })
-        host.view.frame = CGRect(x: 0, y: 0, width: 0, height: 52)
-        host.view.autoresizingMask = .flexibleWidth
-        host.view.backgroundColor = .clear
-        return host.view
-    }()
+    init(coordinator: SystemNumberPad.Coordinator) {
+        self.coordinator = coordinator
+        row = UIHostingController(rootView: OperationsRow(isCalculation: false, perform: coordinator.perform))
+        row.view.frame = CGRect(x: 0, y: 0, width: 0, height: 52)
+        row.view.autoresizingMask = .flexibleWidth
+        row.view.backgroundColor = .clear
+        super.init(frame: .zero)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { nil }
+
+    /// Shows `=` on the last key while a calculation is typed, and the key that hides the keyboard otherwise.
+    func showCalculation(_ isCalculation: Bool) {
+        guard row.rootView.isCalculation != isCalculation else { return }
+        row.rootView = OperationsRow(isCalculation: isCalculation, perform: coordinator.perform)
+    }
 
     override var canBecomeFirstResponder: Bool { true }
-    override var inputAccessoryView: UIView? { accessory }
+    override var inputAccessoryView: UIView? { row.view }
 
     var hasText: Bool { true }
 
     func insertText(_ text: String) {
         for digit in text.compactMap(\.wholeNumberValue) {
-            coordinator?.press(.digit(digit))
+            coordinator.perform(.press(.digit(digit)))
         }
     }
 
     func deleteBackward() {
-        coordinator?.press(.backspace)
+        coordinator.perform(.press(.backspace))
     }
 
     override func resignFirstResponder() -> Bool {
         let didResign = super.resignFirstResponder()
         if didResign {
-            coordinator?.didHide()
+            coordinator.didHide()
         }
         return didResign
     }
 }
 
-/// The row on top of the number pad: AC, ÷ × − + =, and the button that puts the keyboard away.
-private struct OperationsRow: View {
+/// The keys floating on top of the number pad, in glass like the system's own controls: AC, ÷ × − +, and `=` or the
+/// key that hides the keyboard.
+struct OperationsRow: View {
     enum Action {
         case press(KeypadKey)
         case hide
     }
 
+    /// Whether a calculation is typed, so the last key works it out rather than hiding the keyboard.
+    let isCalculation: Bool
     let perform: (Action) -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
-            key(Text("AC"), isOperator: false) { perform(.press(.allClear)) }
+        HStack(spacing: 8) {
+            key(isOperator: false) { perform(.press(.allClear)) } label: { Text("AC") }
                 .accessibilityLabel("All clear")
             ForEach([CalculatorOperation.divide, .multiply, .subtract, .add], id: \.self) { operation in
-                key(Text(verbatim: operation.symbol), isOperator: true) { perform(.press(.operation(operation))) }
+                key(isOperator: true) { perform(.press(.operation(operation))) } label: {
+                    Text(verbatim: operation.symbol)
+                }
             }
-            key(Text(verbatim: "="), isOperator: true) { perform(.press(.equals)) }
-                .accessibilityLabel("Equals")
-            key(Image(systemName: "keyboard.chevron.compact.down"), isOperator: false) { perform(.hide) }
+            if isCalculation {
+                key(isOperator: true) { perform(.press(.equals)) } label: { Text(verbatim: "=") }
+                    .accessibilityLabel("Equals")
+            } else {
+                key(isOperator: false) { perform(.hide) } label: {
+                    Image(systemName: "keyboard.chevron.compact.down")
+                }
                 .accessibilityLabel("Hide Keyboard")
+            }
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 6)
-        .background(.bar)
+        .font(.body.weight(.semibold))
+        .tint(.green)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .animation(.snappy, value: isCalculation)
     }
 
-    /// One key of the row, as wide as the others: an operator on green, AC and Hide on the keyboard's own key gray.
-    private func key(_ label: some View, isOperator: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            label
-                .font(.title3.weight(.semibold))
-                .frame(maxWidth: .infinity, minHeight: 40)
-                .foregroundStyle(isOperator ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-                .background(
-                    isOperator ? AnyShapeStyle(Color.green) : AnyShapeStyle(.fill.secondary),
-                    in: .rect(cornerRadius: 8)
-                )
-                .contentShape(.rect)
+    /// One capsule key, as wide as the others: an operator in green glass, AC and Hide in clear glass.
+    @ViewBuilder
+    private func key(
+        isOperator: Bool, action: @escaping () -> Void, @ViewBuilder label: () -> some View
+    ) -> some View {
+        let button = Button(action: action) {
+            label().frame(maxWidth: .infinity, minHeight: 24)
         }
-        .buttonStyle(.plain)
+        .buttonBorderShape(.capsule)
+        if isOperator {
+            button.buttonStyle(.glassProminent)
+        } else {
+            button.buttonStyle(.glass).foregroundStyle(.primary)
+        }
     }
 }
 #endif
