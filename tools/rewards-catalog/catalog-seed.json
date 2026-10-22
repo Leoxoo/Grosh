@@ -1997,6 +1997,21 @@
       "verified": false
     },
     {
+      "id": "goldman-sachs-apple-card",
+      "name": "Apple Card",
+      "issuer": "Goldman Sachs",
+      "network": "Mastercard",
+      "isBusiness": false,
+      "annualFee": 0,
+      "rewardKind": "cashback",
+      "rewardProgram": null,
+      "baseEarnRate": 1,
+      "sourceUrl": "https://www.apple.com/apple-card/",
+      "discontinued": false,
+      "sourceHost": "www.apple.com",
+      "verified": false
+    },
+    {
       "id": "penfed-pathfinder",
       "name": "Pathfinder",
       "issuer": "PenFed",

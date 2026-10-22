@@ -28,6 +28,9 @@ OUT = Path(__file__).with_name("catalog-seed.json")
 # Hand-fixed issuer pages, {card id: url}, for cards whose CardPin url has moved. Kept apart
 # from the seed so that rebuilding the seed from a fresh CSV doesn't undo the fixes.
 URL_OVERRIDES = Path(__file__).with_name("url-overrides.json")
+# Cards CardPin doesn't have (Apple Card, for one), added by hand: a list of objects with
+# EXTRA_REQUIRED's keys. They join the seed like any other card.
+EXTRA_CARDS = Path(__file__).with_name("extra-cards.json")
 
 # CardPin's issuer codes, as people would write them.
 ISSUER_NAMES = {
@@ -100,7 +103,29 @@ def number(text: str) -> float | int:
     return int(value) if value.is_integer() else value
 
 
-def build(rows: list[dict[str, str]], url_overrides: dict[str, str] | None = None) -> list[dict]:
+EXTRA_REQUIRED = ("name", "issuer", "network", "isBusiness", "annualFee", "rewardKind", "rewardProgram", "baseEarnRate", "sourceUrl")
+
+
+def extra_card(entry: dict) -> dict:
+    """A card added by hand in extra-cards.json, in the seed's shape. Its id comes from issuer and name,
+    like every other card's, so it can't be given a different one."""
+    missing = [key for key in EXTRA_REQUIRED if key not in entry]
+    if missing:
+        sys.exit(f"extra-cards.json: {entry.get('name', entry)!r} is missing {missing}")
+    if entry["rewardKind"] not in ("cashback", "points", "miles"):
+        sys.exit(f"extra-cards.json: {entry['name']!r} has rewardKind {entry['rewardKind']!r}, not cashback, points or miles")
+    return {
+        "id": slug(f'{entry["issuer"]} {entry["name"]}'),
+        **{key: entry[key] for key in EXTRA_REQUIRED},
+        "discontinued": entry.get("discontinued", False),
+        "sourceHost": urlparse(entry["sourceUrl"]).netloc,
+        "verified": False,
+    }
+
+
+def build(
+    rows: list[dict[str, str]], url_overrides: dict[str, str] | None = None, extra_cards: list[dict] | None = None
+) -> list[dict]:
     url_overrides = url_overrides or {}
     cards: dict[str, dict] = {}
     for row in rows:
@@ -125,7 +150,7 @@ def build(rows: list[dict[str, str]], url_overrides: dict[str, str] | None = Non
             "sourceHost": urlparse(row["url"]).netloc,
             "verified": False,
         }
-    catalog = sorted(cards.values(), key=lambda card: card["id"])
+    catalog = sorted([*cards.values(), *map(extra_card, extra_cards or [])], key=lambda card: card["id"])
     ids = [card["id"] for card in catalog]
     unknown = sorted(set(url_overrides) - set(ids))
     if unknown:
@@ -145,7 +170,8 @@ def main() -> None:
         sys.exit(__doc__)
     with open(sys.argv[1], newline="", encoding="utf-8") as file:
         overrides = json.loads(URL_OVERRIDES.read_text(encoding="utf-8")) if URL_OVERRIDES.exists() else {}
-        catalog = build(list(csv.DictReader(file)), overrides)
+        extras = json.loads(EXTRA_CARDS.read_text(encoding="utf-8")) if EXTRA_CARDS.exists() else []
+        catalog = build(list(csv.DictReader(file)), overrides, extras)
     document = {
         "seededFrom": "CardPin raw_import.csv (MIT)",
         "cards": catalog,

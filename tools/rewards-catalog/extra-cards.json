@@ -1,0 +1,13 @@
+[
+  {
+    "name": "Apple Card",
+    "issuer": "Goldman Sachs",
+    "network": "Mastercard",
+    "isBusiness": false,
+    "annualFee": 0,
+    "rewardKind": "cashback",
+    "rewardProgram": null,
+    "baseEarnRate": 1,
+    "sourceUrl": "https://www.apple.com/apple-card/"
+  }
+]

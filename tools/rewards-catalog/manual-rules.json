@@ -1,0 +1,43 @@
+{
+  "goldman-sachs-apple-card": {
+    "rules": [
+      {
+        "selection": "fixed",
+        "picks": null,
+        "hasOtherChoices": false,
+        "unit": "percent",
+        "capAmount": null,
+        "capPeriod": null,
+        "validFrom": null,
+        "validTo": null,
+        "conditions": [],
+        "categories": [
+          "everything-else"
+        ],
+        "rate": 2,
+        "requires": [
+          "apple-pay"
+        ],
+        "quote": "Get 2% Daily Cash back when you use Apple Card with Apple Pay."
+      },
+      {
+        "selection": "fixed",
+        "picks": null,
+        "hasOtherChoices": false,
+        "unit": "percent",
+        "capAmount": null,
+        "capPeriod": null,
+        "validFrom": null,
+        "validTo": null,
+        "conditions": [],
+        "categories": [
+          "everything-else"
+        ],
+        "rate": 1,
+        "requires": [],
+        "quote": "When you use the card, you’ll get 1% Daily Cash back on every purchase."
+      }
+    ],
+    "cardConditions": []
+  }
+}

@@ -124,23 +124,45 @@ For each card it splits the cached page text into chunks of about 12,000 charact
 
 **Checks on every proposed rule** (`validate_rule`, none of which trusts the model):
 
-1. category is in the catalog list, unit is `percent` or `per-dollar`, the rate is a number above 0 and up to 10;
+1. every category is in the catalog list, unit is `percent` or `per-dollar`, the rate is a number above 0 and up to 10;
 2. the quote appears on the page word for word (ignoring case, spacing, curly quotes and ®/™ marks);
 3. the rate appears in the quote as a whole number (13% is not 3%), and the quote has a `%` for percent or points, miles or X for per-dollar;
-4. the quote uses a word for its category (for example "grocer", "restaurant", "all other"), which catches a rate filed under the wrong category;
+4. the quote uses a word for its category (for example "grocer", "restaurant", "all other"), which catches a rate filed under the wrong category. A base rate may leave out "all other" if the quote names no other category (Apple Card's "Get 2% Daily Cash back when you use Apple Card with Apple Pay");
 5. a cap needs an amount and a period, and both appear in the quote (`$6,000`, `6K` and `6000` match; "year" or "annual");
-6. every **condition** (an exclusion or restriction on the rate, such as "excluding superstores like Walmart® and Target®") is the page's own sentence, word for word. Conditions are never paraphrased, so what a person sees is what the issuer wrote. A rule with a condition that isn't on the page is rejected whole, since showing the rate without its restriction would overstate it.
+6. every **condition** (an exclusion or restriction on the rate, such as "excluding superstores like Walmart® and Target®") is the page's own sentence, word for word. Conditions are never paraphrased, so what a person sees is what the issuer wrote. A rule with a condition that isn't on the page is rejected whole, since showing the rate without its restriction would overstate it;
+7. a rule where the cardholder chooses or the card picks (`selection` of `choose` or `top-spend`) needs a quote that says so ("of your choice", "top eligible category"), and every category it lists must be mentioned on the page;
+8. a `requires` tag (`apple-pay`, `activation`, `issuer-booking`) is accepted only if the quote or a condition has words that back it ("Apple Pay", "activate", "booked through");
+9. `validFrom` / `validTo` are accepted only if the quote or a condition gives that date's month and year, so a period can't be made up.
 
-A rule that fails any check is listed as rejected, never edited.
+A rule that fails any check is listed as rejected, never edited. **Card-wide conditions** (`cardConditions`: sentences that limit several of a card's rates, such as Capital One's note that digital wallets may not earn the higher rate) must also be on the page word for word; one that isn't is dropped and listed under `rejected`, and the card's rules are kept.
+
+### Odd earning rules
+
+| Case | How a rule says it |
+|---|---|
+| Needs a way of paying (Apple Card's 2% with Apple Pay) | `requires: ["apple-pay"]` |
+| Needs activation or booking through the issuer | `requires: ["activation"]` or `["issuer-booking"]` |
+| The cardholder picks the categories (Bank of America Customized Cash) | `selection: "choose"`, the eligible `categories`, `picks`, and `hasOtherChoices: true` if the page lists choices outside the catalog list |
+| The card applies the rate to the top-spend category (Citi Custom Cash) | `selection: "top-spend"`, same fields |
+| Only for a stated period (rotating 5% categories) | `validFrom` / `validTo`, with `requires: ["activation"]` where the page says to activate |
+
+Not handled: relationship boosts (Bank of America Preferred Rewards), caps shared between categories, and rates at one named store (the catalog skips those). The page's own sentence about them can still ride along in `conditions`.
+
+### Hand-entered cards and rules
+
+- `extra-cards.json` adds cards CardPin lacks (Apple Card so far) to the seed; `build_seed.py` merges them, gives each the same id scheme as every card, and stops on a missing field or an id clash.
+- `manual-rules.json` (`{card id: {rules: [...], cardConditions: [...]}}`) holds rules a person writes in the same shape as the model's. They run through the same checks without needing the page, and `extract.py` needs no LM Studio for them. A rule whose quote is found on the cached page is `verified: "page"`; one the page can't confirm (no page, or the page says something else) is `verified: "manual"` and should be re-checked at review. Apple Card's two rules are in there, both `"page"`.
+- Citi Custom Cash and Bank of America Customized Cash are **not** entered yet. Their saved pages don't contain the rules (Citi's page says it stopped taking applications on May 28, 2026 and has 734 characters; Bank of America's is mostly navigation), so there's no page to take an exact quote from. They need a page that states the rules.
 
 **What I measured on the 138 fetched pages, without a model:** 8 are `wrong-page` (for example `u-s-bank-business-leverage`, `wells-fargo-attune`), 130 would be sent to the model, and that takes about 339 model calls: 50 pages need one call, 32 need two, and the three big Amex pages need 18 each. With a 7B model on a Mac expect a full run to take on the order of an hour or more; it can be stopped and resumed, since each card is saved as it finishes.
 
 **Not done, and worth knowing:**
 
-- It has never talked to a real model: the tests use a stand-in. The first run decides whether the prompt works. Try `--only capital-one-savor`, read its candidate file, and look at `rejected` to see why rules fail.
+- It has run against the real model once, on Capital One Savor: 5 rules, all correct, none rejected, and (with prompt version 2) the right exclusions, though the digital-wallet sentence landed on the 1% rule instead of the higher ones. That motivated `cardConditions`. Prompt version 3, with selection, requirements, dates and card conditions, has not been tried against the model yet. Rerun `--only capital-one-savor` and read the candidate file.
 - **Mixed pages.** Amex pages hold other cards' marketing. The prompt tells the model to take only this card's rates, but a quote about a different card would still pass the checks. Review Amex candidates by hand.
 - **Conditions come from the same chunk as the rate.** A footnote far from its headline, in another 12,000-character chunk, is missed, and the rule looks unrestricted. A second pass that hunts for footnotes is the fix if this shows up in real runs. Whether a condition really belongs to the rate, and not to a neighbouring one, can't be checked automatically; that's for the reviewer.
-- **Rotating categories** (Discover 5%, Freedom Flex) and their dates are not extracted; `validFrom` / `validTo` are still to do.
+- **Rotating categories** (Discover 5%, Freedom Flex) carry `validFrom` / `validTo`, but only when the page names the months and the year. Pages that say "this quarter" give the extractor nothing to date.
+- **Chunks with no rate in them aren't sent**, so a footnote-only chunk holding a card-wide condition can be skipped on big pages.
 - **Category words** are a guess at what a quote about a category says. Valid rules the list misses show up in `rejected` as "quote doesn't mention ...", and the fix is to add the word to `CATEGORIES`.
 
 ## Why issuers' different sites are survivable
@@ -181,10 +203,12 @@ A fetch that fails, a page that vanished or an extraction that fails validation 
 ```
 Card   id, name, issuer, network, isBusiness, annualFee, rewardKind,
        rewardProgram, baseEarnRate, discontinued, sourceUrl, verified,
-       verifiedAt, rules[]
-Rule   category, rate, unit (percent | per-dollar), capAmount, capPeriod
-       (month | quarter | year), rateAfterCap, validFrom, validTo,
-       conditions (the issuer's own sentences, verbatim), evidence { url, quote, pageHash }
+       verifiedAt, cardConditions[] (the issuer's sentences that limit several rates), rules[]
+Rule   categories[], selection (fixed | choose | top-spend), picks, hasOtherChoices,
+       rate, unit (percent | per-dollar), capAmount, capPeriod (month | quarter | year),
+       requires[] (apple-pay | activation | issuer-booking), validFrom, validTo,
+       conditions[] (the issuer's own sentences, verbatim), verified (page | manual),
+       evidence { url, quote, pageHash }
 ```
 
 - `validFrom` / `validTo` exist for **rotating categories** (Discover, Chase Freedom Flex): they are the reason the cadence below has a quarterly run.

@@ -988,6 +988,14 @@
     "lastStatus": "refused",
     "url": "https://www.bestwestern.com/en_US/offers/hotel-discounts/best-western-rewards-visa.html"
   },
+  "goldman-sachs-apple-card": {
+    "changedAt": "2026-10-22",
+    "finalUrl": "https://www.apple.com/apple-card/",
+    "hash": "82ab4a1af7bbf62faf81a940e358dc6a08138daec14db94150aac36f7c5ea854",
+    "lastStatus": "ok",
+    "textChars": 43217,
+    "url": "https://www.apple.com/apple-card/"
+  },
   "penfed-pathfinder": {
     "lastStatus": "failed",
     "url": "https://www.penfed.org/credit-cards/pathfinder-rewards"
