@@ -1,52 +1,46 @@
 import SwiftUI
 
-/// The Apple Calculator–style keypad for typing an amount cents-first, with green operators.
-/// Pair it with ``AmountRow`` showing the same ``AmountEntry``. Each key ticks the moment a finger lands on it, on a
-/// device that gets haptics while the Haptics switch is on.
+/// The keypad for typing an amount cents-first: a phone's number pad (1 2 3 at the top, then 00, 0 and delete), with
+/// a row above it holding AC on the left and the calculator's operators in green. Pair it with ``AmountRow`` showing the
+/// same ``AmountEntry``. Each key ticks the moment a finger lands on it, on a device that gets haptics while the Haptics
+/// switch is on.
 struct AmountKeypad: View {
     @Binding var entry: AmountEntry
     @AppStorage(SoundsAndHaptics.hapticsKey) private var hapticsOn = SoundsAndHaptics.defaultIsOn
 
     var body: some View {
-        Grid(horizontalSpacing: 8, verticalSpacing: 8) {
-            GridRow {
-                key(.allClear).gridCellColumns(2)
-                key(.backspace)
-                key(.operation(.divide))
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                key(.allClear, height: 38)
+                ForEach([CalculatorOperation.divide, .multiply, .subtract, .add], id: \.self) { operation in
+                    key(.operation(operation), height: 38)
+                }
+                key(.equals, height: 38)
             }
-            GridRow {
-                key(.digit(7))
-                key(.digit(8))
-                key(.digit(9))
-                key(.operation(.multiply))
-            }
-            GridRow {
-                key(.digit(4))
-                key(.digit(5))
-                key(.digit(6))
-                key(.operation(.subtract))
-            }
-            GridRow {
-                key(.digit(1))
-                key(.digit(2))
-                key(.digit(3))
-                key(.operation(.add))
-            }
-            GridRow {
-                key(.digit(0)).gridCellColumns(2)
-                key(.doubleZero)
-                key(.equals)
+            Grid(horizontalSpacing: 8, verticalSpacing: 8) {
+                ForEach([[1, 2, 3], [4, 5, 6], [7, 8, 9]], id: \.self) { digits in
+                    GridRow {
+                        ForEach(digits, id: \.self) { digit in
+                            key(.digit(digit))
+                        }
+                    }
+                }
+                GridRow {
+                    key(.doubleZero)
+                    key(.digit(0))
+                    key(.backspace)
+                }
             }
         }
         .padding(8)
     }
 
-    private func key(_ key: KeypadKey) -> some View {
+    private func key(_ key: KeypadKey, height: CGFloat = 48) -> some View {
         Button {
             entry.press(key)
         } label: {
             key.label
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .frame(maxWidth: .infinity, minHeight: height)
         }
         .buttonStyle(KeypadButtonStyle(role: key.role, tick: playsTicks ? key.tick.feedback : nil))
         .accessibilityLabel(key.accessibilityLabel)

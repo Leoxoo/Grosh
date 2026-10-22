@@ -8,7 +8,7 @@ enum KeypadSheetField: Hashable {
 
 /// The shell of every sheet that types an amount on ``AmountKeypad``: a grouped form in its own navigation stack,
 /// the keypad docked below it, and Cancel and Save. The amount has focus first; tapping its row shows or hides the
-/// keypad, and focusing a text field hides it. `content` builds the form's sections, with its amount row and text
+/// keypad, and focusing a text field or swiping the form hides it. `content` builds the form's sections, with its amount row and text
 /// fields made by the ``KeypadSheetFields`` it is handed.
 struct KeypadSheet<Content: View>: View {
     let title: Text
@@ -37,6 +37,14 @@ struct KeypadSheet<Content: View>: View {
                 ))
             }
             .formStyle(.grouped)
+            // Swiping the form anywhere puts the keypad away, as it does the system keyboard. Tapping the amount's row
+            // brings it back. A swipe down on the keypad itself is the sheet's, to close it.
+            .onScrollPhaseChange { _, phase in
+                if phase == .interacting {
+                    isKeypadShown = false
+                }
+            }
+            .scrollDismissesKeyboard(.immediately)
             .safeAreaInset(edge: .bottom) {
                 if isKeypadShown {
                     AmountKeypad(entry: keypadEntry)
