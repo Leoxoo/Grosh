@@ -201,6 +201,15 @@ class Job:
             }
 
 
+def format_stats(stats: dict | None) -> str:
+    """One line on what a card cost: "2 calls, 12.2s, 2,486 prompt tokens (2,400 cached), 403 reply tokens"."""
+    if not stats or not stats.get("calls"):
+        return ""
+    prompt = f"{stats['promptTokens']:,} prompt tokens" + (f" ({stats['cachedTokens']:,} cached)" if stats.get("cachedTokens") else "")
+    reply = f"{stats['replyTokens']:,} reply tokens" + (f" ({stats['reasoningTokens']:,} reasoning)" if stats.get("reasoningTokens") else "")
+    return f"{stats['calls']} call{'s' if stats['calls'] != 1 else ''}, {stats['seconds']}s, {prompt}, {reply}"
+
+
 class Problem(Exception):
     """A request the page should be told is wrong: carries the HTTP status."""
 
@@ -337,7 +346,8 @@ class App:
                     "status": candidate.get("status"), "rules": len(candidate.get("rules", [])),
                     "rejected": len(candidate.get("rejected", [])), "model": candidate.get("model"),
                     "promptVersion": candidate.get("promptVersion"), "needs": candidate.get("needs", []),
-                    "errors": candidate.get("errors", [])[:1],
+                    "errors": candidate.get("errors", [])[:1], "stats": candidate.get("stats"),
+                    "statsText": format_stats(candidate.get("stats")),
                 },
                 "pending": pending,
             })
@@ -403,6 +413,27 @@ class App:
             return {"ok": False, "seconds": seconds, "meta": client.last_meta, "reply": reply[:600],
                     "error": f"The reply isn't in the shape we need: {problem}"}
         return {"ok": True, "seconds": seconds, "meta": client.last_meta, "reply": reply[:600], "error": None}
+
+    def ask(self, body: dict) -> dict:
+        """Send any prompt to the chosen model, with extra request fields for this one try. For finding out
+        what a server accepts: which field shortens its thinking, how fast it answers, how much it reasons."""
+        prompt, extra = body.get("prompt"), body.get("extraBody") or ""
+        if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 6000:
+            raise Problem("Write a prompt (up to 6,000 characters)")
+        try:
+            extra_fields = json.loads(extra) if isinstance(extra, str) and extra.strip() else (extra if isinstance(extra, dict) else {})
+        except ValueError as problem:
+            raise Problem(f"The extra fields aren't valid JSON: {problem}") from problem
+        if not isinstance(extra_fields, dict):
+            raise Problem("The extra fields must be a JSON object")
+        client = self.client()
+        started = time.time()
+        try:
+            reply = client.complete([{"role": "user", "content": prompt}], free=True, extra_body=extra_fields)
+        except (OSError, ValueError) as problem:
+            return {"ok": False, "seconds": round(time.time() - started, 1), "meta": client.last_meta,
+                    "error": f"{type(problem).__name__}: {problem}"}
+        return {"ok": True, "seconds": round(time.time() - started, 1), "meta": client.last_meta, "reply": reply[:4000]}
 
     def try_card(self, card_id: str) -> dict:
         """Send the card's first rate-bearing chunk to the model and show the raw reply and what the
@@ -530,6 +561,8 @@ class App:
                 job.start_card(event["name"], "(hand-entered)" if event["kind"] == "hand-entered" else f"· {client.model}")
             else:
                 detail = "" if event["rules"] is None else f"{event['rules']} rules, {event['rejected']} rejected"
+                if event.get("stats"):
+                    detail += f"  [{format_stats(event['stats'])}]"
                 failed = event["status"] == "failed"
                 job.card_done(event["name"], event["status"], detail, "error" if failed else "info")
                 for message in event["errors"][:2]:
@@ -588,6 +621,8 @@ class App:
                 return self.change_profile(body)
             if path == "/api/test-model":
                 return self.test_model()
+            if path == "/api/ask":
+                return self.ask(body)
             if path == "/api/job":
                 return self.start_job(body)
             if path == "/api/job/stop":

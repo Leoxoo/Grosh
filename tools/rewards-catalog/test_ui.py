@@ -400,6 +400,53 @@ class JobTests(AppCase):
         self.assertEqual(job.snapshot(job.snapshot(0)["logNext"])["log"], [])
 
 
+class AskAndStatsTests(AppCase):
+    def test_ask_sends_a_plain_request_with_extras_for_that_try_only(self):
+        lm = self.use(replies=["Three."])
+        result = self.app.ask({"prompt": "How many r in strawberry?", "extraBody": '{"top_k": 3}'})
+        self.assertEqual((result["ok"], result["reply"]), (True, "Three."))
+        body = lm.asked[0]
+        self.assertEqual((body["top_k"], body["messages"][0]["content"]), (3, "How many r in strawberry?"))
+        self.assertNotIn("response_format", body)
+        self.assertNotIn("top_k", self.app.settings()["extraBody"])
+
+    def test_ask_refuses_nonsense_and_reports_failures(self):
+        for body in ({"prompt": ""}, {"prompt": "x" * 6001}, {"prompt": "hi", "extraBody": "{nope"}, {"prompt": "hi", "extraBody": "[1]"}):
+            self.assertEqual(self.app.handle("POST", "/api/ask", {}, body)[0], 400, body)
+        self.app.lm_urlopen = lambda request, timeout: io.BytesIO(b'{"choices": [{"finish_reason": "length", "message": {"content": ""}}]}')
+        result = self.app.ask({"prompt": "hi"})
+        self.assertFalse(result["ok"])
+        self.assertIn("empty reply", result["error"])
+        self.assertEqual(result["meta"]["finishReason"], "length")
+
+    def test_a_cards_cost_is_shown_in_the_log_and_the_overview(self):
+        self.give_page("bank-a")
+        self.app.save_settings({"model": "good-model"})
+        lm = self.use()
+        original = lm.__call__
+
+        def with_usage(request, timeout):
+            reply = original(request, timeout)
+            if request.full_url.endswith("/models"):
+                return reply
+            data = json.loads(reply.read())
+            data["usage"] = {"prompt_tokens": 2486, "completion_tokens": 403, "prompt_tokens_details": {"cached_tokens": 2400}}
+            return io.BytesIO(json.dumps(data).encode())
+
+        self.app.lm_urlopen = with_usage
+        self.app.start_job({"kind": "extract", "which": "pending"})
+        done = self.wait()
+        self.assertTrue(any("2,486 prompt tokens (2,400 cached), 403 reply tokens" in line["text"] for line in done["log"]))
+        row = next(r for r in self.app.overview()["cards"] if r["id"] == "bank-a")
+        self.assertIn("2,400 cached", row["extract"]["statsText"])
+
+    def test_format_stats(self):
+        self.assertEqual(ui.format_stats(None), "")
+        self.assertEqual(ui.format_stats({"calls": 0}), "")
+        self.assertEqual(ui.format_stats({"calls": 2, "seconds": 3.5, "promptTokens": 10, "cachedTokens": 0, "replyTokens": 5, "reasoningTokens": 2}),
+                         "2 calls, 3.5s, 10 prompt tokens, 5 reply tokens (2 reasoning)")
+
+
 class ServerTests(AppCase):
     def serve(self):
         try:

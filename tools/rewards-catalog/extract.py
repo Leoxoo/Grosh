@@ -33,6 +33,7 @@ import json
 import os
 import re
 import sys
+import time
 import unicodedata
 import urllib.error
 import urllib.request
@@ -45,7 +46,7 @@ import fetch  # noqa: E402
 CANDIDATES = fetch.CACHE / "candidates"
 SAVED_SETTINGS = fetch.CACHE / "ui-settings.json"
 MANUAL_RULES = Path(__file__).with_name("manual-rules.json")
-PROMPT_VERSION = "4"
+PROMPT_VERSION = "5"
 DEFAULT_URL = "http://localhost:1234/v1"
 DEFAULT_MODEL = "k2-horizon-7b-uno-uncensored"
 # A reasoning model "thinks" before it answers and can spend a small reply limit on that alone (the first
@@ -391,14 +392,15 @@ SYSTEM_PROMPT = "You extract credit card reward rules from web page text. Reply 
 
 
 def build_messages(card: dict, chunk: str) -> list[dict]:
+    """The prompt for one chunk of one card's page. Everything that is the same for every card comes first
+    and the card and its page text come last, so a server that caches the start of a prompt (most can)
+    reads the long instructions once instead of on every request."""
     categories = "\n".join(f"  - {name}: {CATEGORY_HELP[name]}" for name in CATEGORIES)
     unit = {"cashback": "cash back percent", "points": "points per dollar", "miles": "miles per dollar"}[card["rewardKind"]]
-    user = f"""Card: {card["name"]} (issued by {card["issuer"]}; it earns {unit}).
-
-Find the rates this card earns on purchases, in the text below.
+    user = f"""Find the rates a credit card earns on purchases, in the text at the end.
 
 Rules:
-- Only rates for THIS card, "{card["name"]}". The text may also describe other cards; ignore their rates.
+- Only rates for the card named at the end. The text may also describe other cards; ignore their rates.
 - One entry per rate. categories must come from this list:
 {categories}
   Skip a rate that fits none of these, and a rate for one named store.
@@ -413,7 +415,9 @@ Rules:
 - conditions: copy, word for word, each sentence in the text that excludes or restricts this one rate: excluded stores, a minimum, who qualifies. These are often in footnotes, which repeat the rate with its exclusions. Never paraphrase. Use [] if there are none.
 - cardConditions (at the top level, not in a rule): copy, word for word, each sentence that limits several of this card's rates at once, such as how stores get categorized or limits on digital wallets. Do not repeat them in a rule's conditions. Use [] if there are none.
 - Ignore sign-up bonuses, statement credits, APRs, fees, and what points are worth.
-- If the text states no rate for this card, reply {{"cardConditions": [], "rules": []}}.
+- If the text states no rate for the card, reply {{"cardConditions": [], "rules": []}}.
+
+Card: "{card["name"]}" (issued by {card["issuer"]}; it earns {unit}).
 
 Text:
 \"\"\"
@@ -454,8 +458,10 @@ def empty_reply_message(meta: dict) -> str:
 
 # How the reply's shape is requested. Not every server accepts a JSON schema, so there are fallbacks that
 # describe the shape in the prompt instead; the checks on what comes back are the same either way.
+REPORT_TOOL = "report_rules"
 RESPONSE_MODES = {
     "json_schema": "send the output schema with each request (LM Studio, OpenAI, and others that support it)",
+    "tool": f"offer a function, {REPORT_TOOL}, whose arguments are the schema, and read the answer from its call (servers that enforce tool schemas, such as rec's flint, and others without json_schema)",
     "json_object": "ask for a JSON object, and describe its shape in the prompt",
     "prompt": "send no format field: describe the shape in the prompt and read the reply",
 }
@@ -515,9 +521,13 @@ class ChatServer:
             data = json.load(reply)
         return [entry["id"] for entry in (data["data"] if isinstance(data, dict) else data)]
 
-    def complete(self, messages: list[dict]) -> str:
+    def complete(self, messages: list[dict], free: bool = False, extra_body: dict | None = None) -> str:
+        """The model's reply. `free` sends a plain chat request (no output format asked for), for trying
+        a prompt by hand; `extra_body` adds fields for this call only."""
         notes = []
-        if self.response_mode != "json_schema":
+        if self.response_mode == "tool" and not free:
+            notes.append(f"Report your answer by calling the {REPORT_TOOL} function, with the answer as its arguments.")
+        elif self.response_mode != "json_schema" and not free:
             notes.append("Reply with only a JSON object that follows this JSON Schema, and nothing else:\n" + json.dumps(SCHEMA))
         if self.prompt_suffix:
             notes.append(self.prompt_suffix)
@@ -526,13 +536,21 @@ class ChatServer:
         body: dict = {self.token_field: self.max_tokens}
         if self.temperature is not None:  # some models accept only their default
             body["temperature"] = self.temperature
-        if self.response_mode == "json_schema":
+        if free:
+            pass
+        elif self.response_mode == "tool":
+            # strict: a server that constrains tool arguments to their schema (rec's flint does for strict tools)
+            # then can't return the wrong field names. tool_choice is left to the server: some accept only "auto".
+            body["tools"] = [{"type": "function", "function": {
+                "name": REPORT_TOOL, "description": "Report the reward rules found in the text.", "strict": True, "parameters": SCHEMA}}]
+        elif self.response_mode == "json_schema":
             body["response_format"] = {"type": "json_schema", "json_schema": {"name": "rules", "strict": True, "schema": SCHEMA}}
         elif self.response_mode == "json_object":
             body["response_format"] = {"type": "json_object"}
-        body.update({k: v for k, v in self.extra_body.items() if k not in ("model", "messages")})
+        body.update({k: v for k, v in {**self.extra_body, **(extra_body or {})}.items() if k not in ("model", "messages")})
         body.update(model=self.model, messages=messages)
         request = self._request(f"{self.base_url}/chat/completions", json.dumps(body).encode())
+        self.last_meta = {}
         with self._open(request, self.timeout) as reply:
             data = json.load(reply)
         try:
@@ -541,10 +559,17 @@ class ChatServer:
         except (KeyError, IndexError, TypeError) as problem:
             raise ValueError(f"unexpected reply from the model server: {problem}") from problem
         content = message.get("content") or ""
+        called = False
+        for call in message.get("tool_calls") or []:  # the answer, when it came as a function call
+            function = (call or {}).get("function") or {}
+            if function.get("name") == REPORT_TOOL and function.get("arguments"):
+                arguments = function["arguments"]
+                content, called = (arguments if isinstance(arguments, str) else json.dumps(arguments)), True
+                break
         reasoning = message.get("reasoning_content") or message.get("reasoning") or ""
         self.last_meta = {
             "finishReason": choice.get("finish_reason"), "usage": data.get("usage"), "reasoningChars": len(reasoning),
-            "replyChars": len(content), "maxTokens": self.max_tokens,
+            "replyChars": len(content), "maxTokens": self.max_tokens, "viaTool": called,
         }
         if not content.strip():
             raise ValueError(empty_reply_message(self.last_meta))
@@ -606,8 +631,17 @@ def _empty_candidate(card: dict, model: str, prompt_version: str | None, page_ha
 def split_fixed(proposal) -> list:
     """A "fixed" rule that lists several categories says the rate applies to each, so it becomes one rule
     per category with the same quote, and each is then checked on its own. The model does this often
-    ("3% on dining, groceries and streaming"); nothing about the rule changes."""
+    ("3% on dining, groceries and streaming"); nothing about the rule changes. A "choose" or "top-spend" rule
+    that picks as many categories as it lists is fixed in the same way."""
     categories = proposal.get("categories") if isinstance(proposal, dict) else None
+    picks = proposal.get("picks") if isinstance(proposal, dict) else None
+    if (
+        isinstance(proposal, dict) and proposal.get("selection") in ("choose", "top-spend") and isinstance(categories, list)
+        and categories and isinstance(picks, int) and not isinstance(picks, bool) and picks >= len(categories)
+    ):
+        # "Choose 3 of these 3" leaves nothing to choose: every listed category earns the rate. (Categories
+        # the model saw but the catalog lacks, such as entertainment, stay out, as in any fixed rule.)
+        proposal = {**proposal, "selection": "fixed", "picks": None, "hasOtherChoices": False}
     if isinstance(proposal, dict) and proposal.get("selection") == "fixed" and isinstance(categories, list) and len(categories) > 1:
         return [
             {**proposal, "categories": [category], "conditions": _conditions_about(proposal.get("conditions"), category)}
@@ -768,6 +802,21 @@ def has_page(card: dict, state: dict, cache: Path) -> bool:
     return bool(state.get(card["id"], {}).get("hash")) and (cache / card["id"] / "latest.txt").exists()
 
 
+def summarize_calls(calls: list[dict]) -> dict:
+    """Totals for the model calls made for one card: how many, how long, and how many tokens went where."""
+    def total(get) -> int:
+        return sum(get(call) or 0 for call in calls)
+
+    return {
+        "calls": len(calls),
+        "seconds": round(sum(call["seconds"] for call in calls), 1),
+        "promptTokens": total(lambda c: (c.get("usage") or {}).get("prompt_tokens")),
+        "cachedTokens": total(lambda c: ((c.get("usage") or {}).get("prompt_tokens_details") or {}).get("cached_tokens")),
+        "replyTokens": total(lambda c: (c.get("usage") or {}).get("completion_tokens")),
+        "reasoningTokens": total(lambda c: ((c.get("usage") or {}).get("completion_tokens_details") or {}).get("reasoning_tokens")),
+    }
+
+
 def process_cards(
     chosen: list[dict], *, state: dict, manual: dict, client: ChatServer, chunk_chars: int, force: bool,
     cache: Path, candidates: Path, emit, ensure_server=None, progress=None, should_stop=None,
@@ -800,15 +849,25 @@ def process_cards(
                     ensure_server()
                 server_checked = True
             emit({"event": "card-start", **base, "kind": "model"})
+            calls: list[dict] = []
+
+            def timed(messages: list[dict]) -> str:
+                started = time.monotonic()
+                try:
+                    return client.complete(messages)
+                finally:
+                    calls.append({"seconds": time.monotonic() - started, **client.last_meta})
+
             candidate = extract_card(
-                card, text, page_hash, client.complete, client.model, chunk_chars,
+                card, text, page_hash, timed, client.model, chunk_chars,
                 progress=(lambda done, total, _id=card["id"]: progress(_id, done, total)) if progress else None,
             )
+            candidate["stats"] = summarize_calls(calls)
         fetch.write_json(path, candidate)
         counts[candidate["status"]] = counts.get(candidate["status"], 0) + 1
         emit({
             "event": "card", **base, "status": candidate["status"], "rules": len(candidate["rules"]),
-            "rejected": len(candidate["rejected"]), "errors": candidate.get("errors", []),
+            "rejected": len(candidate["rejected"]), "errors": candidate.get("errors", []), "stats": candidate.get("stats"),
         })
     return counts
 

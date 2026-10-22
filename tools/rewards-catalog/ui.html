@@ -118,6 +118,7 @@
         <label>Ask for the reply's shape by
           <select id="responseMode">
             <option value="json_schema">sending the schema (LM Studio, OpenAI…)</option>
+            <option value="tool">calling a function (rec/flint, and servers without json_schema)</option>
             <option value="json_object">asking for a JSON object</option>
             <option value="prompt">describing it in the prompt only</option>
           </select></label>
@@ -135,6 +136,20 @@
       <p class="small muted">Settings are saved in <span class="mono">cache/ui-settings.json</span>, which is not committed and is readable only by you; that includes the API key, which is never sent back to this page. Changing the model makes every card "need extracting" again, since candidates are kept per model.</p>
     </details>
     <div id="testResult" class="result" hidden></div>
+    <details style="margin-top: 10px">
+      <summary>Ask the model anything (to find out what a server accepts)</summary>
+      <div class="row" style="margin-top: 8px">
+        <label style="flex: 1 1 360px">Prompt
+          <input type="text" id="askPrompt" value="How many times does the letter r appear in the word strawberry? Think it through, then answer.">
+        </label>
+        <label style="flex: 1 1 280px">Extra fields for this try only (JSON)
+          <input type="text" id="askExtra" spellcheck="false" autocomplete="off" placeholder='{"thinking_budget_tokens": 64}'>
+        </label>
+        <button id="ask" type="button">Ask</button>
+      </div>
+      <p class="small muted">Sends a plain chat request with your saved settings (key, reply limit, extra fields) plus these fields. It reports the time, tokens used, and how much the model reasoned, so you can see whether a field changes anything.</p>
+      <div id="askResult" class="result" hidden></div>
+    </details>
   </section>
 
   <section class="panel" aria-labelledby="run-h">
@@ -312,6 +327,18 @@ $("test").onclick = async () => {
   } catch (e) { showResult(box, false, e.message); }
 };
 
+$("ask").onclick = async () => {
+  const box = $("askResult"); showResult(box, true, "Asking…");
+  $("ask").disabled = true;
+  try {
+    const r = await api("POST", "/api/ask", { prompt: $("askPrompt").value, extraBody: $("askExtra").value });
+    const m = r.meta || {}, used = (m.usage || {}).completion_tokens;
+    const how = m.finishReason === undefined ? "" : `Ended with "${m.finishReason}" · ${used ?? "?"} tokens used · ${m.reasoningChars ? m.reasoningChars + " characters of reasoning" : "no reasoning text"}`;
+    showResult(box, r.ok, `${r.ok ? "Answered" : "Failed"} in ${r.seconds}s. ${how}\n\n${r.ok ? r.reply : r.error}`);
+  } catch (e) { showResult(box, false, e.message); }
+  $("ask").disabled = false;
+};
+
 // ---------- overview and table ----------
 async function loadOverview() {
   const data = await api("GET", "/api/overview");
@@ -362,6 +389,7 @@ function renderRows() {
       h("td", {}, ex ? h("div", { class: "stack" },
         h("span", {}, chip(ex.status, extractKind[ex.status] ?? ""), " ", ex.rules ? `${ex.rules} rule${ex.rules === 1 ? "" : "s"}` : "", ex.rejected ? ` · ${ex.rejected} rejected` : ""),
         h("span", { class: "small muted", text: ex.model ? `${ex.model} · prompt ${ex.promptVersion ?? "-"}` : "" }),
+        ex.statsText ? h("span", { class: "small muted", text: ex.statsText }) : null,
         c.pending ? chip("needs extracting with the chosen model", "warn") : null,
         ex.errors.length ? h("span", { class: "small", style: "color: var(--bad)", text: ex.errors[0].slice(0, 140) }) : null)
         : h("div", { class: "stack" }, h("span", { class: "muted", text: "not extracted" }), c.pending ? chip("needs extracting", "warn") : null)),
@@ -477,6 +505,7 @@ async function openCard(id, quiet) {
     cand ? [
       h("p", { class: "small" }, chip(cand.status, extractKind[cand.status] ?? ""), ` ${cand.model || ""}${cand.promptVersion ? " · prompt " + cand.promptVersion : ""}`,
         cand.needs.length ? [" · asks: ", cand.needs.map((n) => NEEDS[n] || n).join(", ")] : null),
+      cand.stats && cand.stats.calls ? h("p", { class: "small muted", text: `Cost: ${cand.stats.calls} model call${cand.stats.calls === 1 ? "" : "s"}, ${cand.stats.seconds}s, ${cand.stats.promptTokens.toLocaleString()} prompt tokens${cand.stats.cachedTokens ? " (" + cand.stats.cachedTokens.toLocaleString() + " cached)" : ""}, ${cand.stats.replyTokens.toLocaleString()} reply tokens${cand.stats.reasoningTokens ? " (" + cand.stats.reasoningTokens.toLocaleString() + " reasoning)" : ""}` }) : null,
       cand.errors && cand.errors.length ? h("div", { class: "result bad", text: "The model call failed:\n\n" + cand.errors.join("\n\n") }) : null,
       cand.rules.length ? cand.rules.map(ruleBox) : h("p", { class: "muted small", text: "No rules." }),
       cand.cardConditions.length ? [h("h3", { text: "Applies to the whole card" }), h("ul", {}, cand.cardConditions.map((t) => h("li", { text: t })))] : null,

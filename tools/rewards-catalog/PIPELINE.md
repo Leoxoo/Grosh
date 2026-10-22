@@ -194,6 +194,24 @@ A small local page, standard library only, that drives the same code as `fetch.p
 - **Cards:** every card with its fetch status, extraction status, rule count, model, and the questions it asks the user; search, issuer and status filters; click a card for a drawer with the page's rate-looking lines, every rule in plain words with the quote it came from, what was rejected and why, and any error. **Try the model on this page** shows the model's raw reply and what the checks make of each rule, without saving anything.
 - **Safe to leave running:** it listens on `127.0.0.1` only, refuses requests whose Host isn't local, and refuses POSTs without an `X-Requested-With` header, so a web page you visit can't drive it. It never puts page text into markup (text is set with `textContent`).
 
+### Speed, and what was learned about `flint` (`rec serve`)
+
+**What makes a run slow** is mostly the model's thinking, not the page. On the Savor chunk: `k2-horizon-7b-uno-uncensored` with reasoning off took 12 seconds and 403 tokens; `flint` took 189 seconds and 17,831 tokens, 79,878 characters of it reasoning. At about 339 model calls, that is the difference between a few hours and most of a day.
+
+**Done:**
+
+- **Prompt order.** The unchanging rules now come first and the card's name and page text last, so a server that caches the start of a prompt (rec's `flint` has a prefix cache; LM Studio and vLLM do too) reads the 3,000-odd characters of rules once and not for every card. Prompt version 5. (Before this the card's name was the first line, so no two requests shared a prefix.) The page shows each card's prompt tokens and how many were cached, for servers that report it (`flint` does).
+- **Per-card cost** (calls, seconds, prompt tokens and cached ones, reply tokens and reasoning ones) is saved in each candidate and shown in the log, the table and the card's drawer, so a change can be measured.
+- **Function-calling mode** (`tool`), for servers that don't take `response_format`.
+
+**What `rec`'s server does and doesn't accept** (read from its own code, `rec_mlx/server.py`): it keeps only these request fields and silently drops everything else (logging "Ignoring unsupported request field" once in the terminal running `rec serve`): `model`, `messages`, `tools`, `tool_choice` (only `auto` or `none`), `stream`, `stream_options`, `temperature`, `top_p`, `top_k`, `max_tokens`, `max_completion_tokens`, `seed`, `stop`, `frequency_penalty` (0 only), `repetition_penalty` (1 only), `presence_penalty`, `logprobs`, `min_p` (0 only), `store` (false only), `grammar` (`none` or `flint`), `parallel_tool_calls`.
+
+- **No `response_format`**, so a JSON schema is never enforced there, and `flint` drifted from the field names (`category` for `categories`). Its own constraint (`--grammar flint`, on by default) applies to the schemas of tools offered with the request, which is why the `tool` mode exists.
+- **No thinking switch.** Twelve guesses at the field name (`enable_thinking`, `thinking_budget_tokens`, `reasoning_effort`, `reasoning.max_tokens`, `chat_template_kwargs` and others) changed nothing, and the allowed list above explains why. The "Limit thinking" budget in the model settings panel you showed is not something this server reads from a request.
+- **One request at a time.** Its scheduler is not batched (`is_batchable = False`; requests queue on one worker), so sending several at once wouldn't make a run faster.
+
+**Not done:** a thinking budget (cut the reasoning at N tokens, close it, and let the model answer) would need the server to continue an assistant turn from raw text, which its chat API doesn't offer. A model that doesn't reason (k2 with `reasoning_effort: "none"`) is the practical speedup today.
+
 ## Why issuers' different sites are survivable
 
 Fetching is the same for everyone. The only issuer-specific work is turning a page into rules, and that is the part that breaks when a site is redesigned. Two ways to do it:
@@ -207,7 +225,7 @@ Fetching is the same for everyone. The only issuer-specific work is turning a pa
 
 - The extract stage talks to any server that speaks the OpenAI chat completions API: LM Studio (the default, `http://localhost:1234/v1`), a local server such as `rec serve` for the `flint` model (`http://127.0.0.1:11500/v1`), vLLM, OpenAI itself. Set the address, model and **API key** (sent as `Authorization: Bearer ...`) on the web page; the command line reads the same saved settings, and takes the key from `LLM_API_KEY` (never a flag, so it stays out of shell history). Other environment variables: `LLM_BASE_URL`, `LLM_MODEL` (the older `LM_STUDIO_URL` and `LM_STUDIO_MODEL` still work).
 - **The key is a secret.** It is saved in `cache/ui-settings.json`, which is not committed and is created readable only by you; the page never gets it back (it only learns that one is set), it isn't written into logs or error messages, and the page can remove it. Don't paste it into a file in the repo.
-- **Servers differ**, so the page has settings for the three things that most often do: how the reply's shape is requested (`json_schema` sends the schema, as LM Studio and OpenAI accept; `json_object` and `prompt` describe the shape in the prompt instead, for servers without schema support; the checks on the reply are the same), the name of the reply-limit field (`max_tokens`, or `max_completion_tokens` for newer OpenAI models), and the temperature (leave it empty for models that accept only their default). A server with no model list (HTTP 404) is taken on trust, and a 401 or 403 says the key was refused.
+- **Servers differ**, so the page has settings for the three things that most often do: how the reply's shape is requested (`json_schema` sends the schema, as LM Studio and OpenAI accept; `tool` offers one function, `report_rules`, whose arguments are the schema, and reads the answer from its call; `json_object` and `prompt` describe the shape in the prompt instead, for servers with neither; the checks on the reply are the same), the name of the reply-limit field (`max_tokens`, or `max_completion_tokens` for newer OpenAI models), and the temperature (leave it empty for models that accept only their default). A server with no model list (HTTP 404) is taken on trust, and a 401 or 403 says the key was refused.
 - It requests structured output (`response_format` with a JSON schema) at temperature 0, so replies parse without cleanup.
 - Local models are weaker than hosted ones, so **validation carries more of the load**: expect more candidates to be dropped, and treat "extraction failed" as a normal outcome, not an error.
 - Long pages are split into chunks that fit the model's context window, and results are merged. Only pages whose hash changed are extracted.

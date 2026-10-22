@@ -341,6 +341,23 @@ class ExtractCardTests(unittest.TestCase):
         self.assertEqual(parts["dining"], [about_nothing])  # the supermarket sentence is not about dining
         self.assertEqual(parts["streaming"], [about_nothing])
 
+    def test_choosing_every_listed_category_is_a_fixed_rule(self):
+        everything = rule(categories=["dining", "groceries", "streaming"], selection="choose", picks=3, hasOtherChoices=True, quote=EXCLUSION, rate=3)
+        parts = extract.split_fixed(everything)
+        self.assertEqual([(p["categories"], p["selection"], p["picks"], p["hasOtherChoices"]) for p in parts],
+                         [(["dining"], "fixed", None, False), (["groceries"], "fixed", None, False), (["streaming"], "fixed", None, False)])
+        result = self.run_card(FakeModel([everything]))
+        self.assertEqual([r["categories"] for r in result["rules"]], [["dining"], ["groceries"]])  # streaming isn't in that quote
+
+    def test_a_real_choice_is_left_alone(self):
+        real = choice_rule()  # picks 1 of 5
+        self.assertEqual(extract.split_fixed(real), [real])
+        top = rule(categories=["dining", "gas"], selection="top-spend", picks=1, quote=TOP, rate=5)
+        self.assertEqual(extract.split_fixed(top), [top])
+        for odd in (None, True, "3"):
+            kept = rule(categories=["dining", "gas"], selection="choose", picks=odd)
+            self.assertEqual(extract.split_fixed(kept), [kept])
+
     def test_only_fixed_rules_are_split(self):
         self.assertEqual(len(extract.split_fixed(choice_rule())), 1)
         self.assertEqual(len(extract.split_fixed(rule(categories=["dining"]))), 1)
@@ -355,6 +372,17 @@ class ExtractCardTests(unittest.TestCase):
         self.assertIn("Earn 5% cash back on hotels", user)
         for word in ("choose", "top-spend", "apple-pay", "validFrom", "cardConditions"):
             self.assertIn(word, user)
+
+    def test_everything_that_is_the_same_for_every_card_comes_first_so_servers_can_cache_it(self):
+        import os
+        a = extract.build_messages(CARD, "Earn 3% on dining.")
+        b = extract.build_messages({**CARD, "name": "Another Card", "issuer": "Other Bank", "rewardKind": "points"}, "Earn 2X on gas.")
+        self.assertEqual(a[0], b[0])  # the system message
+        shared = os.path.commonprefix([a[1]["content"], b[1]["content"]])
+        self.assertGreater(len(shared), 3000)  # all the rules
+        self.assertNotIn("Savor", shared)
+        self.assertLess(len(a[1]["content"]) - len(shared), 400)  # only the card line and the page text differ
+        self.assertTrue(a[1]["content"].index('"Savor Rewards"') < a[1]["content"].index("Earn 3% on dining."))
 
     def test_the_same_rule_from_several_chunks_is_kept_once(self):
         model = FakeModel([rule()])
@@ -408,6 +436,36 @@ class ExtractCardTests(unittest.TestCase):
 
     def test_a_reply_without_card_conditions_is_still_read(self):
         self.assertEqual(len(self.run_card(FakeModel(json.dumps({"rules": [rule()]})))["rules"]), 1)
+
+
+class StatsTests(unittest.TestCase):
+    def test_calls_are_totalled_including_what_a_server_leaves_out(self):
+        calls = [
+            {"seconds": 2.04, "usage": {"prompt_tokens": 100, "completion_tokens": 40, "prompt_tokens_details": {"cached_tokens": 60},
+                                         "completion_tokens_details": {"reasoning_tokens": 25}}},
+            {"seconds": 1.0, "usage": {"prompt_tokens": 50, "completion_tokens": 10}},
+            {"seconds": 0.5},  # a call that failed before the server reported anything
+        ]
+        self.assertEqual(extract.summarize_calls(calls), {
+            "calls": 3, "seconds": 3.5, "promptTokens": 150, "cachedTokens": 60, "replyTokens": 50, "reasoningTokens": 25})
+        self.assertEqual(extract.summarize_calls([])["calls"], 0)
+
+    def test_a_processed_card_carries_its_stats(self):
+        import tempfile
+        from pathlib import Path
+        server = extract.ChatServer("http://x", "m", urlopen=lambda request, timeout: io.BytesIO(json.dumps({
+            "choices": [{"message": {"content": json.dumps({"cardConditions": [], "rules": []})}}],
+            "usage": {"prompt_tokens": 90, "completion_tokens": 7, "prompt_tokens_details": {"cached_tokens": 80}}}).encode()))
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp)
+            (cache / CARD["id"]).mkdir()
+            (cache / CARD["id"] / "latest.txt").write_text(PAGE)
+            events = []
+            extract.process_cards([CARD], state={CARD["id"]: {"hash": "h"}}, manual={}, client=server, chunk_chars=12000, force=True,
+                                  cache=cache, candidates=cache / "c", emit=events.append)
+            saved = json.loads((cache / "c" / f"{CARD['id']}.json").read_text())
+        self.assertEqual((saved["stats"]["calls"], saved["stats"]["promptTokens"], saved["stats"]["cachedTokens"]), (1, 90, 80))
+        self.assertEqual(events[-1]["stats"], saved["stats"])
 
 
 class ManualRulesTests(unittest.TestCase):
@@ -554,6 +612,45 @@ class LMStudioTests(unittest.TestCase):
         self.assertNotIn("response_format", asks["prompt"])
         self.assertIn(schema_text, asks["prompt"]["messages"][-1]["content"])
         self.assertEqual(asks["prompt"]["messages"][0]["content"], "s")
+
+    def test_function_calling_mode_offers_one_strict_tool_and_reads_the_answer_from_its_call(self):
+        calls = []
+
+        def urlopen(request, timeout):
+            calls.append(json.loads(request.data))
+            message = {"content": None, "tool_calls": [{"type": "function", "function": {
+                "name": "report_rules", "arguments": json.dumps({"cardConditions": [], "rules": []})}}]}
+            return io.BytesIO(json.dumps({"choices": [{"finish_reason": "tool_calls", "message": message}]}).encode())
+
+        client = extract.ChatServer("http://api.test/v1", "m", urlopen=urlopen, response_mode="tool")
+        reply = client.complete([{"role": "system", "content": "s"}, {"role": "user", "content": "find rates"}])
+        self.assertEqual(json.loads(reply), {"cardConditions": [], "rules": []})
+        self.assertTrue(client.last_meta["viaTool"])
+        body = calls[0]
+        self.assertNotIn("response_format", body)
+        function = body["tools"][0]["function"]
+        self.assertEqual((function["name"], function["strict"], function["parameters"]), ("report_rules", True, extract.SCHEMA))
+        self.assertNotIn("tool_choice", body)  # some servers accept only "auto"; the settings' extra fields can add one
+        self.assertIn("by calling the report_rules function", body["messages"][-1]["content"])
+
+    def test_function_calling_mode_falls_back_to_plain_text_and_other_tools_are_ignored(self):
+        def serve(message):
+            return extract.ChatServer("http://x", "m", response_mode="tool", urlopen=lambda r, timeout: io.BytesIO(
+                json.dumps({"choices": [{"message": message}]}).encode()))
+
+        self.assertEqual(serve({"content": '{"rules": []}'}).complete([{"role": "user", "content": "x"}]), '{"rules": []}')
+        other = {"content": "", "tool_calls": [{"function": {"name": "something_else", "arguments": "{}"}}]}
+        with self.assertRaises(ValueError):
+            serve(other).complete([{"role": "user", "content": "x"}])
+
+    def test_free_requests_ask_for_no_format_and_take_extra_fields_for_one_call(self):
+        client, calls = self.serve(response_mode="tool", extra_body={"top_k": 5})
+        client.complete([{"role": "user", "content": "hi"}], free=True, extra_body={"seed": 1})
+        body = calls[0][2]
+        self.assertTrue(all(k not in body for k in ("tools", "response_format")))
+        self.assertEqual((body["top_k"], body["seed"], body["messages"][-1]["content"]), (5, 1, "hi"))
+        client.complete([{"role": "user", "content": "hi"}], free=True)
+        self.assertNotIn("seed", calls[1][2])
 
     def test_the_reply_limit_field_and_temperature_follow_the_settings(self):
         client, calls = self.serve(token_field="max_completion_tokens", max_tokens=77, temperature=None)
