@@ -1,6 +1,6 @@
 /// What balances, Opening and Ending balances and the period strip read of a transaction: its wallet, its day and
 /// what it adds to or takes from the wallet.
-protocol DatedAmount {
+nonisolated protocol DatedAmount {
     var wallet: Wallet? { get }
     /// The ``CalendarDay`` as `yyyymmdd`.
     var dayRaw: Int { get }
@@ -14,7 +14,7 @@ extension Transaction: DatedAmount {}
 /// Recently Deleted. The screens that add balances up read these rather than the transactions: a transaction's values
 /// are slow to read while a screen draws, and a balance reads every transaction. Each is read again from its transaction
 /// whenever a save changes it.
-struct LedgerEntry: DatedAmount {
+nonisolated struct LedgerEntry: DatedAmount {
     let transaction: Transaction
     let wallet: Wallet?
     let dayRaw: Int

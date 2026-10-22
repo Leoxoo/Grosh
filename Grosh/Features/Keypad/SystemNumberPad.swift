@@ -89,6 +89,7 @@ final class NumberPadInput: UIView, UIKeyInput {
         coordinator.perform(.press(.backspace))
     }
 
+    @discardableResult
     override func resignFirstResponder() -> Bool {
         let didResign = super.resignFirstResponder()
         if didResign {

@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// What a Reimbursement sheet holds: an amount, the day it was paid back and an optional note.
-struct ReimbursementDraft {
+nonisolated struct ReimbursementDraft {
     var amount = Money(cents: 0)
     var day: CalendarDay
     var note = ""

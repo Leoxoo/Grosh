@@ -41,7 +41,7 @@ struct LocalNotificationReminders: ReminderScheduler {
 
 extension LocalNotificationReminders {
     /// The identifier of the "Text them" notification action.
-    static let textThemAction = "grosh.text-them"
+    nonisolated static let textThemAction = "grosh.text-them"
 
     /// Gives the reminders that name a Person (Owes me, Loan and Debt) a "Text them" action, which opens the Messages
     /// compose sheet for that Person (``ReminderActionHandler``). The action only opens the app; the user taps Send, and

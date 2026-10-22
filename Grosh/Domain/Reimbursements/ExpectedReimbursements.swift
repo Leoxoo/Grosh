@@ -230,7 +230,7 @@ extension ExpectedReimbursement {
 
 /// What the Add Transaction sheet holds for one + Owes me: the Person, an optional amount (blank is an open amount) and
 /// the reminder day.
-struct OwesMeDraft {
+nonisolated struct OwesMeDraft {
     let person: Person
     /// Entered positive, or `nil` while blank: an open amount.
     var amount: Money?
