@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// A form row showing an amount typed on ``AmountKeypad``: always with two decimals, and while a calculation is
-/// typed, the expression above what it comes to. Tapping the row calls `onTap` (show the keypad there). When the
-/// row has keyboard focus, typing on a Mac or hardware keyboard goes straight into it, cents-first.
+/// A form row showing an amount typed on the keypad (``SystemNumberPad``, or ``AmountKeypad`` on a Mac): always with
+/// two decimals, and while a calculation is typed, the expression above what it comes to. Tapping the row calls `onTap`
+/// (show the keypad there). When the row has keyboard focus, typing on a Mac or hardware keyboard goes straight into
+/// it, cents-first.
 struct AmountRow: View {
     let title: LocalizedStringKey
     @Binding var entry: AmountEntry

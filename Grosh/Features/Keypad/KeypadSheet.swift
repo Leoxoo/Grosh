@@ -6,9 +6,11 @@ enum KeypadSheetField: Hashable {
     case amount, secondAmount, note, event
 }
 
-/// The shell of every sheet that types an amount on ``AmountKeypad``: a grouped form in its own navigation stack,
-/// the keypad docked below it, and Cancel and Save. The amount has focus first; tapping its row shows or hides the
-/// keypad, and focusing a text field or swiping the form hides it. `content` builds the form's sections, with its amount row and text
+/// The shell of every sheet that types an amount: a grouped form in its own navigation stack, the keypad, and Cancel
+/// and Save. On iPhone and iPad the keypad is the system number pad with AC and the operators on top
+/// (``SystemNumberPad``); on a Mac, which has no on-screen keyboard, it is ``AmountKeypad`` docked below the form. The
+/// amount has focus first; tapping its row shows or hides the keypad, and focusing a text field or swiping the form
+/// hides it. `content` builds the form's sections, with its amount row and text
 /// fields made by the ``KeypadSheetFields`` it is handed.
 struct KeypadSheet<Content: View>: View {
     let title: Text
@@ -37,20 +39,22 @@ struct KeypadSheet<Content: View>: View {
                 ))
             }
             .formStyle(.grouped)
-            // Swiping the form anywhere puts the keypad away, as it does the system keyboard. Tapping the amount's row
-            // brings it back. A swipe down on the keypad itself is the sheet's, to close it.
-            .onScrollPhaseChange { _, phase in
-                if phase == .interacting {
-                    isKeypadShown = false
-                }
+            #if os(iOS)
+            // The iPhone's own number pad, with AC and the operators on top. Swiping the form anywhere puts it away, as
+            // it does any keyboard; tapping the amount's row brings it back.
+            .background {
+                SystemNumberPad(entry: keypadEntry, isShown: $isKeypadShown)
+                    .frame(width: 0, height: 0)
             }
             .scrollDismissesKeyboard(.immediately)
+            #else
             .safeAreaInset(edge: .bottom) {
                 if isKeypadShown {
                     AmountKeypad(entry: keypadEntry)
                         .background(.bar)
                 }
             }
+            #endif
             .navigationTitle(title)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
