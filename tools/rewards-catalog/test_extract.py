@@ -342,6 +342,13 @@ class ManualRulesTests(unittest.TestCase):
             result = self.candidate({"rules": [self.APPLE_RULE]}, text)
             self.assertEqual([r["verified"] for r in result["rules"]], ["manual"], text)
 
+    def test_a_choice_rule_is_page_verified_when_the_page_lists_the_choices_and_manual_when_it_cannot(self):
+        entry = {"rules": [choice_rule()]}
+        self.assertEqual([r["verified"] for r in self.candidate(entry)["rules"]], ["page"])
+        self.assertEqual([r["verified"] for r in self.candidate(entry, None)["rules"]], ["manual"])
+        bare = "Earn 3% cash back in the category of your choice."
+        self.assertEqual([r["verified"] for r in self.candidate({"rules": [choice_rule(quote=bare)]}, bare)["rules"]], ["manual"])
+
     def test_a_rule_that_breaks_the_shape_rules_is_rejected_even_by_hand(self):
         bad = rule(rate=4, quote=APPLE)
         result = self.candidate({"rules": [bad]})

@@ -81,7 +81,8 @@ CATEGORY_HELP = {
     "utilities": "phone, internet, cable and utility bills",
     "everything-else": "the base rate on all other purchases",
 }
-PERIOD_WORDS = {"month": ("month",), "quarter": ("quarter",), "year": ("year", "annual")}
+PERIOD_WORDS = {"month": ("month",), "quarter": ("quarter",), "year": ("year", "annual"),
+                "cycle": ("billing cycle", "statement period", "each cycle")}
 
 # Who decides which categories earn a rate. "fixed": the rate always applies to its one category.
 # "choose": the cardholder picks (Bank of America Customized Cash). "top-spend": the card applies
@@ -111,7 +112,7 @@ RULE_SCHEMA = {
         "rate": {"type": "number"},
         "unit": {"type": "string", "enum": ["percent", "per-dollar"]},
         "capAmount": {"type": ["number", "null"]},
-        "capPeriod": {"type": ["string", "null"], "enum": ["month", "quarter", "year", None]},
+        "capPeriod": {"type": ["string", "null"], "enum": [*PERIOD_WORDS, None]},
         "requires": {"type": "array", "items": {"type": "string", "enum": list(REQUIRES)}},
         "validFrom": {"type": ["string", "null"]},
         "validTo": {"type": ["string", "null"]},
@@ -294,7 +295,7 @@ def validate_rule(rule, page_norm: str | None = None) -> str | None:
     if cap is not None and (isinstance(cap, bool) or not isinstance(cap, (int, float)) or cap <= 0):
         return f"cap {cap!r} is not a positive number"
     if period not in (None, *PERIOD_WORDS):
-        return f"cap period {period!r} is not month, quarter or year"
+        return f"cap period {period!r} is not one of {', '.join(PERIOD_WORDS)}"
     if (cap is None) != (period is None):
         return "a cap needs both an amount and a period"
     if (
@@ -327,9 +328,8 @@ def validate_rule(rule, page_norm: str | None = None) -> str | None:
     else:
         if not mentions(quote_norm, SELECTION_WORDS[selection]):
             return f"quote doesn't say who chooses ({selection})"
-        haystack = page_norm if page_norm is not None else context
-        for category in categories:
-            if not mentions(haystack, CATEGORIES[category]):
+        for category in categories:  # the choices usually sit apart from the quote, so only the page can confirm them
+            if page_norm is not None and not mentions(page_norm, CATEGORIES[category]):
                 return f"{category} is not mentioned on the page"
     if cap is not None:
         if float(cap) not in numbers_in(quote):
@@ -369,7 +369,7 @@ Rules:
 - rate: the number alone (3 for "3%" and for "3X points").
 - unit: "percent" for cash back percent, "per-dollar" for points or miles per dollar.
 - quote: copy the exact words of one sentence or phrase from the text that states the rate. Do not change, shorten or join them.
-- capAmount and capPeriod: only if that same sentence limits how much spending earns the rate (for "up to $6,000 per year": 6000 and "year"). Otherwise null for both.
+- capAmount and capPeriod: only if that same sentence limits how much spending earns the rate (for "up to $6,000 per year": 6000 and "year"; the period is month, quarter, year, or cycle for a billing cycle). Otherwise null for both.
 - requires: only what the text says the rate needs. "apple-pay" (must pay with Apple Pay), "activation" (must activate or enroll), "issuer-booking" (must book through the issuer's travel site or portal). Otherwise [].
 - validFrom and validTo: for a rate that applies only in a stated period, its first and last day as YYYY-MM-DD, and only when the text names the months and the year (October through December 2026 is 2026-10-01 and 2026-12-31). Otherwise null.
 - conditions: copy, word for word, each sentence in the text that excludes or restricts this one rate: excluded stores, a minimum, who qualifies. These are often in footnotes, which repeat the rate with its exclusions. Never paraphrase. Use [] if there are none.
@@ -525,11 +525,11 @@ def manual_candidate(card: dict, entry: dict, text: str | None, page_hash: str |
     candidate = _empty_candidate(card, "manual", None, page_hash, "manual")
     page_norm = normalize(text) if text else None
     for proposal in entry.get("rules", []):
-        problem = validate_rule(proposal, None)
+        grounded = page_norm is not None and validate_rule(proposal, page_norm) is None
+        problem = None if grounded else validate_rule(proposal, None)
         if problem:
             candidate["rejected"].append({"rule": proposal, "reason": problem})
             continue
-        grounded = page_norm is not None and validate_rule(proposal, page_norm) is None
         candidate["rules"].append(accepted_rule(proposal, card["sourceUrl"], page_hash, "page" if grounded else "manual"))
     for condition in entry.get("cardConditions", []):
         problem = check_condition(condition, None)

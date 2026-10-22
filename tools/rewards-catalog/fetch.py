@@ -480,6 +480,9 @@ def run(
         # fall back on; otherwise a 304 would leave some card with nothing to compare against.
         known = all(state.get(c["id"], {}).get("hash") and (cache / c["id"] / "latest.txt").exists() for c in sharing)
         validators = read_json(cache / sharing[0]["id"] / "http.json", {}) if known else {}
+        # A validator describes one page. If the card now points somewhere else, it says nothing about this one.
+        if validators.get("url") != url:
+            validators = {}
         page = fetch_page(url, get, robots, throttle, validators)
         outcomes = [_record(card, url, page, state, cache, today) for card in sharing]
         summary.outcomes.extend(outcomes)
@@ -514,7 +517,7 @@ def _record(card: dict, url: str, page: PageResult, state: dict, cache: Path, to
             status = "changed"
         folder.mkdir(parents=True, exist_ok=True)
         latest.write_text(page.text, encoding="utf-8")
-        write_json(folder / "http.json", {"etag": page.etag, "last_modified": page.last_modified})
+        write_json(folder / "http.json", {"url": url, "etag": page.etag, "last_modified": page.last_modified})
         state[card_id] = {
             "url": url,
             "hash": new_hash,

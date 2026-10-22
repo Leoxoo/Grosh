@@ -597,7 +597,7 @@
       "rewardProgram": null,
       "baseEarnRate": 1,
       "discontinued": false,
-      "sourceUrl": "https://www.bankofamerica.com/credit-cards/products/cash-back-credit-card/",
+      "sourceUrl": "https://www.bankofamerica.com/credit-cards/products/cash-back-credit-card/cash-back-category-choices/",
       "sourceHost": "www.bankofamerica.com",
       "verified": false
     },
@@ -1722,7 +1722,7 @@
       "rewardProgram": null,
       "baseEarnRate": 2,
       "discontinued": false,
-      "sourceUrl": "https://www.citi.com/credit-cards/citi-custom-cash-credit-card",
+      "sourceUrl": "https://www.citi.com/usc/Multi/Featured/default.htm",
       "sourceHost": "www.citi.com",
       "verified": false
     },

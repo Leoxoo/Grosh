@@ -231,6 +231,21 @@ class RunTests(unittest.TestCase):
         self.assertEqual(set(self.statuses(summary).values()), {"unchanged"})
         self.assertEqual(self.state, before)
 
+    def test_validators_are_only_sent_back_to_the_page_they_came_from(self):
+        self.web.route("https://x.test/a", page(etag='"v1"'))
+        self.go()
+        self.go(day="2026-11-20")
+        last_for_a = [r for r in self.web.requests if r[0] == "https://x.test/a"][-1]
+        self.assertIn("If-None-Match", last_for_a[1])  # same page: ask whether it changed
+
+        self.cards[0] = {"id": "a", "sourceUrl": "https://x.test/a-moved"}
+        self.web.route("https://x.test/a-moved", page(BODY.replace("Earn 3%", "Earn 4%")))
+        summary = self.go(day="2026-12-20")
+        moved = [r for r in self.web.requests if r[0] == "https://x.test/a-moved"]
+        self.assertEqual(len(moved), 1)
+        self.assertNotIn("If-None-Match", moved[0][1])  # a new page: read it in full
+        self.assertEqual(self.statuses(summary)["a"], "changed")
+
     def test_a_changed_page_is_reported_with_its_size(self):
         self.go()
         self.web.route("https://x.test/a", page(BODY.replace("Earn 3%", "Earn 4%")))

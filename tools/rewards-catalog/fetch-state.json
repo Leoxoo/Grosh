@@ -299,12 +299,12 @@
     "url": "https://www.bankofamerica.com/smallbusiness/credit-cards/products/unlimited-cash-rewards-business-credit-card"
   },
   "bank-of-america-customized-cash-rewards": {
-    "changedAt": "2026-10-20",
-    "finalUrl": "https://www.bankofamerica.com/credit-cards/products/cash-back-credit-card/",
-    "hash": "d267b43b9d8e5a34cfeef44c0c0ab19692b8c309e2936b6c1a9f0225a216252f",
+    "changedAt": "2026-10-22",
+    "finalUrl": "https://www.bankofamerica.com/credit-cards/products/cash-back-credit-card/cash-back-category-choices/",
+    "hash": "2b6b3648615b079395f0a775edf53f183137a016ccb10779a094179972d87d83",
     "lastStatus": "ok",
-    "textChars": 5963,
-    "url": "https://www.bankofamerica.com/credit-cards/products/cash-back-credit-card/"
+    "textChars": 14723,
+    "url": "https://www.bankofamerica.com/credit-cards/products/cash-back-credit-card/cash-back-category-choices/"
   },
   "bank-of-america-free-spirit": {
     "changedAt": "2026-10-20",
@@ -867,12 +867,12 @@
     "url": "https://www.att.com/deals/att-points-plus-citi/"
   },
   "citi-custom-cash": {
-    "changedAt": "2026-10-20",
-    "finalUrl": "https://www.citi.com/credit-cards/citi-custom-cash-credit-card",
-    "hash": "2df0b4d64358ad43e3c875b748ddcd74d217fac2956f12143cc2e931689a9bec",
+    "changedAt": "2026-10-22",
+    "finalUrl": "https://www.citi.com/usc/Multi/Featured/default.htm",
+    "hash": "1681b33d431be7243da1e3e5d3dff7465dda6bc404c9a7c9b1c3719290c7fc41",
     "lastStatus": "ok",
-    "textChars": 725,
-    "url": "https://www.citi.com/credit-cards/citi-custom-cash-credit-card"
+    "textChars": 77809,
+    "url": "https://www.citi.com/usc/Multi/Featured/default.htm"
   },
   "citi-double-cash": {
     "changedAt": "2026-10-20",

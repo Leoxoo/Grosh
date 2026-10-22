@@ -49,6 +49,7 @@ python3 -m unittest discover -s tools/rewards-catalog      # offline tests
   | `gone` | 404 or 410. |
   | `failed` | Network error, timeout, server error, or an unreadable robots.txt. |
 
+- **Validators belong to a URL.** The saved ETag / Last-Modified are sent only back to the page they came from. When a card's `sourceUrl` changes, the new page is read in full (an earlier version asked the new URL "has it changed since the old page?" and got a false "not modified").
 - **Failure never erases:** a card that didn't fetch keeps its last hash.
 - **Exit code 1 only if more than 25% of cards are `failed` or `gone`.** `refused`, `robots` and `needs-browser` are expected outcomes to report, not signs that the run broke.
 - Not built yet: a headless browser for `needs-browser` pages.
@@ -128,7 +129,7 @@ For each card it splits the cached page text into chunks of about 12,000 charact
 2. the quote appears on the page word for word (ignoring case, spacing, curly quotes and ®/™ marks);
 3. the rate appears in the quote as a whole number (13% is not 3%), and the quote has a `%` for percent or points, miles or X for per-dollar;
 4. the quote uses a word for its category (for example "grocer", "restaurant", "all other"), which catches a rate filed under the wrong category. A base rate may leave out "all other" if the quote names no other category (Apple Card's "Get 2% Daily Cash back when you use Apple Card with Apple Pay");
-5. a cap needs an amount and a period, and both appear in the quote (`$6,000`, `6K` and `6000` match; "year" or "annual");
+5. a cap needs an amount and a period, and both appear in the quote (`$6,000`, `6K` and `6000` match; "year" or "annual"; `cycle` is a "billing cycle");
 6. every **condition** (an exclusion or restriction on the rate, such as "excluding superstores like Walmart® and Target®") is the page's own sentence, word for word. Conditions are never paraphrased, so what a person sees is what the issuer wrote. A rule with a condition that isn't on the page is rejected whole, since showing the rate without its restriction would overstate it;
 7. a rule where the cardholder chooses or the card picks (`selection` of `choose` or `top-spend`) needs a quote that says so ("of your choice", "top eligible category"), and every category it lists must be mentioned on the page;
 8. a `requires` tag (`apple-pay`, `activation`, `issuer-booking`) is accepted only if the quote or a condition has words that back it ("Apple Pay", "activate", "booked through");
@@ -152,7 +153,9 @@ Not handled: relationship boosts (Bank of America Preferred Rewards), caps share
 
 - `extra-cards.json` adds cards CardPin lacks (Apple Card so far) to the seed; `build_seed.py` merges them, gives each the same id scheme as every card, and stops on a missing field or an id clash.
 - `manual-rules.json` (`{card id: {rules: [...], cardConditions: [...]}}`) holds rules a person writes in the same shape as the model's. They run through the same checks without needing the page, and `extract.py` needs no LM Studio for them. A rule whose quote is found on the cached page is `verified: "page"`; one the page can't confirm (no page, or the page says something else) is `verified: "manual"` and should be re-checked at review. Apple Card's two rules are in there, both `"page"`.
-- Citi Custom Cash and Bank of America Customized Cash are **not** entered yet. Their saved pages don't contain the rules (Citi's page says it stopped taking applications on May 28, 2026 and has 734 characters; Bank of America's is mostly navigation), so there's no page to take an exact quote from. They need a page that states the rules.
+- **Citi Custom Cash and Bank of America Customized Cash are entered**, from pages that state their rules: Citi's featured-cards page (its own card page now says Citi stopped accepting applications on May 28, 2026, so the FAQ on `citi.com/usc/Multi/Featured/default.htm` is the page that still has the rules) and Bank of America's "Categories & Exclusions" page. Citi's 5% is a `top-spend` rule over seven catalog categories with a $500 cap per billing cycle (`capPeriod: "cycle"`) and `hasOtherChoices` for home improvement, fitness clubs and live entertainment. Bank of America's 3% is a `choose` rule (gas, online shopping, dining, travel, drug stores; home improvement is outside the list) with a $2,500 combined quarterly cap, next to a 2% grocery rule and a 1% base rate. Its card-wide condition ("Merchants, not Bank of America, categorize and submit purchases ...") and the online-shopping exclusion are the page's own sentences. All were checked against the cached pages: `verified: "page"`.
+- Citi Custom Cash is **closed to new applicants** but still held by existing cardholders, so it stays in the catalog. There's no field for "closed to new applicants" yet.
+- Not entered: Bank of America's Preferred Rewards boost (up to 5.25% on the choice category), Citi's extra 4% on Citi Travel bookings, and Bank of America's first-year 6% offer. Pages disagree on the last one, so it needs a decision before it goes in.
 
 **What I measured on the 138 fetched pages, without a model:** 8 are `wrong-page` (for example `u-s-bank-business-leverage`, `wells-fargo-attune`), 130 would be sent to the model, and that takes about 339 model calls: 50 pages need one call, 32 need two, and the three big Amex pages need 18 each. With a 7B model on a Mac expect a full run to take on the order of an hour or more; it can be stopped and resumed, since each card is saved as it finishes.
 
@@ -205,7 +208,7 @@ Card   id, name, issuer, network, isBusiness, annualFee, rewardKind,
        rewardProgram, baseEarnRate, discontinued, sourceUrl, verified,
        verifiedAt, cardConditions[] (the issuer's sentences that limit several rates), rules[]
 Rule   categories[], selection (fixed | choose | top-spend), picks, hasOtherChoices,
-       rate, unit (percent | per-dollar), capAmount, capPeriod (month | quarter | year),
+       rate, unit (percent | per-dollar), capAmount, capPeriod (month | quarter | year | cycle),
        requires[] (apple-pay | activation | issuer-booking), validFrom, validTo,
        conditions[] (the issuer's own sentences, verbatim), verified (page | manual),
        evidence { url, quote, pageHash }
