@@ -74,8 +74,15 @@ final class Transaction {
     /// relationship. Set when the first payback is recorded and never cleared, so it can read true for an Expense whose
     /// paybacks are gone, which only costs a look.
     var hasPaybacksElsewhere: Bool = false
-    /// On a payback recorded into another wallet, the Expected reimbursement it was paid against.
+    /// On a payback recorded into another wallet, the Expected reimbursement it was paid against, or `nil` when no one
+    /// was expected to pay.
     var paidExpectation: ExpectedReimbursement?
+    /// On a payback recorded into another wallet, the Expense it paid back (ADR-0010).
+    var paidBackExpense: Transaction?
+    /// On an Expense, the money paid back into other wallets against it, Recently Deleted ones included. Read through
+    /// ``paybacksElsewhere``.
+    @Relationship(deleteRule: .nullify, inverse: \Transaction.paidBackExpense)
+    var paybacks: [Transaction]? = []
 
     init(
         amount: Money,

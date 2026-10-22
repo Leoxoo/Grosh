@@ -42,7 +42,7 @@ struct ReimbursementSection: View {
             } header: {
                 Text("Reimbursements")
             } footer: {
-                Text("Money paid back is kept on this expense. Its net, what is left of it, is what counts in your balance and reports.")
+                Text("Money paid back into this wallet is kept on this expense, and its net, what is left of it, counts in your balance and reports. Money paid back into another wallet is a transaction there.")
             }
             .errorAlert("Couldn't Delete Reimbursement", message: $errorMessage)
         }

@@ -64,7 +64,7 @@ struct ExpectationPaymentEditor: View {
             } footer: {
                 if let problem = problem as? ExpectedReimbursementRuleError, problem == .otherCurrency {
                     Text(problem.localizedDescription)
-                } else if expectation.isElsewhere(draft.wallet) {
+                } else if expectation.expense?.isElsewhere(draft.wallet) == true {
                     Text("Recorded as money in that wallet, on the day you received it, linked to the expense. The expense shows its net in the Total.")
                 } else {
                     Text("Kept on the expense, which then counts what is left of it. No transaction is made.")

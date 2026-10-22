@@ -142,36 +142,46 @@ private struct TransactionForm: View {
         }
     }
 
+    /// Add more details: With and its + Owes me first, then a section for each Person who owes, then the rest, so one
+    /// Person's Owes me is set apart from the next one's and from the other details.
+    @ViewBuilder
     private var detailsSection: some View {
         Section {
             DisclosureGroup("Add more details", isExpanded: $isShowingDetails) {
                 WithField(people: $draft.people, picksOne: draft.requiresWith)
-                if draft.offersOwesMe || !draft.owes.isEmpty {
-                    OwesMeField(draft: $draft)
-                }
-                Toggle("Exclude from report", isOn: $draft.isExcludedFromReport)
-                if draft.offersReminder {
-                    ReminderField(day: $draft.reminderDay)
-                }
-                LabeledContent {
-                    Text("Coming soon")
-                } label: {
-                    Label("Location", systemImage: "mappin.and.ellipse")
-                }
-                .foregroundStyle(.tertiary)
-                LabeledContent {
-                    Text(draft.eventName.isEmpty ? String(localized: "None") : draft.eventName)
-                } label: {
-                    Label("Event", systemImage: "calendar")
-                }
-                .foregroundStyle(.tertiary)
+                OwesMeAddButtons(draft: $draft)
             }
         } footer: {
             if draft.isMissingWith {
                 Text("A Loan or Debt needs a With: who you lent to or borrowed from.")
-            } else if isShowingDetails {
-                Text("A transaction excluded from report still counts in balances, just not in income and spending.")
             }
+        }
+        if isShowingDetails {
+            OwesMeSections(draft: $draft)
+            otherDetailsSection
+        }
+    }
+
+    private var otherDetailsSection: some View {
+        Section {
+            Toggle("Exclude from report", isOn: $draft.isExcludedFromReport)
+            if draft.offersReminder {
+                ReminderField(day: $draft.reminderDay)
+            }
+            LabeledContent {
+                Text("Coming soon")
+            } label: {
+                Label("Location", systemImage: "mappin.and.ellipse")
+            }
+            .foregroundStyle(.tertiary)
+            LabeledContent {
+                Text(draft.eventName.isEmpty ? String(localized: "None") : draft.eventName)
+            } label: {
+                Label("Event", systemImage: "calendar")
+            }
+            .foregroundStyle(.tertiary)
+        } footer: {
+            Text("A transaction excluded from report still counts in balances, just not in income and spending.")
         }
     }
 

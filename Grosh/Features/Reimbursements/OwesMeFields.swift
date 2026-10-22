@@ -1,33 +1,40 @@
 import SwiftData
 import SwiftUI
 
-/// The "Owes me" rows of an Expense's more details, under With: each Person who is yet to pay part of it back, with the
-/// amount (blank is an open amount, shown as `?`) and a Reminder a week after the Expense, then a + Owes me for each
-/// Person in With who has none (ADR-0010). Nothing here moves any balance or report. Use inside a `Form` or `List`.
-struct OwesMeField: View {
+/// A + Owes me for each Person in With who doesn't owe anything yet, on an Expense (ADR-0010). Use under With, inside a
+/// `Form` or `List`.
+struct OwesMeAddButtons: View {
     @Binding var draft: TransactionDraft
 
-    private var currencyCode: String { draft.wallet?.currencyCode ?? Money.defaultCurrencyCode }
-
-    /// The people in With who don't owe anything yet.
-    private var peopleToAdd: [Person] {
-        draft.people.filter { draft.owesEntry(for: $0) == nil }
-    }
-
     var body: some View {
-        ForEach($draft.owes, id: \.person.persistentModelID) { $entry in
-            OwesMeRow(
-                entry: $entry, currencyCode: currencyCode, expenseDay: draft.day,
-                remove: entry.hasPayments ? nil : { draft.removeOwes(entry.person) }
-            )
-        }
         if draft.offersOwesMe {
-            ForEach(peopleToAdd, id: \.persistentModelID) { person in
+            ForEach(draft.people.filter { draft.owesEntry(for: $0) == nil }, id: \.persistentModelID) { person in
                 Button {
                     draft.addOwes(person)
                 } label: {
                     Label("+ Owes me: \(person.name)", systemImage: "plus.circle")
                 }
+            }
+        }
+    }
+}
+
+/// Each Person who is yet to pay part of the Expense back, in a section of their own headed with their name, so one
+/// Person's amount, reminder and Remove are apart from the next one's: the amount (blank is an open amount, shown as
+/// `?`) and a Reminder a week after the Expense (ADR-0010). Nothing here moves any balance or report. Use inside a `Form`
+/// or `List`.
+struct OwesMeSections: View {
+    @Binding var draft: TransactionDraft
+
+    private var currencyCode: String { draft.wallet?.currencyCode ?? Money.defaultCurrencyCode }
+
+    var body: some View {
+        ForEach($draft.owes, id: \.person.persistentModelID) { $entry in
+            Section("\(entry.person.name) owes me") {
+                OwesMeRow(
+                    entry: $entry, currencyCode: currencyCode, expenseDay: draft.day,
+                    remove: entry.hasPayments ? nil : { draft.removeOwes(entry.person) }
+                )
             }
         }
     }
@@ -52,7 +59,7 @@ private struct OwesMeRow: View {
                 #endif
                 .frame(maxWidth: 120)
         } label: {
-            Label("\(entry.person.name) owes me", systemImage: "arrow.uturn.backward.circle")
+            Label("Amount", systemImage: "arrow.uturn.backward.circle")
         }
         .onAppear { text = Self.text(of: entry.amount) }
         .onChange(of: text) { entry.amount = Self.amount(typed: text, currencyCode: currencyCode) }

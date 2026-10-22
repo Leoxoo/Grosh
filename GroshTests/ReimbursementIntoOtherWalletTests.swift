@@ -327,6 +327,44 @@ struct ReimbursementIntoOtherWalletTests {
         #expect(!dinner.hasPaybacksElsewhere)
     }
 
+    // MARK: Without Owes me
+
+    /// Someone paid me back, into another wallet, on an Expense nobody was expected to pay back: the same linked
+    /// transaction there as Record payment makes, with no one in With and no expectation.
+    @Test func someonePaidMeBackIntoAnotherWalletWithoutOwesMe() throws {
+        let dinner = try fixture.dinner()
+        let draft = ReimbursementDraft(amount: Money(cents: 20_00), day: receivedDay, note: "Cash")
+
+        let payback = try dinner.recordPaybackElsewhere(draft, into: cash, in: context)
+
+        #expect(payback.wallet === cash)
+        #expect(payback.amountCents == 20_00)
+        #expect(payback.day == receivedDay)
+        #expect(payback.category?.lockedRole == .reimbursement)
+        #expect(payback.paidBackExpense === dinner)
+        #expect(payback.paidExpectation == nil)
+        #expect(payback.orderedPeople.isEmpty)
+        #expect(dinner.paybacksElsewhere == [payback])
+        #expect(dinner.reimbursedCents == 0)
+        #expect(try payback.related(in: context) == [dinner])
+        #expect(try listed(in: .total) == [dinner])
+        #expect(dinner.totalViewNetCents == -40_00)
+        #expect(cash.balance(asOf: today) == Money(cents: 20_00))
+    }
+
+    @Test func someonePaidMeBackIntoAWalletInAnotherCurrencyIsRefused() throws {
+        let dinner = try fixture.dinner()
+        let euros = Wallet(name: "Euros")
+        euros.currencyCode = "EUR"
+        context.insert(euros)
+        let draft = ReimbursementDraft(amount: Money(cents: 20_00), day: receivedDay)
+
+        #expect(throws: ExpectedReimbursementRuleError.otherCurrency) {
+            try dinner.recordPaybackElsewhere(draft, into: euros, in: context)
+        }
+        #expect(!dinner.hasPaybacksElsewhere)
+    }
+
     // MARK: The category
 
     @Test func theReimbursementCategoryIsLockedAndOnlyFiledByRecordPayment() throws {
