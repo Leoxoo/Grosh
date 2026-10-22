@@ -14,15 +14,17 @@ PAGE = "\n".join([
     "Earn 5% cash back on hotels and rental cars booked through Bank Travel.",
     "Earn 2X points on groceries at U.S. supermarkets on up to $6,000 per year in purchases.",
     "Earn 1% cash back on all other purchases.",
+    "Earn unlimited 3% cash back at grocery stores (excluding superstores like Walmart® and Target®), on dining.",
     "Menu\nContact us\nPrivacy",
 ])
+EXCLUSION = "Earn unlimited 3% cash back at grocery stores (excluding superstores like Walmart and Target), on dining."
 PAGE_NORM = normalize(PAGE)
 GROCERY_QUOTE = "Earn 2X points on groceries at U.S. supermarkets on up to $6,000 per year in purchases."
 
 
 def rule(**overrides) -> dict:
     base = {
-        "category": "dining", "rate": 3, "unit": "percent", "capAmount": None, "capPeriod": None,
+        "category": "dining", "rate": 3, "unit": "percent", "capAmount": None, "capPeriod": None, "conditions": [],
         "quote": "Earn unlimited 3% cash back on dining, entertainment and popular streaming services.",
     }
     return {**base, **overrides}
@@ -75,6 +77,16 @@ class ValidateRuleTests(unittest.TestCase):
         self.assertIn("needs both", self.check(**groceries, capAmount=6000))
         self.assertIn("cap 5000", self.check(**groceries, capAmount=5000, capPeriod="year"))
         self.assertIn("period month", self.check(**groceries, capAmount=6000, capPeriod="month"))
+
+    def test_a_condition_must_be_the_issuers_own_words(self):
+        self.assertIsNone(self.check(conditions=[EXCLUSION]))  # the page has ® marks the model dropped
+        self.assertIn("not on the page", self.check(conditions=["Excludes superstores like Walmart."]))
+        self.assertIn("not on the page", self.check(conditions=[EXCLUSION, "Made up."]))
+
+    def test_conditions_must_be_a_short_list_of_text(self):
+        for bad in (None, "excluding Walmart", [""], [3], ["x"] * 6, ["a" * 401]):
+            self.assertIn("condition", self.check(conditions=bad), bad)
+        self.assertIn("condition", validate_rule({k: v for k, v in rule().items() if k != "conditions"}, PAGE_NORM))
 
     def test_not_a_rule(self):
         self.assertEqual(validate_rule("3% on dining", PAGE_NORM), "not an object")
@@ -137,7 +149,19 @@ class ExtractCardTests(unittest.TestCase):
         self.assertEqual(result["rules"][0]["evidence"], {"quote": rule()["quote"], "url": CARD["sourceUrl"], "pageHash": "hash1"})
         self.assertEqual(len(result["rejected"]), 1)
         self.assertIn("not on the page", result["rejected"][0]["reason"])
-        self.assertEqual((result["model"], result["promptVersion"], result["pageHash"]), ("test-model", "1", "hash1"))
+        self.assertEqual((result["model"], result["promptVersion"], result["pageHash"]), ("test-model", extract.PROMPT_VERSION, "hash1"))
+
+    def test_conditions_are_kept_and_merged_across_chunks(self):
+        with_condition = rule(category="groceries", quote=EXCLUSION, conditions=[EXCLUSION])
+        without = rule(category="groceries", quote=EXCLUSION)
+        result = self.run_card(FakeModel([without], [with_condition]), max_chars=150)
+        grocery = [r for r in result["rules"] if r["category"] == "groceries"]
+        self.assertEqual([r["conditions"] for r in grocery], [[EXCLUSION]])
+
+    def test_a_rule_with_a_made_up_condition_is_rejected_whole(self):
+        result = self.run_card(FakeModel([rule(conditions=["Not on the page at all."])]))
+        self.assertEqual((result["rules"], result["status"]), ([], "no-rules"))
+        self.assertIn("condition", result["rejected"][0]["reason"])
 
     def test_the_prompt_names_the_card_and_carries_the_page(self):
         model = FakeModel([])

@@ -128,7 +128,8 @@ For each card it splits the cached page text into chunks of about 12,000 charact
 2. the quote appears on the page word for word (ignoring case, spacing, curly quotes and ®/™ marks);
 3. the rate appears in the quote as a whole number (13% is not 3%), and the quote has a `%` for percent or points, miles or X for per-dollar;
 4. the quote uses a word for its category (for example "grocer", "restaurant", "all other"), which catches a rate filed under the wrong category;
-5. a cap needs an amount and a period, and both appear in the quote (`$6,000`, `6K` and `6000` match; "year" or "annual").
+5. a cap needs an amount and a period, and both appear in the quote (`$6,000`, `6K` and `6000` match; "year" or "annual");
+6. every **condition** (an exclusion or restriction on the rate, such as "excluding superstores like Walmart® and Target®") is the page's own sentence, word for word. Conditions are never paraphrased, so what a person sees is what the issuer wrote. A rule with a condition that isn't on the page is rejected whole, since showing the rate without its restriction would overstate it.
 
 A rule that fails any check is listed as rejected, never edited.
 
@@ -138,6 +139,7 @@ A rule that fails any check is listed as rejected, never edited.
 
 - It has never talked to a real model: the tests use a stand-in. The first run decides whether the prompt works. Try `--only capital-one-savor`, read its candidate file, and look at `rejected` to see why rules fail.
 - **Mixed pages.** Amex pages hold other cards' marketing. The prompt tells the model to take only this card's rates, but a quote about a different card would still pass the checks. Review Amex candidates by hand.
+- **Conditions come from the same chunk as the rate.** A footnote far from its headline, in another 12,000-character chunk, is missed, and the rule looks unrestricted. A second pass that hunts for footnotes is the fix if this shows up in real runs. Whether a condition really belongs to the rate, and not to a neighbouring one, can't be checked automatically; that's for the reviewer.
 - **Rotating categories** (Discover 5%, Freedom Flex) and their dates are not extracted; `validFrom` / `validTo` are still to do.
 - **Category words** are a guess at what a quote about a category says. Valid rules the list misses show up in `rejected` as "quote doesn't mention ...", and the fix is to add the word to `CATEGORIES`.
 
@@ -182,7 +184,7 @@ Card   id, name, issuer, network, isBusiness, annualFee, rewardKind,
        verifiedAt, rules[]
 Rule   category, rate, unit (percent | per-dollar), capAmount, capPeriod
        (month | quarter | year), rateAfterCap, validFrom, validTo,
-       conditions, evidence { url, quote, fetchedAt, contentHash }
+       conditions (the issuer's own sentences, verbatim), evidence { url, quote, pageHash }
 ```
 
 - `validFrom` / `validTo` exist for **rotating categories** (Discover, Chase Freedom Flex): they are the reason the cadence below has a quarterly run.

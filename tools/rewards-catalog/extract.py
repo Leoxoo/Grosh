@@ -34,12 +34,14 @@ sys.path.insert(0, str(Path(__file__).parent))
 import fetch  # noqa: E402
 
 CANDIDATES = fetch.CACHE / "candidates"
-PROMPT_VERSION = "1"
+PROMPT_VERSION = "2"
 DEFAULT_URL = "http://localhost:1234/v1"
 DEFAULT_MODEL = "k2-horizon-7b-uno-uncensored"
 CHUNK_CHARS = 12_000
 CHUNK_OVERLAP_LINES = 3
 MAX_RATE = 10
+MAX_CONDITIONS = 5
+MAX_CONDITION_CHARS = 400
 ATTEMPTS_PER_CHUNK = 2
 
 # The catalog's fixed categories (PIPELINE.md), each with words a quote about it would use.
@@ -88,8 +90,9 @@ SCHEMA = {
                     "capAmount": {"type": ["number", "null"]},
                     "capPeriod": {"type": ["string", "null"], "enum": ["month", "quarter", "year", None]},
                     "quote": {"type": "string"},
+                    "conditions": {"type": "array", "items": {"type": "string"}},
                 },
-                "required": ["category", "rate", "unit", "capAmount", "capPeriod", "quote"],
+                "required": ["category", "rate", "unit", "capAmount", "capPeriod", "quote", "conditions"],
                 "additionalProperties": False,
             },
         }
@@ -211,6 +214,16 @@ def validate_rule(rule, page_norm: str) -> str | None:
             return f"cap {cap} is not in the quote"
         if not mentions(quote_norm, PERIOD_WORDS[period]):
             return f"cap period {period} is not in the quote"
+    # Conditions are shown to people as the issuer wrote them, so each must be the issuer's own words.
+    # A rule with a made-up condition is dropped whole: keeping the rate without it would overstate the rate.
+    conditions = rule.get("conditions")
+    if not isinstance(conditions, list) or len(conditions) > MAX_CONDITIONS:
+        return f"conditions must be a list of at most {MAX_CONDITIONS} quotes"
+    for condition in conditions:
+        if not isinstance(condition, str) or not condition.strip() or len(condition) > MAX_CONDITION_CHARS:
+            return f"a condition is empty or over {MAX_CONDITION_CHARS} characters"
+        if normalize(condition) not in page_norm:
+            return "a condition is not on the page word for word"
     return None
 
 
@@ -240,6 +253,7 @@ Rules:
 - unit: "percent" for cash back percent, "per-dollar" for points or miles per dollar.
 - quote: copy the exact words of one sentence or phrase from the text that states the rate. Do not change, shorten or join them.
 - capAmount and capPeriod: only if that same sentence limits how much spending earns the rate (for "up to $6,000 per year": 6000 and "year"). Otherwise null for both.
+- conditions: copy, word for word, each sentence in the text that excludes or restricts this rate: excluded stores, a required way of booking or paying, a minimum, or who qualifies. These are often in footnotes, which repeat the rate with its exclusions. Never paraphrase. Use [] if there are none.
 - Ignore sign-up bonuses, statement credits, APRs, fees, and what points are worth.
 - If the text states no rate for this card, reply {{"rules": []}}.
 
@@ -334,14 +348,17 @@ def extract_card(card: dict, text: str, page_hash: str, complete, model: str, ma
                 candidate["rejected"].append({"rule": proposal, "reason": reason})
                 continue
             key = (proposal["category"], float(proposal["rate"]), proposal["unit"], proposal["capAmount"], proposal["capPeriod"])
-            accepted.setdefault(key, {
+            entry = accepted.setdefault(key, {
                 "category": proposal["category"],
                 "rate": proposal["rate"],
                 "unit": proposal["unit"],
                 "capAmount": proposal["capAmount"],
                 "capPeriod": proposal["capPeriod"],
+                "conditions": [],
                 "evidence": {"quote": proposal["quote"].strip(), "url": card["sourceUrl"], "pageHash": page_hash},
             })
+            # The same rate seen in another chunk may carry a condition this chunk didn't have.
+            entry["conditions"] += [c.strip() for c in proposal["conditions"] if c.strip() not in entry["conditions"]]
     candidate["rules"] = sorted(accepted.values(), key=lambda r: (r["category"], -r["rate"]))
     if failures:
         candidate["status"] = "failed"
