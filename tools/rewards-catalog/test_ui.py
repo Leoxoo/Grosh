@@ -35,9 +35,11 @@ class FakeLM:
         self.asked: list[dict] = []
 
     def __call__(self, request, timeout):
-        if isinstance(request, str):
+        if request.full_url.endswith("/models"):
+            self.seen_headers = dict(request.header_items())
             return io.BytesIO(json.dumps({"data": [{"id": m} for m in self.models]}).encode())
         body = json.loads(request.data)
+        self.seen_headers = dict(request.header_items())
         self.asked.append(body)
         if self.on_complete:
             self.on_complete()
@@ -83,7 +85,7 @@ class SettingsTests(AppCase):
         saved = self.app.save_settings({"model": "good-model", "baseUrl": "http://localhost:1234/v1/", "chunkChars": 8000, "junk": 1})
         self.assertEqual((saved["model"], saved["baseUrl"], saved["chunkChars"]), ("good-model", "http://localhost:1234/v1", 8000))
         self.assertNotIn("junk", saved)
-        self.assertEqual(self.app.settings(), saved)  # read back from cache/ui-settings.json
+        self.assertEqual(ui.public_settings(self.app.settings()), saved)  # read back from cache/ui-settings.json
 
     def test_bad_settings_are_refused_with_a_reason(self):
         for bad, message in (({"extraBody": "{nope"}, "JSON"), ({"extraBody": "[1]"}, "object"), ({"promptSuffix": "x" * 501}, "suffix"),
@@ -98,6 +100,77 @@ class SettingsTests(AppCase):
         client = self.app.client()
         self.assertEqual((client.extra_body, client.prompt_suffix, client.max_tokens), ({"reasoning_effort": "low"}, "/no_think", 4000))
         self.assertEqual(ui.default_settings()["maxTokens"], extract.DEFAULT_MAX_TOKENS)
+
+    def test_the_api_key_is_kept_private(self):
+        public = self.app.save_settings({"apiKey": "secret-token-123"})
+        self.assertEqual((public["apiKey"], public["apiKeySet"]), ("", True))
+        self.assertEqual(self.app.settings()["apiKey"], "secret-token-123")
+        self.assertEqual(self.paths.settings.stat().st_mode & 0o777, 0o600)
+
+        for path in ("/api/settings", "/api/overview"):  # nothing the page can read includes the key
+            status, payload = self.app.handle("GET", path, {}, {})
+            self.assertEqual(status, 200)
+            self.assertNotIn("secret-token-123", json.dumps(payload))
+        status, payload = self.app.handle("POST", "/api/settings", {}, {"model": "good-model", "apiKey": "secret-token-123"})
+        self.assertNotIn("secret-token-123", json.dumps(payload))
+
+    def test_a_blank_key_keeps_the_saved_one_and_clearing_removes_it(self):
+        self.app.save_settings({"apiKey": "secret-token-123"})
+        self.app.save_settings({"model": "other-model", "apiKey": ""})
+        self.assertEqual(self.app.settings()["apiKey"], "secret-token-123")
+        public = self.app.save_settings({"clearApiKey": True})
+        self.assertEqual((self.app.settings()["apiKey"], public["apiKeySet"]), ("", False))
+
+    def test_the_settings_file_stays_private_when_it_already_existed(self):
+        self.paths.cache.mkdir(parents=True)
+        self.paths.settings.write_text("{}")
+        self.paths.settings.chmod(0o644)
+        self.app.save_settings({"apiKey": "secret-token-123"})
+        self.assertEqual(self.paths.settings.stat().st_mode & 0o777, 0o600)
+
+    def test_new_settings_are_checked(self):
+        for bad, message in (({"apiKey": "has space"}, "API key"), ({"apiKey": "line\nbreak"}, "API key"), ({"apiKey": "kéy"}, "API key"),
+                             ({"responseMode": "xml"}, "responseMode"), ({"tokenField": "limit"}, "tokenField"),
+                             ({"temperature": 5}, "temperature"), ({"temperature": "hot"}, "temperature")):
+            status, payload = self.app.handle("POST", "/api/settings", {}, bad)
+            self.assertEqual(status, 400, bad)
+            self.assertIn(message, payload["error"])
+        self.assertIsNone(self.app.save_settings({"temperature": ""})["temperature"])
+        self.assertEqual(self.app.save_settings({"temperature": 0.5})["temperature"], 0.5)
+
+    def test_the_client_carries_all_of_it(self):
+        self.app.save_settings({"apiKey": "k", "responseMode": "prompt", "tokenField": "max_completion_tokens", "temperature": ""})
+        client = self.app.client()
+        self.assertEqual((client.api_key, client.response_mode, client.token_field, client.temperature), ("k", "prompt", "max_completion_tokens", None))
+
+    def test_profiles_keep_a_server_with_its_key_and_switching_swaps_them(self):
+        self.app.save_settings({"baseUrl": "http://a.test/v1", "model": "model-a", "apiKey": "key-a"})
+        self.app.change_profile({"action": "save", "name": "Server A"})
+        self.app.save_settings({"baseUrl": "http://b.test/v1", "model": "model-b", "apiKey": "key-b", "chunkChars": 5000})
+        listed = self.app.change_profile({"action": "save", "name": "Server B"})
+        self.assertEqual([p["name"] for p in listed["profiles"]], ["Server A", "Server B"])
+        self.assertEqual(listed["active"], "Server B")
+        self.assertNotIn("key-", json.dumps(listed))
+
+        used = self.app.change_profile({"action": "use", "name": "Server A"})
+        self.assertEqual((used["settings"]["model"], used["settings"]["apiKeySet"], used["active"]), ("model-a", True, "Server A"))
+        self.assertEqual(self.app.settings()["apiKey"], "key-a")  # B's key is no longer the one in use
+        self.assertEqual(self.app.profile_list()["profiles"][1]["name"], "Server B")  # and B is still saved
+
+        self.app.save_settings({"model": "model-a2"})  # editing the active settings doesn't lose the profiles
+        self.assertEqual(len(self.app.profile_list()["profiles"]), 2)
+        self.assertIsNone(self.app.profile_list()["active"])  # no longer matches Server A
+
+    def test_profile_requests_are_checked_and_deleting_removes_the_key(self):
+        self.app.save_settings({"apiKey": "key-a"})
+        self.app.change_profile({"action": "save", "name": "A"})
+        for body, status in (({"action": "save", "name": ""}, 400), ({"action": "save", "name": "x" * 41}, 400),
+                             ({"action": "use", "name": "nope"}, 404), ({"action": "explode", "name": "A"}, 400)):
+            self.assertEqual(self.app.handle("POST", "/api/profiles", {}, body)[0], status, body)
+        self.app.change_profile({"action": "delete", "name": "A"})
+        self.assertNotIn("A", self.paths.settings.read_text())
+        self.assertEqual(self.paths.settings.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(self.app.handle("GET", "/api/profiles", {}, {})[1]["profiles"], [])
 
     def test_a_corrupt_settings_file_falls_back_to_defaults(self):
         self.paths.cache.mkdir(parents=True)
@@ -155,6 +228,33 @@ class DetailAndModelTests(AppCase):
         result = self.app.lm_models()
         self.assertFalse(result["ok"])
         self.assertIn("refused", result["error"])
+
+    def test_a_server_without_a_model_list_still_works_and_a_bad_key_is_named(self):
+        def no_list(request, timeout):
+            raise urllib.error.HTTPError(request.full_url, 404, "Not Found", {}, io.BytesIO(b"{}"))
+
+        self.app.lm_urlopen = no_list
+        result = self.app.lm_models()
+        self.assertEqual((result["ok"], result["models"]), (True, []))
+        self.assertIn("type the model id", result["note"])
+
+        def refused(request, timeout):
+            raise urllib.error.HTTPError(request.full_url, 401, "Unauthorized", {}, io.BytesIO(b'{"error": "bad key"}'))
+
+        self.app.lm_urlopen = refused
+        result = self.app.lm_models()
+        self.assertFalse(result["ok"])
+        self.assertIn("Check the API key", result["error"])
+
+    def test_the_key_goes_out_as_a_bearer_token_when_models_are_listed_and_asked(self):
+        self.app.save_settings({"apiKey": "secret-token-123", "model": "good-model"})
+        lm = self.use()
+        self.app.lm_models()
+        self.assertEqual(lm.seen_headers["Authorization"], "Bearer secret-token-123")
+        self.give_page("bank-a")
+        self.app.start_job({"kind": "extract", "which": "pending"})
+        self.wait()
+        self.assertEqual(lm.seen_headers["Authorization"], "Bearer secret-token-123")
 
     def test_the_model_test_uses_the_real_schema_and_reports_lm_studios_complaint(self):
         lm = self.use(replies=['{"cardConditions": [], "rules": []}'])

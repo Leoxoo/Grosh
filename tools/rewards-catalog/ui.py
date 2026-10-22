@@ -10,8 +10,12 @@ Host isn't local or whose POSTs lack the X-Requested-With header, so a web page 
 drive it.
 
 What the page does:
-  - lists LM Studio's models and lets you choose one (and the chunk size, token limit and timeout);
-  - tests the model on the real output schema, which shows at once whether LM Studio accepts it;
+  - works with any server that speaks the OpenAI chat completions API (LM Studio, OpenAI, vLLM, a
+    vendor's own), including ones that need a bearer token; lists the server's models and lets you
+    choose one, plus the reply limit, time limit, page size, output format and other request fields;
+  - keeps the API key in cache/ui-settings.json (not committed, readable only by you) and never
+    sends it back to the page;
+  - tests the model on the real output schema, which shows at once whether the server accepts it;
   - runs one job at a time, either "fetch pages" or "extract rules", on all cards, the ones that
     need it, or the ones you tick, with a live log, a progress bar and a Stop button;
   - shows every card's fetch and extraction status, and for one card: the rules found, what was
@@ -62,8 +66,12 @@ class Paths:
 
 def default_settings() -> dict:
     return {
-        "baseUrl": os.environ.get("LM_STUDIO_URL", extract.DEFAULT_URL),
-        "model": os.environ.get("LM_STUDIO_MODEL", extract.DEFAULT_MODEL),
+        "baseUrl": os.environ.get("LLM_BASE_URL") or os.environ.get("LM_STUDIO_URL") or extract.DEFAULT_URL,
+        "model": os.environ.get("LLM_MODEL") or os.environ.get("LM_STUDIO_MODEL") or extract.DEFAULT_MODEL,
+        "apiKey": os.environ.get("LLM_API_KEY", ""),
+        "responseMode": "json_schema",
+        "tokenField": "max_tokens",
+        "temperature": 0,
         "chunkChars": extract.CHUNK_CHARS,
         "maxTokens": extract.DEFAULT_MAX_TOKENS,
         "timeoutSeconds": extract.DEFAULT_TIMEOUT,
@@ -72,12 +80,34 @@ def default_settings() -> dict:
     }
 
 
+MAX_PROFILES = 20
+
+
+def _same_server(a: dict, b: dict) -> bool:
+    """Whether two settings point at the same server, key and model (the other settings are tuning)."""
+    return all(a.get(k) == b.get(k) for k in ("baseUrl", "model", "apiKey"))
+
+
+def public_settings(settings: dict) -> dict:
+    """The settings as the page may see them: everything except the API key, which is only ever reported as set or not."""
+    return {**{k: v for k, v in settings.items() if k != "apiKey"}, "apiKey": "", "apiKeySet": bool(settings.get("apiKey"))}
+
+
+def write_private(path: Path, data: str) -> None:
+    """Write a file only its owner can read: it may hold an API key."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as file:
+        os.fchmod(file.fileno(), 0o600)  # also for a file that existed with looser permissions
+        file.write(data)
+
+
 def clean_settings(raw: dict, current: dict) -> dict:
     """`current` with the given settings applied, or ValueError saying which one is wrong."""
     merged = {**current, **{key: raw[key] for key in current if key in raw}}
     url, model = merged["baseUrl"], merged["model"]
     if not isinstance(url, str) or not re.match(r"^https?://", url.strip()):
-        raise ValueError("The LM Studio address must start with http:// or https://")
+        raise ValueError("The server address must start with http:// or https://")
     if not isinstance(model, str) or not model.strip():
         raise ValueError("Choose a model")
     ranges = {"chunkChars": (1_000, 60_000), "maxTokens": (200, 32_000), "timeoutSeconds": (10, 3_600)}
@@ -85,6 +115,18 @@ def clean_settings(raw: dict, current: dict) -> dict:
         value = merged[key]
         if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
             raise ValueError(f"{key} must be a whole number from {low} to {high}")
+    key = merged["apiKey"]
+    if not isinstance(key, str) or len(key) > 500 or not key.isascii() or any(c.isspace() or not c.isprintable() for c in key):
+        raise ValueError("The API key must be a single line of plain characters (up to 500)")
+    if merged["responseMode"] not in extract.RESPONSE_MODES:
+        raise ValueError(f"responseMode must be one of: {', '.join(extract.RESPONSE_MODES)}")
+    if merged["tokenField"] not in extract.TOKEN_FIELDS:
+        raise ValueError(f"tokenField must be one of: {', '.join(extract.TOKEN_FIELDS)}")
+    temperature = merged["temperature"]
+    if temperature in ("", None):
+        merged["temperature"] = None  # leave it out of requests: some models accept only their default
+    elif isinstance(temperature, bool) or not isinstance(temperature, (int, float)) or not 0 <= temperature <= 2:
+        raise ValueError("temperature must be a number from 0 to 2, or empty to leave it out")
     extra, suffix = merged["extraBody"], merged["promptSuffix"]
     if not isinstance(extra, str) or not isinstance(suffix, str) or len(suffix) > 500:
         raise ValueError("Extra request fields and the prompt suffix must be text (the suffix at most 500 characters)")
@@ -193,25 +235,77 @@ class App:
         raise Problem(f"No card {card_id!r}", 404)
 
     def settings(self) -> dict:
-        saved = fetch.read_json(self.paths.settings, {})
+        saved = {k: v for k, v in fetch.read_json(self.paths.settings, {}).items() if k != "profiles"}
         try:
             return clean_settings(saved, default_settings())
         except ValueError:
             return default_settings()
 
+    def _profiles(self) -> dict:
+        profiles = fetch.read_json(self.paths.settings, {}).get("profiles", {})
+        return profiles if isinstance(profiles, dict) else {}
+
+    def _write_settings(self, active: dict, profiles: dict) -> None:
+        # One private file holds the active settings, the saved profiles, and every key in them.
+        write_private(self.paths.settings, json.dumps({**active, "profiles": profiles}, indent=2, sort_keys=True) + "\n")
+
+    def profile_list(self) -> dict:
+        """Saved profiles (a server address, key and model kept together), without their keys."""
+        current, profiles = self.settings(), self._profiles()
+        names = sorted(profiles)
+        same = [n for n in names if _same_server(profiles[n], current)]
+        return {
+            "profiles": [{"name": n, "baseUrl": profiles[n].get("baseUrl"), "model": profiles[n].get("model"),
+                          "apiKeySet": bool(profiles[n].get("apiKey"))} for n in names],
+            "active": same[0] if same else None,
+        }
+
+    def change_profile(self, body: dict) -> dict:
+        action, name = body.get("action"), body.get("name")
+        if not isinstance(name, str) or not name.strip() or len(name.strip()) > 40 or not name.isprintable():
+            raise Problem("A profile name is 1 to 40 plain characters")
+        name = name.strip()
+        profiles = self._profiles()
+        if action == "save":
+            if name not in profiles and len(profiles) >= MAX_PROFILES:
+                raise Problem(f"At most {MAX_PROFILES} profiles")
+            profiles[name] = self.settings()
+        elif action in ("use", "delete"):
+            if name not in profiles:
+                raise Problem(f"No profile {name!r}", 404)
+            if action == "delete":
+                del profiles[name]
+            else:
+                try:
+                    self._write_settings(clean_settings(profiles[name], default_settings()), profiles)
+                except ValueError as problem:
+                    raise Problem(f"That profile is no longer valid: {problem}") from problem
+                return {**self.profile_list(), "settings": public_settings(self.settings())}
+        else:
+            raise Problem("action must be save, use or delete")
+        self._write_settings(self.settings(), profiles)
+        return {**self.profile_list(), "settings": public_settings(self.settings())}
+
     def save_settings(self, raw: dict) -> dict:
+        """Apply and save settings; returns them without the API key. A blank key in `raw` keeps the saved
+        key, so the page need not hold it; `clearApiKey` removes it."""
+        current = self.settings()
+        raw = {k: v for k, v in raw.items() if not (k == "apiKey" and not v)}
+        if raw.get("clearApiKey"):
+            raw["apiKey"] = ""
         try:
-            merged = clean_settings(raw, self.settings())
+            merged = clean_settings(raw, current)
         except ValueError as problem:
             raise Problem(str(problem)) from problem
-        fetch.write_json(self.paths.settings, merged)
-        return merged
+        self._write_settings(merged, self._profiles())
+        return public_settings(merged)
 
-    def client(self, settings: dict | None = None) -> extract.LMStudio:
+    def client(self, settings: dict | None = None) -> extract.ChatServer:
         s = settings or self.settings()
-        return extract.LMStudio(
+        return extract.ChatServer(
             s["baseUrl"], s["model"], s["timeoutSeconds"], urlopen=self.lm_urlopen, max_tokens=s["maxTokens"],
             extra_body=json.loads(s["extraBody"]) if s["extraBody"] else {}, prompt_suffix=s["promptSuffix"],
+            api_key=s["apiKey"], response_mode=s["responseMode"], token_field=s["tokenField"], temperature=s["temperature"],
         )
 
     def candidate(self, card_id: str) -> dict | None:
@@ -254,7 +348,7 @@ class App:
             summary["extracted"] += bool(row["extract"] and row["extract"]["status"] in ("ok", "manual"))
             summary["failed"] += bool(row["extract"] and row["extract"]["status"] == "failed")
         return {
-            "cards": rows, "summary": summary, "settings": settings, "promptVersion": extract.PROMPT_VERSION,
+            "cards": rows, "summary": summary, "settings": public_settings(settings), "promptVersion": extract.PROMPT_VERSION,
             "job": self.job.snapshot(with_log=False) if self.job else None,
         }
 
@@ -273,19 +367,24 @@ class App:
             "manual": fetch.read_json(self.paths.manual, {}).get(card_id), "page": page,
         }
 
-    # --- LM Studio ----------------------------------------------------------------------------
+    # --- the model server ---------------------------------------------------------------------
 
     def lm_models(self) -> dict:
         settings = self.settings()
         try:
             models = self.client(settings).models()
-        except (OSError, ValueError, KeyError) as problem:
-            return {"ok": False, "models": [], "error": f"Can't reach LM Studio at {settings['baseUrl']}: {problem}"}
+        except extract.ServerHTTPError as problem:
+            if problem.code in (404, 405, 501):  # some servers have no model list: typing a model id still works
+                return {"ok": True, "models": [], "error": None, "note": "This server doesn't list its models; type the model id."}
+            hint = " Check the API key." if problem.code in (401, 403) else ""
+            return {"ok": False, "models": [], "error": f"The server at {settings['baseUrl']} refused the request: {problem}.{hint}"}
+        except (OSError, ValueError, KeyError, TypeError) as problem:
+            return {"ok": False, "models": [], "error": f"Can't reach the model server at {settings['baseUrl']}: {problem}"}
         return {"ok": True, "models": models, "error": None}
 
     def test_model(self) -> dict:
         """Ask the chosen model for an empty list of rules, using the real output schema. This is the
-        quickest way to learn whether LM Studio accepts the schema and the model answers in time."""
+        quickest way to learn whether the server accepts the schema and the model answers in time."""
         client = self.client()
         messages = [
             {"role": "system", "content": extract.SYSTEM_PROMPT},
@@ -472,9 +571,11 @@ class App:
             if path == "/api/overview":
                 return self.overview()
             if path == "/api/settings":
-                return self.settings()
+                return public_settings(self.settings())
             if path == "/api/models":
                 return self.lm_models()
+            if path == "/api/profiles":
+                return self.profile_list()
             if path == "/api/job":
                 since = int((query.get("since") or ["0"])[0] or 0)
                 return {"job": self.job.snapshot(since) if self.job else None}
@@ -483,6 +584,8 @@ class App:
         elif method == "POST":
             if path == "/api/settings":
                 return self.save_settings(body)
+            if path == "/api/profiles":
+                return self.change_profile(body)
             if path == "/api/test-model":
                 return self.test_model()
             if path == "/api/job":

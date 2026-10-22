@@ -30,7 +30,7 @@
   .row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; }
   label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
   input, select, button { font: inherit; color: inherit; }
-  input[type=text], input[type=number], select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; min-width: 0; }
+  input[type=text], input[type=number], input[type=password], select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; min-width: 0; }
   input:focus-visible, select:focus-visible, button:focus-visible, tr:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   button { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
   button:hover:not(:disabled) { border-color: var(--accent); }
@@ -77,17 +77,28 @@
 </head>
 <body>
 <header>
-  <h1>Rewards catalog<small>Fetch issuer pages, then extract reward rules with a local model</small></h1>
-  <span id="server" class="pill">checking LM Studio…</span>
+  <h1>Rewards catalog<small>Fetch issuer pages, then extract reward rules with a model</small></h1>
+  <span id="server" class="pill">checking the model server…</span>
 </header>
 
 <main>
   <section class="panel" aria-labelledby="model-h">
     <h2 id="model-h">Model</h2>
+    <div class="row" style="margin-bottom: 12px">
+      <label>Saved profile
+        <select id="profile"><option value="">(none)</option></select></label>
+      <button id="saveProfile" type="button">Save current settings as…</button>
+      <button id="deleteProfile" type="button">Delete profile</button>
+      <span class="small muted">A profile keeps a server's address, key and model together, so switching servers is one click.</span>
+    </div>
     <div class="row">
-      <label style="flex: 1 1 260px">LM Studio address
+      <label style="flex: 1 1 260px">Server address (any OpenAI-compatible API, ending in /v1)
         <input type="text" id="baseUrl" spellcheck="false" autocomplete="off">
       </label>
+      <label style="flex: 1 1 220px">API key (bearer token, if the server needs one)
+        <input type="password" id="apiKey" spellcheck="false" autocomplete="off" placeholder="none">
+      </label>
+      <button id="clearKey" type="button" hidden>Remove saved key</button>
       <label style="flex: 1 1 280px">Model (pick one or type its id)
         <input type="text" id="model" list="models" spellcheck="false" autocomplete="off">
         <datalist id="models"></datalist>
@@ -104,13 +115,24 @@
         <label>Time limit per request (seconds)<input type="number" id="timeoutSeconds" min="10" max="3600" step="10"></label>
       </div>
       <div class="row" style="margin-top: 8px">
+        <label>Ask for the reply's shape by
+          <select id="responseMode">
+            <option value="json_schema">sending the schema (LM Studio, OpenAI…)</option>
+            <option value="json_object">asking for a JSON object</option>
+            <option value="prompt">describing it in the prompt only</option>
+          </select></label>
+        <label>Reply-limit field
+          <select id="tokenField"><option value="max_tokens">max_tokens</option><option value="max_completion_tokens">max_completion_tokens (newer OpenAI models)</option></select></label>
+        <label>Temperature (empty to leave out)<input type="number" id="temperature" min="0" max="2" step="0.1" style="width: 8em"></label>
+      </div>
+      <div class="row" style="margin-top: 8px">
         <label style="flex: 1 1 280px">Extra request fields (JSON, optional)
           <input type="text" id="extraBody" spellcheck="false" autocomplete="off" placeholder='{"reasoning_effort": "low"}'></label>
         <label style="flex: 1 1 220px">Added to the end of every prompt (optional)
           <input type="text" id="promptSuffix" spellcheck="false" autocomplete="off" placeholder="/no_think"></label>
       </div>
       <p class="small muted">For a model that reasons before answering, a small reply limit runs out before the answer starts. Raise the limit, or try these to shorten or switch off the reasoning. What works depends on the model: use "Test model" and "Try the model on this page" to see.</p>
-      <p class="small muted">Settings are saved in <span class="mono">cache/ui-settings.json</span>. Changing the model makes every card "need extracting" again, since candidates are kept per model.</p>
+      <p class="small muted">Settings are saved in <span class="mono">cache/ui-settings.json</span>, which is not committed and is readable only by you; that includes the API key, which is never sent back to this page. Changing the model makes every card "need extracting" again, since candidates are kept per model.</p>
     </details>
     <div id="testResult" class="result" hidden></div>
   </section>
@@ -207,15 +229,49 @@ const fetchKind = { ok: "ok", new: "ok", unchanged: "ok", changed: "ok", never: 
 const extractKind = { ok: "ok", manual: "info", "no-rules": "", "wrong-page": "warn", failed: "bad" };
 const NEEDS = { "choice-categories": "picks a category", "account-opened": "date opened", "pays-with-apple-pay": "uses Apple Pay" };
 
+// ---------- profiles ----------
+async function loadProfiles() {
+  const data = await api("GET", "/api/profiles");
+  $("profile").replaceChildren(h("option", { value: "", text: data.profiles.length ? "(current settings)" : "(none saved)" }),
+    ...data.profiles.map((p) => h("option", { value: p.name, text: `${p.name} · ${p.model}${p.apiKeySet ? " · key saved" : ""}` })));
+  $("profile").value = data.active || "";
+  $("deleteProfile").disabled = !data.active;
+}
+async function applyProfile(data) {
+  fillSettings(data.settings); await loadProfiles(); await loadModels(); await loadOverview();
+}
+$("profile").onchange = async () => {
+  const name = $("profile").value; if (!name) return;
+  try { await applyProfile(await api("POST", "/api/profiles", { action: "use", name })); showResult($("testResult"), true, `Using "${name}".`); }
+  catch (e) { showResult($("testResult"), false, e.message); await loadProfiles(); }
+};
+$("saveProfile").onclick = async () => {
+  if (!(await saveSettings())) return;
+  const name = prompt("Name this profile (for example: LM Studio, or flint on rec):", $("profile").value || "");
+  if (!name) return;
+  try { await applyProfile(await api("POST", "/api/profiles", { action: "save", name })); showResult($("testResult"), true, `Saved "${name}".`); }
+  catch (e) { showResult($("testResult"), false, e.message); }
+};
+$("deleteProfile").onclick = async () => {
+  const name = $("profile").value; if (!name || !confirm(`Delete the profile "${name}"? Its saved key goes with it.`)) return;
+  try { await applyProfile(await api("POST", "/api/profiles", { action: "delete", name })); } catch (e) { showResult($("testResult"), false, e.message); }
+};
+
 // ---------- model panel ----------
 function fillSettings(s) {
-  for (const key of ["baseUrl", "model", "chunkChars", "maxTokens", "timeoutSeconds", "extraBody", "promptSuffix"]) $(key).value = s[key];
+  for (const key of ["baseUrl", "model", "chunkChars", "maxTokens", "timeoutSeconds", "extraBody", "promptSuffix", "responseMode", "tokenField"]) $(key).value = s[key];
+  $("temperature").value = s.temperature ?? "";
+  $("apiKey").value = ""; $("apiKey").placeholder = s.apiKeySet ? "saved: type to replace" : "none";
+  $("clearKey").hidden = !s.apiKeySet;
 }
 function readSettings() {
   return {
     baseUrl: $("baseUrl").value, model: $("model").value, chunkChars: Number($("chunkChars").value),
     maxTokens: Number($("maxTokens").value), timeoutSeconds: Number($("timeoutSeconds").value),
     extraBody: $("extraBody").value, promptSuffix: $("promptSuffix").value,
+    responseMode: $("responseMode").value, tokenField: $("tokenField").value,
+    temperature: $("temperature").value === "" ? null : Number($("temperature").value),
+    apiKey: $("apiKey").value,  // blank keeps the saved key
   };
 }
 function showResult(el, ok, text) { el.hidden = false; el.className = "result " + (ok ? "ok" : "bad"); el.textContent = text; }
@@ -228,20 +284,26 @@ async function loadModels() {
     $("models").replaceChildren(...data.models.map((m) => h("option", { value: m })));
     if (data.ok) {
       const has = data.models.includes($("model").value);
-      pill.className = "pill " + (has ? "ok" : "bad");
-      pill.textContent = has ? `LM Studio connected · ${data.models.length} models` : `LM Studio connected, but "${$("model").value}" isn't listed`;
-    } else { pill.className = "pill bad"; pill.textContent = "LM Studio not reachable"; pill.title = data.error; }
+      const listed = data.models.length > 0, name = $("model").value;
+      pill.className = "pill " + (has || !listed ? "ok" : "bad");
+      pill.textContent = !listed ? "Server reachable (it doesn't list models)" : has ? `Server connected · ${data.models.length} models` : `Server connected, but "${name}" isn't listed`;
+      pill.title = data.note || "";
+    } else { pill.className = "pill bad"; pill.textContent = "Model server not usable"; pill.title = data.error; showResult($("testResult"), false, data.error); }
   } catch (e) { pill.className = "pill bad"; pill.textContent = "Can't ask the server: " + e.message; }
 }
 async function saveSettings() {
-  try { fillSettings(await api("POST", "/api/settings", readSettings())); await loadModels(); await loadOverview(); return true; }
+  try { fillSettings(await api("POST", "/api/settings", readSettings())); await loadProfiles(); await loadModels(); await loadOverview(); return true; }
   catch (e) { showResult($("testResult"), false, e.message); return false; }
 }
+$("clearKey").onclick = async () => {
+  try { fillSettings(await api("POST", "/api/settings", { clearApiKey: true })); await loadModels(); showResult($("testResult"), true, "The saved key was removed."); }
+  catch (e) { showResult($("testResult"), false, e.message); }
+};
 $("save").onclick = async () => { if (await saveSettings()) showResult($("testResult"), true, "Saved."); };
 $("refresh").onclick = async () => { await saveSettings(); };
 $("test").onclick = async () => {
   if (!(await saveSettings())) return;
-  const box = $("testResult"); showResult(box, true, "Asking the model… (the first request can take a while if LM Studio must load it)");
+  const box = $("testResult"); showResult(box, true, "Asking the model… (the first request can take a while if the server must load the model)");
   try {
     const r = await api("POST", "/api/test-model", {});
     const m = r.meta || {}, used = (m.usage || {}).completion_tokens;
@@ -445,7 +507,7 @@ async function jobFor(kind, id, force) {
 (async function start() {
   try {
     fillSettings(await api("GET", "/api/settings"));
-    await loadModels(); await loadOverview();
+    await loadProfiles(); await loadModels(); await loadOverview();
     const { job } = await api("GET", "/api/job?since=0");
     if (job) { applyJob(job); if (job.state === "running") startPolling(); }
   } catch (e) { $("server").className = "pill bad"; $("server").textContent = "Can't reach the page's server: " + e.message; }

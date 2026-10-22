@@ -5,9 +5,12 @@
     python3 tools/rewards-catalog/extract.py --issuer "capital one" --limit 5
     python3 tools/rewards-catalog/extract.py            # every card with a fetched page
 
-Needs LM Studio's local server running (Developer tab, Start Server) with the model
-loaded. Defaults: http://localhost:1234/v1 and k2-horizon-7b-uno-uncensored; change them
-with --base-url / --model or the LM_STUDIO_URL / LM_STUDIO_MODEL environment variables.
+Needs a server that speaks the OpenAI chat completions API: LM Studio (Developer tab, Start
+Server), OpenAI itself, vLLM, or any other. Settings come from what the web page (ui.py) last
+saved, and flags override them: --base-url, --model, --max-tokens, --timeout, --extra-body,
+--prompt-suffix, --response-mode, --token-field, --temperature. The API key (a bearer token) comes
+from the LLM_API_KEY environment variable or the page's saved settings, never from a flag, so it
+stays out of your shell history and process list.
 
 For each card it reads cache/<id>/latest.txt (written by fetch.py), asks the model for
 rules in chunks, and writes cache/candidates/<id>.json. The model only PROPOSES. A rule
@@ -446,59 +449,97 @@ def empty_reply_message(meta: dict) -> str:
     hint = ""
     if meta.get("finishReason") == "length" or meta.get("reasoningChars"):
         hint = " The model ran out of room before answering, probably because it reasons first: raise the reply limit in the page's settings, or choose a model that answers directly."
-    return f"LM Studio returned an empty reply ({'; '.join(parts)}).{hint}"
+    return f"The model server returned an empty reply ({'; '.join(parts)}).{hint}"
 
 
-class LMStudio:
-    """LM Studio's OpenAI-compatible server."""
+# How the reply's shape is requested. Not every server accepts a JSON schema, so there are fallbacks that
+# describe the shape in the prompt instead; the checks on what comes back are the same either way.
+RESPONSE_MODES = {
+    "json_schema": "send the output schema with each request (LM Studio, OpenAI, and others that support it)",
+    "json_object": "ask for a JSON object, and describe its shape in the prompt",
+    "prompt": "send no format field: describe the shape in the prompt and read the reply",
+}
+TOKEN_FIELDS = ("max_tokens", "max_completion_tokens")  # newer OpenAI models want the second
+
+
+class ServerHTTPError(OSError):
+    """The server answered with an HTTP error: `code` is its status, and the message carries its own words."""
+
+    def __init__(self, code: int, detail: str) -> None:
+        super().__init__(f"the server answered HTTP {code}: {detail}" if detail else f"the server answered HTTP {code}")
+        self.code = code
+
+
+class ChatServer:
+    """Any server that speaks the OpenAI chat completions API: LM Studio, OpenAI itself, vLLM, a vendor's own.
+    `api_key` is sent as a bearer token. It is never logged or put in an error message."""
 
     def __init__(
         self, base_url: str, model: str, timeout: float = DEFAULT_TIMEOUT, urlopen=urllib.request.urlopen,
         max_tokens: int = DEFAULT_MAX_TOKENS, extra_body: dict | None = None, prompt_suffix: str = "",
+        api_key: str = "", response_mode: str = "json_schema", token_field: str = "max_tokens",
+        temperature: float | None = 0,
     ) -> None:
+        if response_mode not in RESPONSE_MODES or token_field not in TOKEN_FIELDS:
+            raise ValueError(f"response_mode must be one of {list(RESPONSE_MODES)} and token_field one of {list(TOKEN_FIELDS)}")
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = timeout
         self.urlopen = urlopen
         self.max_tokens = max_tokens
         # Two ways to steer a model without changing code: fields added to every request (for example
-        # {"reasoning_effort": "low"}) and a line added to the end of every prompt (for example "/no_think").
+        # {"reasoning_effort": "none"}) and a line added to the end of every prompt (for example "/no_think").
         self.extra_body = extra_body or {}
         self.prompt_suffix = prompt_suffix.strip()
+        self.api_key = api_key.strip()
+        self.response_mode = response_mode
+        self.token_field = token_field
+        self.temperature = temperature
         self.last_meta: dict = {}  # how the latest reply ended: finish reason, tokens used, reasoning text
 
+    def _request(self, url: str, data: bytes | None = None) -> urllib.request.Request:
+        headers = {"Content-Type": "application/json"} if data is not None else {}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        return urllib.request.Request(url, data=data, headers=headers)
+
+    def _open(self, request: urllib.request.Request, timeout: float):
+        try:
+            return self.urlopen(request, timeout=timeout)
+        except urllib.error.HTTPError as problem:
+            # A refused request is explained in the body (a schema it can't use, no such model, a bad key).
+            raise ServerHTTPError(problem.code, problem.read(600).decode("utf-8", "replace").strip()) from problem
+
     def models(self) -> list[str]:
-        with self.urlopen(f"{self.base_url}/models", timeout=10) as reply:
-            return [entry["id"] for entry in json.load(reply)["data"]]
+        with self._open(self._request(f"{self.base_url}/models"), 10) as reply:
+            data = json.load(reply)
+        return [entry["id"] for entry in (data["data"] if isinstance(data, dict) else data)]
 
     def complete(self, messages: list[dict]) -> str:
+        notes = []
+        if self.response_mode != "json_schema":
+            notes.append("Reply with only a JSON object that follows this JSON Schema, and nothing else:\n" + json.dumps(SCHEMA))
         if self.prompt_suffix:
-            messages = [*messages[:-1], {**messages[-1], "content": f"{messages[-1]['content']}\n\n{self.prompt_suffix}"}]
-        body = {
-            "temperature": 0,
-            "max_tokens": self.max_tokens,
-            "response_format": {"type": "json_schema", "json_schema": {"name": "rules", "strict": True, "schema": SCHEMA}},
-            **{k: v for k, v in self.extra_body.items() if k not in ("model", "messages")},
-            "model": self.model,
-            "messages": messages,
-        }
-        request = urllib.request.Request(
-            f"{self.base_url}/chat/completions",
-            data=json.dumps(body).encode(),
-            headers={"Content-Type": "application/json"},
-        )
-        try:
-            with self.urlopen(request, timeout=self.timeout) as reply:
-                data = json.load(reply)
-        except urllib.error.HTTPError as problem:
-            # LM Studio explains a refused request (a schema it can't use, no model loaded) in the body.
-            detail = problem.read(600).decode("utf-8", "replace").strip()
-            raise OSError(f"LM Studio answered HTTP {problem.code}: {detail}") from problem
+            notes.append(self.prompt_suffix)
+        if notes:
+            messages = [*messages[:-1], {**messages[-1], "content": "\n\n".join([messages[-1]["content"], *notes])}]
+        body: dict = {self.token_field: self.max_tokens}
+        if self.temperature is not None:  # some models accept only their default
+            body["temperature"] = self.temperature
+        if self.response_mode == "json_schema":
+            body["response_format"] = {"type": "json_schema", "json_schema": {"name": "rules", "strict": True, "schema": SCHEMA}}
+        elif self.response_mode == "json_object":
+            body["response_format"] = {"type": "json_object"}
+        body.update({k: v for k, v in self.extra_body.items() if k not in ("model", "messages")})
+        body.update(model=self.model, messages=messages)
+        request = self._request(f"{self.base_url}/chat/completions", json.dumps(body).encode())
+        with self._open(request, self.timeout) as reply:
+            data = json.load(reply)
         try:
             choice = data["choices"][0]
             message = choice["message"]
         except (KeyError, IndexError, TypeError) as problem:
-            raise ValueError(f"unexpected reply from LM Studio: {problem}") from problem
+            raise ValueError(f"unexpected reply from the model server: {problem}") from problem
         content = message.get("content") or ""
         reasoning = message.get("reasoning_content") or message.get("reasoning") or ""
         self.last_meta = {
@@ -688,23 +729,30 @@ def up_to_date(path: Path, page_hash: str, model: str) -> bool:
 
 
 class ServerProblem(Exception):
-    """LM Studio isn't answering, or doesn't have the chosen model."""
+    """The model server isn't answering, refuses the key, or doesn't have the chosen model."""
 
 
 class Stopped(Exception):
     """A running job was asked to stop."""
 
 
-def check_server(client: LMStudio) -> list[str]:
-    """The model ids LM Studio lists, or ServerProblem saying what to fix."""
+def check_server(client: ChatServer) -> list[str]:
+    """The model ids the server lists, or ServerProblem saying what to fix. A server with no model list
+    (HTTP 404/405) is taken on trust, and the model id is used as given."""
     try:
         available = client.models()
-    except (OSError, ValueError, KeyError) as problem:
-        raise ServerProblem(
-            f"LM Studio isn't answering at {client.base_url} ({problem}). Start its local server (Developer tab)."
-        ) from problem
+    except ServerHTTPError as problem:
+        if problem.code in (401, 403):
+            raise ServerProblem(
+                f"The server at {client.base_url} refused the API key (HTTP {problem.code}). Check the key in the page's settings."
+            ) from problem
+        if problem.code in (404, 405, 501):
+            return []
+        raise ServerProblem(f"The server at {client.base_url} answered badly: {problem}") from problem
+    except (OSError, ValueError, KeyError, TypeError) as problem:
+        raise ServerProblem(f"The model server isn't answering at {client.base_url} ({problem}). Is it running?") from problem
     if client.model not in available:
-        raise ServerProblem(f"LM Studio has no model {client.model!r}. It lists: {', '.join(available) or 'nothing'}.")
+        raise ServerProblem(f"The server has no model {client.model!r}. It lists: {', '.join(available) or 'nothing'}.")
     return available
 
 
@@ -721,7 +769,7 @@ def has_page(card: dict, state: dict, cache: Path) -> bool:
 
 
 def process_cards(
-    chosen: list[dict], *, state: dict, manual: dict, client: LMStudio, chunk_chars: int, force: bool,
+    chosen: list[dict], *, state: dict, manual: dict, client: ChatServer, chunk_chars: int, force: bool,
     cache: Path, candidates: Path, emit, ensure_server=None, progress=None, should_stop=None,
 ) -> dict[str, int]:
     """Extract rules for the chosen cards one at a time, saving each candidate as it finishes.
@@ -766,19 +814,22 @@ def process_cards(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Propose reward rules from fetched pages, using LM Studio.")
+    parser = argparse.ArgumentParser(description="Propose reward rules from fetched pages, using an OpenAI-compatible model server.")
     parser.add_argument("--only", nargs="+", default=[], metavar="ID")
     parser.add_argument("--issuer", default="")
     parser.add_argument("--limit", type=int)
     parser.add_argument("--force", action="store_true", help="redo cards whose page, model and prompt are unchanged")
     saved = fetch.read_json(SAVED_SETTINGS, {})  # what the web page (ui.py) last saved; flags override it
-    parser.add_argument("--base-url", default=os.environ.get("LM_STUDIO_URL", saved.get("baseUrl", DEFAULT_URL)))
-    parser.add_argument("--model", default=os.environ.get("LM_STUDIO_MODEL", saved.get("model", DEFAULT_MODEL)))
+    parser.add_argument("--base-url", default=os.environ.get("LLM_BASE_URL") or os.environ.get("LM_STUDIO_URL") or saved.get("baseUrl", DEFAULT_URL))
+    parser.add_argument("--model", default=os.environ.get("LLM_MODEL") or os.environ.get("LM_STUDIO_MODEL") or saved.get("model", DEFAULT_MODEL))
     parser.add_argument("--chunk-chars", type=int, default=saved.get("chunkChars", CHUNK_CHARS), help="page text sent to the model at a time")
     parser.add_argument("--max-tokens", type=int, default=saved.get("maxTokens", DEFAULT_MAX_TOKENS), help="reply limit, including any reasoning")
     parser.add_argument("--timeout", type=int, default=saved.get("timeoutSeconds", DEFAULT_TIMEOUT), help="seconds to wait for one reply")
     parser.add_argument("--extra-body", default=saved.get("extraBody", ""), metavar="JSON", help='fields added to every request, e.g. \'{"reasoning_effort": "none"}\'')
     parser.add_argument("--prompt-suffix", default=saved.get("promptSuffix", ""), help='text added to the end of every prompt, e.g. "/no_think"')
+    parser.add_argument("--response-mode", default=saved.get("responseMode", "json_schema"), choices=list(RESPONSE_MODES))
+    parser.add_argument("--token-field", default=saved.get("tokenField", "max_tokens"), choices=TOKEN_FIELDS, help="name of the reply-limit field")
+    parser.add_argument("--temperature", type=float, default=saved.get("temperature", 0), help="sampling temperature (omit with the page's settings if the model accepts only its default)")
     args = parser.parse_args()
     try:
         extra_body = json.loads(args.extra_body) if args.extra_body else {}
@@ -803,8 +854,10 @@ def main() -> int:
 
     if saved:
         print(f"Using model settings saved by the web page ({SAVED_SETTINGS.name}); flags override them.", flush=True)
-    client = LMStudio(
-        args.base_url, args.model, args.timeout, max_tokens=args.max_tokens, extra_body=extra_body, prompt_suffix=args.prompt_suffix
+    client = ChatServer(
+        args.base_url, args.model, args.timeout, max_tokens=args.max_tokens, extra_body=extra_body,
+        prompt_suffix=args.prompt_suffix, api_key=os.environ.get("LLM_API_KEY") or saved.get("apiKey", ""),
+        response_mode=args.response_mode, token_field=args.token_field, temperature=args.temperature,
     )
 
     def ensure_server() -> None:

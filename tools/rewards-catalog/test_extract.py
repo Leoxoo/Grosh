@@ -3,6 +3,7 @@
 import io
 import json
 import unittest
+import urllib.error
 
 import extract
 from extract import extract_card, manual_candidate, normalize, validate_rule
@@ -451,7 +452,7 @@ class LMStudioTests(unittest.TestCase):
             calls.append(request)
             return io.BytesIO(json.dumps(payload).encode())
 
-        return extract.LMStudio("http://lm.test/v1/", "m", urlopen=urlopen), calls
+        return extract.ChatServer("http://lm.test/v1/", "m", urlopen=urlopen), calls
 
     def test_lists_models(self):
         client, _ = self.client({"data": [{"id": "a"}, {"id": "b"}]})
@@ -477,7 +478,7 @@ class LMStudioTests(unittest.TestCase):
         def refuse(request, timeout):
             raise urllib.error.HTTPError(request.full_url, 400, "Bad Request", {}, io.BytesIO(b'{"error": "Invalid schema"}'))
 
-        client = extract.LMStudio("http://lm.test/v1", "m", urlopen=refuse)
+        client = extract.ChatServer("http://lm.test/v1", "m", urlopen=refuse)
         with self.assertRaises(OSError) as raised:
             client.complete([])
         self.assertIn("HTTP 400", str(raised.exception))
@@ -502,7 +503,7 @@ class LMStudioTests(unittest.TestCase):
             calls.append(json.loads(request.data))
             return io.BytesIO(json.dumps({"choices": [{"message": {"content": "{}"}}]}).encode())
 
-        client = extract.LMStudio("http://lm.test/v1", "m", urlopen=urlopen, max_tokens=123,
+        client = extract.ChatServer("http://lm.test/v1", "m", urlopen=urlopen, max_tokens=123,
                                   extra_body={"reasoning_effort": "low", "model": "sneaky", "messages": []}, prompt_suffix=" /no_think ")
         client.complete([{"role": "system", "content": "s"}, {"role": "user", "content": "find rates"}])
         body = calls[0]
@@ -514,6 +515,96 @@ class LMStudioTests(unittest.TestCase):
         client.complete([])
         self.assertEqual(client.last_meta["finishReason"], "stop")
         self.assertEqual(client.last_meta["replyChars"], 2)
+
+    def serve(self, **options):
+        """A ChatServer whose requests are recorded as (url, headers, body)."""
+        calls = []
+
+        def urlopen(request, timeout):
+            calls.append((request.full_url, {k.lower(): v for k, v in request.header_items()}, json.loads(request.data) if request.data else None))
+            if request.full_url.endswith("/models"):
+                return io.BytesIO(b'{"data": [{"id": "m"}]}')
+            return io.BytesIO(json.dumps({"choices": [{"message": {"content": "{}"}}]}).encode())
+
+        return extract.ChatServer("http://api.test/v1", "m", urlopen=urlopen, **options), calls
+
+    def test_the_api_key_is_sent_as_a_bearer_token_on_every_request(self):
+        client, calls = self.serve(api_key=" secret-token ")
+        client.models()
+        client.complete([{"role": "user", "content": "hi"}])
+        self.assertEqual([c[1]["authorization"] for c in calls], ["Bearer secret-token"] * 2)
+
+    def test_no_key_means_no_authorization_header(self):
+        client, calls = self.serve()
+        client.models()
+        client.complete([{"role": "user", "content": "hi"}])
+        self.assertTrue(all("authorization" not in c[1] for c in calls))
+
+    def test_how_the_reply_shape_is_requested(self):
+        schema_text = json.dumps(extract.SCHEMA)
+        asks = {}
+        for mode in extract.RESPONSE_MODES:
+            client, calls = self.serve(response_mode=mode)
+            client.complete([{"role": "system", "content": "s"}, {"role": "user", "content": "find rates"}])
+            asks[mode] = calls[0][2]
+        self.assertEqual(asks["json_schema"]["response_format"]["json_schema"]["schema"], extract.SCHEMA)
+        self.assertNotIn(schema_text, asks["json_schema"]["messages"][-1]["content"])
+        self.assertEqual(asks["json_object"]["response_format"], {"type": "json_object"})
+        self.assertIn(schema_text, asks["json_object"]["messages"][-1]["content"])
+        self.assertNotIn("response_format", asks["prompt"])
+        self.assertIn(schema_text, asks["prompt"]["messages"][-1]["content"])
+        self.assertEqual(asks["prompt"]["messages"][0]["content"], "s")
+
+    def test_the_reply_limit_field_and_temperature_follow_the_settings(self):
+        client, calls = self.serve(token_field="max_completion_tokens", max_tokens=77, temperature=None)
+        client.complete([{"role": "user", "content": "hi"}])
+        body = calls[0][2]
+        self.assertEqual(body["max_completion_tokens"], 77)
+        self.assertNotIn("max_tokens", body)
+        self.assertNotIn("temperature", body)
+        self.assertEqual(self.serve(temperature=0.3)[0].temperature, 0.3)
+
+    def test_unknown_response_modes_and_token_fields_are_refused(self):
+        with self.assertRaises(ValueError):
+            extract.ChatServer("http://x", "m", response_mode="xml")
+        with self.assertRaises(ValueError):
+            extract.ChatServer("http://x", "m", token_field="limit")
+
+    def test_a_model_list_may_be_a_bare_list(self):
+        client = extract.ChatServer("http://x", "m", urlopen=lambda request, timeout: io.BytesIO(b'[{"id": "a"}]'))
+        self.assertEqual(client.models(), ["a"])
+
+    def http_error(self, code: int, body: bytes = b"nope"):
+        def urlopen(request, timeout):
+            raise urllib.error.HTTPError(request.full_url, code, "x", {}, io.BytesIO(body))
+
+        return extract.ChatServer("http://api.test/v1", "m", urlopen=urlopen, api_key="secret-token")
+
+    def test_check_server_tells_a_bad_key_from_a_missing_model_list_and_a_dead_server(self):
+        for code in (401, 403):
+            with self.assertRaises(extract.ServerProblem) as raised:
+                extract.check_server(self.http_error(code))
+            self.assertIn("API key", str(raised.exception))
+            self.assertNotIn("secret-token", str(raised.exception))
+        self.assertEqual(extract.check_server(self.http_error(404)), [])  # no model list: the model id is taken on trust
+
+        def down(request, timeout):
+            raise urllib.error.URLError("connection refused")
+
+        with self.assertRaises(extract.ServerProblem) as raised:
+            extract.check_server(extract.ChatServer("http://api.test/v1", "m", urlopen=down))
+        self.assertIn("isn't answering", str(raised.exception))
+
+        with self.assertRaises(extract.ServerProblem) as raised:
+            extract.check_server(self.serve()[0].__class__("http://x", "other", urlopen=lambda r, timeout: io.BytesIO(b'{"data": [{"id": "m"}]}')))
+        self.assertIn("has no model 'other'", str(raised.exception))
+
+    def test_errors_carry_the_servers_words_and_status_but_never_the_key(self):
+        with self.assertRaises(extract.ServerHTTPError) as raised:
+            self.http_error(400, b'{"error": "bad schema"}').complete([{"role": "user", "content": "hi"}])
+        self.assertEqual(raised.exception.code, 400)
+        self.assertIn("bad schema", str(raised.exception))
+        self.assertNotIn("secret-token", str(raised.exception))
 
     def test_an_odd_reply_is_a_value_error(self):
         client, _ = self.client({"oops": 1})
