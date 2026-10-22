@@ -22,7 +22,7 @@ struct DebtLoanTests {
         draft.wallet = checking
         draft.amount = Money(cents: cents)
         draft.category = try context.lockedCategory(role)
-        draft.withName = name
+        draft.people = [try Person.add(named: name, in: context)]
         return try Transaction.create(draft, in: context)
     }
 
@@ -82,6 +82,8 @@ struct DebtLoanTests {
         #expect(collection.day == paidOn)
         #expect(collection.wallet == checking)
         #expect(collection.withName == "Pasha")
+        #expect(collection.orderedPeople == loan.orderedPeople)
+        #expect(loan.orderedPeople.count == 1)
         #expect(collection.isExcludedFromReport)
         #expect(recorded.overpayment == nil)
         #expect(try loan.related(in: context) == [collection])
@@ -448,7 +450,7 @@ struct DebtLoanTests {
         entered.wallet = checking
         entered.amount = Money(cents: 100_00)
         entered.category = try context.lockedCategory(.loan)
-        entered.withName = "Pasha"
+        entered.people = [try Person.add(named: "Pasha", in: context)]
         entered.note = "Rent help"
         entered.isExcludedFromReport = true
         let loan = try Transaction.create(entered, in: context)
@@ -483,7 +485,7 @@ struct DebtLoanTests {
         var editing = TransactionDraft(editing: loan)
         editing.amount = Money(cents: 150_00)
         editing.day = lentOn.adding(days: -2)
-        editing.withName = "Pavel"
+        editing.people = [try Person.add(named: "Pavel", in: context)]
         editing.note = "Rent help"
         editing.reminderDay = paidOn.adding(days: 30)
         try loan.update(with: editing)

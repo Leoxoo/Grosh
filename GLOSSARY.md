@@ -49,8 +49,19 @@ One dated movement of money into or out of one wallet, filed under one category.
 _Avoid_: Entry, record, item
 
 **With**:
-The person a transaction involved, such as who the user ate with or who a Loan was given to. A name, not a contact.
-_Avoid_: Contact, member, payee
+The people a transaction involved, such as who the user ate with or who a Loan was given to. A transaction can be with several Persons, except a Loan or Debt, which is with exactly one. Typing a name in With makes the Person or reuses the one who has that name, ignoring case.
+_Avoid_: Member, payee
+
+**Person**:
+Someone a transaction involved: a name with an optional phone, a hidden flag and the date they were last used. People and places are the same thing, so a restaurant is a Person too. A Person can be linked to an entry in the user's Contacts, which keeps their name and phone up to date (ADR-0009).
+_Avoid_: Contact (that is the entry in the Contacts app a Person may be linked to), member, payee
+
+**Previous**:
+The section of the With menu that lists every Person who isn't hidden, the one used most recently first. Choosing a Person in With makes them the most recent.
+
+**Hide**:
+Swiping a name in Previous and choosing Hide leaves that Person out of Previous. Their name and their place on every transaction stay, so history never changes, and typing their name in With again brings them back.
+_Avoid_: Delete, archive (archived is for wallets and Cards)
 
 **Event**:
 A named occasion a transaction belonged to, such as a trip or a wedding.
@@ -69,7 +80,7 @@ Categories nest at most two levels deep (e.g. Bills & Utilities → Phone Bill).
 Moving every transaction from one category (or Card) into another, then removing the first.
 
 **Locked category**:
-A category the app itself depends on (the transfer pair, Other Income, Other Expense, the four Debt/Loan categories, and Starting balance). It can't be deleted or merged.
+A category the app itself depends on (the transfer pair, Other Income, Other Expense, the four Debt/Loan categories, Starting balance and Reimbursement). It can't be deleted or merged.
 
 **Hidden category**:
 A category removed from the picker that keeps its history.
@@ -97,13 +108,13 @@ _Avoid_: Balance (that word belongs to wallets)
 A Loan or Debt with nothing outstanding, whether it was paid in full or forgiven. Settling never changes the original transaction; anything paid beyond what was owed is ordinary income or expense, which never needs a Card.
 
 **Forgive**:
-Settling whatever is still outstanding on a Loan or Debt without any money moving and without adding any transaction. The Loan or Debt is marked **Forgiven** on the day, with an optional note, and can be un-forgiven. The forgiven amount counts in reports as income (a forgiven Debt) or expense (a forgiven Loan) on that day, and never changes any wallet's balance.
+Settling whatever is still outstanding on a Loan or Debt without any money moving and without adding any transaction. The Loan or Debt is marked **Forgiven** on the day, with an optional note, and can be un-forgiven. The forgiven amount counts in reports as income (a forgiven Debt) or expense (a forgiven Loan) on that day, and never changes any wallet's balance. An Expected reimbursement is forgiven the same way, but as it never counted in a balance or report, forgiving it changes neither.
 
 **Forgiven**:
-The mark a forgiven Loan or Debt carries: how much was forgiven, and when. The Loan or Debt's detail tells the whole story, such as borrowed $250, repaid $200, forgiven $50.
+The mark a forgiven Loan, Debt or Expected reimbursement carries: how much was forgiven, and when. The Loan or Debt's detail tells the whole story, such as borrowed $250, repaid $200, forgiven $50.
 
 **Reminder date**:
-The day a Loan or Debt is due. The user gets a notification that day, and the Home bell lists it from then until it is settled.
+The day a Loan or Debt is due, or the day an Expected reimbursement reminds the user to ask for the money. The user gets a notification that day at 09:00, and the Home bell lists it from then until it is settled.
 _Avoid_: Alarm, deadline
 
 **Transfer**:
@@ -119,8 +130,20 @@ Dividing one Expense or Income transaction into several real transactions, one p
 _Avoid_: Divide, break up
 
 **Reimbursement**:
-Money someone paid back against an Expense, kept as an entry on that Expense (an amount, a day and an optional note) and never as a transaction of its own. An Expense can have any number. Its **net** is its amount plus its Reimbursements, shown on its row as `= +3` beside the original amount; the net lands in the Expense's own wallet, on the Expense's own day. The net, not the original amount, counts in balances, the transaction list and every report; only a Card's statement and Card filter total still use the original amount, because that is what the Card was charged. While the net is below zero it counts as Spent under the Expense's own category; at zero it counts as nothing; above zero the Expense counts nothing as Spent and the extra counts as Income under Other Income. Money paid into a different wallet is not a Reimbursement: the user records it as an ordinary transfer or income. Splitting an Expense that has Reimbursements asks which part each belongs to.
+Money someone paid back against an Expense, kept as an entry on that Expense (an amount, a day and an optional note) and never as a transaction of its own. An Expense can have any number. Its **net** is its amount plus its Reimbursements, shown on its row as `= +3` beside the original amount; the net lands in the Expense's own wallet, on the Expense's own day. The net, not the original amount, counts in balances, the transaction list and every report; only a Card's statement and Card filter total still use the original amount, because that is what the Card was charged. While the net is below zero it counts as Spent under the Expense's own category; at zero it counts as nothing; above zero the Expense counts nothing as Spent and the extra counts as Income under Other Income. Money paid back into a different wallet than the Expense's is not an entry on the Expense but a real transaction in that wallet, a **Reimbursement into another wallet** (ADR-0010): dated the day it was received, filed under the locked Reimbursement category, linked to the Expense like the halves of a Transfer, and counted in its own wallet's balance and report as money in. The Total list hides it and the Expense shows its net there, counting only what was paid into wallets included in the Total; the Expense's own wallet shows the full amount with a note of what was reimbursed to which wallet. The Total report counts the Expense net of those, and a single wallet's report counts only what happened in it. Splitting an Expense that has Reimbursements asks which part each belongs to. See **Expected reimbursement** for the part of an Expense someone is yet to pay back.
 _Avoid_: Repayment (that is money paid back against a Debt), refund (that is money back from the seller), payback
+
+**Expected reimbursement**:
+The part of an Expense that one Person is yet to pay back ("Owes me"), made with + Owes me on each Person chosen in With, with an optional amount: left blank it is an open amount, shown as `?`, and left out of totals and flagged ("+1 open"). It is a record of its own beside the Expense and never changes any wallet's balance, the transaction list or any report; the Expense stays at its full amount until money comes back. It is listed in Debts & Loans with its own detail, goes to Recently Deleted and back with its Expense, and an edit to the Expense that would break it (making it Income, taking the Person out of With, costing less than what is owed) is refused. It has a Reminder, on by default for a week after the Expense. Record payment turns what comes back into a Reimbursement (or, into another wallet, a Reimbursement into another wallet); an expectation with an amount closes itself once payments cover it, and an open amount is closed by hand. **Forgive** marks it Forgiven and settled, with no accounting effect (ADR-0004, ADR-0010).
+_Avoid_: IOU, split bill, Loan (that is money lent outside an Expense)
+
+**Show by people**:
+The way Debts & Loans lists one row per Person instead of one per Loan, Debt and Expected reimbursement; **Show by Loan/Debt** is the list as it was, and the choice is remembered. A row shows what the Person owes the user (their Loans plus their Expected reimbursements, combined) and what the user owes them (their Debts) apart, never netted and one amount per currency; an Expected reimbursement with no amount is flagged ("+1 open") and left out of both. People with something outstanding come first, then a Settled section; a hidden Person is listed while anything is outstanding with them. Opening a Person lists their Loans, Debts and Owes me, each opening its own detail (ADR-0009, ADR-0010).
+_Avoid_: Contacts list, address book
+
+**Text them**:
+Texting a Person about what is owed, from the Text button on their row in Show by people (shown while anything is outstanding with them) or from the "Text them" action on a reminder notification. It prepares a message naming the outstanding amount in the app's money formatting, which the user sends themselves; nothing is ever sent for them. When the Person has a number and the device can text, it opens the Messages compose sheet to that number (the linked contact's current one while the contact resolves, otherwise the Person's stored phone), and the user taps Send. Otherwise, with no number or where texting is unavailable (the simulator, an iPad without Messages), the message is copied or shared.
+_Avoid_: Nudge, chase
 
 **Balance adjustment**:
 A transaction that records the difference between a wallet's recorded balance and its real balance. Its category is the reason (interest earned, stock sold, fees, lost transactions), and it counts in reports like any other transaction. It never needs a Card.

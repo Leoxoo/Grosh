@@ -37,10 +37,14 @@ struct PeriodStrip: View {
         // A lazy stack would otherwise take all the height it is offered.
         .fixedSize(horizontal: false, vertical: true)
         .defaultScrollAnchor(.trailing)
-        // Any part of the tab on screen counts as in view, so the button waits until the tab is fully gone.
+        // Any part of the tab on screen counts as in view, so the button waits until the tab is fully gone. This is
+        // called on every frame of a scroll, so it changes state, and starts the button's animation, only when the
+        // answer changes.
         .onScrollTargetVisibilityChange(idType: Period.self, threshold: 0.001) { visible in
+            let inView = visible.contains(current)
+            guard inView != isCurrentPeriodInView else { return }
             withAnimation {
-                isCurrentPeriodInView = visible.contains(current)
+                isCurrentPeriodInView = inView
             }
         }
         .onAppear { scrollToSelection() }

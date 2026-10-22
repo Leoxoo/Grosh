@@ -10,7 +10,8 @@ struct TransactionRow: View {
     var showsDay = false
     /// Shows the paying wallet's icon in gray, for lists that mix wallets. A list of one wallet turns it off.
     var showsWalletIcon = true
-    /// Whether the row shows a paid-back Expense's net beside its amount, or only what its Card was charged.
+    /// Whether the row shows a paid-back Expense's net beside its amount, or only what its Card was charged. In the Total
+    /// the net also takes off what was paid back into other wallets there; in a wallet the row notes it instead.
     var listed = ListedAmount.net
 
     var body: some View {
@@ -30,14 +31,14 @@ struct TransactionRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                ReimbursementEntriesText(transaction: transaction)
+                ReimbursementEntriesText(transaction: transaction, listed: listed)
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 4) {
                 HStack(spacing: 6) {
                     AmountText(amount: transaction.amount)
-                    if listed == .net {
-                        ReimbursementNetText(transaction: transaction)
+                    if listed != .charged {
+                        ReimbursementNetText(transaction: transaction, listed: listed)
                     }
                 }
                 HStack(spacing: 6) {

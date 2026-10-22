@@ -5,6 +5,7 @@ import SwiftData
 enum GroshStore {
     static let schema = Schema([
         Wallet.self, Category.self, Card.self, Transaction.self, Reimbursement.self, RecurringTransaction.self,
+        Person.self, ExpectedReimbursement.self,
     ])
 
     static func makeContainer(inMemory: Bool = false) throws -> ModelContainer {
@@ -17,12 +18,14 @@ enum GroshStore {
     }
 
     /// The store as the app opens it: ``makeContainer(inMemory:)`` with the default categories seeded into an empty
-    /// one (``CategorySeeder``). Previews open theirs in memory, so they start where a fresh install does, with the
-    /// locked categories the app depends on.
+    /// one (``CategorySeeder``), and the With names typed before there were people turned into people
+    /// (``Person/migrateWithNames(in:)``), so no screen ever sees a With without its Person. Previews open theirs in
+    /// memory, so they start where a fresh install does, with the locked categories the app depends on.
     static func makeSeededContainer(inMemory: Bool = false) throws -> ModelContainer {
         let container = try makeContainer(inMemory: inMemory)
         try CategorySeeder.seedIfNeeded(in: container.mainContext)
         try CategorySeeder.restoreMissingDefaults(in: container.mainContext)
+        try Person.migrateWithNames(in: container.mainContext)
         return container
     }
 }

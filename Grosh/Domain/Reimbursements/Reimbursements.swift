@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// What a Reimbursement sheet holds: an amount, the day it was paid back and an optional note.
-struct ReimbursementDraft {
+nonisolated struct ReimbursementDraft {
     var amount = Money(cents: 0)
     var day: CalendarDay
     var note = ""
@@ -76,14 +76,19 @@ extension Transaction {
 }
 
 extension Reimbursement {
-    /// Adds the draft as a Reimbursement of `expense`, entered now. No transaction is made. Saves.
+    /// Adds the draft as a Reimbursement of `expense`, entered now, recorded against `expectation` when one is given
+    /// (ADR-0010). No transaction is made. Saves.
     @discardableResult
-    static func add(_ draft: ReimbursementDraft, to expense: Transaction, in context: ModelContext) throws -> Reimbursement {
+    static func add(
+        _ draft: ReimbursementDraft, to expense: Transaction, for expectation: ExpectedReimbursement? = nil,
+        in context: ModelContext
+    ) throws -> Reimbursement {
         try draft.validate()
         guard expense.canBeReimbursed else { throw ReimbursementRuleError.notAnExpense }
         let reimbursement = Reimbursement(amount: Money(cents: 0), day: draft.day)
         context.insert(reimbursement)
         reimbursement.expense = expense
+        reimbursement.expectation = expectation
         reimbursement.apply(draft)
         expense.recountReimbursements()
         try context.save()
@@ -110,6 +115,7 @@ extension Reimbursement {
         guard let context = modelContext else { return }
         let expense = expense
         expense?.reimbursements?.removeAll { $0 === self }
+        expectation?.reimbursements?.removeAll { $0 === self }
         context.delete(self)
         expense?.recountReimbursements()
     }

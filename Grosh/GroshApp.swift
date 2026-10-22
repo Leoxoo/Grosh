@@ -4,6 +4,9 @@ import SwiftUI
 @main
 struct GroshApp: App {
     private let container: ModelContainer
+    private let textThemInbox = TextThemInbox()
+    /// The notification center holds its delegate weakly, so the app keeps it.
+    private let reminderActions: ReminderActionHandler
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -12,11 +15,13 @@ struct GroshApp: App {
         } catch {
             fatalError("Couldn't open the Grosh store: \(error)")
         }
+        reminderActions = ReminderActionHandler.install(inbox: textThemInbox, context: container.mainContext)
     }
 
     var body: some Scene {
         WindowGroup {
             RootView()
+                .presentsTextThem(textThemInbox)
                 .onChange(of: scenePhase, initial: true) { _, phase in
                     // Items in Recently Deleted that have waited 30 days are removed for good, and Recurring transactions
                     // make the days that came due while the app was closed, whenever the app opens or comes back to the

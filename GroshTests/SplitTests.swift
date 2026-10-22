@@ -115,7 +115,7 @@ struct SplitTests {
         draft.wallet = checking
         draft.amount = Money(cents: 100_00)
         draft.category = try context.lockedCategory(role)
-        draft.withName = "Pasha"
+        draft.people = [try Person.add(named: "Pasha", in: context)]
         let original = try Transaction.create(draft, in: context)
         var payment = try DebtPaymentDraft(settling: original, on: today, in: context)
         payment.amount = Money(cents: 120_00)
@@ -133,7 +133,7 @@ struct SplitTests {
         draft.wallet = checking
         draft.amount = Money(cents: 50_00)
         draft.category = try context.lockedCategory(.loan)
-        draft.withName = "Pasha"
+        draft.people = [try Person.add(named: "Pasha", in: context)]
         let loan = try Transaction.create(draft, in: context)
         let forgiveness = try ForgiveDraft(forgiving: loan, on: today, in: context)
         try Forgiveness.record(forgiveness, in: context)
@@ -165,7 +165,7 @@ struct SplitTests {
         let card = try Card.create(CardDraft(name: "Apple Card", kind: .credit, payingWallet: checking), in: context)
         let coffee = try record(25_00, card: card)
         coffee.note = "Brunch"
-        coffee.withName = "Anna"
+        coffee.setPeople([try Person.add(named: "Anna", in: context)])
         coffee.eventName = "Trip"
         coffee.isExcludedFromReport = true
 
@@ -218,7 +218,7 @@ struct SplitTests {
     @Test func aNewPartStartsAtZeroAsACopyOfTheOriginal() throws {
         let coffee = try record(25_00)
         coffee.note = "Brunch"
-        coffee.withName = "Anna"
+        coffee.setPeople([try Person.add(named: "Anna", in: context)])
         var draft = SplitDraft(splitting: coffee)
         draft.original.category = try store.category("Education")
 
@@ -228,7 +228,7 @@ struct SplitTests {
         #expect(part.category == draft.original.category)
         #expect(part.day == today)
         #expect(part.note == "Brunch")
-        #expect(part.withName == "Anna")
+        #expect(part.people.map(\.name) == ["Anna"])
     }
 
     @Test func theOriginalKeepsItsIdentityCreatedAtAndRecurringAttachment() throws {
@@ -291,11 +291,11 @@ struct SplitTests {
         part.category = try store.category("Education")
         part.day = today.adding(days: -2)
         part.note = "  Milk \n"
-        part.withName = " Anna "
+        part.people = [try Person.add(named: " Anna ", in: context)]
         part.eventName = " Trip "
         draft.addPart(part)
         draft.original.note = "Latte"
-        draft.original.withName = "Pasha"
+        draft.original.people = [try Person.add(named: "Pasha", in: context)]
         draft.original.eventName = "Wedding"
         draft.original.category = try store.category("Restaurants")
         draft.original.day = today.adding(days: 1)
@@ -499,7 +499,7 @@ struct SplitTests {
         draft.wallet = checking
         draft.amount = Money(cents: 100_00)
         draft.category = try context.lockedCategory(.debt)
-        draft.withName = "Anna"
+        draft.people = [try Person.add(named: "Anna", in: context)]
         let debt = try Transaction.create(draft, in: context)
         var payment = try DebtPaymentDraft(settling: debt, on: today, in: context)
         payment.amount = Money(cents: 120_00)
@@ -515,7 +515,7 @@ struct SplitTests {
         draft.wallet = checking
         draft.amount = Money(cents: 100_00)
         draft.category = try context.lockedCategory(.debt)
-        draft.withName = "Anna"
+        draft.people = [try Person.add(named: "Anna", in: context)]
         let debt = try Transaction.create(draft, in: context)
         var payment = try DebtPaymentDraft(settling: debt, on: today, in: context)
         payment.amount = Money(cents: 120_00)
@@ -784,5 +784,27 @@ struct SplitTests {
         #expect(first.orderedReimbursements.isEmpty)
         try first.undoSplit(in: context)
         #expect(coffee.orderedReimbursements == [reimbursement])
+    }
+
+    // MARK: People in With
+
+    @Test func eachPartCanBeWithSeveralPeople() throws {
+        let coffee = try record(25_00)
+        let anna = try Person.add(named: "Anna", in: context)
+        let ivan = try Person.add(named: "Ivan", in: context)
+        coffee.setPeople([anna])
+        var draft = SplitDraft(splitting: coffee)
+        #expect(draft.original.people == [anna])
+        var part = draft.newPart()
+        #expect(part.people == [anna])
+        part.amount = Money(cents: 10_00)
+        part.people = [anna, ivan]
+        draft.addPart(part)
+
+        let created = try #require(try coffee.split(draft, in: context).first)
+
+        #expect(created.orderedPeople.map(\.name) == ["Anna", "Ivan"])
+        #expect(created.withName == "Anna; Ivan")
+        #expect(coffee.orderedPeople == [anna])
     }
 }

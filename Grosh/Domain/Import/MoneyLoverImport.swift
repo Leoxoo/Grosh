@@ -1,10 +1,10 @@
 import Foundation
 import SwiftData
 
-/// Import from MoneyLover ("Replace all data"): a MoneyLover CSV export replaces every wallet, Card and transaction.
-/// The categories are kept.
+/// Import from MoneyLover ("Replace all data"): a MoneyLover CSV export replaces every wallet, Card, Person and
+/// transaction. The categories are kept.
 enum MoneyLoverImport {
-    /// Replaces the wallets, Cards and transactions in `context` with `rows`, a MoneyLover export as
+    /// Replaces the wallets, Cards, people and transactions in `context` with `rows`, a MoneyLover export as
     /// ``MoneyLoverCSV/rows(in:)`` reads it, entered at `now`:
     ///
     /// - Each wallet is created once by name, with a $0 Starting balance on its first day.
@@ -14,11 +14,14 @@ enum MoneyLoverImport {
     /// - Outgoing and Incoming transfer rows link into transfers. One with no partner becomes a balance adjustment,
     ///   filed as Adjust Balance files it; one of no amount has nothing to adjust and isn't imported.
     /// - Each Debt Collection links to the earliest open Loan of its wallet and amount, each Repayment to a Debt.
+    /// - A row's With becomes one Person, created the first time its name is read and reused after, ignoring case
+    ///   (ADR-0009), and last used when its newest transaction was entered.
     /// - Within a day, rows keep the file's order.
     ///
     /// A Grosh export (``GroshCSVExport``) is restored as it was instead: each row gets the Card its `Card` column
     /// names, its note stays as it is, rows sharing a `Linked` value are linked, and a wallet's Starting balance is the
-    /// file's own row rather than a $0 one. Nothing is left unmatched.
+    /// file's own row rather than a $0 one. A With of several names, as the export joins them with `; `, becomes
+    /// several people. Nothing is left unmatched.
     ///
     /// Saves once, at the end: the old data is deleted by the same save that adds the new. Throws without changing
     /// anything when it can't finish, saving included, and ``MoneyLoverImportError/noTransactions`` for no rows.
@@ -40,11 +43,11 @@ enum MoneyLoverImport {
         }
     }
 
-    /// Deletes every transaction, Card and wallet. Categories stay. Doesn't save.
+    /// Deletes every transaction, Card, Person and wallet. Categories stay. Doesn't save.
     ///
     /// One by one, rather than as batch deletes, which take effect in the store right away, where a rollback can't
-    /// undo them. Each category, Card and wallet lets go of its transactions first: left to update those lists one
-    /// deleted transaction at a time, saving ~6,000 deletes takes several seconds rather than a fraction of one.
+    /// undo them. Each category, Card, Person and wallet lets go of its transactions first: left to update those lists
+    /// one deleted transaction at a time, saving ~6,000 deletes takes several seconds rather than a fraction of one.
     private static func removeAllData(in context: ModelContext) throws {
         for category in try context.fetch(FetchDescriptor<Category>()) {
             category.transactions = []
@@ -53,6 +56,10 @@ enum MoneyLoverImport {
         for card in try context.fetch(FetchDescriptor<Card>()) {
             card.transactions = []
             context.delete(card)
+        }
+        for person in try context.fetch(FetchDescriptor<Person>()) {
+            person.transactions = []
+            context.delete(person)
         }
         for wallet in try context.fetch(FetchDescriptor<Wallet>()) {
             wallet.transactions = []
@@ -76,6 +83,7 @@ private struct Importer {
     private var wallets: [String: Wallet] = [:]
     private var walletOrder: [String] = []
     private var cards: [MoneyLoverCardTag: Card] = [:]
+    private var people = PeopleByName()
 
     init(rows: [MoneyLoverRow], context: ModelContext, now: Date) throws {
         self.rows = rows
@@ -97,13 +105,17 @@ private struct Importer {
             }
             try addWallet(firstSeenIn: row, withStartingBalance: !hasStartingBalance)
         }
+        let withPeople = addPeople(splittingNames: isGroshExport)
         if isGroshExport {
-            return try restore(filedUnder: filed, categories: &categories)
+            return try restore(filedUnder: filed, with: withPeople, categories: &categories)
         }
         let paid = try addCards(for: filed)
         // `imported[i]` is `rows[i]`.
         let imported = rows.indices.map { index in
-            record(rows[index], at: index, filedUnder: filed[index], paidWith: paid[index].card, note: paid[index].note)
+            record(
+                rows[index], at: index, filedUnder: filed[index], paidWith: paid[index].card, note: paid[index].note,
+                with: withPeople[index]
+            )
         }
 
         var unmatched: [ObjectIdentifier: MoneyLoverImportSummary.UnmatchedRow.Outcome] = [:]
@@ -152,19 +164,33 @@ private struct Importer {
         walletOrder.append(row.walletName)
     }
 
+    /// Adds the people the rows' With names, each once however many rows name it, and returns for each row the people it
+    /// is with. A name is read as it is, or with `splittingNames` as several joined with `; ` (a Grosh export's way).
+    /// Doesn't save.
+    private mutating func addPeople(splittingNames: Bool) -> [[Person]] {
+        var withPeople: [[Person]] = []
+        for row in rows {
+            let names = splittingNames
+                ? row.withName.components(separatedBy: Transaction.withSeparator) : [row.withName]
+            withPeople.append(names.compactMap { people.reuseOrCreate($0, lastUsedAt: .distantPast, in: context) })
+        }
+        return withPeople
+    }
+
     /// Records a Grosh export's rows as they were exported: each with the Card its `Card` column names and its note as
     /// it is, linked to the rows that share its `Linked` value, and a Loan or Debt with the Forgiven mark its
     /// `Forgiven` columns hold (its category found among `filer`'s, or added). Says what was done; the wallets'
     /// Starting balances, which are rows of the file, aren't counted. Doesn't save.
     private func restore(
-        filedUnder categories: [Category], categories filer: inout CategoryFiler
+        filedUnder categories: [Category], with withPeople: [[Person]], categories filer: inout CategoryFiler
     ) throws -> MoneyLoverImportSummary {
         let paid = try addNamedCards()
         var links: [String: UUID] = [:]
         for index in rows.indices {
             let row = rows[index]
             let transaction = record(
-                row, at: index, filedUnder: categories[index], paidWith: paid.cards[index], note: row.note
+                row, at: index, filedUnder: categories[index], paidWith: paid.cards[index], note: row.note,
+                with: withPeople[index]
             )
             if let forgiven = row.forgiven, let kind = transaction.loanOrDebtKind {
                 try markForgiven(transaction, as: forgiven, kind: kind, categories: &filer)
@@ -271,17 +297,18 @@ private struct Importer {
     /// Records `row`, the `index`th of the file. The file lists a day's rows newest first, so each row is entered a
     /// second before the one above it and they keep the file's order within a day.
     private func record(
-        _ row: MoneyLoverRow, at index: Int, filedUnder category: Category, paidWith card: Card?, note: String
+        _ row: MoneyLoverRow, at index: Int, filedUnder category: Category, paidWith card: Card?, note: String,
+        with chosen: [Person]
     ) -> Transaction {
         let transaction = Transaction(
             amount: row.amount, day: row.day, wallet: nil, category: nil,
             note: note.trimmingCharacters(in: .whitespacesAndNewlines)
         )
         transaction.createdAt = now.addingTimeInterval(-Double(index))
-        transaction.withName = row.withName
         transaction.eventName = row.eventName
         transaction.isExcludedFromReport = row.isExcludedFromReport
         context.insert(transaction)
+        transaction.setPeople(chosen, usedAt: transaction.createdAt)
         transaction.wallet = wallets[row.walletName]
         transaction.category = category
         transaction.card = card

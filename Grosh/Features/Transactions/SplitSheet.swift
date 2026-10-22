@@ -258,14 +258,7 @@ private struct SplitPartEditor: View {
             }
 
             Section {
-                TextField("With", text: $part.withName)
-                    .focused(fields.focus, equals: .withName)
-                if fields.focus.wrappedValue == .withName {
-                    WithNameSuggestions(typed: part.withName) { name in
-                        part.withName = name
-                        fields.focus.wrappedValue = nil
-                    }
-                }
+                WithField(people: $part.people, picksOne: false)
                 TextField("Event", text: $part.eventName)
                     .focused(fields.focus, equals: .event)
             }

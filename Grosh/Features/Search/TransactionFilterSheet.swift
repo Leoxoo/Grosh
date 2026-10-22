@@ -1,7 +1,8 @@
+import SwiftData
 import SwiftUI
 
-/// The filters a transaction list can be narrowed by: wallet, category, Card, type, date range, amount range and
-/// excluded only. Every wallet, category and Card is offered, archived and hidden ones included, since their
+/// The filters a transaction list can be narrowed by: wallet, category, Card, With, type, date range, amount range and
+/// excluded only. Every wallet, category, Card and Person is offered, archived and hidden ones included, since their
 /// history stays searchable; choosing a parent category includes its subcategories. Changes apply as they are made;
 /// Clear resets every filter but leaves the search text.
 struct TransactionFilterSheet: View {
@@ -16,6 +17,7 @@ struct TransactionFilterSheet: View {
                     WalletPicker(title: "Wallet", everyWalletOr: "Any", selection: $filter.wallet)
                     CategoryPicker(title: "Category", everyCategoryOr: "Any", selection: $filter.category)
                     CardPicker(title: "Card", everyCardOr: "Any", selection: $filter.card)
+                    WithFilterPicker(selection: $filter.person)
                     Picker("Type", selection: $filter.type) {
                         Text("Any").tag(CategoryType?.none)
                         ForEach(CategoryType.segments, id: \.self) { type in
@@ -59,6 +61,24 @@ struct TransactionFilterSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
+            }
+        }
+    }
+}
+
+/// Picks the Person to narrow the list to: any of the people in a transaction's With counts. Every Person is offered,
+/// hidden ones included, or Anyone.
+private struct WithFilterPicker: View {
+    @Binding var selection: Person?
+
+    @Query(Person.everyone) private var everyone: [Person]
+
+    var body: some View {
+        Picker("With", selection: $selection) {
+            Text("Anyone").tag(Person?.none)
+            ForEach(everyone) { person in
+                Text(person.isHidden ? "\(person.name) (Hidden)" : person.name)
+                    .tag(Optional(person))
             }
         }
     }

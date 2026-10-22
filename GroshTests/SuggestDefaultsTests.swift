@@ -46,7 +46,7 @@ struct SuggestDefaultsTests {
         #expect(suggested.category == nil)
         #expect(suggested.card == nil)
         #expect(suggested.note.isEmpty)
-        #expect(suggested.withName.isEmpty)
+        #expect(suggested.people.isEmpty)
         #expect(!suggested.isExcludedFromReport)
     }
 

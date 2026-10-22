@@ -84,6 +84,8 @@ struct TransactionDetailView: View {
 
             ReimbursementSection(transaction: transaction, action: $reimbursementAction)
 
+            OwesMeSection(transaction: transaction)
+
             Section {
                 fields
             }

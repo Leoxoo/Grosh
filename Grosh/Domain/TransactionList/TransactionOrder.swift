@@ -19,7 +19,7 @@ extension Transaction {
 
 /// What ``Transaction/listOrder`` sorts a transaction by, read once: a model's stored properties are slow to read, and
 /// a sort reads them for every comparison.
-private struct ListPosition {
+private nonisolated struct ListPosition {
     let dayRaw: Int
     let createdAt: Date
     let transaction: Transaction
