@@ -52,7 +52,7 @@
   .bar.sub { height: 5px; margin-top: 0; } .bar.sub > span { background: var(--info); }
   #log { font: 12px/1.5 var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
          height: 240px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
-  #log .error { color: var(--bad); } #log .t { color: var(--muted); }
+  #log .error { color: var(--bad); } #log .warn { color: var(--warn); } #log .t { color: var(--muted); }
   .result { margin-top: 10px; padding: 8px 10px; border-radius: 6px; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
   .result.ok { background: var(--ok-bg); color: var(--ok); } .result.bad { background: var(--bad-bg); color: var(--bad); }
   .tablewrap { overflow-x: auto; }
@@ -391,6 +391,7 @@ function renderRows() {
         h("span", { class: "small muted", text: ex.model ? `${ex.model} · prompt ${ex.promptVersion ?? "-"}` : "" }),
         ex.statsText ? h("span", { class: "small muted", text: ex.statsText }) : null,
         c.pending ? chip("needs extracting with the chosen model", "warn") : null,
+        ex.warnings && ex.warnings.length ? chip(`check: ${ex.warnings.length} thing${ex.warnings.length === 1 ? "" : "s"} to look at`, "warn") : null,
         ex.errors.length ? h("span", { class: "small", style: "color: var(--bad)", text: ex.errors[0].slice(0, 140) }) : null)
         : h("div", { class: "stack" }, h("span", { class: "muted", text: "not extracted" }), c.pending ? chip("needs extracting", "warn") : null)),
       h("td", {}, (ex ? ex.needs : []).map((n) => [chip(NEEDS[n] || n, "info"), " "])));
@@ -458,6 +459,7 @@ function describe(r) {
   const cats = r.categories.map((c) => c.replace("-", " ")).join(", ");
   let what;
   if (r.selection === "choose") what = `${r.rate}${unit} in the ${r.picks === 1 ? "category" : r.picks + " categories"} the cardholder chooses: ${cats}${r.hasOtherChoices ? " (and others)" : ""}`;
+  else if (r.selection === "rotating") what = `${r.rate}${unit} in bonus categories that change each quarter${cats ? " (this period: " + cats + ")" : ""}`;
   else if (r.selection === "top-spend") what = `${r.rate}${unit} on the top-spend category each cycle, from: ${cats}${r.hasOtherChoices ? " (and others)" : ""}`;
   else what = `${r.rate}${unit} on ${cats}`;
   if (r.capAmount) what += `, up to $${r.capAmount.toLocaleString()} per ${r.capPeriod === "cycle" ? "billing cycle" : r.capPeriod}`;
@@ -506,6 +508,7 @@ async function openCard(id, quiet) {
       h("p", { class: "small" }, chip(cand.status, extractKind[cand.status] ?? ""), ` ${cand.model || ""}${cand.promptVersion ? " · prompt " + cand.promptVersion : ""}`,
         cand.needs.length ? [" · asks: ", cand.needs.map((n) => NEEDS[n] || n).join(", ")] : null),
       cand.stats && cand.stats.calls ? h("p", { class: "small muted", text: `Cost: ${cand.stats.calls} model call${cand.stats.calls === 1 ? "" : "s"}, ${cand.stats.seconds}s, ${cand.stats.promptTokens.toLocaleString()} prompt tokens${cand.stats.cachedTokens ? " (" + cand.stats.cachedTokens.toLocaleString() + " cached)" : ""}, ${cand.stats.replyTokens.toLocaleString()} reply tokens${cand.stats.reasoningTokens ? " (" + cand.stats.reasoningTokens.toLocaleString() + " reasoning)" : ""}` }) : null,
+      cand.warnings && cand.warnings.length ? h("div", { class: "result", style: "background: var(--warn-bg); color: var(--warn)", text: "Worth a look (every rate below is on the page, but they can't all be right):\n" + cand.warnings.join("\n") }) : null,
       cand.errors && cand.errors.length ? h("div", { class: "result bad", text: "The model call failed:\n\n" + cand.errors.join("\n\n") }) : null,
       cand.rules.length ? cand.rules.map(ruleBox) : h("p", { class: "muted small", text: "No rules." }),
       cand.cardConditions.length ? [h("h3", { text: "Applies to the whole card" }), h("ul", {}, cand.cardConditions.map((t) => h("li", { text: t })))] : null,

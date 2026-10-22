@@ -128,15 +128,37 @@ For each card it splits the cached page text into chunks of about 12,000 charact
 1. every category is in the catalog list, unit is `percent` or `per-dollar`, the rate is a number above 0 and up to 10;
 2. the quote appears on the page word for word (ignoring case, spacing, curly quotes and ®/™ marks);
 3. the rate appears in the quote as a whole number (13% is not 3%), and the quote has a `%` for percent or points, miles or X for per-dollar;
-4. the quote uses a word for its category (for example "grocer", "restaurant", "all other"), which catches a rate filed under the wrong category. A base rate may leave out "all other" if the quote names no other category (Apple Card's "Get 2% Daily Cash back when you use Apple Card with Apple Pay");
+4. the quote uses a word for its category (for example "grocer", "restaurant", "all other"), which catches a rate filed under the wrong category. Brand names are not category words (a rate "on Lyft rides" is one company's promotion, not a transit rate). A base rate (`everything-else`) may leave out "all other" if the quote names no other category (Apple Card's "Get 2% Daily Cash back when you use Apple Card with Apple Pay"), but never if the quote talks about a quarter, activating, enrolling, rotating or "different places": that's a rotating bonus, not the base;
 5. a cap needs an amount and a period, and both appear in the quote (`$6,000`, `6K` and `6000` match; "year" or "annual"; `cycle` is a "billing cycle");
 6. every **condition** (an exclusion or restriction on the rate, such as "excluding superstores like Walmart® and Target®") is the page's own sentence, word for word. Conditions are never paraphrased, so what a person sees is what the issuer wrote. A rule with a condition that isn't on the page is rejected whole, since showing the rate without its restriction would overstate it;
 7. a rule where the cardholder chooses or the card picks (`selection` of `choose` or `top-spend`) needs a quote that says so ("of your choice", "top eligible category"), and every category it lists must be mentioned on the page;
 8. a `requires` tag (`apple-pay`, `activation`, `issuer-booking`) is accepted only if the quote or a condition has words that back it ("Apple Pay", "activate", "booked through");
 9. `validFrom` / `validTo` are accepted only if the quote or a condition gives that date's month and year, so a period can't be made up.
-10. `firstMonths` (a rate only for the first N months after opening, such as a first-year bonus) is accepted only if the quote or a condition says "first year", "first 12 months" or similar for that length.
+10. `firstMonths` (a rate only for the first N months after opening, such as a first-year bonus) is accepted only if the quote or a condition says "first year", "first 12 months" or similar for that length;
+11. a `rotating` rule's quote must say the categories change ("quarter", "rotating", "bonus categories", "different places"), and any category it does name must be in the quote.
 
-A rule that fails any check is listed as rejected, never edited. One tidy-up happens before the checks: a `fixed` rule that lists several categories (the model likes "3% on dining, groceries and streaming") becomes one rule per category with the same quote, each checked on its own, and each keeps only the conditions that are about it or name no category. **Card-wide conditions** (`cardConditions`: sentences that limit several of a card's rates, such as Capital One's note that digital wallets may not earn the higher rate) must also be on the page word for word; one that isn't is dropped and listed under `rejected`, and the card's rules are kept.
+A rule that fails any check is listed as rejected, never edited. Before the checks, a few relabelings that change nothing about what the page says are applied: a rotating bonus the model filed as "top-spend", "choose" or the base rate is retyped as `rotating` (only when the quote says the categories change, such as "bonus categories" or "different places you shop each quarter", and not who picks them; "each quarter" alone, as in a cap, doesn't count); and the same rule found twice (the model words a quote a little differently in each part of a page) is kept once, with its conditions and requirements combined. One tidy-up happens before the checks: a `fixed` rule that lists several categories (the model likes "3% on dining, groceries and streaming") becomes one rule per category with the same quote, each checked on its own, and each keeps only the conditions that are about it or name no category. **Card-wide conditions** (`cardConditions`: sentences that limit several of a card's rates, such as Capital One's note that digital wallets may not earn the higher rate) must also be on the page word for word; one that isn't is dropped and listed under `rejected`, and the card's rules are kept.
+
+### What "accepted" and "rejected" mean
+
+**Accepted means supported, not true.** The checks prove a rule is well-formed and grounded in the page: the quote is on the page word for word, the numbers and words it relies on are in that quote, and its category, cap, dates and requirements are things the quote says. They cannot prove the model read the page correctly, so every accepted rule still needs a person to look at it before it ships (the review stage). What they are good at is stopping the model from inventing things: a rate that isn't in its quote, a quote it made up, a category the sentence doesn't mention, a cap or date it guessed.
+
+**Rejected means the model proposed something the page doesn't back.** Each rejection is kept with its reason, which is how the page tells you what the model got wrong. On Chase Freedom Flex, the first full read produced:
+
+| Model proposed | Verdict | Why |
+|---|---|---|
+| 3% dining, 3% drugstores, 1% on all other purchases, 5% on travel through Chase Travel | accepted | each quote is on the page and says what the rule says |
+| 5% "in that quarter's bonus categories", filed under dining, then gas, then travel, then transit, then online shopping | all five rejected | the sentence names none of those categories, so no single category is backed (it is a rotating rule) |
+| 1.5% on everything else | rejected | 1.5 is not in the quote it gave |
+| A "see chase.com/RewardsCategoryFAQs" sentence as a card-wide condition | rejected | not on the page word for word (the page has extra text after it) |
+| 2% on transit, "on Lyft rides... through September 30, 2027" | **accepted, wrongly** | the quote is real and the model's reading was wrong: it is one company's promotion. Fixed by dropping brand names from the category words. |
+
+**Where a wrong reading can still get through**, and what is done about it:
+
+- A quote that really is on the page but means something else (the Lyft case). Each such hole gets a check once it is seen; the brand-name and base-rate checks above came from this.
+- Two accepted rules that contradict each other. These are **flagged, not removed**: a card whose rules show two rates for the same thing with nothing to tell them apart (two base rates, say) gets a `warnings` entry, shown on the page as "check: N things to look at". Every rate is on the page, but they can't all be right.
+- A card where every rate on the page was found but the base rate was not. That is flagged too ("no rate for all other purchases was found"), since the model sometimes skips a plain "1% on all other purchases" sentence.
+- Rules for a different card on a shared page, and conditions attached to the wrong rate. Neither can be checked by a script; they are for the reviewer.
 
 ### Odd earning rules
 
@@ -146,7 +168,8 @@ A rule that fails any check is listed as rejected, never edited. One tidy-up hap
 | Needs activation or booking through the issuer | `requires: ["activation"]` or `["issuer-booking"]` |
 | The cardholder picks the categories (Bank of America Customized Cash) | `selection: "choose"`, the eligible `categories`, `picks`, and `hasOtherChoices: true` if the page lists choices outside the catalog list |
 | The card applies the rate to the top-spend category (Citi Custom Cash) | `selection: "top-spend"`, same fields |
-| Only for a stated period (rotating 5% categories) | `validFrom` / `validTo`, with `requires: ["activation"]` where the page says to activate |
+| Bonus categories the issuer changes every quarter (Discover, Chase Freedom Flex) | `selection: "rotating"`, `categories: []` (the page rarely names them), the rate, the cap, and `requires: ["activation"]` where the page says to activate. If a page names this period's categories with dates, they go in `categories` with `validFrom` / `validTo`. |
+| A rate for a stated period | `validFrom` / `validTo` |
 
 Not handled: relationship boosts (Bank of America Preferred Rewards), caps shared between categories, and rates at one named store (the catalog skips those). The page's own sentence about them can still ride along in `conditions`.
 

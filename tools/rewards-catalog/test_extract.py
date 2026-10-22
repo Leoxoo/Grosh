@@ -187,6 +187,144 @@ class RequiresAndDatesTests(unittest.TestCase):
         self.assertIn("month march", problem)
 
 
+FREEDOM = "Activate each quarter to earn 5% cash back on up to $1,500 in combined purchases in that quarter's bonus categories."
+DISCOVER = "Earn 5% cash back on everyday purchases at different places you shop each quarter, up to the quarterly maximum when you activate."
+LYFT = "Earn 2% total cash back on Lyft rides with your card through September 30, 2027."
+
+
+class WhatCountsAsWhatTests(unittest.TestCase):
+    PAGE = normalize("\n".join([FREEDOM, DISCOVER, LYFT, "Earn 1% on all other purchases.", "Earn 5% on all purchases in the quarter.", "Earn 3% on Netflix."]))
+
+    def check(self, **overrides):
+        return validate_rule(rule(**overrides), self.PAGE)
+
+    def test_a_bonus_rate_that_changes_is_never_the_base_rate(self):
+        self.assertIn("doesn't mention everything-else", self.check(categories=["everything-else"], rate=5, quote=DISCOVER))
+        self.assertIn("doesn't mention everything-else", self.check(categories=["everything-else"], rate=5, quote="Earn 5% on all purchases in the quarter."))
+        self.assertIsNone(self.check(categories=["everything-else"], rate=1, quote="Earn 1% on all other purchases."))
+
+    def test_a_rate_at_one_named_company_is_not_a_category_rate(self):
+        self.assertIn("doesn't mention transit", self.check(categories=["transit"], rate=2, quote=LYFT))
+        self.assertIn("doesn't mention streaming", self.check(categories=["streaming"], rate=3, quote="Earn 3% on Netflix."))
+
+    def test_a_rotating_rate_is_its_own_kind(self):
+        freedom = dict(categories=[], selection="rotating", rate=5, quote=FREEDOM, capAmount=1500, capPeriod="quarter", requires=["activation"])
+        self.assertIsNone(self.check(**freedom))
+        self.assertIsNone(self.check(categories=[], selection="rotating", rate=5, quote=DISCOVER, requires=["activation"]))
+        self.assertEqual(extract.needs_of(rule(**freedom)), [])  # nobody has to answer anything: the issuer rotates them
+
+    def test_a_card_with_a_rotating_rule_goes_through_extraction(self):
+        page = "Savor Rewards\n" + FREEDOM + "\nEarn 1% on all other purchases.\n" + DISCOVER
+        reply = [
+            rule(categories=[], selection="rotating", rate=5, quote=FREEDOM, capAmount=1500, capPeriod="quarter", requires=["activation"]),
+            rule(categories=[], selection="rotating", rate=5, quote=DISCOVER, requires=["activation"]),
+            rule(categories=["everything-else"], rate=1, quote="Earn 1% on all other purchases."),
+            rule(categories=["everything-else"], rate=5, quote=DISCOVER),  # the old mistake: a rotating bonus filed as the base
+        ]
+        result = extract_card(CARD, page, "h", FakeModel(reply), "m")
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual([(r["selection"], r["rate"]) for r in result["rules"]], [("fixed", 1), ("rotating", 5), ("rotating", 5)])
+        self.assertEqual(result["rejected"], [])  # the old mistake (a rotating bonus filed as the base) is retyped, not lost
+        self.assertEqual(result["warnings"], [])  # the 5% is not a second base rate any more
+
+    def test_a_rotating_rate_the_model_calls_top_spend_is_retyped(self):
+        mislabeled = rule(categories=["dining", "gas"], selection="top-spend", picks=1, rate=5, quote=DISCOVER, requires=["activation"])
+        fixed = extract.split_fixed(mislabeled)
+        self.assertEqual([(p["selection"], p["categories"], p["picks"], p["hasOtherChoices"]) for p in fixed], [("rotating", [], None, False)])
+        self.assertIsNone(self.check(**fixed[0]))
+
+    def test_a_rotating_bonus_filed_as_the_base_rate_is_retyped(self):
+        as_base = rule(categories=["everything-else"], rate=5, quote=DISCOVER, requires=["activation"])
+        fixed = extract.split_fixed(as_base)
+        self.assertEqual([(p["selection"], p["categories"]) for p in fixed], [("rotating", [])])
+        self.assertIsNone(self.check(**fixed[0]))
+        real_base = rule(categories=["everything-else"], rate=1, quote="Earn 1% on all other purchases.")
+        self.assertEqual(extract.split_fixed(real_base), [real_base])
+
+    def test_the_same_quote_seen_twice_is_one_rule_with_the_requirements_combined(self):
+        first = rule(categories=["everything-else"], rate=2, quote=APPLE, requires=["apple-pay"])
+        again = rule(categories=["everything-else"], rate=2, quote=APPLE, requires=[])
+        page = PAGE + "\n" + APPLE
+        for order in ((first, again), (again, first)):
+            result = extract_card(CARD, page, "h", FakeModel([order[0]], [order[1]]), "m", max_chars=150)
+            two = [r for r in result["rules"] if r["rate"] == 2]
+            self.assertEqual([(r["requires"], r["needs"]) for r in two], [(["apple-pay"], ["pays-with-apple-pay"])])
+
+    def test_the_same_rule_quoted_two_ways_is_still_one_rule(self):
+        a = rule(categories=["dining"], rate=3, quote="Earn unlimited 3% cash back on dining, entertainment and popular streaming services.")
+        b = rule(categories=["dining"], rate=3, quote=EXCLUSION)  # a different sentence on the page that says the same thing
+        result = extract_card(CARD, PAGE, "h", FakeModel([a], [b]), "m", max_chars=150)
+        self.assertEqual(len([r for r in result["rules"] if r["categories"] == ["dining"]]), 1)
+
+    def test_a_cap_that_says_each_quarter_is_not_a_rotating_rate(self):
+        capped = rule(categories=["dining", "gas"], selection="top-spend", picks=1, rate=2,
+                      quote="Earn 2% cash back at gas stations and restaurants on up to $1,000 in combined purchases each quarter.")
+        self.assertEqual(extract.split_fixed(capped), [capped])  # left as it was, so the checks reject it for what it is
+        self.assertIn("who chooses", validate_rule(capped, normalize(capped["quote"])))
+
+    def test_a_real_top_spend_or_choice_is_not_retyped(self):
+        for selection, quote in (("top-spend", TOP), ("choose", CHOICE)):
+            real = rule(categories=["dining", "gas"], selection=selection, picks=1, quote=quote)
+            self.assertEqual(extract.split_fixed(real), [real])
+        both = rule(categories=["dining", "gas"], selection="top-spend", picks=1, quote="Earn 5% on your top spend category each quarter.")
+        self.assertEqual(extract.split_fixed(both), [both])  # it says who picks, so leave it
+        self.assertEqual(extract.split_fixed(rule(quote=None, selection="choose", picks=1, categories=["gas", "dining"])), [rule(quote=None, selection="choose", picks=1, categories=["gas", "dining"])])
+
+    def test_a_rotating_rule_must_say_the_categories_change(self):
+        self.assertIn("categories change", self.check(categories=[], selection="rotating", rate=1, quote="Earn 1% on all other purchases."))
+
+    def test_a_rotating_rule_may_name_this_periods_categories_if_the_quote_does(self):
+        quote = "Earn 5% cash back on gas stations, this quarter's bonus category, from October 1 through December 31, 2026. Activate each quarter."
+        page = PAGE_NORM + " " + normalize(quote)
+        named = rule(categories=["gas"], selection="rotating", rate=5, quote=quote, requires=["activation"], validFrom="2026-10-01", validTo="2026-12-31")
+        self.assertIsNone(validate_rule(named, page))
+        self.assertIn("doesn't mention dining", validate_rule({**named, "categories": ["gas", "dining"]}, page))
+
+    def test_rotating_rules_have_no_picks_or_everything_else_and_other_kinds_need_a_category(self):
+        for bad in (dict(picks=1), dict(hasOtherChoices=True), dict(categories=["everything-else"])):
+            self.assertIn("rotating rule has no", self.check(**{"categories": [], "selection": "rotating", "rate": 5, "quote": FREEDOM, **bad}))
+        self.assertIn("categories must be", self.check(categories=[], selection="fixed"))
+        self.assertIn("categories must be", self.check(categories=[], selection="choose", picks=1, hasOtherChoices=True))
+
+    def test_the_output_schema_allows_a_rotating_rule_with_no_categories(self):
+        self.assertIn("rotating", extract.RULE_SCHEMA["properties"]["selection"]["enum"])
+        self.assertNotIn("minItems", extract.RULE_SCHEMA["properties"]["categories"])
+
+
+class ReviewWarningTests(unittest.TestCase):
+    def rules(self, *specs):
+        return [extract.accepted_rule(rule(**spec), "u", "h", "page") for spec in specs]
+
+    def test_two_rates_for_the_same_thing_are_flagged(self):
+        base = dict(categories=["everything-else"], quote="Earn 1% on all other purchases.")
+        warnings = extract.review_warnings(self.rules({**base, "rate": 1}, {**base, "rate": 5}))
+        self.assertEqual(warnings, ["everything-else earns 1 and 5 with nothing to tell them apart"])
+
+    def test_rates_with_something_to_tell_them_apart_are_not(self):
+        base = dict(categories=["dining"])
+        rules = self.rules({**base, "rate": 3}, {**base, "rate": 5, "requires": ["issuer-booking"]},
+                           {**base, "rate": 6, "validFrom": "2026-10-01", "validTo": "2026-12-31"},
+                           {**base, "rate": 4, "capAmount": 500, "capPeriod": "month"},
+                           {"categories": [], "selection": "rotating", "rate": 5}, {"categories": [], "selection": "rotating", "rate": 2},
+                           {"categories": ["everything-else"], "rate": 1, "quote": "Earn 1% on all other purchases."})
+        self.assertEqual(extract.review_warnings(rules), [])
+
+    def test_a_card_with_rates_but_no_base_rate_is_flagged(self):
+        dining = self.rules({"categories": ["dining"], "rate": 3})
+        self.assertEqual(extract.review_warnings(dining), ["no rate for all other purchases was found: check the page for what everything else earns"])
+        both = self.rules({"categories": ["dining"], "rate": 3}, {"categories": ["everything-else"], "rate": 1, "quote": "Earn 1% on all other purchases."})
+        self.assertEqual(extract.review_warnings(both), [])
+        self.assertEqual(extract.review_warnings([]), [])  # nothing found is already no-rules
+
+    def test_a_candidate_carries_its_warnings(self):
+        reply = [rule(categories=["everything-else"], rate=1, quote="Earn 1% cash back on all other purchases."),
+                 rule(categories=["everything-else"], rate=3, quote="Earn unlimited 3% cash back on everything else.")]
+        page = PAGE + "\nEarn unlimited 3% cash back on everything else."
+        result = extract_card(CARD, page, "h", FakeModel(reply), "m")
+        self.assertEqual(result["warnings"], ["everything-else earns 1 and 3 with nothing to tell them apart"])
+        self.assertEqual(len(result["rules"]), 2)  # a warning flags, it never removes
+
+
 class FirstMonthsAndNeedsTests(unittest.TestCase):
     def check(self, **overrides) -> str | None:
         return validate_rule(choice_rule(**overrides), PAGE_NORM)

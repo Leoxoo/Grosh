@@ -46,7 +46,7 @@ import fetch  # noqa: E402
 CANDIDATES = fetch.CACHE / "candidates"
 SAVED_SETTINGS = fetch.CACHE / "ui-settings.json"
 MANUAL_RULES = Path(__file__).with_name("manual-rules.json")
-PROMPT_VERSION = "5"
+PROMPT_VERSION = "6"
 DEFAULT_URL = "http://localhost:1234/v1"
 DEFAULT_MODEL = "k2-horizon-7b-uno-uncensored"
 # A reasoning model "thinks" before it answers and can spend a small reply limit on that alone (the first
@@ -62,7 +62,8 @@ MAX_CONDITION_CHARS = 400
 ATTEMPTS_PER_CHUNK = 2
 
 # The catalog's fixed categories (PIPELINE.md), each with words a quote about it would use.
-# A quote that uses none of them is filed under the wrong category.
+# A quote that uses none of them is filed under the wrong category. Brand names (Lyft, Netflix, Amazon...)
+# are deliberately not words: a rate at one named company is not a category rate, and the catalog skips it.
 CATEGORIES = {
     "dining": ("dining", "restaurant", "takeout", "take out", "food", "bars", "eating out"),
     "groceries": ("grocer", "supermarket", "food at home"),
@@ -70,10 +71,10 @@ CATEGORIES = {
     "travel": ("travel", "flight", "airline", "hotel", "rental car", "car rental", "cruise", "vacation",
                "airfare", "lodging", "trip", "airport"),
     "transit": ("transit", "rideshare", "ride share", "ride-hailing", "taxi", "train", "buses", "parking",
-                "toll", "commut", "uber", "lyft"),
-    "streaming": ("streaming", "netflix", "spotify", "hulu", "disney"),
-    "drugstores": ("drugstore", "drug store", "pharmac", "cvs", "walgreens"),
-    "online-shopping": ("online", "amazon", "e-commerce", "internet retail"),
+                "toll", "commut"),
+    "streaming": ("streaming",),
+    "drugstores": ("drugstore", "drug store", "pharmac"),
+    "online-shopping": ("online", "e-commerce", "internet retail"),
     "utilities": ("utilit", "phone", "wireless", "cable", "internet", "electric", "cell"),
     "everything-else": ("all other", "everything else", "other purchase", "other eligible", "every purchase",
                         "every $1", "every dollar", "all purchase", "all eligible", "everywhere", "each purchase",
@@ -96,8 +97,10 @@ PERIOD_WORDS = {"month": ("month",), "quarter": ("quarter",), "year": ("year", "
 
 # Who decides which categories earn a rate. "fixed": the rate always applies to its one category.
 # "choose": the cardholder picks (Bank of America Customized Cash). "top-spend": the card applies
-# it to the eligible category where the cardholder spends most (Citi Custom Cash).
-SELECTIONS = ("fixed", "choose", "top-spend")
+# it to the eligible category where the cardholder spends most (Citi Custom Cash). "rotating": the issuer
+# changes the bonus categories every quarter or month (Discover, Chase Freedom Flex), so the rule has no
+# fixed category: `categories` lists them only if the page names them for a stated period.
+SELECTIONS = ("fixed", "choose", "top-spend", "rotating")
 SELECTION_WORDS = {
     "choose": ("choice", "choose", "choosing", "chosen", "select", "pick"),
     "top-spend": ("top", "highest", "most", "greatest"),
@@ -124,7 +127,7 @@ MONTHS = ("january", "february", "march", "april", "may", "june", "july", "augus
 RULE_SCHEMA = {
     "type": "object",
     "properties": {
-        "categories": {"type": "array", "items": {"type": "string", "enum": list(CATEGORIES)}, "minItems": 1},
+        "categories": {"type": "array", "items": {"type": "string", "enum": list(CATEGORIES)}},
         "selection": {"type": "string", "enum": list(SELECTIONS)},
         "picks": {"type": ["integer", "null"]},
         "hasOtherChoices": {"type": "boolean"},
@@ -234,14 +237,24 @@ def mentions(text: str, words: tuple[str, ...]) -> bool:
 # --- Checking what the model said ---------------------------------------------------------
 
 
+# A base rate ("1% on all other purchases") holds all the time. A sentence about a quarter, activating,
+# or "different places" describes a bonus rate that changes: that is a rotating rate, never the base.
+NOT_A_BASE_RATE = ("quarter", "activate", "activation", "enroll", "different places", "rotating", "bonus categor")
+# "Each quarter" alone is not enough: a cap ("up to $1,000 each quarter") says it too. A rotating rate says
+# the categories themselves change.
+ROTATING_WORDS = ("rotating", "different places", "bonus categor", "categories change", "categories that change")
+
+
 def _category_fits(category: str, quote_norm: str) -> bool:
-    if mentions(quote_norm, CATEGORIES[category]):
-        return True
-    # "Get 2% back when you use Apple Pay" is a base rate without saying "all other purchases":
-    # it fits if it names no other category.
-    return category == "everything-else" and not any(
-        mentions(quote_norm, words) for name, words in CATEGORIES.items() if name != category
-    )
+    if category == "everything-else":
+        if mentions(quote_norm, NOT_A_BASE_RATE):
+            return False
+        if mentions(quote_norm, CATEGORIES[category]):
+            return True
+        # "Get 2% back when you use Apple Pay" is a base rate without saying "all other purchases":
+        # it fits if it names no other category.
+        return not any(mentions(quote_norm, words) for name, words in CATEGORIES.items() if name != category)
+    return mentions(quote_norm, CATEGORIES[category])
 
 
 def _date_problem(label: str, value, text: str) -> str | None:
@@ -299,14 +312,17 @@ def validate_rule(rule, page_norm: str | None = None) -> str | None:
         return f"selection {selection!r} is not fixed, choose or top-spend"
     if (
         not isinstance(categories, list)
-        or not categories
+        or (not categories and selection != "rotating")
         or not all(isinstance(c, str) and c in CATEGORIES for c in categories)
         or len(set(categories)) != len(categories)
     ):
         return "categories must be distinct categories from the catalog's list"
     if not isinstance(other, bool):
         return "hasOtherChoices must be true or false"
-    if selection == "fixed":
+    if selection == "rotating":
+        if "everything-else" in categories or picks is not None or other:
+            return "a rotating rule has no everything-else, no picks and no other choices"
+    elif selection == "fixed":
         if len(categories) != 1 or picks is not None or other:
             return "a fixed rule has one category, no picks and no other choices"
     else:
@@ -354,7 +370,13 @@ def validate_rule(rule, page_norm: str | None = None) -> str | None:
         return "unit is per-dollar but the quote has no points, miles or X"
 
     context = " ".join([quote_norm, *map(normalize, conditions)])
-    if selection == "fixed":
+    if selection == "rotating":
+        if not mentions(quote_norm, ROTATING_WORDS):
+            return "quote doesn't say the categories change (quarter, rotating, bonus categories...)"
+        for category in categories:
+            if not mentions(quote_norm, CATEGORIES[category]):
+                return f"quote doesn't mention {category}"
+    elif selection == "fixed":
         if not _category_fits(categories[0], quote_norm):
             return f"quote doesn't mention {categories[0]}"
     else:
@@ -405,6 +427,7 @@ Rules:
 {categories}
   Skip a rate that fits none of these, and a rate for one named store.
 - selection: "fixed" when the rate always applies to one category (list exactly that one). "choose" when the cardholder picks which categories earn the rate. "top-spend" when the card applies the rate by itself to the eligible category where the cardholder spends the most. For "choose" and "top-spend", list every eligible category that is in the list above, set picks to how many categories earn the rate (1 for "your top category"), and set hasOtherChoices to true if the text also lists eligible categories that are not in the list above. For "fixed", picks is null and hasOtherChoices is false.
+- "rotating" when the issuer changes the bonus categories every quarter or month (such as "5% in bonus categories that change each quarter"): leave categories as [] unless the text names them for a stated period, set picks to null and hasOtherChoices to false, and include requires ["activation"] if the text says to activate.
 - rate: the number alone (3 for "3%" and for "3X points").
 - unit: "percent" for cash back percent, "per-dollar" for points or miles per dollar.
 - quote: copy the exact words of one sentence or phrase from the text that states the rate. Do not change, shorten or join them.
@@ -617,22 +640,61 @@ def accepted_rule(proposal: dict, url: str, page_hash: str | None, verified: str
 def _rule_key(rule: dict) -> tuple:
     return (
         tuple(rule["categories"]), rule["selection"], rule["picks"], float(rule["rate"]), rule["unit"],
-        rule["capAmount"], rule["capPeriod"], tuple(rule["requires"]), rule["validFrom"], rule["validTo"], rule["firstMonths"],
+        rule["capAmount"], rule["capPeriod"], rule["validFrom"], rule["validTo"], rule["firstMonths"],
     )
+
+
+def review_warnings(rules: list[dict]) -> list[str]:
+    """Things that pass every check but that a person should look at before trusting the card: the same
+    thing earning two different rates with nothing to tell them apart (two base rates, say). Each of the
+    rates is on the page; at most one is probably the right reading."""
+    groups: dict[tuple, set] = {}
+    for rule in rules:
+        if rule["selection"] != "fixed" or rule["capAmount"] is not None:
+            continue
+        key = (rule["categories"][0], tuple(rule["requires"]), rule["validFrom"], rule["validTo"], rule["firstMonths"])
+        groups.setdefault(key, set()).add(rule["rate"])
+    warnings = [
+        f"{key[0]} earns {' and '.join(f'{rate:g}' for rate in sorted(rates))} with nothing to tell them apart"
+        for key, rates in sorted(groups.items(), key=lambda item: repr(item[0])) if len(rates) > 1
+    ]
+    if rules and not any(r["selection"] == "fixed" and r["categories"] == ["everything-else"] for r in rules):
+        warnings.append("no rate for all other purchases was found: check the page for what everything else earns")
+    return warnings
 
 
 def _empty_candidate(card: dict, model: str, prompt_version: str | None, page_hash: str | None, status: str) -> dict:
     return {
         "cardId": card["id"], "model": model, "promptVersion": prompt_version, "pageHash": page_hash,
-        "status": status, "needs": [], "cardConditions": [], "rules": [], "rejected": [],
+        "status": status, "needs": [], "warnings": [], "cardConditions": [], "rules": [], "rejected": [],
     }
 
 
+def _retype_rotating(proposal):
+    """A "choose" or "top-spend" rule, or a base rate, whose quote says the categories change and says nothing
+    about who picks them, is a rotating rule that was mislabeled (the model reads "different places you shop
+    each quarter" as "top spend", or as "everything else"). Its categories were guessed, so they are dropped."""
+    if not isinstance(proposal, dict):
+        return proposal
+    selection = proposal.get("selection")
+    base_rate = selection == "fixed" and proposal.get("categories") == ["everything-else"]
+    if selection not in ("choose", "top-spend") and not base_rate:
+        return proposal
+    quote = normalize(proposal["quote"]) if isinstance(proposal.get("quote"), str) else ""
+    says_who_picks = bool(selection in SELECTION_WORDS) and mentions(quote, SELECTION_WORDS[selection])
+    if mentions(quote, ROTATING_WORDS) and not says_who_picks:
+        # A base rate never says "at different places you shop each quarter": it is the rotating bonus.
+        return {**proposal, "selection": "rotating", "categories": [], "picks": None, "hasOtherChoices": False}
+    return proposal
+
+
 def split_fixed(proposal) -> list:
-    """A "fixed" rule that lists several categories says the rate applies to each, so it becomes one rule
+    """Tidy-ups of what the model proposed that change nothing about its meaning: a rotating rule mislabeled
+    as choose or top-spend is retyped, and a "fixed" rule that lists several categories says the rate applies to each, so it becomes one rule
     per category with the same quote, and each is then checked on its own. The model does this often
     ("3% on dining, groceries and streaming"); nothing about the rule changes. A "choose" or "top-spend" rule
     that picks as many categories as it lists is fixed in the same way."""
+    proposal = _retype_rotating(proposal)
     categories = proposal.get("categories") if isinstance(proposal, dict) else None
     picks = proposal.get("picks") if isinstance(proposal, dict) else None
     if (
@@ -705,8 +767,11 @@ def extract_card(
                 continue
             rule = accepted_rule(proposal, card["sourceUrl"], page_hash, "page")
             entry = accepted.setdefault(_rule_key(rule), rule)
-            # The same rate seen in another chunk may carry a condition this chunk didn't have.
+            # The same rule seen again (the model words a quote a little differently in each part of a page) may carry a
+            # condition or requirement the first time lacked.
             entry["conditions"] += [c for c in rule["conditions"] if c not in entry["conditions"]]
+            entry["requires"] += [q for q in rule["requires"] if q not in entry["requires"]]
+            entry["needs"] = needs_of(entry)
         for condition in card_conditions:
             problem = check_condition(condition, page_norm) or (
                 None if len(candidate["cardConditions"]) < MAX_CARD_CONDITIONS else "too many card conditions"
@@ -715,8 +780,9 @@ def extract_card(
                 candidate["rejected"].append({"cardCondition": condition, "reason": problem})
             elif condition.strip() not in candidate["cardConditions"]:
                 candidate["cardConditions"].append(condition.strip())
-    candidate["rules"] = sorted(accepted.values(), key=lambda r: (r["categories"][0], -r["rate"]))
+    candidate["rules"] = sorted(accepted.values(), key=lambda r: (r["categories"][0] if r["categories"] else "~", -r["rate"]))  # "~" sorts rotating rules last
     candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
+    candidate["warnings"] = review_warnings(candidate["rules"])
     if failures:
         candidate["status"] = "failed"
         candidate["errors"] = errors
@@ -748,6 +814,7 @@ def manual_candidate(card: dict, entry: dict, text: str | None, page_hash: str |
         normalize(c) in page_norm for c in candidate["cardConditions"]
     )
     candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
+    candidate["warnings"] = review_warnings(candidate["rules"])
     if not candidate["rules"]:
         candidate["status"] = "no-rules"
     return candidate
@@ -866,7 +933,7 @@ def process_cards(
         fetch.write_json(path, candidate)
         counts[candidate["status"]] = counts.get(candidate["status"], 0) + 1
         emit({
-            "event": "card", **base, "status": candidate["status"], "rules": len(candidate["rules"]),
+            "event": "card", **base, "status": candidate["status"], "rules": len(candidate["rules"]), "warnings": candidate.get("warnings", []),
             "rejected": len(candidate["rejected"]), "errors": candidate.get("errors", []), "stats": candidate.get("stats"),
         })
     return counts

@@ -347,6 +347,7 @@ class App:
                     "rejected": len(candidate.get("rejected", [])), "model": candidate.get("model"),
                     "promptVersion": candidate.get("promptVersion"), "needs": candidate.get("needs", []),
                     "errors": candidate.get("errors", [])[:1], "stats": candidate.get("stats"),
+                    "warnings": candidate.get("warnings", []),
                     "statsText": format_stats(candidate.get("stats")),
                 },
                 "pending": pending,
@@ -567,6 +568,8 @@ class App:
                 job.card_done(event["name"], event["status"], detail, "error" if failed else "info")
                 for message in event["errors"][:2]:
                     job.log(f"      {message}", "error")
+                for message in event.get("warnings", []):
+                    job.log(f"      check: {message}", "warn")
 
         def progress(card_id: str, done: int, total: int) -> None:
             job.set_chunk(done, total)
