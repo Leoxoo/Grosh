@@ -136,7 +136,7 @@ For each card it splits the cached page text into chunks of about 12,000 charact
 9. `validFrom` / `validTo` are accepted only if the quote or a condition gives that date's month and year, so a period can't be made up.
 10. `firstMonths` (a rate only for the first N months after opening, such as a first-year bonus) is accepted only if the quote or a condition says "first year", "first 12 months" or similar for that length.
 
-A rule that fails any check is listed as rejected, never edited. **Card-wide conditions** (`cardConditions`: sentences that limit several of a card's rates, such as Capital One's note that digital wallets may not earn the higher rate) must also be on the page word for word; one that isn't is dropped and listed under `rejected`, and the card's rules are kept.
+A rule that fails any check is listed as rejected, never edited. One tidy-up happens before the checks: a `fixed` rule that lists several categories (the model likes "3% on dining, groceries and streaming") becomes one rule per category with the same quote, each checked on its own, and each keeps only the conditions that are about it or name no category. **Card-wide conditions** (`cardConditions`: sentences that limit several of a card's rates, such as Capital One's note that digital wallets may not earn the higher rate) must also be on the page word for word; one that isn't is dropped and listed under `rejected`, and the card's rules are kept.
 
 ### Odd earning rules
 
@@ -174,12 +174,25 @@ Some things about a rule depend on the person, not the card. The catalog doesn't
 
 **Not done, and worth knowing:**
 
-- It has run against the real model once, on Capital One Savor: 5 rules, all correct, none rejected, and (with prompt version 2) the right exclusions, though the digital-wallet sentence landed on the 1% rule instead of the higher ones. That motivated `cardConditions`. Prompt version 3, with selection, requirements, dates and card conditions, has not been tried against the model yet. Rerun `--only capital-one-savor` and read the candidate file.
+- **Run against the real model on Capital One Savor.** With `k2-horizon-7b-uno-uncensored` and settings that switch its reasoning off, it takes about 12 seconds and returns the 5% travel rule (tagged `issuer-booking`), the 1% base rate, the 3% rules for dining, groceries and streaming (the superstore exclusion on groceries only), and the digital-wallet sentence as a card-wide condition. One card is not a benchmark: run a few more issuers before trusting the numbers.
 - **Mixed pages.** Amex pages hold other cards' marketing. The prompt tells the model to take only this card's rates, but a quote about a different card would still pass the checks. Review Amex candidates by hand.
 - **Conditions come from the same chunk as the rate.** A footnote far from its headline, in another 12,000-character chunk, is missed, and the rule looks unrestricted. A second pass that hunts for footnotes is the fix if this shows up in real runs. Whether a condition really belongs to the rate, and not to a neighbouring one, can't be checked automatically; that's for the reviewer.
 - **Rotating categories** (Discover 5%, Freedom Flex) carry `validFrom` / `validTo`, but only when the page names the months and the year. Pages that say "this quarter" give the extractor nothing to date.
 - **Chunks with no rate in them aren't sent**, so a footnote-only chunk holding a card-wide condition can be skipped on big pages.
 - **Category words** are a guess at what a quote about a category says. Valid rules the list misses show up in `rejected` as "quote doesn't mention ...", and the fix is to add the word to `CATEGORIES`.
+
+## The web page (`ui.py`)
+
+```
+python3 tools/rewards-catalog/ui.py        # then open http://127.0.0.1:8765
+```
+
+A small local page, standard library only, that drives the same code as `fetch.py` and `extract.py` on the same files. In the app's Browser pane, the `rewards-catalog` entry in `.claude/launch.json` starts it.
+
+- **Model panel:** LM Studio's address and a model box that lists what LM Studio has (or take any id); **Test model** asks it a trivial question using the real output schema and reports the time, tokens, and how many were spent reasoning; **More settings** holds the page size sent per request, the reply limit, the time limit, extra request fields (JSON, such as `{"reasoning_effort": "none"}`), and text added to every prompt. Settings are saved in `cache/ui-settings.json`, and `extract.py` on the command line uses them as its defaults (flags override).
+- **Run:** fetch (never fetched, retry failed, ticked, all) or extract (what needs it, ticked, redo all), one job at a time, with a progress bar, the card and the part of its page being sent, a live log, and **Stop** (it stops between cards, or between parts of a card). A card is "needs extracting" when it has no result for the chosen model and the current prompt version, so switching models marks every card again.
+- **Cards:** every card with its fetch status, extraction status, rule count, model, and the questions it asks the user; search, issuer and status filters; click a card for a drawer with the page's rate-looking lines, every rule in plain words with the quote it came from, what was rejected and why, and any error. **Try the model on this page** shows the model's raw reply and what the checks make of each rule, without saving anything.
+- **Safe to leave running:** it listens on `127.0.0.1` only, refuses requests whose Host isn't local, and refuses POSTs without an `X-Requested-With` header, so a web page you visit can't drive it. It never puts page text into markup (text is set with `textContent`).
 
 ## Why issuers' different sites are survivable
 
@@ -199,6 +212,7 @@ Fetching is the same for everyone. The only issuer-specific work is turning a pa
 - The model is a setting, not code. Default: `k2-horizon-7b-uno-uncensored`. Small (7B) models drop and garble more, so before trusting it, run it on a handful of cached pages against hand-checked answers and see how often its candidates pass validation. Swap models by changing the setting.
 - Every candidate records the model id and prompt version that produced it, so a rerun with a different model is a visible diff.
 - Extraction runs on the maintainer's Mac, not in CI (hosted runners have no model). CI can still do fetch and change detection.
+- **Reasoning models.** `k2-horizon-7b-uno-uncensored` thinks before it answers, and the thinking counts against the reply limit. At 3,000 tokens it used all of them on reasoning (13,871 characters, 86 seconds) and returned an empty reply, which showed up as a failed card with `the reply was 0 characters`. Sending `{"reasoning_effort": "none"}` with each request turns the thinking off: the same page then takes 12 seconds and 403 tokens. Other tries had no effect on this model: `reasoning_effort: "low"`, `chat_template_kwargs: {enable_thinking: false}`, and `/no_think` at the end of the prompt. The reply limit now defaults to 8,000 tokens and the time limit to 600 seconds. A model that doesn't reason needs none of this.
 
 ### Validation (what makes it trustworthy)
 

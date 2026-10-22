@@ -40,10 +40,15 @@ sys.path.insert(0, str(Path(__file__).parent))
 import fetch  # noqa: E402
 
 CANDIDATES = fetch.CACHE / "candidates"
+SAVED_SETTINGS = fetch.CACHE / "ui-settings.json"
 MANUAL_RULES = Path(__file__).with_name("manual-rules.json")
 PROMPT_VERSION = "4"
 DEFAULT_URL = "http://localhost:1234/v1"
 DEFAULT_MODEL = "k2-horizon-7b-uno-uncensored"
+# A reasoning model "thinks" before it answers and can spend a small reply limit on that alone (the first
+# real run did: 3,000 tokens of reasoning, no answer), so the limit is generous and the wait long.
+DEFAULT_MAX_TOKENS = 8000
+DEFAULT_TIMEOUT = 600
 CHUNK_CHARS = 12_000
 CHUNK_OVERLAP_LINES = 3
 MAX_RATE = 10
@@ -431,26 +436,51 @@ def parse_reply(content: str) -> tuple[list, list]:
     return value["rules"], card_conditions
 
 
+def empty_reply_message(meta: dict) -> str:
+    """Why a model's reply held no text, and what to try. Reasoning models often spend their whole reply
+    limit "thinking" and stop before answering."""
+    used = (meta.get("usage") or {}).get("completion_tokens")
+    parts = [f"finish reason {meta.get('finishReason')!r}", f"{used if used is not None else '?'} of {meta.get('maxTokens')} reply tokens used"]
+    if meta.get("reasoningChars"):
+        parts.append(f"{meta['reasoningChars']} characters of reasoning text")
+    hint = ""
+    if meta.get("finishReason") == "length" or meta.get("reasoningChars"):
+        hint = " The model ran out of room before answering, probably because it reasons first: raise the reply limit in the page's settings, or choose a model that answers directly."
+    return f"LM Studio returned an empty reply ({'; '.join(parts)}).{hint}"
+
+
 class LMStudio:
     """LM Studio's OpenAI-compatible server."""
 
-    def __init__(self, base_url: str, model: str, timeout: float = 300, urlopen=urllib.request.urlopen) -> None:
+    def __init__(
+        self, base_url: str, model: str, timeout: float = DEFAULT_TIMEOUT, urlopen=urllib.request.urlopen,
+        max_tokens: int = DEFAULT_MAX_TOKENS, extra_body: dict | None = None, prompt_suffix: str = "",
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = timeout
         self.urlopen = urlopen
+        self.max_tokens = max_tokens
+        # Two ways to steer a model without changing code: fields added to every request (for example
+        # {"reasoning_effort": "low"}) and a line added to the end of every prompt (for example "/no_think").
+        self.extra_body = extra_body or {}
+        self.prompt_suffix = prompt_suffix.strip()
+        self.last_meta: dict = {}  # how the latest reply ended: finish reason, tokens used, reasoning text
 
     def models(self) -> list[str]:
         with self.urlopen(f"{self.base_url}/models", timeout=10) as reply:
             return [entry["id"] for entry in json.load(reply)["data"]]
 
     def complete(self, messages: list[dict]) -> str:
+        if self.prompt_suffix:
+            messages = [*messages[:-1], {**messages[-1], "content": f"{messages[-1]['content']}\n\n{self.prompt_suffix}"}]
         body = {
+            "temperature": 0,
+            "max_tokens": self.max_tokens,
+            "response_format": {"type": "json_schema", "json_schema": {"name": "rules", "strict": True, "schema": SCHEMA}},
+            **{k: v for k, v in self.extra_body.items() if k not in ("model", "messages")},
             "model": self.model,
             "messages": messages,
-            "temperature": 0,
-            "max_tokens": 3000,
-            "response_format": {"type": "json_schema", "json_schema": {"name": "rules", "strict": True, "schema": SCHEMA}},
         }
         request = urllib.request.Request(
             f"{self.base_url}/chat/completions",
@@ -465,9 +495,19 @@ class LMStudio:
             detail = problem.read(600).decode("utf-8", "replace").strip()
             raise OSError(f"LM Studio answered HTTP {problem.code}: {detail}") from problem
         try:
-            return data["choices"][0]["message"]["content"]
+            choice = data["choices"][0]
+            message = choice["message"]
         except (KeyError, IndexError, TypeError) as problem:
             raise ValueError(f"unexpected reply from LM Studio: {problem}") from problem
+        content = message.get("content") or ""
+        reasoning = message.get("reasoning_content") or message.get("reasoning") or ""
+        self.last_meta = {
+            "finishReason": choice.get("finish_reason"), "usage": data.get("usage"), "reasoningChars": len(reasoning),
+            "replyChars": len(content), "maxTokens": self.max_tokens,
+        }
+        if not content.strip():
+            raise ValueError(empty_reply_message(self.last_meta))
+        return content
 
 
 # --- One card ---------------------------------------------------------------------------------
@@ -522,7 +562,37 @@ def _empty_candidate(card: dict, model: str, prompt_version: str | None, page_ha
     }
 
 
-def extract_card(card: dict, text: str, page_hash: str, complete, model: str, max_chars: int = CHUNK_CHARS) -> dict:
+def split_fixed(proposal) -> list:
+    """A "fixed" rule that lists several categories says the rate applies to each, so it becomes one rule
+    per category with the same quote, and each is then checked on its own. The model does this often
+    ("3% on dining, groceries and streaming"); nothing about the rule changes."""
+    categories = proposal.get("categories") if isinstance(proposal, dict) else None
+    if isinstance(proposal, dict) and proposal.get("selection") == "fixed" and isinstance(categories, list) and len(categories) > 1:
+        return [
+            {**proposal, "categories": [category], "conditions": _conditions_about(proposal.get("conditions"), category)}
+            for category in categories
+        ]
+    return [proposal]
+
+
+def _conditions_about(conditions, category) -> list:
+    """The conditions that apply to one category of a split rule: those about it, and those that name no
+    category at all. A sentence about supermarkets belongs to groceries, not to dining."""
+    if not isinstance(conditions, list) or category not in CATEGORIES:
+        return conditions
+    kept = []
+    for condition in conditions:
+        text = normalize(condition) if isinstance(condition, str) else ""
+        about_this = mentions(text, CATEGORIES[category])
+        about_another = any(mentions(text, words) for name, words in CATEGORIES.items() if name not in (category, "everything-else"))
+        if about_this or not about_another:
+            kept.append(condition)
+    return kept
+
+
+def extract_card(
+    card: dict, text: str, page_hash: str, complete, model: str, max_chars: int = CHUNK_CHARS, progress=None
+) -> dict:
     """The candidate for one card: accepted rules, card-wide conditions, rejected proposals with reasons,
     and a status: ok, no-rules (the page states none), wrong-page (it doesn't name the card) or failed
     (the model could not be read for at least one chunk, so the result is incomplete)."""
@@ -535,7 +605,10 @@ def extract_card(card: dict, text: str, page_hash: str, complete, model: str, ma
     accepted: dict[tuple, dict] = {}
     failures = 0
     errors: list[str] = []
-    for chunk in (c for c in chunk_lines(text, max_chars) if has_rates(c)):
+    to_ask = [c for c in chunk_lines(text, max_chars) if has_rates(c)]
+    for number, chunk in enumerate(to_ask, 1):
+        if progress:
+            progress(number, len(to_ask))  # may raise Stopped to end the card early
         reply = None
         for _ in range(ATTEMPTS_PER_CHUNK):
             try:
@@ -550,7 +623,7 @@ def extract_card(card: dict, text: str, page_hash: str, complete, model: str, ma
             failures += 1
             continue
         proposals, card_conditions = reply
-        for proposal in proposals:
+        for proposal in (split for raw in proposals for split in split_fixed(raw)):
             reason = validate_rule(proposal, page_norm)
             if reason:
                 candidate["rejected"].append({"rule": proposal, "reason": reason})
@@ -614,72 +687,144 @@ def up_to_date(path: Path, page_hash: str, model: str) -> bool:
     )
 
 
+class ServerProblem(Exception):
+    """LM Studio isn't answering, or doesn't have the chosen model."""
+
+
+class Stopped(Exception):
+    """A running job was asked to stop."""
+
+
+def check_server(client: LMStudio) -> list[str]:
+    """The model ids LM Studio lists, or ServerProblem saying what to fix."""
+    try:
+        available = client.models()
+    except (OSError, ValueError, KeyError) as problem:
+        raise ServerProblem(
+            f"LM Studio isn't answering at {client.base_url} ({problem}). Start its local server (Developer tab)."
+        ) from problem
+    if client.model not in available:
+        raise ServerProblem(f"LM Studio has no model {client.model!r}. It lists: {', '.join(available) or 'nothing'}.")
+    return available
+
+
+def load_manual(cards: list[dict], path: Path = MANUAL_RULES) -> dict:
+    manual = fetch.read_json(path, {})
+    unknown = sorted(set(manual) - {card["id"] for card in cards})
+    if unknown:
+        raise ValueError(f"manual-rules.json names cards that aren't in the seed: {unknown}")
+    return manual
+
+
+def has_page(card: dict, state: dict, cache: Path) -> bool:
+    return bool(state.get(card["id"], {}).get("hash")) and (cache / card["id"] / "latest.txt").exists()
+
+
+def process_cards(
+    chosen: list[dict], *, state: dict, manual: dict, client: LMStudio, chunk_chars: int, force: bool,
+    cache: Path, candidates: Path, emit, ensure_server=None, progress=None, should_stop=None,
+) -> dict[str, int]:
+    """Extract rules for the chosen cards one at a time, saving each candidate as it finishes.
+
+    `emit(event)` hears about every card: {"event": "card-start", ...} then {"event": "card", "status": ...}.
+    `ensure_server()` runs once, just before the first card that needs the model (hand-entered cards
+    don't). `progress(card_id, done, total)` hears about each chunk sent. `should_stop()` is asked
+    between cards, and `progress` may raise Stopped to end a card early."""
+    counts: dict[str, int] = {}
+    server_checked = False
+    for number, card in enumerate(chosen, 1):
+        if should_stop and should_stop():
+            raise Stopped
+        base = {"index": number, "total": len(chosen), "id": card["id"], "name": card["name"]}
+        page_hash = state.get(card["id"], {}).get("hash")
+        text = (cache / card["id"] / "latest.txt").read_text(encoding="utf-8") if has_page(card, state, cache) else None
+        path = candidates / f"{card['id']}.json"
+        if card["id"] in manual:
+            emit({"event": "card-start", **base, "kind": "hand-entered"})
+            candidate = manual_candidate(card, manual[card["id"]], text, page_hash)
+        else:
+            if not force and up_to_date(path, page_hash, client.model):
+                counts["up-to-date"] = counts.get("up-to-date", 0) + 1
+                emit({"event": "card", **base, "status": "up-to-date", "rules": None, "rejected": None, "errors": []})
+                continue
+            if not server_checked:
+                if ensure_server:
+                    ensure_server()
+                server_checked = True
+            emit({"event": "card-start", **base, "kind": "model"})
+            candidate = extract_card(
+                card, text, page_hash, client.complete, client.model, chunk_chars,
+                progress=(lambda done, total, _id=card["id"]: progress(_id, done, total)) if progress else None,
+            )
+        fetch.write_json(path, candidate)
+        counts[candidate["status"]] = counts.get(candidate["status"], 0) + 1
+        emit({
+            "event": "card", **base, "status": candidate["status"], "rules": len(candidate["rules"]),
+            "rejected": len(candidate["rejected"]), "errors": candidate.get("errors", []),
+        })
+    return counts
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Propose reward rules from fetched pages, using LM Studio.")
     parser.add_argument("--only", nargs="+", default=[], metavar="ID")
     parser.add_argument("--issuer", default="")
     parser.add_argument("--limit", type=int)
     parser.add_argument("--force", action="store_true", help="redo cards whose page, model and prompt are unchanged")
-    parser.add_argument("--base-url", default=os.environ.get("LM_STUDIO_URL", DEFAULT_URL))
-    parser.add_argument("--model", default=os.environ.get("LM_STUDIO_MODEL", DEFAULT_MODEL))
-    parser.add_argument("--chunk-chars", type=int, default=CHUNK_CHARS, help="page text sent to the model at a time")
+    saved = fetch.read_json(SAVED_SETTINGS, {})  # what the web page (ui.py) last saved; flags override it
+    parser.add_argument("--base-url", default=os.environ.get("LM_STUDIO_URL", saved.get("baseUrl", DEFAULT_URL)))
+    parser.add_argument("--model", default=os.environ.get("LM_STUDIO_MODEL", saved.get("model", DEFAULT_MODEL)))
+    parser.add_argument("--chunk-chars", type=int, default=saved.get("chunkChars", CHUNK_CHARS), help="page text sent to the model at a time")
+    parser.add_argument("--max-tokens", type=int, default=saved.get("maxTokens", DEFAULT_MAX_TOKENS), help="reply limit, including any reasoning")
+    parser.add_argument("--timeout", type=int, default=saved.get("timeoutSeconds", DEFAULT_TIMEOUT), help="seconds to wait for one reply")
+    parser.add_argument("--extra-body", default=saved.get("extraBody", ""), metavar="JSON", help='fields added to every request, e.g. \'{"reasoning_effort": "none"}\'')
+    parser.add_argument("--prompt-suffix", default=saved.get("promptSuffix", ""), help='text added to the end of every prompt, e.g. "/no_think"')
     args = parser.parse_args()
+    try:
+        extra_body = json.loads(args.extra_body) if args.extra_body else {}
+        if not isinstance(extra_body, dict):
+            raise ValueError("it must be a JSON object")
+    except ValueError as problem:
+        sys.exit(f"--extra-body: {problem}")
 
     cards = fetch.read_json(fetch.SEED, {"cards": []})["cards"]
     state = fetch.read_json(fetch.STATE, {})
-    manual = fetch.read_json(MANUAL_RULES, {})
-    unknown = sorted(set(manual) - {card["id"] for card in cards})
-    if unknown:
-        sys.exit(f"manual-rules.json names cards that aren't in the seed: {unknown}")
-
-    def page_path(card: dict) -> Path:
-        return fetch.CACHE / card["id"] / "latest.txt"
-
-    def fetched(card: dict) -> bool:
-        return bool(state.get(card["id"], {}).get("hash")) and page_path(card).exists()
-
-    chosen = [c for c in fetch.select(cards, args.only, args.issuer, None) if fetched(c) or c["id"] in manual]
+    try:
+        manual = load_manual(cards)
+    except ValueError as problem:
+        sys.exit(str(problem))
+    chosen = [
+        c for c in fetch.select(cards, args.only, args.issuer, None)
+        if has_page(c, state, fetch.CACHE) or c["id"] in manual
+    ]
     chosen = chosen[: args.limit] if args.limit else chosen
     if not chosen:
         sys.exit("No fetched pages match. Run fetch.py first.")
 
-    client = LMStudio(args.base_url, args.model)
-    server_checked = False
+    if saved:
+        print(f"Using model settings saved by the web page ({SAVED_SETTINGS.name}); flags override them.", flush=True)
+    client = LMStudio(
+        args.base_url, args.model, args.timeout, max_tokens=args.max_tokens, extra_body=extra_body, prompt_suffix=args.prompt_suffix
+    )
 
-    def check_server() -> None:
+    def ensure_server() -> None:
         try:
-            available = client.models()
-        except (OSError, ValueError, KeyError) as problem:
-            sys.exit(f"LM Studio isn't answering at {args.base_url} ({problem}). Start its local server (Developer tab).")
-        if args.model not in available:
-            sys.exit(f"LM Studio has no model {args.model!r}. It lists: {', '.join(available) or 'nothing'}.")
+            check_server(client)
+        except ServerProblem as problem:
+            sys.exit(str(problem))
 
-    counts: dict[str, int] = {}
-    for number, card in enumerate(chosen, 1):
-        page_hash = state.get(card["id"], {}).get("hash")
-        text = page_path(card).read_text(encoding="utf-8") if fetched(card) else None
-        path = CANDIDATES / f"{card['id']}.json"
-        if card["id"] in manual:
-            candidate = manual_candidate(card, manual[card["id"]], text, page_hash)
-        else:
-            if not args.force and up_to_date(path, page_hash, args.model):
-                counts["up-to-date"] = counts.get("up-to-date", 0) + 1
-                print(f"[{number}/{len(chosen)}] up-to-date    {card['id']}", flush=True)
-                continue
-            if not server_checked:
-                check_server()  # only when a card needs the model: hand-entered rules don't
-                server_checked = True
-            candidate = extract_card(card, text, page_hash, client.complete, args.model, args.chunk_chars)
-        fetch.write_json(path, candidate)
-        counts[candidate["status"]] = counts.get(candidate["status"], 0) + 1
-        print(
-            f"[{number}/{len(chosen)}] {candidate['status']:<14} {card['id']}  "
-            f"{len(candidate['rules'])} rules, {len(candidate['rejected'])} rejected",
-            flush=True,
-        )
-        for message in candidate.get("errors", [])[:2]:
+    def show(event: dict) -> None:
+        if event["event"] != "card":
+            return
+        counts_text = "" if event["rules"] is None else f"  {event['rules']} rules, {event['rejected']} rejected"
+        print(f"[{event['index']}/{event['total']}] {event['status']:<14} {event['id']}{counts_text}", flush=True)
+        for message in event["errors"][:2]:
             print(f"        {message}", flush=True)
 
+    counts = process_cards(
+        chosen, state=state, manual=manual, client=client, chunk_chars=args.chunk_chars, force=args.force,
+        cache=fetch.CACHE, candidates=CANDIDATES, emit=show, ensure_server=ensure_server,
+    )
     print("\n" + ", ".join(f"{count} {status}" for status, count in sorted(counts.items())))
     return 1 if counts.get("failed", 0) / len(chosen) > fetch.FAILURE_LIMIT else 0
 

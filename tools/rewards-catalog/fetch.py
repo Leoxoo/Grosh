@@ -462,12 +462,15 @@ def write_json(path: Path, value) -> None:
 
 
 def run(
-    cards: list[dict], state: dict, cache: Path, get, throttle: Throttle, today: str, after_each=None
+    cards: list[dict], state: dict, cache: Path, get, throttle: Throttle, today: str, after_each=None,
+    before_each=None, should_stop=None,
 ) -> RunSummary:
     """Fetch the given cards' pages one at a time, update `state` and `cache` in place, and say what happened.
 
     `after_each(outcomes)` is called as soon as each page is done, with the outcomes of the
     cards that share it, so the caller can show progress and save `state` before the next page.
+    `before_each(url, cards)` is called just before a page is fetched, and the run ends cleanly
+    between pages once `should_stop()` says so.
     """
     robots = Robots(get, throttle)
     summary = RunSummary()
@@ -476,6 +479,10 @@ def run(
         by_url.setdefault(card["sourceUrl"], []).append(card)
 
     for url, sharing in by_url.items():
+        if should_stop and should_stop():
+            break
+        if before_each:
+            before_each(url, sharing)
         # Ask "has it changed?" only when every card on this page has a hash and a cached copy to
         # fall back on; otherwise a 304 would leave some card with nothing to compare against.
         known = all(state.get(c["id"], {}).get("hash") and (cache / c["id"] / "latest.txt").exists() for c in sharing)

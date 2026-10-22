@@ -319,6 +319,33 @@ class ExtractCardTests(unittest.TestCase):
         self.assertEqual((result["rules"], result["status"]), ([], "no-rules"))
         self.assertIn("condition", result["rejected"][0]["reason"])
 
+    def test_a_fixed_rule_listing_several_categories_becomes_one_rule_each(self):
+        grouped = rule(categories=["dining", "groceries"], quote=EXCLUSION, rate=3)
+        result = self.run_card(FakeModel([grouped]))
+        self.assertEqual([r["categories"] for r in result["rules"]], [["dining"], ["groceries"]])
+        self.assertEqual({r["evidence"]["quote"] for r in result["rules"]}, {EXCLUSION})
+
+    def test_each_split_category_is_checked_on_its_own(self):
+        grouped = rule(categories=["dining", "gas"], quote=EXCLUSION, rate=3)  # the quote never mentions gas
+        result = self.run_card(FakeModel([grouped]))
+        self.assertEqual([r["categories"] for r in result["rules"]], [["dining"]])
+        self.assertEqual([r["reason"] for r in result["rejected"]], ["quote doesn't mention gas"])
+
+    def test_a_split_rule_keeps_only_the_conditions_about_each_category(self):
+        about_groceries = "A supermarket, meat locker, freezer, dairy product store and specialty market. Excludes superstores like Walmart and Target."
+        about_nothing = "Excludes superstores like Walmart and Target."
+        grouped = rule(categories=["dining", "groceries", "streaming"], rate=3, conditions=[about_groceries, about_nothing])
+        parts = {p["categories"][0]: p["conditions"] for p in extract.split_fixed(grouped)}
+        self.assertEqual(parts["groceries"], [about_groceries, about_nothing])
+        self.assertEqual(parts["dining"], [about_nothing])  # the supermarket sentence is not about dining
+        self.assertEqual(parts["streaming"], [about_nothing])
+
+    def test_only_fixed_rules_are_split(self):
+        self.assertEqual(len(extract.split_fixed(choice_rule())), 1)
+        self.assertEqual(len(extract.split_fixed(rule(categories=["dining"]))), 1)
+        self.assertEqual(extract.split_fixed("not a rule"), ["not a rule"])
+        self.assertEqual(extract.split_fixed(rule(categories="dining, gas"))[0]["categories"], "dining, gas")
+
     def test_the_prompt_names_the_card_and_carries_the_page(self):
         model = FakeModel([])
         self.run_card(model)
@@ -455,6 +482,38 @@ class LMStudioTests(unittest.TestCase):
             client.complete([])
         self.assertIn("HTTP 400", str(raised.exception))
         self.assertIn("Invalid schema", str(raised.exception))
+
+    def test_an_empty_reply_says_why_and_what_to_try(self):
+        for payload, expected in (
+            ({"choices": [{"finish_reason": "length", "message": {"content": "", "reasoning_content": "Let me think " * 50}}],
+              "usage": {"completion_tokens": 3000}}, ["'length'", f"3000 of {extract.DEFAULT_MAX_TOKENS}", "characters of reasoning", "raise the reply limit"]),
+            ({"choices": [{"finish_reason": "stop", "message": {"content": None}}]}, ["'stop'", f"? of {extract.DEFAULT_MAX_TOKENS}", "empty reply"]),
+        ):
+            client, _ = self.client(payload)
+            with self.assertRaises(ValueError) as raised:
+                client.complete([])
+            for fragment in expected:
+                self.assertIn(fragment, str(raised.exception))
+
+    def test_extra_fields_and_a_prompt_suffix_reach_the_request(self):
+        calls = []
+
+        def urlopen(request, timeout):
+            calls.append(json.loads(request.data))
+            return io.BytesIO(json.dumps({"choices": [{"message": {"content": "{}"}}]}).encode())
+
+        client = extract.LMStudio("http://lm.test/v1", "m", urlopen=urlopen, max_tokens=123,
+                                  extra_body={"reasoning_effort": "low", "model": "sneaky", "messages": []}, prompt_suffix=" /no_think ")
+        client.complete([{"role": "system", "content": "s"}, {"role": "user", "content": "find rates"}])
+        body = calls[0]
+        self.assertEqual((body["reasoning_effort"], body["max_tokens"], body["model"]), ("low", 123, "m"))
+        self.assertEqual([m["content"] for m in body["messages"]], ["s", "find rates\n\n/no_think"])
+
+    def test_how_a_reply_ended_is_kept(self):
+        client, _ = self.client({"choices": [{"finish_reason": "stop", "message": {"content": "{}"}}], "usage": {"completion_tokens": 2}})
+        client.complete([])
+        self.assertEqual(client.last_meta["finishReason"], "stop")
+        self.assertEqual(client.last_meta["replyChars"], 2)
 
     def test_an_odd_reply_is_a_value_error(self):
         client, _ = self.client({"oops": 1})
