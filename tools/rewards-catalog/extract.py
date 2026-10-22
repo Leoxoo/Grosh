@@ -638,6 +638,9 @@ def accepted_rule(proposal: dict, url: str, page_hash: str | None, verified: str
 
 
 def _rule_key(rule: dict) -> tuple:
+    """What makes two rules the same rule. The quote and the requirements are left out on purpose: the model
+    words the same sentence differently in different parts of a page, and the requirements it finds in one
+    part are merged into the rule (see extract_card)."""
     return (
         tuple(rule["categories"]), rule["selection"], rule["picks"], float(rule["rate"]), rule["unit"],
         rule["capAmount"], rule["capPeriod"], rule["validFrom"], rule["validTo"], rule["firstMonths"],
@@ -670,6 +673,25 @@ def _empty_candidate(card: dict, model: str, prompt_version: str | None, page_ha
     }
 
 
+def _fill_base_category(proposal):
+    """A rule the model left with no category, read from its quote. The quote decides:
+    - "all other purchases" (and no other category named) is the base rate, everything-else;
+    - a rotating rule whose quote says the categories change is left alone for the checks;
+    - otherwise a single named category (a booking, "hotels", "gas") makes it a fixed rule for that category.
+    The model sometimes gives a fixed rate the wrong selection and no categories; the words carry the meaning."""
+    if not isinstance(proposal, dict) or proposal.get("categories") != []:
+        return proposal
+    quote = normalize(proposal["quote"]) if isinstance(proposal.get("quote"), str) else ""
+    named = [name for name, words in CATEGORIES.items() if name != "everything-else" and mentions(quote, words)]
+    if mentions(quote, ROTATING_WORDS):
+        return proposal
+    if mentions(quote, ("all other purchases", "everything else", "all other")) and not named:
+        return {**proposal, "selection": "fixed", "picks": None, "hasOtherChoices": False, "categories": ["everything-else"]}
+    if len(named) == 1:
+        return {**proposal, "selection": "fixed", "picks": None, "hasOtherChoices": False, "categories": named}
+    return proposal
+
+
 def _retype_rotating(proposal):
     """A "choose" or "top-spend" rule, or a base rate, whose quote says the categories change and says nothing
     about who picks them, is a rotating rule that was mislabeled (the model reads "different places you shop
@@ -694,7 +716,7 @@ def split_fixed(proposal) -> list:
     per category with the same quote, and each is then checked on its own. The model does this often
     ("3% on dining, groceries and streaming"); nothing about the rule changes. A "choose" or "top-spend" rule
     that picks as many categories as it lists is fixed in the same way."""
-    proposal = _retype_rotating(proposal)
+    proposal = _retype_rotating(_fill_base_category(proposal))
     categories = proposal.get("categories") if isinstance(proposal, dict) else None
     picks = proposal.get("picks") if isinstance(proposal, dict) else None
     if (

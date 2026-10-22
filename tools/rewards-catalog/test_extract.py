@@ -250,6 +250,29 @@ class WhatCountsAsWhatTests(unittest.TestCase):
             two = [r for r in result["rules"] if r["rate"] == 2]
             self.assertEqual([(r["requires"], r["needs"]) for r in two], [(["apple-pay"], ["pays-with-apple-pay"])])
 
+    def test_a_base_rate_left_uncategorized_is_everything_else(self):
+        base = rule(categories=[], rate=1, quote="Earn 1% on all other purchases.")
+        self.assertEqual([p["categories"] for p in extract.split_fixed(base)], [["everything-else"]])
+        dining = rule(categories=[], rate=3, quote="Earn 3% on dining.")
+        self.assertEqual([p["categories"] for p in extract.split_fixed(dining)], [["dining"]])  # one named category: read from the quote
+
+    def test_an_uncategorized_rule_is_read_from_its_quote(self):
+        base = rule(categories=[], selection="choose", picks=1, hasOtherChoices=True, rate=1, quote="Earn unlimited 1% cash back on all other purchases.")
+        self.assertEqual([(p["selection"], p["categories"]) for p in extract.split_fixed(base)], [("fixed", ["everything-else"])])
+        travel = rule(categories=[], selection="rotating", rate=5, quote="Earn unlimited 5% cash back on hotels, vacation rentals and rental cars booked through Capital One Travel.")
+        self.assertEqual([(p["selection"], p["categories"]) for p in extract.split_fixed(travel)], [("fixed", ["travel"])])
+        bonus = rule(categories=[], selection="rotating", rate=5, quote=DISCOVER)
+        self.assertEqual([(p["selection"], p["categories"]) for p in extract.split_fixed(bonus)], [("rotating", [])])  # says the categories change: stays rotating
+        unclear = rule(categories=[], rate=3, quote="Earn 3% on dining.")
+        self.assertEqual([p["categories"] for p in extract.split_fixed(unclear)], [["dining"]])
+
+    def test_the_same_rule_worded_differently_is_one_rule_with_one_quote(self):
+        a = rule(categories=["dining"], rate=3, quote="Earn 3% on dining at restaurants.")
+        b = rule(categories=["dining"], rate=3, quote="You'll earn 3% Cash Back rewards on dining purchases.")
+        page = PAGE + "\n" + a["quote"] + "\n" + b["quote"]
+        result = extract_card(CARD, page, "h", FakeModel([a], [b]), "m", max_chars=150)
+        self.assertEqual(len([r for r in result["rules"] if r["categories"] == ["dining"]]), 1)
+
     def test_the_same_rule_quoted_two_ways_is_still_one_rule(self):
         a = rule(categories=["dining"], rate=3, quote="Earn unlimited 3% cash back on dining, entertainment and popular streaming services.")
         b = rule(categories=["dining"], rate=3, quote=EXCLUSION)  # a different sentence on the page that says the same thing
