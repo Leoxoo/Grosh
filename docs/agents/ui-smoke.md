@@ -38,7 +38,7 @@ Each step is an activity in the test report. Every screen gets 10 seconds to app
 | `Transactions → scroll` | Three swipes down the list. |
 | `Transactions → open a transaction` | Taps a row between the list's header and the tab bar, and waits for the Transaction screen. |
 | `Transactions → back` | Back to the list. |
-| `Search → find a payee` | Searches the Transactions tab for "Sam" and waits for a "Dinner with Sam". The keyboard's Search key then puts the keyboard away, if the keyboard is still up. |
+| `Search → find a payee` | Searches the Transactions tab for "Sam" and waits for a "Dinner with Sam". Cancel then ends the search and puts the keyboard away. |
 | `Budgets → open` | The Budgets tab. |
 | `Account → open` | The Account tab. |
 | `Wallets → open` | Account → Wallets. |
@@ -78,6 +78,6 @@ This was written where there is no Xcode and no simulator, so none of it has com
   - the keypad's keys labelled 4 and 2;
   - the category list's search field;
   - "Don’t Allow" on the notifications prompt;
-  - the keyboard's Search key putting the keyboard away.
+  - Cancel ending the search and putting the keyboard away.
 - **Animations off.** Check that turning them off in `GroshApp.init` takes effect.
 - **The step log.** Check that it reaches the simulator's log and that `tools/check-logs --ui` tags messages with it. `docs/agents/log-check.md` has a probe for this.
