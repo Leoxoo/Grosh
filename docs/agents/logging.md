@@ -35,18 +35,27 @@ From a device, in Console.app: select the device in the sidebar, click Start, fi
 
 ## Signposts
 
-`Signpost.performance` is the `Performance` category of the same subsystem. It has one interval, `Launch`: the work the app does when it becomes active, which is its startup work at launch (`RecentlyDeleted.purgeExpired` and `RecurringTransaction.catchUp`). It runs again each time the app returns to the foreground.
+`Signpost.performance` is the `Performance` category of the same subsystem, and `Signpost.interval("Name") { … }` runs its work as an interval that begins before it and ends after it, even when it throws. The intervals:
 
-To see it, choose Product ▸ Profile (⌘I) in Xcode, pick the Time Profiler template, click + and add the os_signpost instrument (Signposts in newer Xcode versions), then record and use the app. Filter the signpost track to subsystem `Leoxo.Grosh`. Select a `Launch` bar and the Time Profiler's call tree covers only that interval.
+| Interval | Where | Covers |
+| --- | --- | --- |
+| `Launch` | `GroshApp` | The startup work: `RecentlyDeleted.purgeExpired` and `RecurringTransaction.catchUp`. It runs again each time the app returns to the foreground. |
+| `Save transaction` | `TransactionEditor` | The editor's save: validating the draft and saving it to the store, not the Success cue or closing the sheet. |
+| `Import CSV` | `MoneyLoverImport` | Deleting the old data, adding the imported rows and saving. |
+| `Search` | `TransactionFilter.listed` | Working out the Transactions tab's search results over every transaction, each time they are worked out while there is search text. |
 
-A UI test measures it with `XCTOSSignpostMetric(subsystem: "Leoxo.Grosh", category: "Performance", name: "Launch")` in `measure(metrics:)`.
+Opening a screen has no interval yet.
 
-To add an interval, put a `begin<Name>()` beside `beginLaunch()` in `Log.swift` with its own name literal, and call it with `defer { interval.end() }` on the next line, so every way out closes it.
+To see them, choose Product ▸ Profile (⌘I) in Xcode, pick the Time Profiler template, click + and add the os_signpost instrument (Signposts in newer Xcode versions), then record and use the app. Filter the signpost track to subsystem `Leoxo.Grosh`. Select a bar and the Time Profiler's call tree covers only that interval.
+
+A UI test measures one with `XCTOSSignpostMetric(subsystem: "Leoxo.Grosh", category: "Performance", name: "Save transaction")` in `measure(metrics:)`.
+
+To add an interval, wrap the work in `Signpost.interval`. Wrap one save, search or import, never a row, a loop over transactions or anything that runs per frame.
 
 ## Written without a Mac
 
 Nothing here has been compiled or run, so the first build and run settle these:
 
-- The `os` calls follow Apple's documented signatures (`Logger(subsystem:category:)`, `info`, `error`, `OSSignposter.beginInterval` and `endInterval`). A call the compiler rejects is in `Log.swift`.
+- The `os` calls follow Apple's documented signatures (`Logger(subsystem:category:)`, `info`, `error`, `OSSignposter.beginInterval` and `endInterval`). A call the compiler rejects is in `Log.swift`, where `Signpost.interval` hands its `StaticString` name on to both signposter calls.
 - That `log show` prints the `info` messages with `--info` after the fact: the system may keep `info` only in memory.
 - The Instruments and Console menu names above, which move between Xcode versions.

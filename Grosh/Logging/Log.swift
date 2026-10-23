@@ -63,17 +63,11 @@ nonisolated extension Logger {
 nonisolated enum Signpost {
     static let performance = OSSignposter(subsystem: Log.subsystem, category: "Performance")
 
-    /// Starts the `Launch` interval: the work the app does each time it becomes active, which at launch is all of its
-    /// startup work. End it with `end()` in a `defer` straight after, so every way out of the work closes it.
-    static func beginLaunch() -> Launch {
-        Launch(state: performance.beginInterval("Launch"))
-    }
-
-    nonisolated struct Launch {
-        fileprivate let state: OSSignpostIntervalState
-
-        func end() {
-            Signpost.performance.endInterval("Launch", state)
-        }
+    /// Runs `work` as the interval `name`, which begins before it and ends after it, even when `work` throws. Wrap the
+    /// work of one save, search or import, never a row, a loop over transactions or anything that runs per frame.
+    static func interval<T>(_ name: StaticString, _ work: () throws -> T) rethrows -> T {
+        let state = performance.beginInterval(name)
+        defer { performance.endInterval(name, state) }
+        return try work()
     }
 }

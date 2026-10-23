@@ -24,13 +24,13 @@ struct GroshApp: App {
                     // make the days that came due while the app was closed, whenever the app opens or comes back to the
                     // foreground; nothing runs in the background.
                     if phase == .active {
-                        let launch = Signpost.beginLaunch()
-                        defer { launch.end() }
-                        Log.store.attempt("Removing what Recently Deleted kept for good") {
-                            try RecentlyDeleted.purgeExpired(in: container.mainContext)
-                        }
-                        Log.recurring.attempt("Making the Recurring transactions that came due") {
-                            try RecurringTransaction.catchUp(in: container.mainContext)
+                        Signpost.interval("Launch") {
+                            Log.store.attempt("Removing what Recently Deleted kept for good") {
+                                try RecentlyDeleted.purgeExpired(in: container.mainContext)
+                            }
+                            Log.recurring.attempt("Making the Recurring transactions that came due") {
+                                try RecurringTransaction.catchUp(in: container.mainContext)
+                            }
                         }
                     }
                 }

@@ -182,14 +182,16 @@ private struct TransactionForm: View {
 
     private func save() {
         do {
-            switch mode {
-            case .add, .duplicate:
-                try Transaction.create(draftToSave, in: context)
-            case .payment(let recurring):
-                let transaction = try Transaction.create(draftToSave, in: context)
-                try recurring.attach(transaction, in: context)
-            case .edit(let transaction):
-                try transaction.update(with: draftToSave)
+            try Signpost.interval("Save transaction") {
+                switch mode {
+                case .add, .duplicate:
+                    try Transaction.create(draftToSave, in: context)
+                case .payment(let recurring):
+                    let transaction = try Transaction.create(draftToSave, in: context)
+                    try recurring.attach(transaction, in: context)
+                case .edit(let transaction):
+                    try transaction.update(with: draftToSave)
+                }
             }
             playSuccessCue()
             dismiss()
