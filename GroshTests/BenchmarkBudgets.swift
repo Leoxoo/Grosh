@@ -219,8 +219,12 @@ extension BenchmarkBudgets {
 struct BenchmarkBudgetsTrait: SuiteTrait, TestScoping {
     var isRecursive: Bool { false }
 
+    /// `@concurrent` on the method and its closure matches Swift Testing's `provideScope`, which is built without
+    /// `NonisolatedNonsendingByDefault`. This target's approachable concurrency setting would otherwise run both on the
+    /// caller's actor, and the conformance would not match.
+    @concurrent
     func provideScope(
-        for test: Test, testCase: Test.Case?, performing function: @Sendable () async throws -> Void
+        for test: Test, testCase: Test.Case?, performing function: @concurrent @Sendable () async throws -> Void
     ) async throws {
         BenchmarkBudgets.begin()
         defer { BenchmarkBudgets.finish() }
