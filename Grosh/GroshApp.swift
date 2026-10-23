@@ -5,6 +5,8 @@ import SwiftUI
 struct GroshApp: App {
     private let container: ModelContainer
     @Environment(\.scenePhase) private var scenePhase
+    /// The day the screens treat as today: the real one, moved on when it changes while the app is open.
+    @State private var today = CalendarDay.today
 
     init() {
         do {
@@ -26,10 +28,25 @@ struct GroshApp: App {
                         try? RecurringTransaction.catchUp(in: container.mainContext)
                     }
                 }
+                .environment(\.today, today)
+                // A day that changed while the app was in the background.
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active { refreshToday() }
+                }
+                // Midnight passing while the app is open.
+                .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+                    refreshToday()
+                }
         }
         .modelContainer(container)
         .commands {
             NewTransactionCommands()
         }
+    }
+
+    /// Moves `today` on to the real day when it has changed.
+    private func refreshToday() {
+        let now = CalendarDay.today
+        if now != today { today = now }
     }
 }

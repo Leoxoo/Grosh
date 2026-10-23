@@ -8,12 +8,14 @@ struct ForgiveEditor: View {
     /// The Loan or Debt being forgiven.
     let original: Transaction
 
+    @Environment(\.today) private var today
+
     var body: some View {
         LoanOrDebtSheet(
             unavailableTitle: "Can't Forgive",
             unavailableMessage: "Only a Loan or a Debt can be forgiven."
         ) { context in
-            try ForgiveDraft(forgiving: original, on: .today, in: context)
+            try ForgiveDraft(forgiving: original, on: today, in: context)
         } form: { draft in
             ForgiveForm(startingDraft: draft)
         }

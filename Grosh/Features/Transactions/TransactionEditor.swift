@@ -36,6 +36,7 @@ struct TransactionEditor: View {
     let mode: Mode
 
     @Environment(\.modelContext) private var context
+    @Environment(\.today) private var today
 
     var body: some View {
         TransactionForm(mode: mode, startingDraft: startingDraft)
@@ -43,9 +44,9 @@ struct TransactionEditor: View {
 
     private var startingDraft: TransactionDraft {
         switch mode {
-        case .add: TransactionDefaults.suggest(on: .today, in: context)
-        case .duplicate(let transaction): TransactionDraft(duplicating: transaction, on: .today)
-        case .payment(let recurring): TransactionDraft(paymentFor: recurring, on: .today)
+        case .add: TransactionDefaults.suggest(on: today, in: context)
+        case .duplicate(let transaction): TransactionDraft(duplicating: transaction, on: today)
+        case .payment(let recurring): TransactionDraft(paymentFor: recurring, on: today)
         case .edit(let transaction): TransactionDraft(editing: transaction)
         }
     }

@@ -5,12 +5,11 @@ import SwiftUI
 struct WalletListView: View {
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     @Query(Wallet.archived) private var archivedWallets: [Wallet]
+    @Environment(\.today) private var today
     @State private var editorMode: EditorMode<Wallet>?
     @State private var errorMessage: String?
     /// The wallet waiting for the user to confirm deleting it.
     @State private var deleting: Wallet?
-
-    private var today: CalendarDay { .today }
 
     var body: some View {
         List {
@@ -25,12 +24,12 @@ struct WalletListView: View {
                     .swipeActions {
                         Button("Delete", systemImage: "trash") { deleting = wallet }
                             .tint(.red)
-                        Button("Archive", systemImage: "archivebox") { perform { try wallet.archive() } }
+                        Button("Archive", systemImage: "archivebox") { perform { try wallet.archive(today: today) } }
                             .tint(.orange)
                     }
                     .contextMenu {
                         Button("Edit", systemImage: "pencil") { editorMode = .edit(wallet) }
-                        Button("Archive", systemImage: "archivebox") { perform { try wallet.archive() } }
+                        Button("Archive", systemImage: "archivebox") { perform { try wallet.archive(today: today) } }
                         Button("Delete", systemImage: "trash", role: .destructive) { deleting = wallet }
                     }
                 }
@@ -56,11 +55,15 @@ struct WalletListView: View {
                         .swipeActions {
                             Button("Delete", systemImage: "trash") { deleting = wallet }
                                 .tint(.red)
-                            Button("Unarchive", systemImage: "tray.and.arrow.up") { perform { try wallet.unarchive() } }
-                                .tint(.green)
+                            Button("Unarchive", systemImage: "tray.and.arrow.up") {
+                                perform { try wallet.unarchive(today: today) }
+                            }
+                            .tint(.green)
                         }
                         .contextMenu {
-                            Button("Unarchive", systemImage: "tray.and.arrow.up") { perform { try wallet.unarchive() } }
+                            Button("Unarchive", systemImage: "tray.and.arrow.up") {
+                                perform { try wallet.unarchive(today: today) }
+                            }
                             Button("Delete", systemImage: "trash", role: .destructive) { deleting = wallet }
                         }
                     }

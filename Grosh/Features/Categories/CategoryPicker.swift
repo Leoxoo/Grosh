@@ -13,6 +13,8 @@ struct CategoryPicker: View {
     /// The first choice, which picks no category, such as "Any". `nil` offers categories only.
     private let noneTitle: LocalizedStringKey?
 
+    @Environment(\.today) private var today
+
     /// A transaction's category: those of `type` the user may pick by hand.
     init(title: LocalizedStringKey, type: CategoryType, selection: Binding<Category?>) {
         self.title = title
@@ -31,7 +33,9 @@ struct CategoryPicker: View {
 
     var body: some View {
         NavigationLink {
-            CategoryChoiceList(title: title, offered: offered, noneTitle: noneTitle, selection: $selection)
+            CategoryChoiceList(
+                title: title, offered: offered, noneTitle: noneTitle, today: today, selection: $selection
+            )
         } label: {
             LabeledContent(title) {
                 if let selection {
@@ -59,6 +63,8 @@ private struct CategoryChoiceList: View {
     let title: LocalizedStringKey
     let offered: Offered
     let noneTitle: LocalizedStringKey?
+    /// The day the categories used most lately are counted back from.
+    let today: CalendarDay
     @Binding var selection: Category?
 
     @Environment(\.dismiss) private var dismiss
@@ -70,13 +76,15 @@ private struct CategoryChoiceList: View {
     @State private var query = ""
 
     init(
-        title: LocalizedStringKey, offered: Offered, noneTitle: LocalizedStringKey?, selection: Binding<Category?>
+        title: LocalizedStringKey, offered: Offered, noneTitle: LocalizedStringKey?, today: CalendarDay,
+        selection: Binding<Category?>
     ) {
         self.title = title
         self.offered = offered
         self.noneTitle = noneTitle
+        self.today = today
         _selection = selection
-        let firstDay = CalendarDay.today.adding(days: -(CategoryCatalog.recentUseDays - 1)).rawValue
+        let firstDay = today.adding(days: -(CategoryCatalog.recentUseDays - 1)).rawValue
         _recentTransactions = Query(filter: #Predicate<Transaction> { $0.dayRaw >= firstDay && $0.deletedAt == nil })
     }
 
@@ -132,7 +140,7 @@ private struct CategoryChoiceList: View {
     /// `tree` as the list shows it: the most used lately first, narrowed to the categories matching the search.
     private func arranged(_ tree: [Category]) -> [Category] {
         CategoryCatalog.matching(
-            query, in: CategoryCatalog.byRecentUse(tree, transactions: recentTransactions, today: .today)
+            query, in: CategoryCatalog.byRecentUse(tree, transactions: recentTransactions, today: today)
         )
     }
 

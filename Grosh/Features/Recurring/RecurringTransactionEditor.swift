@@ -22,6 +22,7 @@ struct RecurringTransactionEditor: View {
     let mode: Mode
 
     @Environment(\.modelContext) private var context
+    @Environment(\.today) private var today
 
     var body: some View {
         RecurringForm(mode: mode, startingDraft: startingDraft)
@@ -30,11 +31,11 @@ struct RecurringTransactionEditor: View {
     private var startingDraft: RecurringDraft {
         switch mode {
         case .add:
-            var draft = RecurringDraft(startDay: .today)
-            draft.wallet = TransactionDefaults.suggest(on: .today, in: context).wallet
+            var draft = RecurringDraft(startDay: today)
+            draft.wallet = TransactionDefaults.suggest(on: today, in: context).wallet
             return draft
         case .duplicate(let recurring):
-            return RecurringDraft(duplicating: recurring, on: .today)
+            return RecurringDraft(duplicating: recurring, on: today)
         case .edit(let recurring):
             return RecurringDraft(editing: recurring)
         }
@@ -47,6 +48,7 @@ private struct RecurringForm: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.today) private var today
 
     @State private var draft: RecurringDraft
     @State private var entry: AmountEntry
@@ -262,12 +264,12 @@ private struct RecurringForm: View {
             let saved: RecurringTransaction
             switch mode {
             case .add, .duplicate:
-                saved = try RecurringTransaction.create(draftToSave, in: context)
+                saved = try RecurringTransaction.create(draftToSave, today: today, in: context)
             case .edit(let recurring):
-                try recurring.update(with: draftToSave)
+                try recurring.update(with: draftToSave, today: today)
                 saved = recurring
             }
-            let unentered = saved.unenteredOccurrences(through: .today)
+            let unentered = saved.unenteredOccurrences(through: today)
             if startChanged && !unentered.isEmpty {
                 pastPrompt = PastPrompt(recurring: saved, days: unentered)
             } else {

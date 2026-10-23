@@ -8,9 +8,10 @@ struct TransferEditor: View {
     var viewedWallet: Wallet?
 
     @Environment(\.modelContext) private var context
+    @Environment(\.today) private var today
 
     var body: some View {
-        TransferForm(startingDraft: TransactionDefaults.suggestTransfer(on: .today, viewing: viewedWallet, in: context))
+        TransferForm(startingDraft: TransactionDefaults.suggestTransfer(on: today, viewing: viewedWallet, in: context))
     }
 }
 
@@ -18,6 +19,7 @@ struct TransferEditor: View {
 private struct TransferForm: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.today) private var today
 
     @State private var draft: TransferDraft
     @State private var entry = AmountEntry(cents: 0)
@@ -40,8 +42,8 @@ private struct TransferForm: View {
         KeypadSheet(title: Text("Transfer"), entry: $entry, canSave: draftToSave.canSave, save: save) { fields in
             Section {
                 // Always today's balances, whatever the Date: a transfer dated later doesn't move them today.
-                WalletPicker(title: "From", selection: $draft.from, balancesAsOf: .today)
-                WalletPicker(title: "To", selection: $draft.to, balancesAsOf: .today)
+                WalletPicker(title: "From", selection: $draft.from, balancesAsOf: today)
+                WalletPicker(title: "To", selection: $draft.to, balancesAsOf: today)
                 fields.amountRow("Amount", currencyCode: currencyCode)
                 DayStepper(title: "Date", day: $draft.day)
                 fields.noteField($draft.note)
