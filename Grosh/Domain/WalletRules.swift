@@ -55,6 +55,7 @@ extension Wallet {
 
     /// Retires the wallet: it leaves the Total and every picker, but keeps all of its transactions. Its Recurring
     /// transactions pause, after making what has fallen due by `today`, and make nothing until it is unarchived. Saves.
+    @MainActor
     func archive(today: CalendarDay = .today) throws {
         if let context = modelContext {
             for schedule in recurringTransactions ?? [] {
@@ -67,6 +68,7 @@ extension Wallet {
 
     /// Brings an archived wallet back into its place in the user's order. Its Recurring transactions resume, and what
     /// fell due while it was archived is not made. Saves.
+    @MainActor
     func unarchive(today: CalendarDay = .today) throws {
         isArchived = false
         for schedule in recurringTransactions ?? [] where schedule.isActive {
