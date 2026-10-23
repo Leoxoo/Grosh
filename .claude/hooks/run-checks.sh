@@ -18,8 +18,10 @@
 #
 # The local fix. On the first failure in a row, before blocking, a local model served by LM Studio
 # on localhost:1234 gets one headless attempt, capped at 300 seconds including its tools/check rerun
-# and by what is left of the hook's own 300 seconds. If LM Studio does not answer within 2 seconds,
-# the hook blocks straight away. The local model may read, edit files under Grosh/ and GroshTests/
+# and by what is left of the hook's own 300 seconds. It runs only when GROSH_LOCAL_FIX_MODEL holds
+# the id of the model LM Studio serves, set under "env" in .claude/settings.local.json, which is
+# personal and not committed. If LM Studio does not answer within 2 seconds, the hook blocks
+# straight away. The local model may read, edit files under Grosh/ and GroshTests/
 # and run tools/check, and is refused anything else. When tools/check passes after the attempt, the
 # turn ends as usual, and on the user's next message the agent learns which files changed and why.
 # Otherwise the worktree goes back to a snapshot taken just before the attempt, the attempt's full
@@ -46,7 +48,7 @@ attempt_limit=300 # The local attempt's cap, its tools/check rerun included.
 model_minimum=60  # The local model isn't started with less time than this.
 failure_limit=3
 local_url=http://localhost:1234
-local_model=qwen/qwen3.8-27b
+local_model=${GROSH_LOCAL_FIX_MODEL:-}
 swift_paths=('Grosh/*.swift' 'GroshTests/*.swift')
 
 # The local model's own session runs with GROSH_CHECKS_NESTED set, so its hooks leave it alone.
@@ -249,6 +251,10 @@ local_report=""
 # it undoes the attempt and leaves what the agent needs to know about it in local_report.
 try_local_fix() {
   [ "${GROSH_LOCAL_FIX:-1}" != 0 ] || return
+  if [ -z "$local_model" ]; then
+    log_attempt "skipped: no GROSH_LOCAL_FIX_MODEL" 0
+    return
+  fi
   command -v claude >/dev/null 2>&1 || return
   curl -s -o /dev/null --noproxy '*' -m 2 "$local_url/v1/models" || return
 
