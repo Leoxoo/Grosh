@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Grosh
 
+@MainActor
 struct MoneyTypedAmountTests {
     private static let unitedStates = Locale(identifier: "en_US")
     private static let germany = Locale(identifier: "de_DE")

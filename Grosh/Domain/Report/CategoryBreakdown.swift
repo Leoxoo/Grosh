@@ -72,7 +72,7 @@ struct CategoryBreakdown {
         let own = Array(large.prefix(ownSliceLimit))
         let ownCategories = Set(own.map(\.category))
         let rest = aboveZero.filter { !ownCategories.contains($0.category) }
-        var slices = own.map(Slice.category)
+        var slices = own.map { Slice.category($0) }
         if !rest.isEmpty {
             slices.append(.everythingElse(Money(cents: rest.reduce(0) { $0 + $1.total.cents })))
         }

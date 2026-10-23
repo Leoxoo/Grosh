@@ -52,7 +52,7 @@ extension NotDeletedTransactions {
                 try context.fetch(Transaction.notDeleted)
             } ?? []
             self.transactions = transactions
-            entries = transactions.map(LedgerEntry.init)
+            entries = transactions.map { LedgerEntry($0) }
             positions = Self.positions(of: transactions)
             saves = NotificationCenter.default.addObserver(
                 forName: ModelContext.didSave, object: context, queue: nil
@@ -71,7 +71,7 @@ extension NotDeletedTransactions {
         }
 
         /// The models a save inserted, updated and deleted, by their identifiers.
-        private struct Changes: @unchecked Sendable {
+        nonisolated private struct Changes: @unchecked Sendable {
             let changed: [PersistentIdentifier]
             let deleted: Set<PersistentIdentifier>
 
@@ -120,7 +120,7 @@ extension NotDeletedTransactions {
                 entries = kept.map { entries[$0] }
             }
             transactions += joining
-            entries += joining.map(LedgerEntry.init)
+            entries += joining.map { LedgerEntry($0) }
             positions = Self.positions(of: transactions)
             self.transactions = transactions
             self.entries = entries

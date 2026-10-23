@@ -52,7 +52,7 @@ struct ReimbursementBalanceTests {
 
     @Test func theBalancesAddedUpFromLedgerEntriesCountTheNet() throws {
         try reimbursedDinner()
-        let entries = try context.fetch(Transaction.notDeleted).map(LedgerEntry.init)
+        let entries = try context.fetch(Transaction.notDeleted).map { LedgerEntry($0) }
 
         let balances = WalletBalances(entries, asOf: today)
 
@@ -88,7 +88,7 @@ struct ReimbursementBalanceTests {
 
         for summary in [
             PeriodSummary(of: transactions, in: october, today: today),
-            PeriodSummary(of: transactions.map(LedgerEntry.init), in: october, today: today),
+            PeriodSummary(of: transactions.map { LedgerEntry($0) }, in: october, today: today),
         ] {
             #expect(summary.openingBalance == Money(cents: 1_000_00))
             #expect(summary.endingBalance == Money(cents: 960_00))
