@@ -68,9 +68,9 @@ Each xcodebuild boots simulators of its own, so runs from several worktrees at o
 
 ## Scheme and test plan
 
-The shared `Grosh` scheme tests with `Grosh.xctestplan`. Its one configuration, Default, is the plain run, with no extra arguments or environment. GroshTests is on. GroshUITests is in the plan but off, so ⌘U in Xcode runs the unit tests only, and `--ui` adds it with `-only-testing:GroshUITests`. The UI tests run on the chosen simulator itself, not on clones of it, so `tools/check-logs` can read what they logged.
+The shared `Grosh` scheme tests with `Grosh.xctestplan`. Its one configuration, Default, is the plain run, with no extra arguments or environment. Both test targets are on in the plan. `tools/check` narrows each run with `-only-testing`: a plain run passes `-only-testing:GroshTests`, and `--ui` adds `-only-testing:GroshUITests`. So ⌘U in Xcode runs the UI tests as well as the unit tests. The UI tests run on the chosen simulator itself, not on clones of it, so `tools/check-logs` can read what they logged.
 
-If a run with `--ui` prints `GroshUITests did not run`, that Xcode does not let `-only-testing` run a target that the plan turns off. Turn GroshUITests on in the plan by deleting its `"enabled" : false`. tools/check names the targets it runs, so it needs no change.
+If a run with `--ui` prints `GroshUITests did not run`, check that GroshUITests is still on in `Grosh.xctestplan`. Xcode may skip a target the plan turns off, even when `-only-testing` names it.
 
 ## Testing tools/check
 
