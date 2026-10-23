@@ -63,3 +63,6 @@ fastlane/test_output
 
 # Python bytecode from the tools/ scripts and their tests
 __pycache__/
+
+# Personal Claude Code settings, such as the local model for test fixes (docs/agents/local-fixes.md)
+.claude/settings.local.json
