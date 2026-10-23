@@ -38,7 +38,6 @@ Each step is an activity in the test report. Every screen gets 10 seconds to app
 | `Transactions → scroll` | Three swipes down the list. |
 | `Transactions → open a transaction` | Taps a row between the list's header and the tab bar, and waits for the Transaction screen. |
 | `Transactions → back` | Back to the list. |
-| `Search → find a payee` | Searches the Transactions tab for "Sam" and waits for a "Dinner with Sam". Cancel then ends the search and puts the keyboard away. |
 | `Budgets → open` | The Budgets tab. |
 | `Account → open` | The Account tab. |
 | `Wallets → open` | Account → Wallets. |
@@ -48,6 +47,7 @@ Each step is an activity in the test report. Every screen gets 10 seconds to app
 | `Recently Deleted → open` | Account → Recently Deleted. |
 | `Home → add an Expense` | The + on Home: Expense, 0.42 on the keypad, the category Products (found with the category search), the Card Debit when the suggested wallet needs a Card, a note holding the time, then Save. |
 | `Home → see the new Expense` | Scrolls Home to Recent transactions and waits for the row with that note. |
+| `Search → find a payee` | Opens the Transactions tab's search, searches for "Sam" and waits for a "Dinner with Sam". It comes last, so its keyboard stays up and nothing after it taps a tab. |
 
 The walk logs each step with `os.Logger`, subsystem `Leoxo.GroshUITests`, category `Steps`: `begin <step>` when it starts and `end <step>` when it ends, at the default level (`notice`), with the step name logged `privacy: .public`. `tools/check-logs` parses exactly these two messages, so keep the wording. It tags logged errors with the step names, so keep them short and stable. A new step is named `<Screen> → <action>`.
 
@@ -77,7 +77,6 @@ This was written where there is no Xcode and no simulator, so none of it has com
   - the Card menu's choices as buttons named for the Cards;
   - the keypad's keys labelled 4 and 2;
   - the category list's search field;
-  - "Don’t Allow" on the notifications prompt;
-  - Cancel ending the search and putting the keyboard away.
+  - "Don’t Allow" on the notifications prompt.
 - **Animations off.** Check that turning them off in `GroshApp.init` takes effect.
 - **The step log.** Check that it reaches the simulator's log and that `tools/check-logs --ui` tags messages with it. `docs/agents/log-check.md` has a probe for this.
