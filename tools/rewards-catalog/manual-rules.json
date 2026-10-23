@@ -1,0 +1,152 @@
+{
+  "bank-of-america-customized-cash-rewards": {
+    "cardConditions": [
+      "Merchants, not Bank of America, categorize and submit purchases, so some purchases may not fall into the category where you might expect them to appear."
+    ],
+    "rules": [
+      {
+        "capAmount": 2500,
+        "capPeriod": "quarter",
+        "categories": [
+          "gas",
+          "online-shopping",
+          "dining",
+          "travel",
+          "drugstores"
+        ],
+        "conditions": [
+          "Merchant examples* Amazon Comcast Etsy Netflix Nordstrom Ticketmaster Walmart Purchases made by phone, mail and in-person, including those ordered online but paid for in store will not be eligible to receive the choice category bonus rewards."
+        ],
+        "hasOtherChoices": true,
+        "picks": 1,
+        "quote": "Bank of America® Customized Cash Rewards Credit Card: Categories & Exclusions Skip to main content Bank of America Sign in Log in Locations En español Show/Hide Menu related links Bank of America Home Contact Us Locations Help Schedule an appointment En español Top Credit Card Links Top Credit Card Links Credit Card Home Application Center Check for Customized Offers Manage Your Credit Card Account View All Credit Cards Credit Card Home Application Center Check for Customized Offers Manage Your Credit Card Account View All Credit Cards Credit Cards by Category Credit Cards by Category Cash Back Credit Cards Credit Cards for Building Credit Credit Cards for Students Lower Interest Rate Credit Cards Points Rewards Credit Cards Travel Rewards Credit Cards Airline Rewards Credit Cards Cash Back Credit Cards Credit Cards for Building Credit Credit Cards for Students Lower Interest Rate Credit Cards Points Rewards Credit Cards Travel Rewards Credit Cards Airline Rewards Credit Cards Credit Cards by Feature Credit Cards by Feature Credit Cards with No Annual Fee Low Intro APR Balance Transfer Credit Cards Low Intro Interest Rate Credit Cards No Foreign Transaction Fee Credit Cards Credit Cards with No Annual Fee Low Intro APR Balance Transfer Credit Cards Low Intro Interest Rate Credit Cards No Foreign Transaction Fee Credit Cards Other Credit Card Links Other Credit Card Links Compare Credit Cards Complete a Saved Application Learn About Credit Respond to a Mail Offer View Sample Credit Card Agreements Business Credit Cards Compare Credit Cards Complete a Saved Application Learn About Credit Respond to a Mail Offer View Sample Credit Card Agreements Business Credit Cards Bank of America® Customized Cash Rewards Credit Card Cash Back Categories & Exclusions Choose how you earn rewards 3% cash back in the category of your choice 2% automatic cash back at grocery stores & wholesale clubs 1% unlimited cash back on all other purchases Earn 3% and 2% cash back on up to $2,500 in combined purchases each quarter in the choice category, and at grocery stores and wholesale clubs, then earn unlimited 1% thereafter.",
+        "rate": 3,
+        "requires": [],
+        "selection": "choose",
+        "unit": "percent",
+        "validFrom": null,
+        "validTo": null
+      },
+      {
+        "capAmount": 2500,
+        "capPeriod": "quarter",
+        "categories": [
+          "groceries"
+        ],
+        "conditions": [],
+        "hasOtherChoices": false,
+        "picks": null,
+        "quote": "Bank of America® Customized Cash Rewards Credit Card: Categories & Exclusions Skip to main content Bank of America Sign in Log in Locations En español Show/Hide Menu related links Bank of America Home Contact Us Locations Help Schedule an appointment En español Top Credit Card Links Top Credit Card Links Credit Card Home Application Center Check for Customized Offers Manage Your Credit Card Account View All Credit Cards Credit Card Home Application Center Check for Customized Offers Manage Your Credit Card Account View All Credit Cards Credit Cards by Category Credit Cards by Category Cash Back Credit Cards Credit Cards for Building Credit Credit Cards for Students Lower Interest Rate Credit Cards Points Rewards Credit Cards Travel Rewards Credit Cards Airline Rewards Credit Cards Cash Back Credit Cards Credit Cards for Building Credit Credit Cards for Students Lower Interest Rate Credit Cards Points Rewards Credit Cards Travel Rewards Credit Cards Airline Rewards Credit Cards Credit Cards by Feature Credit Cards by Feature Credit Cards with No Annual Fee Low Intro APR Balance Transfer Credit Cards Low Intro Interest Rate Credit Cards No Foreign Transaction Fee Credit Cards Credit Cards with No Annual Fee Low Intro APR Balance Transfer Credit Cards Low Intro Interest Rate Credit Cards No Foreign Transaction Fee Credit Cards Other Credit Card Links Other Credit Card Links Compare Credit Cards Complete a Saved Application Learn About Credit Respond to a Mail Offer View Sample Credit Card Agreements Business Credit Cards Compare Credit Cards Complete a Saved Application Learn About Credit Respond to a Mail Offer View Sample Credit Card Agreements Business Credit Cards Bank of America® Customized Cash Rewards Credit Card Cash Back Categories & Exclusions Choose how you earn rewards 3% cash back in the category of your choice 2% automatic cash back at grocery stores & wholesale clubs 1% unlimited cash back on all other purchases Earn 3% and 2% cash back on up to $2,500 in combined purchases each quarter in the choice category, and at grocery stores and wholesale clubs, then earn unlimited 1% thereafter.",
+        "rate": 2,
+        "requires": [],
+        "selection": "fixed",
+        "unit": "percent",
+        "validFrom": null,
+        "validTo": null
+      },
+      {
+        "capAmount": null,
+        "capPeriod": null,
+        "categories": [
+          "everything-else"
+        ],
+        "conditions": [],
+        "hasOtherChoices": false,
+        "picks": null,
+        "quote": "1% unlimited cash back on all other purchases",
+        "rate": 1,
+        "requires": [],
+        "selection": "fixed",
+        "unit": "percent",
+        "validFrom": null,
+        "validTo": null
+      }
+    ]
+  },
+  "citi-custom-cash": {
+    "cardConditions": [],
+    "rules": [
+      {
+        "capAmount": 500,
+        "capPeriod": "cycle",
+        "categories": [
+          "dining",
+          "gas",
+          "groceries",
+          "travel",
+          "transit",
+          "streaming",
+          "drugstores"
+        ],
+        "conditions": [],
+        "hasOtherChoices": true,
+        "picks": 1,
+        "quote": "Customers will earn 5% cash back on purchases in the top eligible spend category each billing cycle, up to the first $500 spent.",
+        "rate": 5,
+        "requires": [],
+        "selection": "top-spend",
+        "unit": "percent",
+        "validFrom": null,
+        "validTo": null
+      },
+      {
+        "capAmount": null,
+        "capPeriod": null,
+        "categories": [
+          "everything-else"
+        ],
+        "conditions": [],
+        "hasOtherChoices": false,
+        "picks": null,
+        "quote": "Cardmembers will also earn unlimited 1% cash back on all other purchases.",
+        "rate": 1,
+        "requires": [],
+        "selection": "fixed",
+        "unit": "percent",
+        "validFrom": null,
+        "validTo": null
+      }
+    ]
+  },
+  "goldman-sachs-apple-card": {
+    "cardConditions": [],
+    "rules": [
+      {
+        "capAmount": null,
+        "capPeriod": null,
+        "categories": [
+          "everything-else"
+        ],
+        "conditions": [],
+        "hasOtherChoices": false,
+        "picks": null,
+        "quote": "Get 2% Daily Cash back when you use Apple Card with Apple Pay.",
+        "rate": 2,
+        "requires": [
+          "apple-pay"
+        ],
+        "selection": "fixed",
+        "unit": "percent",
+        "validFrom": null,
+        "validTo": null
+      },
+      {
+        "capAmount": null,
+        "capPeriod": null,
+        "categories": [
+          "everything-else"
+        ],
+        "conditions": [],
+        "hasOtherChoices": false,
+        "picks": null,
+        "quote": "When you use the card, you’ll get 1% Daily Cash back on every purchase.",
+        "rate": 1,
+        "requires": [],
+        "selection": "fixed",
+        "unit": "percent",
+        "validFrom": null,
+        "validTo": null
+      }
+    ]
+  }
+}
