@@ -276,6 +276,7 @@ private struct RecurringForm: View {
                 dismiss()
             }
         } catch {
+            Log.recurring.failed("Saving a Recurring transaction", error)
             errorMessage = error.localizedDescription
         }
     }

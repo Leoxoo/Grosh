@@ -7,7 +7,8 @@ extension TransactionDefaults {
     static func suggestTransfer(on today: CalendarDay, viewing viewed: Wallet? = nil, in context: ModelContext) -> TransferDraft {
         var draft = TransferDraft(day: today)
         draft.from = wallet(viewing: viewed, in: context)
-        draft.to = ((try? context.fetch(Wallet.unarchived)) ?? []).first { $0 != draft.from }
+        let wallets = Log.store.attempt("Reading the unarchived wallets") { try context.fetch(Wallet.unarchived) } ?? []
+        draft.to = wallets.first { $0 != draft.from }
         return draft
     }
 }

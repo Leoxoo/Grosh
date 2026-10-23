@@ -60,6 +60,7 @@ struct RelatedTransactionsSection: View {
                 dismiss()
             }
         } catch {
+            Log.store.failed("Undoing a split", error)
             errorMessage = error.localizedDescription
         }
     }

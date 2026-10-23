@@ -42,6 +42,7 @@ struct ExportCSVView: View {
             try GroshCSVExport.csv(in: context).write(to: url, atomically: true, encoding: .utf8)
             file = url
         } catch {
+            Log.store.failed("Writing the CSV export", error)
             errorMessage = error.localizedDescription
         }
     }

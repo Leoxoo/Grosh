@@ -189,7 +189,7 @@ extension Transaction {
             $0.linkID == link && ($0.category?.lockedRoleRaw == loan || $0.category?.lockedRoleRaw == debt)
         })
         descriptor.fetchLimit = 1
-        return ((try? context.fetchCount(descriptor)) ?? 0) > 0
+        return (Log.store.attempt("Counting the Loan and Debt links") { try context.fetchCount(descriptor) } ?? 0) > 0
     }
 
     /// Whether this is a part of a Split: an Expense or Income sharing a link with no Loan or Debt on it. It is edited

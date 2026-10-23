@@ -175,6 +175,7 @@ struct RecentlyDeletedView: View {
         do {
             try change()
         } catch {
+            Log.store.failed("Changing Recently Deleted", error)
             errorMessage = error.localizedDescription
         }
     }

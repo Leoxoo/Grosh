@@ -55,6 +55,7 @@ struct StartingBalanceEditor: View {
             try transaction.update(with: draftToSave)
             dismiss()
         } catch {
+            Log.store.failed("Saving a starting balance", error)
             errorMessage = error.localizedDescription
         }
     }

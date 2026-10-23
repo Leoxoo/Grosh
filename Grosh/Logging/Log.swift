@@ -70,4 +70,12 @@ nonisolated enum Signpost {
         defer { performance.endInterval(name, state) }
         return try work()
     }
+
+    /// Marks the opening of a screen as the interval `name`, from now to the next turn of the main actor. Call it from
+    /// `onAppear`, once for each screen. SwiftUI builds a screen's body before the screen appears and has no callback
+    /// once it is drawn, so the interval leaves out that body pass and ends at the first turn after the appearance.
+    static func opening(_ name: StaticString) {
+        let state = performance.beginInterval(name)
+        Task { @MainActor in performance.endInterval(name, state) }
+    }
 }

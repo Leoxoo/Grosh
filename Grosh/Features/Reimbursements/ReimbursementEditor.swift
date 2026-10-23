@@ -72,6 +72,7 @@ private struct ReimbursementForm: View {
             }
             dismiss()
         } catch {
+            Log.store.failed("Saving a Reimbursement", error)
             errorMessage = error.localizedDescription
         }
     }

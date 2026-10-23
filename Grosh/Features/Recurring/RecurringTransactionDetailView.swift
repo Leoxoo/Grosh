@@ -178,6 +178,7 @@ struct RecurringTransactionDetailView: View {
         do {
             try recurring.addTransactionNow(today: today, in: context)
         } catch {
+            Log.recurring.failed("Adding a transaction now", error)
             errorMessage = error.localizedDescription
         }
     }
@@ -187,6 +188,7 @@ struct RecurringTransactionDetailView: View {
             try recurring.delete(today: today, in: context)
             dismiss()
         } catch {
+            Log.recurring.failed("Deleting a Recurring transaction", error)
             errorMessage = error.localizedDescription
         }
     }
@@ -195,6 +197,7 @@ struct RecurringTransactionDetailView: View {
         do {
             try recurring.unlink(transaction, in: context)
         } catch {
+            Log.recurring.failed("Unlinking a transaction", error)
             errorMessage = error.localizedDescription
         }
     }

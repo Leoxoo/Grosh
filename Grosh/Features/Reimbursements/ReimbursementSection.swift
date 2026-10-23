@@ -52,6 +52,7 @@ struct ReimbursementSection: View {
         do {
             try entry.delete()
         } catch {
+            Log.store.failed("Deleting a Reimbursement", error)
             errorMessage = error.localizedDescription
         }
     }

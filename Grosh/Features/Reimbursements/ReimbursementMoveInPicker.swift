@@ -16,7 +16,9 @@ struct ReimbursementMoveInPicker: View {
 
     private var candidates: [Transaction] {
         // Read once for the whole list, rather than once for each linked Income in it.
-        let loanOrDebtLinks = (try? Transaction.loanOrDebtLinks(in: context)) ?? []
+        let loanOrDebtLinks = Log.store.attempt("Reading the Loan and Debt links") {
+            try Transaction.loanOrDebtLinks(in: context)
+        } ?? []
         return transactions
             .filter { $0.canBeMovedIntoReimbursement(of: expense, loanOrDebtLinks: loanOrDebtLinks) }
             .matching(filter)
@@ -70,6 +72,7 @@ struct ReimbursementMoveInPicker: View {
             try Reimbursement.moveIn(deposit, to: expense, in: context)
             dismiss()
         } catch {
+            Log.store.failed("Moving a transaction in", error)
             errorMessage = error.localizedDescription
         }
     }

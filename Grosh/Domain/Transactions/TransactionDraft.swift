@@ -81,7 +81,9 @@ struct TransactionDraft {
         cardRuleExemption = transaction.cardRuleExemption
         reminderDay = transaction.reminderDay
         let deletedPayments = transaction.paymentsInRecentlyDeleted
-        if let context = transaction.modelContext, let loanOrDebt = try? LoanOrDebt(transaction, in: context),
+        // A transaction that isn't a Loan or Debt gives nil, not an error: ?? nil flattens the two nils into one.
+        if let context = transaction.modelContext,
+           let loanOrDebt = Log.store.attempt("Reading a Loan or Debt", { try LoanOrDebt(transaction, in: context) }) ?? nil,
            !loanOrDebt.payments.isEmpty || transaction.isForgiven || !deletedPayments.isEmpty {
             let deletedCents = deletedPayments.reduce(0) { $0 + abs($1.amountCents) }
             paymentLock = PaymentLock(
