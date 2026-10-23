@@ -206,10 +206,19 @@ extension SpentOrIncome {
 }
 
 #Preview {
-    List {
-        HomeMonthGraph(
-            today: .today, period: .constant(.month(CalendarMonth(.today))), isShowingReport: .constant(false)
-        )
+    HomeMonthGraphPreview()
+        .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+}
+
+/// Home's Month graph on the month of the day the preview shows.
+private struct HomeMonthGraphPreview: View {
+    @Environment(\.today) private var today
+
+    var body: some View {
+        List {
+            HomeMonthGraph(
+                today: today, period: .constant(.month(CalendarMonth(today))), isShowingReport: .constant(false)
+            )
+        }
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
 }

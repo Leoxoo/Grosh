@@ -19,6 +19,7 @@ struct SideDetailsView: View {
 
     @Query(Transaction.notDeleted) private var transactions: [Transaction]
     @Query private var recurringTransactions: [RecurringTransaction]
+    @Environment(\.today) private var today
 
     /// The two segments of the screen below its total.
     private enum Shows: Hashable {
@@ -35,7 +36,6 @@ struct SideDetailsView: View {
     /// The details, with Other Income read once for everything it counts.
     @ViewBuilder
     private func content(otherIncome: Category) -> some View {
-        let today = CalendarDay.today
         let days = transactions.reportDays(of: period, in: walletSelection, today: today)
         let counted = transactions.counted(in: walletSelection, during: period, today: today, otherIncome: otherIncome)
         let totals = PeriodTotals(of: counted)

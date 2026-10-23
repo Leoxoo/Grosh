@@ -10,6 +10,7 @@ struct AdjustBalanceEditor: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.today) private var today
 
     var body: some View {
         if let draft = startingDraft {
@@ -31,7 +32,7 @@ struct AdjustBalanceEditor: View {
     }
 
     private var startingDraft: BalanceAdjustmentDraft? {
-        try? TransactionDefaults.suggestBalanceAdjustment(on: .today, viewing: viewedWallet, in: context)
+        try? TransactionDefaults.suggestBalanceAdjustment(on: today, viewing: viewedWallet, in: context)
     }
 }
 

@@ -7,16 +7,28 @@ struct HomeView: View {
     /// Remembers across launches whether the Total is hidden.
     static let isTotalHiddenKey = "home.isTotalHidden"
 
+    @Environment(\.today) private var today
+
+    var body: some View {
+        HomeContent(startingMonth: .month(CalendarMonth(today)))
+    }
+}
+
+/// The screen behind ``HomeView``, holding the month its Month graph shows from the moment Home opens.
+private struct HomeContent: View {
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     /// What the Total and the wallets' balances add up.
     @NotDeletedTransactions private var transactions: [Transaction]
-    @AppStorage(Self.isTotalHiddenKey) private var isTotalHidden = false
+    @AppStorage(HomeView.isTotalHiddenKey) private var isTotalHidden = false
+    @Environment(\.today) private var today
     /// The month Home's Month graph shows, which the Report opens on.
-    @State private var monthPeriod = Period.month(CalendarMonth(.today))
+    @State private var monthPeriod: Period
     /// Whether the Report is open.
     @State private var isShowingReport = false
 
-    private var today: CalendarDay { .today }
+    init(startingMonth: Period) {
+        _monthPeriod = State(initialValue: startingMonth)
+    }
 
     var body: some View {
         let balances = WalletBalances($transactions, asOf: today)
@@ -47,7 +59,7 @@ struct HomeView: View {
 
                 HomeComingSoonCards()
 
-                RecentTransactionsSection()
+                RecentTransactionsSection(today: today)
             }
             .navigationTitle("Home")
             // Presented from the list itself, not from a row of it, so the Report opens on the month the strip shows.

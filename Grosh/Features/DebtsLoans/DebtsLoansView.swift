@@ -5,6 +5,7 @@ import SwiftUI
 /// ones. Each opens its transaction detail, where payments are recorded.
 struct DebtsLoansView: View {
     @Query(DebtsAndLoans.transactions) private var transactions: [Transaction]
+    @Environment(\.today) private var today
 
     var body: some View {
         let list = DebtsAndLoans(transactions)
@@ -12,14 +13,14 @@ struct DebtsLoansView: View {
             if !list.open.isEmpty {
                 Section("Open") {
                     ForEach(list.open) { loanOrDebt in
-                        LoanOrDebtLink(loanOrDebt: loanOrDebt)
+                        LoanOrDebtLink(loanOrDebt: loanOrDebt, today: today)
                     }
                 }
             }
             if !list.settled.isEmpty {
                 Section("Settled") {
                     ForEach(list.settled) { loanOrDebt in
-                        LoanOrDebtLink(loanOrDebt: loanOrDebt)
+                        LoanOrDebtLink(loanOrDebt: loanOrDebt, today: today)
                     }
                 }
             }
@@ -40,12 +41,13 @@ struct DebtsLoansView: View {
 /// A Loan or Debt that opens its transaction detail.
 private struct LoanOrDebtLink: View {
     let loanOrDebt: LoanOrDebt
+    let today: CalendarDay
 
     var body: some View {
         NavigationLink {
             TransactionDetailView(transaction: loanOrDebt.original)
         } label: {
-            LoanOrDebtRow(loanOrDebt: loanOrDebt, today: .today)
+            LoanOrDebtRow(loanOrDebt: loanOrDebt, today: today)
         }
     }
 }

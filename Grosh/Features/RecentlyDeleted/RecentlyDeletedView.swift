@@ -11,11 +11,13 @@ struct RecentlyDeletedView: View {
     @Query(RecentlyDeleted.deletedTransactions) private var transactions: [Transaction]
 
     @Environment(\.modelContext) private var context
+    @Environment(\.today) private var today
     @State private var pendingRemoval: PendingRemoval?
     @State private var errorMessage: String?
 
     var body: some View {
         let bin = RecentlyDeleted(wallets: wallets, transactions: transactions, recurring: recurring)
+        // Days left run from the moment an item was deleted, not from a calendar day, so this reads the clock.
         let now = Date.now
 
         List {
@@ -38,13 +40,13 @@ struct RecentlyDeletedView: View {
                                         pendingRemoval = .wallet(wallet)
                                     }
                                     Button("Restore", systemImage: "arrow.uturn.backward") {
-                                        perform { try wallet.restore() }
+                                        perform { try wallet.restore(today: today) }
                                     }
                                     .tint(.blue)
                                 }
                                 .contextMenu {
                                     Button("Restore", systemImage: "arrow.uturn.backward") {
-                                        perform { try wallet.restore() }
+                                        perform { try wallet.restore(today: today) }
                                     }
                                     Button("Delete Forever", systemImage: "trash", role: .destructive) {
                                         pendingRemoval = .wallet(wallet)
@@ -71,14 +73,14 @@ struct RecentlyDeletedView: View {
                                 }
                                 if schedule.restoreBlocker == nil {
                                     Button("Restore", systemImage: "arrow.uturn.backward") {
-                                        perform { try schedule.restore() }
+                                        perform { try schedule.restore(today: today) }
                                     }
                                     .tint(.blue)
                                 }
                             }
                             .contextMenu {
                                 Button("Restore", systemImage: "arrow.uturn.backward") {
-                                    perform { try schedule.restore() }
+                                    perform { try schedule.restore(today: today) }
                                 }
                                 .disabled(schedule.restoreBlocker != nil)
                                 Button("Delete Forever", systemImage: "trash", role: .destructive) {

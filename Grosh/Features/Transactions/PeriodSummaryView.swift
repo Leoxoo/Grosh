@@ -5,7 +5,8 @@ import SwiftUI
 struct PeriodSummaryView: View {
     let summary: PeriodSummary
     let period: Period
-    var today: CalendarDay = .today
+
+    @Environment(\.today) private var today
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {

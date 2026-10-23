@@ -12,6 +12,7 @@ struct RecurringTransactionDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.today) private var today
     @State private var isEditing = false
     @State private var isDuplicating = false
     @State private var editingTransaction: Transaction?
@@ -175,7 +176,7 @@ struct RecurringTransactionDetailView: View {
 
     private func addTransactionNow() {
         do {
-            try recurring.addTransactionNow(in: context)
+            try recurring.addTransactionNow(today: today, in: context)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -183,7 +184,7 @@ struct RecurringTransactionDetailView: View {
 
     private func delete() {
         do {
-            try recurring.delete(in: context)
+            try recurring.delete(today: today, in: context)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
