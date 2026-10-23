@@ -35,6 +35,7 @@ enum MoneyLoverImport {
             try context.save()
             return summary
         } catch {
+            Log.importing.failed("Importing from MoneyLover", error)
             context.rollback()
             throw error
         }

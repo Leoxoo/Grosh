@@ -194,6 +194,7 @@ private struct TransactionForm: View {
             playSuccessCue()
             dismiss()
         } catch {
+            Log.store.failed("Saving a transaction", error)
             errorMessage = error.localizedDescription
         }
     }
