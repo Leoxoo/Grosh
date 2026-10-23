@@ -46,7 +46,7 @@ run() {
         esac
         shift
     done
-    said=$(cd "$in" && env PATH="$here/fakes:$PATH" TMPDIR="$work/tmp" FAKE_CALLS="$in/calls" FAKE_ROOT="$in" \
+    said=$(cd "$in" && env PATH="$here/fakes:$PATH" TMPDIR="$work/tmp" FAKE_CALLS="$in/calls" FAKE_ROOT="$in" GROSH_CRASH_REPORTS="$work/none" \
         ${settings[@]+"${settings[@]}"} "$in/tools/check" "$@" 2>&1)
     status=$?
     said=$(printf '%s\n' "$said" | sed -E 's/ in [0-9]+s/ in Ns/')
@@ -123,6 +123,7 @@ passing() {
     called "xcodebuild -project Grosh.xcodeproj -scheme Grosh -testPlan Grosh -destination platform=iOS Simulator,id=PRO-UDID"
     called "-collect-test-diagnostics never -only-testing:GroshTests test"
     never_called "GROSH_BENCHMARK"
+    never_called "simctl bootstatus"
     called_like "^check-logs --since [0-9]+ --device PRO-UDID$"
 }
 
@@ -252,13 +253,46 @@ stale_lock() {
     never_says "Waiting for another tools/check run"
 }
 
-not_booted() {
-    repo=$(make_repo not-booted)
+boots_a_simulator_that_is_down() {
+    repo=$(make_repo boots-a-simulator-that-is-down)
     run "$repo" FAKE_BOOTED=simctl-none
+    exits 0
+    says "412 passed in Ns (9 skipped)"
+    never_says "tools/check-logs skipped"
+    called "xcrun simctl bootstatus PRO-UDID -b"
+    called_like "^check-logs --since [0-9]+ --device PRO-UDID$"
+    called "xcrun simctl shutdown PRO-UDID"
+    [ "$(grep -n 'check-logs' "$repo/calls" | cut -d: -f1)" -lt "$(grep -n 'simctl shutdown' "$repo/calls" | cut -d: -f1)" ] ||
+        fails "shut its simulator down before reading the log"
+}
+
+a_simulator_that_will_not_boot_stops_the_run() {
+    repo=$(make_repo a-simulator-that-will-not-boot)
+    run "$repo" FAKE_BOOTED=simctl-none FAKE_BOOT_STATUS=1
+    exits 2
+    says "tools/check cannot boot iPhone 17 Pro (iOS 26.4), so nothing ran: fake simctl: the device would not boot"
+    never_called "xcodebuild -project"
+}
+
+goes_down_during_the_run() {
+    repo=$(make_repo goes-down-during-the-run)
+    run "$repo" FAKE_BOOTED=simctl-none FAKE_SHUT_DOWN=1
     exits 0
     says "tools/check-logs skipped: the simulator the tests ran on is not booted, so there is no log to read." \
         "412 passed in Ns (9 skipped)"
     never_called "check-logs"
+    called "xcrun simctl shutdown PRO-UDID"
+}
+
+ui_failure() {
+    repo=$(make_repo ui-failure)
+    run "$repo" GROSH_CRASH_REPORTS="$work/reports" FAKE_CRASH_REPORT=1 FAKE_TESTS=tests-ui-failed \
+        FAKE_SUMMARY=summary-ui-failed FAKE_EXIT=65 --ui
+    exits 1
+    says "1 passed, 1 failed in Ns"
+    says_like "FAIL GroshUITests/testWalkEveryScreen\(\): GroshUITests\.swift:191: Failed to get matching snapshots: .*kAXErrorServerNotFound"
+    says_like "crash report .*/reports/Grosh-2026-10-23\.ips: EXC_BREAKPOINT \(SIGTRAP\) in Grosh"
+    called_like "^check-logs --since [0-9]+ --device PRO-UDID --ui$"
 }
 
 crash_diagnostics() {
@@ -289,7 +323,10 @@ test_case "without an iPhone it stops before building" no_iphone
 test_case "errors Grosh logged fail the run" logged_errors
 test_case "a second run waits for the first and says so" two_runs
 test_case "a lock left by a run that is gone is taken over" stale_lock
-test_case "a simulator that is not booted skips the log check and says so" not_booted
+test_case "a simulator that is down is booted for the run and shut down after it" boots_a_simulator_that_is_down
+test_case "a simulator that will not boot stops the run before it builds" a_simulator_that_will_not_boot_stops_the_run
+test_case "a simulator that goes down during the run skips the log check and says so" goes_down_during_the_run
+test_case "a UI test failure prints its crash report too" ui_failure
 test_case "a crash prints the crashed thread from its crash report" crash_diagnostics
 
 echo "$passed passed, $failed failed"

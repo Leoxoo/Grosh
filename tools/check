@@ -11,7 +11,8 @@
 # 2 the build failed or the tests could not run; 3 xcodebuild is not installed, so nothing ran; 64 bad arguments.
 #
 # The full xcodebuild log and the .xcresult bundle go to $GROSH_CHECK_RESULT_DIR when it is set, otherwise to a new
-# temporary folder. Runs on one Mac take turns: a run started while another is going waits for it, and says so.
+# temporary folder. Runs on one Mac take turns: a run started while another is going waits for it, and says so. A
+# simulator that is down is booted for the run, and shut down again once tools/check-logs has read its log.
 
 set -u -o pipefail
 
@@ -121,6 +122,8 @@ def main(command, *args):
     try:
         if command == "simulator":
             return simulator(*args)
+        if command == "booted":
+            return 0 if is_booted(*args) else 1
         return report(*args)
     except KeyboardInterrupt:
         return 130
@@ -521,7 +524,10 @@ def report(bundle, log, status, seconds, ui, only, results, root, since, device)
              "Its JSON is saved in " + results, full_log, result])
         return 2
 
-    if any("crashed with signal" in line for line in lines):
+    # A UI test whose app died fails only for want of its accessibility server, so its crash report is read too.
+    crashed = any("crashed with signal" in line for line in lines)
+    ui_failed = any(target == UI_TESTS and case.get("result") == "Failed" for target, case in cases)
+    if crashed or ui_failed:
         lines.extend(crash_lines(log, int(since)))
 
     code = 1 if lines or failed else 0
@@ -586,9 +592,14 @@ log=$result_dir/xcodebuild.log
 # repository; the owner removes it on the way out, and a lock whose owner is gone is taken over.
 lock=$tmp/grosh-tools-check.lock
 holding_lock=0
+booted_here=0
 xcodebuild_pid=
 
-release_lock() {
+clean_up() {
+    if [ "$booted_here" = 1 ]; then
+        xcrun simctl shutdown "$udid" >/dev/null 2>&1
+        booted_here=0
+    fi
     if [ "$holding_lock" = 1 ]; then
         rm -rf "$lock"
     fi
@@ -602,7 +613,7 @@ stop() {
     exit "$1"
 }
 
-trap release_lock EXIT
+trap clean_up EXIT
 trap 'stop 129' HUP
 trap 'stop 130' INT
 trap 'stop 143' TERM
@@ -650,6 +661,17 @@ else
                 ;;
         esac
     done
+fi
+
+# check-logs reads the log of the simulator the tests ran on, which has to be booted when it does. xcodebuild leaves alone
+# a simulator that was booted already, so one that is down is booted here, and shut down again by clean_up.
+if ! python3 -I -c "$helper" booted "$udid"; then
+    if boot_error=$(xcrun simctl bootstatus "$udid" -b 2>&1 >/dev/null); then
+        booted_here=1
+    else
+        echo "tools/check cannot boot ${chosen#*$'\t'}, so nothing ran: ${boot_error%%$'\n'*}"
+        exit 2
+    fi
 fi
 
 # xcodebuild refuses to write over an earlier run's bundle in GROSH_CHECK_RESULT_DIR.

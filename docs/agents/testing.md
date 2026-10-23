@@ -35,8 +35,8 @@ Result: /var/folders/…/T/grosh-check.Ab12Cd/Grosh.xcresult
 
 - `FAIL <Suite>/<test>: <file>:<line>: <message>` for each failed expectation, up to five per test. A parameterized test names the failing arguments in brackets after the test.
 - `ERROR <file>:<line>: <message>` for each build error. The summary then reads `0 passed, 0 failed in 23s (the build failed)`.
-- Errors that Grosh logged during the run, from `tools/check-logs`, come just before the summary, which then ends in `; Grosh logged errors (tools/check-logs)`. `tools/check-logs` reads the simulator the tests ran on, so when that simulator is no longer booted it is skipped, the output says so, and the outcome is not changed.
-- When a test crashed, the output adds why, after the failures: the runtime's `Fatal error:` lines from the log, then the crashed thread's top frames from the newest crash report macOS wrote during the run (in `~/Library/Logs/DiagnosticReports`; `GROSH_CRASH_REPORTS` names another folder). It waits up to ten seconds for that report.
+- Errors that Grosh logged during the run, from `tools/check-logs`, come just before the summary, which then ends in `; Grosh logged errors (tools/check-logs)`. `tools/check-logs` reads the simulator the tests ran on. tools/check boots that simulator when it is down, and shuts it down once the log is read. If it is still not booted, the check is skipped, the output says so, and the outcome is not changed.
+- When a test crashed, or a UI test failed, the output adds why, after the failures: the runtime's `Fatal error:` lines from the log, then the crashed thread's top frames from the newest crash report macOS wrote during the run (in `~/Library/Logs/DiagnosticReports`; `GROSH_CRASH_REPORTS` names another folder). It waits up to ten seconds for that report, and says so when none was written.
 - Any other line says why the outcome could not be read: no simulator, xcodebuild stopping before it wrote a result bundle, JSON of an unexpected shape, or `GroshUITests did not run`. The full log has the details.
 
 The outcome comes from the result bundle, through `xcrun xcresulttool`, not from the log text. Nothing else from xcodebuild is printed. The folder on the last lines keeps the full log, the `.xcresult` bundle (open it in Xcode for attachments and screenshots), and the JSON that xcresulttool printed (`xcresult-*.json`).
@@ -57,7 +57,7 @@ Each run makes a new temporary folder, `$TMPDIR/grosh-check.XXXXXX`. When `GROSH
 
 ## Simulator
 
-tools/check uses an available iPhone 17 Pro, otherwise the first available iPhone, on the newest iOS that is at least the app's deployment target. The first line it prints names the simulator.
+tools/check uses an available iPhone 17 Pro, otherwise the first available iPhone, on the newest iOS that is at least the app's deployment target. The first line it prints names the simulator. A simulator that is down is booted for the run and shut down again after it; one that was booted stays booted.
 
 ## One run at a time
 
