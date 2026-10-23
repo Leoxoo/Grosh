@@ -124,10 +124,13 @@ private struct TransactionForm: View {
             fields.amountRow("Amount", currencyCode: currencyCode, tint: Money(cents: draft.sign).tint)
             CategoryPicker(title: "Category", type: draft.type, selection: $draft.category)
                 .disabled(draft.isLockedByPayments)
+                .accessibilityIdentifier("TransactionEditor.category")
             if draft.offersCard {
                 CardPicker(title: "Card", wallet: draft.wallet, selection: $draft.card)
+                    .accessibilityIdentifier("TransactionEditor.card")
             }
             fields.noteField($draft.note)
+                .accessibilityIdentifier("TransactionEditor.note")
             DayStepper(title: "Date", day: $draft.day)
         } footer: {
             if draft.wallet == nil {
