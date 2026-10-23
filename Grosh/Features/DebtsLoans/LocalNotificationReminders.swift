@@ -7,7 +7,12 @@ import UserNotifications
 struct LocalNotificationReminders: ReminderScheduler {
     func requestPermission() async -> Bool {
         let options: UNAuthorizationOptions = [.alert, .sound]
-        return (try? await UNUserNotificationCenter.current().requestAuthorization(options: options)) ?? false
+        do {
+            return try await UNUserNotificationCenter.current().requestAuthorization(options: options)
+        } catch {
+            Log.reminders.failed("Asking to send notifications", error)
+            return false
+        }
     }
 
     func replacePending<Reminder: PendingReminder>(_ reminders: [Reminder]) async {
@@ -30,7 +35,11 @@ struct LocalNotificationReminders: ReminderScheduler {
                 content: content,
                 trigger: reminder.trigger
             )
-            try? await center.add(request)
+            do {
+                try await center.add(request)
+            } catch {
+                Log.reminders.failed("Scheduling a reminder", error)
+            }
         }
     }
 }
