@@ -78,6 +78,7 @@ private struct ForgiveForm: View {
             try Forgiveness.record(draft, in: context)
             dismiss()
         } catch {
+            Log.store.failed("Forgiving a Loan or Debt", error)
             errorMessage = error.localizedDescription
         }
     }

@@ -225,7 +225,10 @@ struct WithNameSuggestions: View {
     @Environment(\.modelContext) private var context
 
     var body: some View {
-        ForEach((try? Transaction.withNames(matching: typed, limit: 3, in: context)) ?? [], id: \.self) { name in
+        let names = Log.store.attempt("Reading the With names") {
+            try Transaction.withNames(matching: typed, limit: 3, in: context)
+        } ?? []
+        ForEach(names, id: \.self) { name in
             Button {
                 onPick(name)
             } label: {

@@ -108,6 +108,7 @@ struct WalletListView: View {
         do {
             try change()
         } catch {
+            Log.store.failed("Changing a wallet", error)
             errorMessage = error.localizedDescription
         }
     }

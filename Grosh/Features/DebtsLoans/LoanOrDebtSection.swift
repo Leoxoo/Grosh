@@ -63,6 +63,7 @@ struct LoanOrDebtSection: View {
         do {
             try transaction.unforgive()
         } catch {
+            Log.store.failed("Un-forgiving a Loan or Debt", error)
             errorMessage = error.localizedDescription
         }
     }
@@ -75,6 +76,7 @@ struct LoanOrDebtSection: View {
             do {
                 try transaction.setReminder(day)
             } catch {
+                Log.reminders.failed("Setting a Loan or Debt reminder", error)
                 errorMessage = error.localizedDescription
             }
         }

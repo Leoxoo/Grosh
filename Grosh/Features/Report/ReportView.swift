@@ -24,6 +24,7 @@ struct ReportView: View {
         OtherIncomeReader { otherIncome in
             content(otherIncome: otherIncome)
         }
+        .onAppear { Signpost.opening("Open Report") }
     }
 
     /// The Report, with Other Income read once for everything it counts.

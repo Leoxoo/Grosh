@@ -65,6 +65,7 @@ private struct TransferForm: View {
             try Transfer.create(draftToSave, in: context)
             dismiss()
         } catch {
+            Log.store.failed("Saving a transfer", error)
             errorMessage = error.localizedDescription
         }
     }

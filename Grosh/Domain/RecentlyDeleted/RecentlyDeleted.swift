@@ -273,7 +273,8 @@ extension Transaction {
             return false
         }
         let linked = FetchDescriptor<Transaction>(predicate: #Predicate { $0.linkID == link && $0.deletedAt == nil })
-        return ((try? context.fetch(linked)) ?? []).contains { $0.isForgiven && $0.loanOrDebtKind?.paymentRole == role }
+        let linkedTransactions = Log.store.attempt("Reading the transactions linked to a payment") { try context.fetch(linked) } ?? []
+        return linkedTransactions.contains { $0.isForgiven && $0.loanOrDebtKind?.paymentRole == role }
     }
 
     /// Brings a transaction deleted on its own back from Recently Deleted, linked as before. One deleted with its
@@ -292,7 +293,8 @@ extension Transaction {
     var paymentsInRecentlyDeleted: [Transaction] {
         guard let kind = loanOrDebtKind, let link = linkID, let context = modelContext else { return [] }
         let deleted = FetchDescriptor<Transaction>(predicate: #Predicate { $0.linkID == link && $0.deletedAt != nil })
-        return ((try? context.fetch(deleted)) ?? []).filter { $0.category?.lockedRole == kind.paymentRole }
+        let found = Log.store.attempt("Reading the payments in Recently Deleted") { try context.fetch(deleted) } ?? []
+        return found.filter { $0.category?.lockedRole == kind.paymentRole }
     }
 
     /// Delete Forever: removes a transaction deleted on its own for good. Saves.

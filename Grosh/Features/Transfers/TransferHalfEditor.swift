@@ -63,7 +63,7 @@ struct TransferHalfEditor: View {
     /// Where the money left and where it went: this half's wallet and, while it is there, the other half's.
     @ViewBuilder
     private var wallets: some View {
-        let wallets = try? transaction.transferWallets(in: context)
+        let wallets = Log.store.attempt("Reading the wallets of a transfer") { try transaction.transferWallets(in: context) }
         WalletLabel(title: "From", wallet: wallets?.from)
         WalletLabel(title: "To", wallet: wallets?.to)
     }
@@ -77,6 +77,7 @@ struct TransferHalfEditor: View {
                 save(.onlyThisOne)
             }
         } catch {
+            Log.store.failed("Checking the other half of a transfer", error)
             errorMessage = error.localizedDescription
         }
     }
@@ -86,6 +87,7 @@ struct TransferHalfEditor: View {
             try transaction.update(with: draftToSave, scope: scope, in: context)
             dismiss()
         } catch {
+            Log.store.failed("Saving a transfer", error)
             errorMessage = error.localizedDescription
         }
     }

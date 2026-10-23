@@ -96,6 +96,7 @@ struct CardListView: View {
         do {
             try change()
         } catch {
+            Log.store.failed("Changing a card", error)
             errorMessage = error.localizedDescription
         }
     }

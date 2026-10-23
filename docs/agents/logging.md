@@ -10,8 +10,8 @@ One subsystem, `Leoxo.Grosh` (the bundle identifier), and a category per area:
 | --- | --- | --- |
 | `Store` | `Log.store` | Saves, fetches and the clean-up at startup. |
 | `Import` | `Log.importing` | Import from MoneyLover. |
-| `Recurring` | `Log.recurring` | Recurring transactions making what came due. |
-| `Reminders` | `Log.reminders` | Scheduling Loan, Debt and Estimated-amount reminders. |
+| `Recurring` | `Log.recurring` | Recurring transactions: making what came due, and saving them. |
+| `Reminders` | `Log.reminders` | Scheduling Loan, Debt and Estimated-amount reminders, and saving a Loan's or Debt's reminder day. |
 | `Reports` | `Log.reports` | The Report. Nothing logs here yet. |
 
 In a `catch`, `Log.store.failed("Saving a transaction", error)`. Where a `try?` dropped the error, `Log.store.attempt("Reading every transaction") { try … } ?? []` gives the same value and logs why it failed. Log only on save, fetch, import and reminder paths, never in a row, a per-transaction loop or anything that runs per frame.
@@ -43,8 +43,11 @@ From a device, in Console.app: select the device in the sidebar, click Start, fi
 | `Save transaction` | `TransactionEditor` | The editor's save: validating the draft and saving it to the store, not the Success cue or closing the sheet. |
 | `Import CSV` | `MoneyLoverImport` | Deleting the old data, adding the imported rows and saving. |
 | `Search` | `TransactionFilter.listed` | Working out the Transactions tab's search results over every transaction, each time they are worked out while there is search text. |
+| `Open Home` | `HomeView` | Home appearing, from when SwiftUI reports it to the next turn of the main actor. |
+| `Open Transactions` | `TransactionsView` | The Transactions tab appearing, measured the same way. |
+| `Open Report` | `ReportView` | The Report appearing, measured the same way. |
 
-Opening a screen has no interval yet.
+A screen's opening is `Signpost.opening`, called from the screen's `onAppear`. SwiftUI builds a screen's body before the screen appears and gives no callback once it is drawn, so the interval leaves out that body pass, where Home, the Transactions tab and the Report read the store. Timing the body as well would need the screen to start its interval from its own body, which takes state.
 
 To see them, choose Product ▸ Profile (⌘I) in Xcode, pick the Time Profiler template, click + and add the os_signpost instrument (Signposts in newer Xcode versions), then record and use the app. Filter the signpost track to subsystem `Leoxo.Grosh`. Select a bar and the Time Profiler's call tree covers only that interval.
 
@@ -56,6 +59,6 @@ To add an interval, wrap the work in `Signpost.interval`. Wrap one save, search 
 
 Nothing here has been compiled or run, so the first build and run settle these:
 
-- The `os` calls follow Apple's documented signatures (`Logger(subsystem:category:)`, `info`, `error`, `OSSignposter.beginInterval` and `endInterval`). A call the compiler rejects is in `Log.swift`, where `Signpost.interval` hands its `StaticString` name on to both signposter calls.
+- The `os` calls follow Apple's documented signatures (`Logger(subsystem:category:)`, `info`, `error`, `OSSignposter.beginInterval` and `endInterval`). A call the compiler rejects is in `Log.swift`, where `Signpost.interval` and `Signpost.opening` hand their `StaticString` names on to the signposter, and `opening` ends its interval in a `Task` on the main actor.
 - That `log show` prints the `info` messages with `--info` after the fact: the system may keep `info` only in memory.
 - The Instruments and Console menu names above, which move between Xcode versions.

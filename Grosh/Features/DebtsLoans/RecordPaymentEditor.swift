@@ -96,6 +96,7 @@ private struct RecordPaymentForm: View {
             try DebtPayment.record(draftToSave, in: context)
             dismiss()
         } catch {
+            Log.store.failed("Recording a payment", error)
             errorMessage = error.localizedDescription
         }
     }

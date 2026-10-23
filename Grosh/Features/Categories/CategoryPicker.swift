@@ -126,7 +126,9 @@ private struct CategoryChoiceList: View {
     private var sections: [ChoiceSection] {
         let all: [ChoiceSection] = switch offered {
         case .pickable(let type):
-            [ChoiceSection(title: nil, categories: (try? CategoryCatalog(context: context).pickerCategories(of: type)) ?? [])]
+            [ChoiceSection(title: nil, categories: Log.store.attempt("Reading the categories to pick from") {
+                try CategoryCatalog(context: context).pickerCategories(of: type)
+            } ?? [])]
         case .every:
             CategoryType.allCases.map { type in
                 ChoiceSection(title: type.title, categories: CategoryCatalog.tree(of: type, from: categories))

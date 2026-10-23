@@ -163,6 +163,7 @@ private struct WalletForm: View {
             try change()
             dismiss()
         } catch {
+            Log.store.failed("Changing a wallet", error)
             errorMessage = error.localizedDescription
         }
     }

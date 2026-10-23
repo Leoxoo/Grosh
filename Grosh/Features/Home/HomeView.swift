@@ -11,6 +11,7 @@ struct HomeView: View {
 
     var body: some View {
         HomeContent(startingMonth: .month(CalendarMonth(today)))
+            .onAppear { Signpost.opening("Open Home") }
     }
 }
 
