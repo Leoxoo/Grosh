@@ -1,6 +1,6 @@
 [
   {
-    "pattern": "failed to create (thumbnail \\[-50\\]|image \\[-62\\])|could not find plugin for image source \\[11 bytes\\] 6E 6F 74 20 61 20 70 68",
+    "pattern": "failed to create (thumbnail \\[-50\\]|image \\[-62\\])|could not find plugin for image source \\[11 bytes\\] 6E 6F 74 20 61 20 70 68|CGImageSourceCreate(Thumbnail|Image)AtIndex\\w*:\\d+",
     "reason": "ImageIO logs an error when data is not an image. CroppedPhotoTests gives it \"not a photo\" on purpose, and CroppedPhoto must answer nil for it."
   },
   {
@@ -28,7 +28,7 @@
     "reason": "The accessibility runtime logs this when it describes the system keyboard's keys while the keyboard is on screen. The keyboard is the system's, and Grosh cannot change how it describes its keys."
   },
   {
-    "pattern": "Automation type mismatch; legacy system derived element type \\d+ from class (SwiftUI\\.VerticalTextView:UITextView|SwiftUI\\.AccessibilityNode:UIResponder|_UIEditMenuListViewCell:_UIEditMenuListViewCell),",
+    "pattern": "Automation type mismatch; legacy system derived element type \\d+ from class (SwiftUI\\.VerticalTextView:UITextView|SwiftUI\\.AccessibilityNode:(UIResponder|NSObject)|_UIEditMenuListViewCell:_UIEditMenuListViewCell),",
     "reason": "The accessibility runtime logs this when its type for SwiftUI's text views and the edit menu's cells differs from the legacy one. SwiftUI and UIKit own those views, and Grosh cannot change how the system describes them."
   },
   {
@@ -68,7 +68,23 @@
     "reason": "The audio system's loudness manager finds no hardware calibration on the simulator, and logs that when a sound is prepared for playback. Grosh cannot supply the calibration."
   },
   {
-    "pattern": "AudioConverterOOP\\.cpp:\\d+\\s+Failed to prepare AudioConverterService: -302",
-    "reason": "The simulator's audio converter service cannot start (error -302), and the system logs it when a sound is prepared for playback. Grosh cannot change the simulator's audio."
+    "pattern": "AudioConverterOOP\\.cpp:\\d+\\s+Failed to prepare AudioConverterService: -\\d+",
+    "reason": "The simulator's audio converter service cannot start (an error such as -302 or -304), and the system logs it when a sound is prepared for playback. Grosh cannot change the simulator's audio."
+  },
+  {
+    "pattern": "EnhanceDialogueProcessor\\.cpp:\\d+",
+    "reason": "The audio system's dialogue enhancement has no tuning for the simulator's device, and logs that when a sound is prepared for playback. Grosh cannot supply that tuning."
+  },
+  {
+    "pattern": "\\[UIKBRenderingLog\\] \\S+ may only be set for UIKBDynamicRenderFactory",
+    "reason": "The system keyboard logs when a layout value is set on a renderer of the wrong kind, and drops the change. The keyboard is the system's, and Grosh cannot change the keyboard's layout code."
+  },
+  {
+    "pattern": "\\[carc\\] Invalidation handler: Connection cannot be formed",
+    "reason": "The system's analytics client logs when it cannot form its connection on the simulator. Grosh has no analytics code."
+  },
+  {
+    "pattern": "\\[XPCErrors\\] non-launching port is incompatible with service identifier \"com\\.apple\\.PointerUI",
+    "reason": "The system's XPC layer logs when the simulator's pointer service is given a port it cannot launch with. Grosh makes no XPC calls of its own."
   }
 ]
