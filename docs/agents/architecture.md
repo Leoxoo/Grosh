@@ -4,7 +4,7 @@ How Grosh is put together, and the performance rules every change has to keep. D
 
 ## The 16k store
 
-Design every change for **the 16k store**: about 16,000 transactions over six years, the size a long-time user or a Money Lover import reaches. Anything that touches each transaction once per frame, per row or per save is visible there, even when it is invisible in a fresh simulator. `GroshTests/PerformanceBenchmarks.swift` builds this store and times launch, every screen, scrolling, search and saving.
+Design every change for **the 16k store**: about 16,000 transactions over six years, the size a long-time user or a Money Lover import reaches. Anything that touches each transaction once per frame, per row or per save is visible there, even when it is invisible in a fresh simulator. `Grosh/Debug/BenchmarkStore.swift` builds this store, and `GroshTests/PerformanceBenchmarks.swift` times launch, every screen, scrolling, search and saving on it. The UI smoke walk opens the app on it too (`docs/agents/ui-smoke.md`).
 
 ## Components
 
