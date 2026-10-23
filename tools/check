@@ -427,9 +427,11 @@ def is_booted(device):
 
 
 def crash_reports(since):
-    """The crash reports macOS wrote since the tests started, newest first."""
+    """The Grosh app's crash reports that macOS wrote since the tests started, newest first. macOS names a report for
+    the process that crashed, so other processes' reports (the Spotlight daemon's, say) are left out."""
     try:
-        paths = [os.path.join(CRASH_REPORTS, name) for name in os.listdir(CRASH_REPORTS) if name.endswith(".ips")]
+        paths = [os.path.join(CRASH_REPORTS, name) for name in os.listdir(CRASH_REPORTS)
+                 if name.startswith("Grosh-") and name.endswith(".ips")]
         fresh = [path for path in paths if os.path.getmtime(path) >= since]
         return sorted(fresh, key=os.path.getmtime, reverse=True)
     except OSError:
@@ -463,7 +465,7 @@ def crash_lines(log, since):
             time.sleep(0.5)
             reports = crash_reports(since)
         if not reports:
-            lines.append("No crash report was written to {}.".format(CRASH_REPORTS))
+            lines.append("No crash report of Grosh was written to {}.".format(CRASH_REPORTS))
         for path in reports[:CRASH_REPORTS_SHOWN]:
             lines.extend(crash_report_lines(path))
         return lines

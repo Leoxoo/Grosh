@@ -308,6 +308,14 @@ crash_diagnostics() {
     called_like "^check-logs --since [0-9]+ --device PRO-UDID$"
 }
 
+other_process_crash_report() {
+    repo=$(make_repo other-process-crash-report)
+    run "$repo" GROSH_CRASH_REPORTS="$work/other-reports" FAKE_OTHER_CRASH_REPORT=1 FAKE_TESTS=tests-ui-failed \
+        FAKE_SUMMARY=summary-ui-failed FAKE_EXIT=65 --ui
+    exits 1
+    says_like "No crash report of Grosh was written to .*/other-reports\.$"
+}
+
 test_case "without Xcode, nothing runs and it exits 3" without_xcode
 test_case "wrong arguments exit 64" bad_arguments
 test_case "a passing run prints three lines and runs the unit tests only" passing
@@ -328,6 +336,7 @@ test_case "a simulator that will not boot stops the run before it builds" a_simu
 test_case "a simulator that goes down during the run skips the log check and says so" goes_down_during_the_run
 test_case "a UI test failure prints its crash report too" ui_failure
 test_case "a crash prints the crashed thread from its crash report" crash_diagnostics
+test_case "a crash report of another process is left out" other_process_crash_report
 
 echo "$passed passed, $failed failed"
 [ "$failed" -eq 0 ]
