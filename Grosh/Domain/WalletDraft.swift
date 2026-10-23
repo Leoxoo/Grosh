@@ -12,7 +12,7 @@ nonisolated struct WalletDraft {
     init() {}
 
     /// The wallet's current fields, ready to edit.
-    init(_ wallet: Wallet) {
+    @MainActor init(_ wallet: Wallet) {
         name = wallet.name
         symbolName = wallet.symbolName
         color = wallet.color
