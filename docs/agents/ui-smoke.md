@@ -13,25 +13,25 @@ xcodebuild test -scheme Grosh -destination 'platform=iOS Simulator,name=iPhone 1
 
 Or click the diamond beside `testWalkEveryScreen` in Xcode. Run it on an iPhone simulator: on iPad the tabs are a sidebar, and the walk looks for a tab bar.
 
-The first run of a day makes the store first, during the app's first launch and before Home appears. That takes minutes, so the walk waits up to 300 seconds for Home. Every later launch that day opens the store already made. A CI runner starts from a new simulator, so it makes the store on every run.
+The app makes the store in its launch, before it has a screen, and no screen can be queried until it has one. So the `Launch` step first launches the app with `-GroshUITestStore make`, which makes the store if today's isn't there yet and then quits, and launches it again to open the store. Making the store takes minutes, which is why that quit gets 900 seconds. A CI runner starts from a new simulator, so it makes the store on every run.
 
 ## The launch argument
 
 `-GroshUITestStore benchmark` makes the app open the 16k store in place of the user's. Only Debug builds read it (`Grosh/Debug/UITestStore.swift`). `BenchmarkStore` (`Grosh/Debug/BenchmarkStore.swift`), which makes the store for this and for the benchmarks, is compiled into Debug builds only, so the app as shipped carries neither. The benchmarks reach it with `@testable import Grosh`, which works because their build is a Debug build with `-O`.
 
-- The store is `GroshUITest-<yyyymmdd>.store` in the app's temporary directory. It is a file of its own, so the user's store is never opened, and the Expenses the walk adds never reach the benchmarks' copy (`GroshBenchmark-v1.store`). Its history runs up to today, so the day's first launch makes a new store and removes the earlier days' stores.
+- The store is `GroshUITest-<yyyymmdd>.store` in the app's temporary directory. It is a file of its own, so the user's store is never opened, and the Expenses the walk adds never reach the benchmarks' copy (`GroshBenchmark-v1.store`). Its history runs up to today, so the first launch of a day makes a new store (with `make`, below) and removes the earlier days' stores.
 - Animations are off (`UIView.setAnimationsEnabled(false)`), so the walk never waits on a transition.
-- Any other value stops the app at launch ("No UI test store is called …") rather than opening the user's store.
+- `make` makes the store, if today's isn't there, and quits the app before it shows a screen, so the walk can wait for the quit. Any other value than `benchmark` or `make` stops the app at launch ("No UI test store is called …") rather than opening the user's store.
 
 To look around the 16k store by hand, add `-GroshUITestStore benchmark` under Product → Scheme → Edit Scheme → Run → Arguments, or run `xcrun simctl launch booted Leoxo.Grosh -GroshUITestStore benchmark`.
 
 ## Steps
 
-Each step is an activity in the test report. Every screen gets 10 seconds to appear, which only runs out on a hang. The exception is `Launch`, which gets 300 seconds.
+Each step is an activity in the test report. Every screen gets 10 seconds to appear, which only runs out on a hang. The exception is `Launch`: the store gets 900 seconds to be made, and Home 300 seconds to appear.
 
 | Step | What it does |
 | --- | --- |
-| `Launch` | Launches Grosh on the 16k store and waits for Home. Answers the notifications prompt with Don't Allow: the store has Loan reminders still to come, so a new simulator asks. |
+| `Launch` | Launches Grosh with `make`, which makes the 16k store and quits, then launches it on the store and waits for Home. Answers the notifications prompt with Don't Allow: the store has Loan reminders still to come, so a new simulator asks. |
 | `Launch → measure` | Launches it five more times under `XCTApplicationLaunchMetric`, then waits for Home. |
 | `Home → open` | Home's Total and wallets. |
 | `Transactions → open` | The Transactions tab and its list. |
@@ -57,7 +57,9 @@ The walk finds screens by their navigation bar titles and tabs by their names. T
 
 - `<step>: <screen> did not appear within 10 seconds.` The screen hung, or the title or label the walk looks for changed. The step in `GroshUITests.swift` shows what it looks for.
 - `<step>: Grosh is no longer running …` The app crashed, or an uncaught exception ended it. The simulator's crash report is on the Mac in `~/Library/Logs/DiagnosticReports`.
-- `Launch: Home did not appear within 300 seconds.` Making the day's store took longer than that, or the launch hung.
+- `Launch: the 16k store was still being made after 900 seconds.` Making the store took longer than that, or the app hung in its launch.
+- `Launch: Home did not appear within 300 seconds.` The store opened, but Home did not show: the launch hung, or the screen changed.
+- `Failed to get matching snapshots: … kAXErrorServerNotFound`, at any step. XCTest found no running app to query: it had crashed or quit, or it was still in its launch. `tools/check` prints the crash report of a failed UI test. With none written, the app quit or hung without crashing.
 
 ## Written without a Mac
 
@@ -66,7 +68,7 @@ This was written where there is no Xcode and no simulator, so none of it has com
 - **It compiles, and the walk passes.**
 - **The launch baseline.** It has to be recorded on a Mac and checked in. Run the walk in Xcode. In the test report, open the launch metric's result, click Set Baseline, and commit `Grosh.xcodeproj/xcshareddata/xcbaselines/`. A baseline belongs to the Mac and the simulator it was recorded on, so other machines, CI among them, have nothing to compare against. Until a baseline is recorded, launch is measured and reported but never fails the test.
 - **How long it takes.** Once the day's store is made, it should finish in a few minutes on a laptop.
-- **The first launch of a day.** Check that `launch()` waits while the app makes the store, and that 300 seconds is enough for a Debug build, both on a laptop and on CI. If it isn't, raise the `Launch` step's timeout.
+- **Making the store.** The `make` launch quits once the store is made, and a launch that finds the store made already quits after three seconds, so that XCTest sees it running. Check both on a laptop and on CI, and that 900 seconds is enough for a Debug build. If it isn't, raise the `Launch` step's first timeout.
 - **What the walk looks for.** Each of these comes from reading the views, not from the accessibility tree:
   - navigation bars named by their screen's title, and tab bar buttons by the tab's name;
   - the back button first in its navigation bar;

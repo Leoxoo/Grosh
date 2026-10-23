@@ -15,7 +15,6 @@ final class GroshUITests: XCTestCase {
     @MainActor
     func testWalkEveryScreen() {
         let app = XCUIApplication()
-        app.launchArguments += ["-GroshUITestStore", "benchmark"]
         let walk = Walk(app)
         // The time in the note tells this walk's Expense apart from those of earlier walks today.
         let note = "Smoke walk \(Int(Date.now.timeIntervalSince1970))"
@@ -24,11 +23,18 @@ final class GroshUITests: XCTestCase {
         }
 
         walk.step("Launch") {
+            // The app makes the 16k store in its launch, before it has a screen, and no screen can be queried until
+            // then. So it is launched to make the store, which quits once the store is made, and launched again to
+            // open it.
+            app.launchArguments = ["-GroshUITestStore", "make"]
             app.launch()
-            walk.expect(
-                app.navigationBars["Home"], "Home", timeout: 300,
-                because: "The first launch of a day makes the 16k store before Home appears, which takes minutes."
+            XCTAssertTrue(
+                app.wait(for: .notRunning, timeout: 900),
+                "\(walk.current): the 16k store was still being made after 900 seconds."
             )
+            app.launchArguments = ["-GroshUITestStore", "benchmark"]
+            app.launch()
+            walk.expect(app.navigationBars["Home"], "Home", timeout: 300)
             walk.declineNotificationsIfAsked()
         }
         walk.step("Launch → measure") {

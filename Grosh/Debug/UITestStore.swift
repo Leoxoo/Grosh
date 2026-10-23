@@ -8,8 +8,10 @@ import UIKit
 /// The store a UI test opens the app on, asked for at launch with `-GroshUITestStore benchmark`: the 16k store
 /// (``BenchmarkStore``) in the temporary directory, under a name of its own, so neither the user's store nor the
 /// benchmarks' copy is ever opened. Its history runs up to today, so its name carries the day: the first launch of a
-/// day makes a new one, which takes minutes, and removes the earlier days' ones. Animations are off while it is open,
-/// so a test never waits on one. Only Debug builds read the argument. The walk that uses it: `docs/agents/ui-smoke.md`.
+/// day makes a new one, which takes minutes, and removes the earlier days' ones. `make` makes it and then quits, before
+/// any screen, because the app makes it in its launch, where no screen can be queried. Animations are off while it is
+/// open, so a test never waits on one. Only Debug builds read the argument. The walk that uses it:
+/// `docs/agents/ui-smoke.md`.
 enum UITestStore {
     /// The launch argument's name. A launch argument `-name value` lands in the standard user defaults.
     static let argument = "GroshUITestStore"
@@ -18,16 +20,23 @@ enum UITestStore {
     private static let namePrefix = "GroshUITest-"
 
     /// The store a UI test asked for, made first when today's isn't there yet, or `nil` when the app was launched
-    /// without the argument. A value other than `benchmark` is refused rather than opening the user's store.
+    /// without the argument. `make` quits the app once the store is made. A value other than `benchmark` or `make` is
+    /// refused rather than opening the user's store.
     static func containerIfAsked() throws -> ModelContainer? {
         guard let name = UserDefaults.standard.string(forKey: argument) else { return nil }
-        guard name == "benchmark" else { throw UITestStoreError.unknown(name) }
+        guard name == "benchmark" || name == "make" else { throw UITestStoreError.unknown(name) }
         #if os(iOS)
         UIView.setAnimationsEnabled(false)
         #endif
         let url = URL.temporaryDirectory.appending(path: "\(namePrefix)\(CalendarDay.today.rawValue).store")
         removeEarlierStores(keeping: url)
         try BenchmarkStore.prepare(at: url, years: years)
+        if name == "make" {
+            // Kept running a moment, so the launch that asked for this sees the app running even when the store was made
+            // already and there was nothing to wait for.
+            Thread.sleep(forTimeInterval: 3)
+            exit(0)
+        }
         let container = try BenchmarkStore.open(at: url)
         // Seeded as the app's own store is (GroshStore.makeSeededContainer).
         try CategorySeeder.seedIfNeeded(in: container.mainContext)
@@ -55,7 +64,7 @@ nonisolated enum UITestStoreError: Error, Equatable {
 extension UITestStoreError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .unknown(let name): "No UI test store is called “\(name)”. The one there is: benchmark."
+        case .unknown(let name): "No UI test store is called “\(name)”. The ones there are: benchmark and make."
         }
     }
 }
