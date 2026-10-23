@@ -76,9 +76,10 @@ final class GroshUITests: XCTestCase {
             field.typeText("Sam")
             walk.expect(walk.element(containing: "Dinner with Sam"), "a dinner with Sam")
             // The keyboard's Search key puts the keyboard away, uncovering the tab bar. When the results come in,
-            // the field can lose its keyboard focus, and then the keyboard is already away.
-            if field.hasKeyboardFocus {
-                field.typeText("\n")
+            // the field can lose its keyboard focus, and then the keyboard, and its Search key, are already away.
+            let searchKey = app.keyboards.buttons["Search"]
+            if searchKey.exists {
+                searchKey.tap()
             }
             walk.expectGone(app.keyboards.firstMatch, "The keyboard")
         }
