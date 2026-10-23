@@ -60,7 +60,8 @@ final class GroshUITests: XCTestCase {
         }
         walk.step("Transactions → open a transaction") {
             let row = walk.firstRowOnScreen(of: app.collectionViews.firstMatch, "the transaction list")
-            let tapped = row.label
+            // A row is a cell that holds its text in a child element, so the cell's own label is empty.
+            let tapped = row.descendants(matching: .any).firstMatch.label
             row.tap()
             walk.expect(app.navigationBars["Transaction"], "the transaction's detail after tapping \"\(tapped)\"")
         }
@@ -269,15 +270,22 @@ private final class Walk {
         settle(list)
     }
 
-    /// The first row of `list` that is on screen once the list has stopped moving: a list keeps a few rows ready past
-    /// its edges.
+    /// The first row of `list` that is on screen once the list has stopped moving, below the list's header and above
+    /// the tab bar. A list keeps a few rows ready past its edges. Rows scroll under the header and the tab bar, which
+    /// take the taps that land on them: such a row is hittable, but a tap on it opens nothing.
     func firstRowOnScreen(of list: XCUIElement, _ what: String) -> XCUIElement {
         settle(list)
+        // The header takes up the top of the screen, so rows are taken from the middle of the screen down.
+        let top = app.frame.midY
+        let bottom = app.tabBars.firstMatch.frame.minY
         let rows = list.cells
-        for index in 0..<min(rows.count, 30) where rows.element(boundBy: index).isHittable {
-            return rows.element(boundBy: index)
+        for index in 0..<min(rows.count, 30) {
+            let row = rows.element(boundBy: index)
+            if row.isHittable, row.frame.midY >= top, row.frame.midY <= bottom {
+                return row
+            }
         }
-        XCTFail("\(current): no row of \(what) is on screen.")
+        XCTFail("\(current): no row of \(what) is on screen between its header and the tab bar.")
         return rows.firstMatch
     }
 

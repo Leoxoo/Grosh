@@ -36,7 +36,7 @@ Each step is an activity in the test report. Every screen gets 10 seconds to app
 | `Home → open` | Home's Total and wallets. |
 | `Transactions → open` | The Transactions tab and its list. |
 | `Transactions → scroll` | Three swipes down the list. |
-| `Transactions → open a transaction` | Taps a row on screen and waits for the Transaction screen. |
+| `Transactions → open a transaction` | Taps a row between the list's header and the tab bar, and waits for the Transaction screen. |
 | `Transactions → back` | Back to the list. |
 | `Search → find a payee` | Searches the Transactions tab for "Sam" and waits for a "Dinner with Sam". The keyboard's Search key then puts the keyboard away. |
 | `Budgets → open` | The Budgets tab. |
