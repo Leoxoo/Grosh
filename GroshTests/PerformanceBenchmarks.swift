@@ -17,11 +17,15 @@ import UIKit
 ///     TEST_RUNNER_GROSH_BENCHMARK=1 xcodebuild test -scheme Grosh -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
 ///         SWIFT_OPTIMIZATION_LEVEL=-O -parallel-testing-enabled NO -only-testing:GroshTests/PerformanceBenchmarks
 ///
-/// Each line it prints starts with `BENCH`, then the median, fastest and slowest of the timed runs in milliseconds; with
-/// `TEST_RUNNER_GROSH_BENCHMARK_OUT` set to a path, the lines are added to that file too. The store is made on the first
-/// run of the day, which takes a few minutes.
+/// Each line it prints starts with `BENCH`, then the median, fastest and slowest of the timed runs in milliseconds and
+/// the step's budget; with `TEST_RUNNER_GROSH_BENCHMARK_OUT` set to a path, the lines are added to that file too. The
+/// store is made on the first run of the day, which takes a few minutes.
+///
+/// A step whose median is over its budget in `BenchmarkBudgets` fails the test, and so does a step with no budget; on
+/// a setup other than the one the budgets were measured on, a step over its budget is a warning instead. The run ends
+/// with a summary line. See `docs/agents/benchmarks.md`.
 @MainActor
-@Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["GROSH_BENCHMARK"] != nil))
+@Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["GROSH_BENCHMARK"] != nil), .checkingBudgets)
 struct PerformanceBenchmarks {
     /// About 16,000 transactions over six years, as a long-time user (or a Money Lover import) has.
     static let years = 6
@@ -171,10 +175,13 @@ struct PerformanceBenchmarks {
 
 // MARK: - Timing
 
-/// Runs `body` once to warm up, then `runs` times, and prints the median, fastest and slowest run.
+/// Runs `body` once to warm up, then `runs` times, and reports the median, fastest and slowest run against the step's
+/// budget. A failure is recorded on the line that called this.
 @MainActor
 @discardableResult
-func time(_ name: String, runs: Int = 7, _ body: () throws -> Void) rethrows -> Double {
+func time(
+    _ name: String, runs: Int = 7, sourceLocation: SourceLocation = #_sourceLocation, _ body: () throws -> Void
+) rethrows -> Double {
     try body()
     var samples: [Double] = []
     for _ in 0..<runs {
@@ -182,27 +189,23 @@ func time(_ name: String, runs: Int = 7, _ body: () throws -> Void) rethrows -> 
         try body()
         samples.append(milliseconds(ContinuousClock.now - start))
     }
-    return report(name, samples)
+    return report(name, samples, sourceLocation: sourceLocation)
 }
 
+/// Prints a step's median, fastest and slowest sample and its budget, then holds the median to the budget
+/// (`BenchmarkBudgets.check`).
 @discardableResult
-func report(_ name: String, _ samples: [Double]) -> Double {
+func report(_ name: String, _ samples: [Double], sourceLocation: SourceLocation = #_sourceLocation) -> Double {
     let sorted = samples.sorted()
     let median = sorted[sorted.count / 2]
-    let line = String(
-        format: "BENCH %-60@ median %8.2f ms   min %8.2f   max %8.2f   (n=%d)",
-        name as NSString, median, sorted.first ?? 0, sorted.last ?? 0, samples.count
+    let step = BenchmarkStep(name: name, median: median, budget: BenchmarkBudgets.steps[name])
+    printBench(
+        String(
+            format: "BENCH %-60@ median %8.2f ms   min %8.2f   max %8.2f   (n=%d)",
+            name as NSString, median, sorted.first ?? 0, sorted.last ?? 0, samples.count
+        ) + step.budgetColumn
     )
-    print(line)
-    if let path = ProcessInfo.processInfo.environment["GROSH_BENCHMARK_OUT"],
-       let handle = FileHandle(forWritingAtPath: path) ?? {
-           FileManager.default.createFile(atPath: path, contents: nil)
-           return FileHandle(forWritingAtPath: path)
-       }() {
-        handle.seekToEndOfFile()
-        handle.write(Data((line + "\n").utf8))
-        try? handle.close()
-    }
+    BenchmarkBudgets.check(step, sourceLocation: sourceLocation)
     return median
 }
 
