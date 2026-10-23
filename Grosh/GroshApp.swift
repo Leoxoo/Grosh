@@ -10,6 +10,13 @@ struct GroshApp: App {
 
     init() {
         do {
+            #if DEBUG
+            // A UI test can ask for the 16k store in place of the user's (UITestStore).
+            if let uiTestStore = try UITestStore.containerIfAsked() {
+                container = uiTestStore
+                return
+            }
+            #endif
             container = try GroshStore.makeSeededContainer()
         } catch {
             fatalError("Couldn't open the Grosh store: \(error)")
