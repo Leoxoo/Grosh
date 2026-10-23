@@ -27,6 +27,10 @@ Pick the narrowest source that answers the question:
 
 `@Query(Transaction.notDeleted)` re-reads all ~16k rows after every save, once per screen showing it. The Report screens still do this; moving them onto `@NotDeletedTransactions` is the known next step.
 
+## What day it is
+
+Screens read the day from `@Environment(\.today)`, a `CalendarDay`. The app sets it once at the root, from the real date, and moves it on when the day changes while the app is open (`Grosh/Views/Today.swift`). A test or a preview shows a screen as of a fixed day with `.environment(\.today, day)`. Views pass it into the Domain rules, which keep taking `today:` as an argument, so a view should not read `CalendarDay.today` or the clock to decide what day it is.
+
 ## Performance rules
 
 **Balances and sums read `LedgerEntry`.** A `LedgerEntry` copies a transaction's wallet, day and amount once and is refreshed only when a save changes them. Balance-style code takes `some Sequence<some DatedAmount>` and works on either. Reading a model's properties while a screen draws is the slow path; 16k of them is a quarter of a second.
@@ -48,6 +52,8 @@ TEST_RUNNER_GROSH_BENCHMARK=1 xcodebuild test -scheme Grosh -destination 'platfo
 ```
 
 Put the before → after milliseconds in the commit message, as cc60ff5 and d91cfa8 do.
+
+Each step has a budget in `GroshTests/BenchmarkBudgets.swift`, and a step over its budget fails the run on the setup the budgets were recorded on. To read a budget failure, or to record or change one, see `docs/agents/benchmarks.md`.
 
 ## House style
 
