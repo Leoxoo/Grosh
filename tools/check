@@ -1,0 +1,597 @@
+#!/usr/bin/env bash
+#
+# Builds Grosh, runs its tests on an iPhone simulator and prints only what failed: one line per failing test or build
+# error, then one summary line. How to run it and read it: docs/agents/testing.md.
+#
+#   tools/check                   the unit tests (GroshTests)
+#   tools/check --ui              the unit tests and the UI tests (GroshUITests)
+#   tools/check --only <Suite>    one suite, by its type name, such as ReimbursementTests
+#
+# Exit status: 0 every test passed; 1 a test failed, no test ran, or Grosh logged errors (tools/check-logs);
+# 2 the build failed or the tests could not run; 3 xcodebuild is not installed, so nothing ran; 64 bad arguments.
+#
+# The full xcodebuild log and the .xcresult bundle go to $GROSH_CHECK_RESULT_DIR when it is set, otherwise to a new
+# temporary folder. Runs on one Mac take turns: a run started while another is going waits for it, and says so.
+
+set -u -o pipefail
+
+usage() {
+    cat <<'EOF'
+Usage: tools/check [--ui] [--only <Suite>]...
+  --ui            also run the UI tests (GroshUITests)
+  --only <Suite>  run one suite, by its type name (ReimbursementTests), or one test in it
+                  (ReimbursementTests/deletingAReimbursementDoesNotDeleteItsExpense()); repeat it for more
+EOF
+}
+
+ui=0
+only=()
+while [ $# -gt 0 ]; do
+    case $1 in
+        --ui) ui=1 ;;
+        --only=?*) only+=("${1#--only=}") ;;
+        --only)
+            case ${2:-} in
+                '' | -*)
+                    echo "tools/check: --only needs a suite name" >&2
+                    usage >&2
+                    exit 64
+                    ;;
+            esac
+            only+=("$2")
+            shift
+            ;;
+        -h | --help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "tools/check: unknown argument: $1" >&2
+            usage >&2
+            exit 64
+            ;;
+    esac
+    shift
+done
+
+if ! command -v xcodebuild >/dev/null 2>&1; then
+    echo "tools/check: xcodebuild is not installed, so nothing ran. The tests need Xcode on a Mac." >&2
+    exit 3
+fi
+if ! version=$(xcodebuild -version 2>&1); then
+    echo "tools/check: xcodebuild cannot run, so nothing ran: ${version%%$'\n'*}" >&2
+    exit 3
+fi
+
+result_dir=${GROSH_CHECK_RESULT_DIR:-}
+case $result_dir in
+    '' | /*) ;;
+    *) result_dir=$PWD/$result_dir ;;
+esac
+
+root=$(cd "$(dirname "$0")/.." && pwd -P) || exit 2
+cd "$root" || exit 2
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "tools/check needs python3, which comes with Xcode's command line tools."
+    exit 2
+fi
+
+# Reads what bash cannot: the simulator list and the result bundle, both JSON. `simulator` prints the chosen
+# simulator's UDID and name; `report` prints the outcome and exits with tools/check's status.
+IFS= read -r -d '' helper <<'PY'
+import json
+import os
+import re
+import subprocess
+import sys
+from urllib.parse import parse_qs, unquote, urlparse
+
+PREFERRED_SIMULATOR = "iPhone 17 Pro"
+UI_TESTS = "GroshUITests"
+FAILURES_PER_TEST = 5
+LONGEST_MESSAGE = 500
+
+# Where xcresulttool puts a failure's place: "ReimbursementTests.swift:42: Expectation failed: ...", or at the end in
+# parentheses.
+LOCATED = re.compile(r"(?P<file>[^\s:()][^:()]*\.\w+):(?P<line>\d+): (?P<message>.*)\Z", re.S)
+LOCATED_AT_END = re.compile(r"(?P<message>.*) \((?P<file>[^\s:()][^:()]*\.\w+):(?P<line>\d+)\)\Z", re.S)
+# Repeats a compiler error already listed with its file and line.
+COMMAND_FAILED = re.compile(r"ERROR Command \S+ failed with a nonzero exit code\Z")
+
+
+class Problem(Exception):
+    """Why tools/check cannot tell the outcome, in words printed as they are."""
+
+
+class ToolFailed(Problem):
+    """An xcrun command exited with an error."""
+
+
+def main(command, *args):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except AttributeError:
+        pass
+    try:
+        if command == "simulator":
+            return simulator(*args)
+        return report(*args)
+    except KeyboardInterrupt:
+        return 130
+
+
+def say(lines):
+    for line in lines:
+        print(line)
+
+
+def one_line(text):
+    return " ".join(str(text).split())
+
+
+def shorten(text):
+    return text if len(text) <= LONGEST_MESSAGE else text[: LONGEST_MESSAGE - 3] + "..."
+
+
+def first_line(text):
+    for line in (text or "").splitlines():
+        if line.strip():
+            return line.strip()
+    return ""
+
+
+def unique(lines):
+    seen = set()
+    return [line for line in lines if not (line in seen or seen.add(line))]
+
+
+def version_of(text, separator):
+    parts = [part for part in text.split(separator) if part]
+    return tuple(int(part) for part in parts) if parts and all(part.isdigit() for part in parts) else None
+
+
+def dotted(version):
+    return ".".join(str(part) for part in version)
+
+
+def deployment_target(pbxproj):
+    """The newest iOS any target deploys to: a simulator older than that cannot run the tests."""
+    try:
+        with open(pbxproj, encoding="utf-8", errors="replace") as handle:
+            found = re.findall(r'IPHONEOS_DEPLOYMENT_TARGET = "?([0-9.]+)"?;', handle.read())
+    except OSError:
+        return None
+    versions = [version for version in (version_of(text, ".") for text in found) if version]
+    return max(versions) if versions else None
+
+
+def simulator(pbxproj):
+    """An available iPhone 17 Pro if there is one, otherwise the first available iPhone, on the newest iOS."""
+    try:
+        listing = subprocess.run(
+            ["xcrun", "simctl", "list", "--json", "devices", "available"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8", errors="replace",
+        )
+    except OSError as error:
+        print("tools/check could not run xcrun simctl: {}".format(error))
+        return 2
+    if listing.returncode != 0:
+        print("tools/check could not list the simulators: {}".format(
+            first_line(listing.stderr) or "xcrun simctl exited {}".format(listing.returncode)))
+        return 2
+    try:
+        runtimes = json.loads(listing.stdout)["devices"]
+        if not isinstance(runtimes, dict):
+            raise TypeError
+    except (ValueError, KeyError, TypeError):
+        print('tools/check could not read the simulator list: xcrun simctl printed no "devices" object.')
+        return 2
+    target = deployment_target(pbxproj)
+    choices = []
+    for runtime, devices in runtimes.items():
+        match = re.search(r"\.iOS-([0-9-]+)\Z", runtime)
+        version = version_of(match.group(1), "-") if match else None
+        if version is None or (target and version < target) or not isinstance(devices, list):
+            continue
+        for device in devices:
+            if (isinstance(device, dict) and device.get("isAvailable", True) is not False and device.get("udid")
+                    and str(device.get("name", "")).startswith("iPhone")):
+                choices.append((version, device))
+    if not choices:
+        if target:
+            print("No available iPhone simulator runs iOS {} or later. Install it in Xcode > Settings > Components, "
+                  "or add an iPhone in Window > Devices and Simulators.".format(dotted(target)))
+        else:
+            print("No iPhone simulator is available. Add one in Xcode's Window > Devices and Simulators.")
+        return 2
+    choices.sort(key=lambda choice: choice[0], reverse=True)
+    version, device = next((choice for choice in choices if choice[1].get("name") == PREFERRED_SIMULATOR), choices[0])
+    print("{}\t{} (iOS {})".format(device["udid"], device["name"], dotted(version)))
+    return 0
+
+
+def xcresult(bundle, results, name, *command):
+    """What `xcrun xcresulttool get <command>` says about the bundle, also saved as xcresult-<name>.json."""
+    what = "xcresulttool get " + " ".join(command)
+    try:
+        run = subprocess.run(
+            ["xcrun", "xcresulttool", "get"] + list(command) + ["--path", bundle],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8", errors="replace",
+        )
+    except OSError as error:
+        raise ToolFailed("{} could not run: {}".format(what, error))
+    if run.returncode != 0:
+        raise ToolFailed("{} failed: {}".format(
+            what, first_line(run.stderr) or first_line(run.stdout) or "exit status {}".format(run.returncode)))
+    saved = os.path.join(results, "xcresult-{}.json".format(name))
+    try:
+        with open(saved, "w", encoding="utf-8") as handle:
+            handle.write(run.stdout)
+    except OSError:
+        saved = "not saved"
+    try:
+        data = json.loads(run.stdout)
+    except ValueError:
+        raise Problem("{} did not print JSON ({})".format(what, saved))
+    if not isinstance(data, dict):
+        raise Problem("{} printed JSON that is not an object ({})".format(what, saved))
+    return data
+
+
+def count(summary, key, default=None):
+    if key not in summary and default is not None:
+        return default
+    value = summary.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise Problem('the test summary\'s "{}" is {}, not a count'.format(key, json.dumps(value)))
+    return value
+
+
+def child_nodes(node, key="children", required=False):
+    if required and key not in node:
+        raise Problem('the test results have no "{}"'.format(key))
+    nodes = node.get(key, [])
+    if not isinstance(nodes, list) or not all(isinstance(child, dict) for child in nodes):
+        raise Problem('"{}" in the test results is not a list of test nodes'.format(key))
+    return nodes
+
+
+def test_cases(nodes, bundle):
+    """Each test with the name of the test bundle (target) it is in."""
+    for node in nodes:
+        kind = str(node.get("nodeType", ""))
+        inside = str(node.get("name", "")) if kind.endswith("test bundle") else bundle
+        if kind == "Test Case":
+            yield inside, node
+        else:
+            for case in test_cases(child_nodes(node), inside):
+                yield case
+
+
+def failure_messages(node, arguments):
+    """A test's failure messages, each with the arguments it failed with, if it takes any."""
+    for child in child_nodes(node):
+        kind = child.get("nodeType")
+        if kind == "Failure Message":
+            yield arguments, str(child.get("name") or "")
+        else:
+            for found in failure_messages(child, child.get("name") if kind == "Arguments" else arguments):
+                yield found
+
+
+def relative(path, root):
+    for candidate in (path, os.path.realpath(path)):
+        for base in (root, os.path.realpath(root)):
+            prefix = base.rstrip("/") + "/"
+            if candidate.startswith(prefix):
+                return candidate[len(prefix):]
+    return path
+
+
+class Sources:
+    """Gives a failure's file as its path in the repository, as xcresulttool names only the file."""
+
+    def __init__(self, root):
+        self.root = root
+        self.paths = None
+
+    def place(self, text):
+        text = one_line(text)
+        match = LOCATED.match(text) or LOCATED_AT_END.match(text)
+        if not match:
+            return shorten(text)
+        return "{}:{}: {}".format(self.find(match.group("file")), match.group("line"), shorten(match.group("message")))
+
+    def find(self, file):
+        if os.path.isabs(file):
+            return relative(file, self.root)
+        if "/" in file:
+            return file
+        if self.paths is None:
+            self.paths = {}
+            for folder, folders, files in os.walk(self.root):
+                folders[:] = [name for name in folders
+                              if not name.startswith(".") and not os.path.splitext(name)[1]
+                              and name not in ("build", "DerivedData")]
+                for name in files:
+                    self.paths.setdefault(name, []).append(os.path.relpath(os.path.join(folder, name), self.root))
+        found = self.paths.get(file, [])
+        return found[0] if len(found) == 1 else file
+
+
+def failure_lines(cases, summary, failed, root):
+    reasons = {}
+    for entry in summary.get("testFailures") or []:
+        if isinstance(entry, dict):
+            test = str(entry.get("testIdentifierString") or entry.get("testName") or "an unnamed test")
+            reasons.setdefault(test, []).append(str(entry.get("failureText") or "failed"))
+    sources = Sources(root)
+    lines = []
+    for _, case in cases:
+        if case.get("result") != "Failed":
+            continue
+        test = str(case.get("nodeIdentifier") or case.get("name") or "an unnamed test")
+        found = []
+        for arguments, text in failure_messages(case, None):
+            label = test + (" [{}]".format(one_line(arguments)) if arguments else "")
+            found.append("FAIL {}: {}".format(label, sources.place(text)))
+        if not found:
+            texts = reasons.get(test) or reasons.get(str(case.get("name"))) or ["failed, and the result bundle says no more"]
+            found = ["FAIL {}: {}".format(test, sources.place(text)) for text in texts]
+        found = unique(found)
+        if len(found) > FAILURES_PER_TEST:
+            found = found[:FAILURES_PER_TEST] + [
+                "FAIL {}: ... and {} more failures".format(test, len(found) - FAILURES_PER_TEST)]
+        lines.extend(found)
+    if not lines:
+        for test, texts in reasons.items():
+            lines.extend("FAIL {}: {}".format(test, sources.place(text)) for text in texts)
+    if not lines and failed:
+        lines.append("FAIL {} tests failed, but the result bundle does not name them".format(failed))
+    return lines
+
+
+def source_location(url, root):
+    """file:///.../Grosh/Foo.swift#...&StartingLineNumber=40 as Grosh/Foo.swift:41: the bundle counts lines from 0."""
+    if not isinstance(url, str) or not url:
+        return None
+    parsed = urlparse(url)
+    path = relative(unquote(parsed.path) if parsed.scheme == "file" else url.split("#")[0], root)
+    line = (parse_qs(parsed.fragment).get("StartingLineNumber") or [""])[0]
+    return "{}:{}".format(path, int(line) + 1) if line.isdigit() else path
+
+
+def build_errors(build, root):
+    entries = build.get("errors", [])
+    if not isinstance(entries, list) or not all(isinstance(entry, dict) for entry in entries):
+        raise Problem('the build results\' "errors" is not a list of issues')
+    lines = []
+    for entry in entries:
+        where = source_location(entry.get("sourceURL"), root)
+        message = shorten(one_line(entry.get("message") or entry.get("issueType") or "an unnamed error"))
+        lines.append("ERROR " + (where + ": " if where else "") + message)
+    lines = unique(lines)
+    located = [line for line in lines if not COMMAND_FAILED.match(line)]
+    lines = located or lines
+    errors = build.get("errorCount")
+    if not lines and isinstance(errors, int) and not isinstance(errors, bool) and errors > 0:
+        lines.append("ERROR the build failed with {} errors, but the result bundle does not list them".format(errors))
+    return lines
+
+
+def log_hints(log, limit=5):
+    """The few lines of the log that say why xcodebuild stopped, for when the result bundle cannot."""
+    hints = []
+    try:
+        with open(log, encoding="utf-8", errors="replace") as handle:
+            after_testing_failed = False
+            for raw in handle:
+                line = raw.strip()
+                if line.startswith(("xcodebuild: error:", "xcode-select: error:")):
+                    hints.append(line)
+                    after_testing_failed = False
+                elif line.startswith("Testing failed:"):
+                    after_testing_failed = True
+                elif after_testing_failed and raw.startswith("\t") and line:
+                    hints.append("Testing failed: " + line)
+                else:
+                    after_testing_failed = False
+    except OSError:
+        return []
+    return [shorten(hint) for hint in unique(hints)[:limit]]
+
+
+def check_logs(root, since, ui):
+    """Runs tools/check-logs, if it is there, for the errors Grosh logged while the tests ran."""
+    tool = os.path.join(root, "tools", "check-logs")
+    if not (os.path.isfile(tool) and os.access(tool, os.X_OK)):
+        return 0, []
+    try:
+        run = subprocess.run(
+            [tool, "--since", since] + (["--ui"] if ui else []), cwd=root,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8", errors="replace",
+        )
+    except OSError as error:
+        return 126, ["tools/check-logs could not run: {}".format(error)]
+    return run.returncode, [line for line in run.stdout.splitlines() if line.strip()]
+
+
+def report(bundle, log, status, seconds, ui, only, results, root, since):
+    status, seconds = int(status), int(seconds)
+    ui, only = ui == "1", only != "0"
+    full_log, result = "Full log: " + log, "Result: " + bundle
+
+    if not os.path.isdir(bundle):
+        say(log_hints(log) + ["xcodebuild exited {} without writing a result bundle.".format(status), full_log])
+        return 2
+    try:
+        build = xcresult(bundle, results, "build", "build-results")
+        errors = build_errors(build, root)
+        if errors:
+            say(errors + ["0 passed, 0 failed in {}s (the build failed)".format(seconds), full_log, result])
+            return 2
+        try:
+            summary = xcresult(bundle, results, "summary", "test-results", "summary")
+        except ToolFailed as failure:
+            say(log_hints(log) + ["The tests did not run: {}".format(failure), full_log, result])
+            return 2
+        passed, failed = count(summary, "passedTests"), count(summary, "failedTests")
+        skipped, expected = count(summary, "skippedTests", 0), count(summary, "expectedFailures", 0)
+        tests = xcresult(bundle, results, "tests", "test-results", "tests")
+        cases = list(test_cases(child_nodes(tests, "testNodes", required=True), None))
+        ran = passed + failed + expected
+        if ran and not cases:
+            raise Problem("the test results list no tests, though the summary counts {}".format(ran))
+        lines = failure_lines(cases, summary, failed, root)
+    except Problem as problem:
+        say(["tools/check could not read the result bundle: {}".format(problem), full_log, result])
+        return 2
+    except Exception as error:
+        say(["tools/check could not read the result bundle: {}: {}".format(type(error).__name__, error),
+             "Its JSON is saved in " + results, full_log, result])
+        return 2
+
+    code = 1 if lines or failed else 0
+    ui_ran = any(target == UI_TESTS for target, _ in cases)
+    if not ran:
+        lines.extend(log_hints(log))
+        if status != 0:
+            lines.append("The tests did not run: xcodebuild exited {}.".format(status))
+            code = 2
+        else:
+            lines.append("No tests ran." + (" Check the names given to --only." if only else ""))
+            code = 1
+    elif ui and not only and not ui_ran:
+        lines.append("{} did not run, though --ui asked for it (see docs/agents/testing.md).".format(UI_TESTS))
+        code = 1
+    if code == 0 and (status != 0 or summary.get("result") == "Failed"):
+        lines.extend(log_hints(log))
+        lines.append("xcodebuild exited {}, though the result bundle shows no failed test.".format(status))
+        code = 1
+
+    note = ""
+    if ran:
+        logged_status, logged = check_logs(root, since, ui_ran)
+        lines.extend(logged)
+        if logged_status:
+            code = max(code, 1)
+            note = ("; Grosh logged errors (tools/check-logs)" if logged_status == 1
+                    else "; tools/check-logs exited {}".format(logged_status))
+
+    counts = "{} passed".format(passed) if code == 0 else "{} passed, {} failed".format(passed, failed)
+    said = "{} in {}s".format(counts, seconds) + (" ({} skipped)".format(skipped) if skipped else "") + note
+    say(lines + [said] + ([full_log, result] if code else [result]))
+    return code
+
+
+sys.exit(main(*sys.argv[1:]))
+PY
+
+if ! chosen=$(python3 -I -c "$helper" simulator Grosh.xcodeproj/project.pbxproj); then
+    [ -n "$chosen" ] && printf '%s\n' "$chosen"
+    exit 2
+fi
+udid=${chosen%%$'\t'*}
+echo "Simulator: ${chosen#*$'\t'}"
+
+tmp=${TMPDIR:-/tmp}
+tmp=${tmp%/}
+if [ -n "$result_dir" ]; then
+    if ! mkdir -p "$result_dir" || ! result_dir=$(cd "$result_dir" && pwd -P); then
+        echo "tools/check cannot keep its results in GROSH_CHECK_RESULT_DIR=$GROSH_CHECK_RESULT_DIR"
+        exit 2
+    fi
+elif ! result_dir=$(mktemp -d "$tmp/grosh-check.XXXXXX"); then
+    echo "tools/check cannot make a temporary folder in $tmp"
+    exit 2
+fi
+bundle=$result_dir/Grosh.xcresult
+log=$result_dir/xcodebuild.log
+
+# One run at a time on this Mac: each xcodebuild boots simulators of its own, and runs from several worktrees at once
+# slow every one of them down. The lock is a folder, as mkdir either makes it or fails, holding the owner's pid and
+# repository; the owner removes it on the way out, and a lock whose owner is gone is taken over.
+lock=$tmp/grosh-tools-check.lock
+holding_lock=0
+xcodebuild_pid=
+
+release_lock() {
+    if [ "$holding_lock" = 1 ]; then
+        rm -rf "$lock"
+    fi
+}
+
+stop() {
+    if [ -n "$xcodebuild_pid" ]; then
+        kill -TERM "$xcodebuild_pid" 2>/dev/null
+        wait "$xcodebuild_pid" 2>/dev/null
+    fi
+    exit "$1"
+}
+
+trap release_lock EXIT
+trap 'stop 129' HUP
+trap 'stop 130' INT
+trap 'stop 143' TERM
+
+if [ ! -d "$tmp" ] || [ ! -w "$tmp" ]; then
+    echo "tools/check cannot take its lock: $tmp is not a folder it can write to"
+    exit 2
+fi
+noted_owner=
+noted_at=$SECONDS
+until mkdir "$lock" 2>/dev/null; do
+    owner=$(cat "$lock/pid" 2>/dev/null)
+    if [ -n "$owner" ] && ! ps -p "$owner" >/dev/null 2>&1; then
+        if [ "$(cat "$lock/pid" 2>/dev/null)" = "$owner" ]; then
+            rm -rf "$lock"
+        fi
+        continue
+    fi
+    if { [ -n "$owner" ] && [ "$owner" != "$noted_owner" ]; } || [ $((SECONDS - noted_at)) -ge 30 ]; then
+        echo "Waiting for another tools/check run (pid ${owner:-?}, $(cat "$lock/dir" 2>/dev/null))"
+        noted_owner=$owner
+        noted_at=$SECONDS
+    fi
+    sleep 1
+done
+holding_lock=1
+printf '%s\n' "$root" >"$lock/dir"
+printf '%s\n' "$$" >"$lock/pid"
+
+tests=()
+if [ ${#only[@]} -eq 0 ]; then
+    tests+=(-only-testing:GroshTests)
+    if [ "$ui" = 1 ]; then
+        tests+=(-only-testing:GroshUITests)
+    fi
+else
+    for name in "${only[@]}"; do
+        case $name in
+            GroshTests | GroshTests/* | GroshUITests | GroshUITests/*) tests+=("-only-testing:$name") ;;
+            *)
+                tests+=("-only-testing:GroshTests/$name")
+                if [ "$ui" = 1 ]; then
+                    tests+=("-only-testing:GroshUITests/$name")
+                fi
+                ;;
+        esac
+    done
+fi
+
+# xcodebuild refuses to write over an earlier run's bundle in GROSH_CHECK_RESULT_DIR.
+rm -rf "$bundle"
+since=$(date +%s)
+started=$SECONDS
+xcodebuild -project Grosh.xcodeproj -scheme Grosh -testPlan Grosh \
+    -destination "platform=iOS Simulator,id=$udid" -resultBundlePath "$bundle" \
+    -collect-test-diagnostics never "${tests[@]}" test >"$log" 2>&1 &
+xcodebuild_pid=$!
+wait "$xcodebuild_pid"
+status=$?
+xcodebuild_pid=
+elapsed=$((SECONDS - started))
+
+python3 -I -c "$helper" report "$bundle" "$log" "$status" "$elapsed" "$ui" "${#only[@]}" "$result_dir" "$root" "$since"
+exit $?
