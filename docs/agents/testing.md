@@ -73,6 +73,21 @@ The shared `Grosh` scheme tests with `Grosh.xctestplan`. Its one configuration, 
 
 If a run with `--ui` prints `GroshUITests did not run`, check that GroshUITests is still on in `Grosh.xctestplan`. Xcode may skip a target the plan turns off, even when `-only-testing` names it.
 
+## Snapshot tests
+
+`GroshTests/SnapshotTests.swift` draws each transaction row kind (Expense, Income, Transfer, Split, Reimbursement) and Home with its Month graph, in light, dark and the accessibility text size AX3, and compares each with a PNG in `GroshTests/__Snapshots__/SnapshotTests/`. It uses [swift-snapshot-testing](https://github.com/pointfreeco/swift-snapshot-testing), 1.17 or later, linked to GroshTests only. Each screen is drawn as of 12 October 2026, from fixed transactions, on a 402 × 874 screen in English (United States), so the same tree draws the same image on any day.
+
+**References recorded on:** Mac (to be recorded), simulator (to be recorded), OS (to be recorded). Record and compare on that setup only. The simulator's language and region must be English (United States) too, since amounts and dates use the device's locale.
+
+CI skips the suite and prints one line saying so, because the references belong to a Mac.
+
+```
+tools/check --only SnapshotTests
+```
+
+- **Record a reference on purpose.** Delete the PNG to replace, or the whole `__Snapshots__/SnapshotTests` folder for all of them, then run. swift-snapshot-testing writes a missing reference and fails its test once, so run again to compare. Or turn on the library's record mode for one run, with the `record` argument of `assertSnapshot` (the pinned version's README describes it). That overwrites every reference the run draws. Take it out again before committing.
+- **Review the diff.** A changed screen fails its test, and `tools/check` prints the failure. Open the `Grosh.xcresult` it names in Xcode, and compare the reference with the new image in the failed test's attachments. In git, `git status` lists the changed PNGs: open the old and new files side by side, and commit only the changes you meant to make.
+
 ## Testing tools/check
 
 `tools/tests/check/run.sh` runs tools/check against stand-ins for xcodebuild, xcrun and tools/check-logs, so it needs no Xcode.
