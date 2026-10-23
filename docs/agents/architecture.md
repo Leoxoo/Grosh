@@ -13,6 +13,8 @@ Design every change for **the 16k store**: about 16,000 transactions over six ye
 | `Grosh/Model/` | SwiftData `@Model` classes, `Money`, `CalendarDay`, `GroshStore` (the container), `NotDeletedTransactions`. | Every property optional or defaulted, no `.unique`, every relationship optional with an inverse (ADR-0001). A new model goes into `GroshStore.schema`. |
 | `Grosh/Domain/<Concept>/` | The rules: extensions on the models, value types (drafts, summaries, `LedgerEntry`), and `FetchDescriptor`s named for what they read (`MonthGraphHistory.transactions(for:)`, `RecentlyDeleted.deletedTransactions`). | Plain Swift plus SwiftData: no SwiftUI. Value types stay free of `ModelContext`; whatever a calculation needs from the store is fetched by its caller and passed in. |
 | `Grosh/Features/<Area>/` | SwiftUI screens and rows, one folder per area of the app. | Views read data and call Domain rules. Arithmetic, eligibility and sign handling live in Domain, where tests reach them. |
+| `Grosh/Logging/` | `Log`, one `os.Logger` per area, and `Signpost`, the intervals Instruments shows. | A message names what failed and the error, never the data (`docs/agents/logging.md`). |
+| `Grosh/Debug/` | The 16k store generator and the UI test launch hook. | Wrapped in `#if DEBUG`, so the shipped app never carries them. |
 | `GroshTests/` | Swift Testing suites, one per behaviour, each with its own in-memory container (`GroshStore.makeContainer(inMemory: true)`), plus shared fixtures (`*Fixture.swift`). | A Domain rule ships with tests written first. |
 
 Startup work runs in `GroshApp` on `scenePhase == .active`: `RecentlyDeleted.purgeExpired` and `RecurringTransaction.catchUp`. Both are on the launch benchmark.
