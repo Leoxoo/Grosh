@@ -13,77 +13,29 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# The runner image and the Xcode version are pinned here and nowhere else. The Xcode must
-# ship the SDK the app deploys to (iOS 26.4) and the image must carry its simulator
-# runtime. `runs-on` cannot read `env`, so the jobs alias the image through its anchor.
+# The Xcode must ship the SDK the app deploys to (iOS 26.4), and the runner image below must carry
+# that Xcode and its simulator runtime. Check both against GitHub's runner image list before relying on them.
 env:
-  MACOS_RUNNER: &macos_runner macos-26
   XCODE_VERSION: "26.4"
 
-# Benchmarks and snapshot tests are not run on CI: their budgets and reference images
-# belong to the developer's Mac.
+# Benchmarks and snapshot tests are not run on CI: their budgets and reference images belong to
+# the developer's Mac.
 jobs:
-  unit-tests:
-    name: Unit tests
-    runs-on: *macos_runner
-    timeout-minutes: 30
-    steps:
-      - name: Check out the repository
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Choose where tools/check writes its results
-        run: |
-          mkdir -p "$RUNNER_TEMP/check-results"
-          echo "GROSH_CHECK_RESULT_DIR=$RUNNER_TEMP/check-results" >> "$GITHUB_ENV"
-
-      - name: Select Xcode ${{ env.XCODE_VERSION }}
-        run: |
-          xcode_app="/Applications/Xcode_${XCODE_VERSION}.app"
-          if [ ! -d "$xcode_app" ]; then
-            echo "::error::Xcode ${XCODE_VERSION} is not on this runner image. Set XCODE_VERSION to one of the installed versions listed in this step's log."
-            ls -d /Applications/Xcode*.app
-            exit 1
-          fi
-          sudo xcode-select --switch "$xcode_app/Contents/Developer"
-
-      - name: Show Xcode and available simulators
-        run: |
-          echo "Runner image: ${ImageOS:-unknown} ${ImageVersion:-unknown}"
-          sw_vers
-          xcode-select --print-path
-          xcodebuild -version
-          xcrun simctl list devices available
-
-      # Keyed on the project file and Package.resolved (which exists once the project has
-      # Swift packages). A change to either saves a new cache, seeded from the latest one.
-      - name: Cache SwiftPM packages and DerivedData
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/Library/Caches/org.swift.swiftpm
-            ~/Library/Developer/Xcode/DerivedData
-          key: ${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-${{ github.job }}-${{ hashFiles('Grosh.xcodeproj/project.pbxproj', '**/Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-${{ github.job }}-
-
-      - name: Run the unit tests
-        run: tools/check
-
-      - name: Upload the test results
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ github.job }}-results
-          path: ${{ env.GROSH_CHECK_RESULT_DIR }}
-          retention-days: 14
-
-  # The repo is public, so macOS runners are free. If it goes private, macOS minutes count
-  # ten times against the allowance: revisit running this job on every pull request.
-  ui-tests:
-    name: UI tests
-    runs-on: *macos_runner
+  checks:
+    # One check per entry, so the unit tests and the UI tests each show on the pull request.
+    # A failure in one does not stop the other.
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Unit tests
+            id: unit
+            command: tools/check
+          - name: UI tests
+            id: ui
+            command: tools/check --ui
+    runs-on: macos-26
     timeout-minutes: 45
     steps:
       - name: Check out the repository
@@ -91,48 +43,44 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Choose where tools/check writes its results
-        run: |
-          mkdir -p "$RUNNER_TEMP/check-results"
-          echo "GROSH_CHECK_RESULT_DIR=$RUNNER_TEMP/check-results" >> "$GITHUB_ENV"
-
-      - name: Select Xcode ${{ env.XCODE_VERSION }}
+      - name: Select the pinned Xcode
         run: |
           xcode_app="/Applications/Xcode_${XCODE_VERSION}.app"
           if [ ! -d "$xcode_app" ]; then
-            echo "::error::Xcode ${XCODE_VERSION} is not on this runner image. Set XCODE_VERSION to one of the installed versions listed in this step's log."
+            echo "::error::Xcode ${XCODE_VERSION} is not on this runner image. Set XCODE_VERSION to one of the versions listed below."
             ls -d /Applications/Xcode*.app
             exit 1
           fi
           sudo xcode-select --switch "$xcode_app/Contents/Developer"
 
-      - name: Show Xcode and available simulators
+      - name: Show the Xcode and the simulators in use
         run: |
-          echo "Runner image: ${ImageOS:-unknown} ${ImageVersion:-unknown}"
           sw_vers
-          xcode-select --print-path
           xcodebuild -version
           xcrun simctl list devices available
 
-      # Keyed on the project file and Package.resolved (which exists once the project has
-      # Swift packages). A change to either saves a new cache, seeded from the latest one.
+      # Keyed on the project file and Package.resolved, which appears once the project has Swift packages.
       - name: Cache SwiftPM packages and DerivedData
         uses: actions/cache@v4
         with:
           path: |
             ~/Library/Caches/org.swift.swiftpm
             ~/Library/Developer/Xcode/DerivedData
-          key: ${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-${{ github.job }}-${{ hashFiles('Grosh.xcodeproj/project.pbxproj', '**/Package.resolved') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-${{ hashFiles('Grosh.xcodeproj/project.pbxproj', '**/Package.resolved') }}
           restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-${{ github.job }}-
+            ${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-
 
-      - name: Run the UI tests and check the app's logs
-        run: tools/check --ui
+      - name: Run the checks
+        env:
+          GROSH_CHECK_RESULT_DIR: ${{ runner.temp }}/check-results
+        run: |
+          mkdir -p "$GROSH_CHECK_RESULT_DIR"
+          ${{ matrix.command }}
 
-      - name: Upload the test results
+      - name: Upload the results
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.job }}-results
-          path: ${{ env.GROSH_CHECK_RESULT_DIR }}
+          name: ${{ matrix.id }}-results
+          path: ${{ runner.temp }}/check-results
           retention-days: 14
