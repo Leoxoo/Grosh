@@ -79,7 +79,7 @@ extension ReminderSource {
         let hasPassedTheHour = calendar.component(.hour, from: now) >= ReminderArrival.hour
         return reminders(from: today).compactMap { reminder in
             guard reminder.day == today, hasPassedTheHour else { return reminder }
-            guard let earlier, !earlier.contains(where: { reminder.isSameReminder(as: $0) }) else { return nil }
+            guard let earlier, !earlier.contains(where: reminder.isSameReminder) else { return nil }
             var rightAway = reminder
             rightAway.arrival = .rightAway
             return rightAway

@@ -107,7 +107,7 @@ struct TransactionFilter: Equatable {
     /// archived ones included; otherwise the list holds the matching ones among ``transactions(in:from:)`` on `days`
     /// (the selected period).
     func listed(from all: [Transaction], selection: WalletSelection, on days: DayRange) -> [Transaction] {
-        listed(from: all, selected: transactions(in: selection, from: all.map { LedgerEntry($0) }), on: days)
+        listed(from: all, selected: transactions(in: selection, from: all.map(LedgerEntry.init)), on: days)
     }
 
     /// ``listed(from:selection:on:)`` with the selection's transactions at hand already: `selected`, as
@@ -121,7 +121,7 @@ struct TransactionFilter: Equatable {
     /// narrow them: the wallet filter's wallet when one is set (any wallet, archived or left out of the Total, in
     /// place of `selection`), otherwise `selection`'s. The period strip reaches back to the first of them.
     func transactions<Entry: DatedAmount>(in selection: WalletSelection, from all: [Entry]) -> [Entry] {
-        let selection = wallet.map { WalletSelection.wallet($0) } ?? selection
+        let selection = wallet.map(WalletSelection.wallet) ?? selection
         // A wallet is asked once whether it belongs, rather than once for each of its transactions.
         var includesWallet: [ObjectIdentifier?: Bool] = [:]
         return all.filter { transaction in
@@ -139,6 +139,6 @@ extension Sequence where Element == Transaction {
     /// The transactions that pass `filter`.
     func matching(_ filter: TransactionFilter) -> [Transaction] {
         let search = TransactionFilter.Search(filter)
-        return self.filter { search.matches($0) }
+        return self.filter(search.matches)
     }
 }

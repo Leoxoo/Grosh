@@ -61,7 +61,7 @@ struct MonthGraphChart: View {
         .chartXScale(domain: 0.0...1.0)
         .chartYScale(domain: totalsDomain)
         .chartXAxis {
-            AxisMarks(values: labeledDays.map { graph.position(of: $0) }) { value in
+            AxisMarks(values: labeledDays.map(graph.position(of:))) { value in
                 AxisGridLine()
                 AxisValueLabel {
                     Text(labeledDays[value.index].day, format: .number)

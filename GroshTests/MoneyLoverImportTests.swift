@@ -272,7 +272,7 @@ struct MoneyLoverImportTests {
             return "\(original.wallet?.name ?? "") \(original.day.month)/\(original.day.day) \(original.amountCents)"
         }
         let all = try DebtsAndLoans(in: context)
-        return (Set(all.open.map { describe($0) }), Set(all.settled.map { describe($0) }))
+        return (Set(all.open.map(describe)), Set(all.settled.map(describe)))
     }
 
     @Test func eachDebtCollectionSettlesTheEarliestOpenLoanOfItsWalletAndAmount() throws {

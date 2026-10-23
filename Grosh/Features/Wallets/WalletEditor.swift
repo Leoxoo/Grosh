@@ -39,7 +39,7 @@ private struct WalletForm: View {
 
     init(mode: EditorMode<Wallet>, startingDay: CalendarDay) {
         self.mode = mode
-        _draft = State(initialValue: mode.editing.map { WalletDraft($0) } ?? WalletDraft())
+        _draft = State(initialValue: mode.editing.map(WalletDraft.init) ?? WalletDraft())
         _startingDay = State(initialValue: startingDay)
     }
 

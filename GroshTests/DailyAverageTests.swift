@@ -3,7 +3,6 @@ import Testing
 
 /// Income and Spent details' Daily average: a period's total divided by the days it covers, through today in the current
 /// period and every day of a past one.
-@MainActor
 struct DailyAverageTests {
     /// The ticket's example: $3,492.87 over Oct 1–16 is $218.30 a day.
     @Test func dividesTheTotalByTheDaysThroughToday() {

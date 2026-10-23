@@ -43,6 +43,6 @@ extension Sequence where Element == Transaction {
     /// The transactions in the order every transaction list shows them: newest day first and, within a day,
     /// the most recently entered first.
     func inListOrder() -> [Transaction] {
-        map { ListPosition($0) }.sorted { $0.isListed(before: $1) }.map(\.transaction)
+        map(ListPosition.init).sorted { $0.isListed(before: $1) }.map(\.transaction)
     }
 }

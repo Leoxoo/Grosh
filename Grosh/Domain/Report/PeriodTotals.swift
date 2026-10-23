@@ -55,7 +55,7 @@ extension Sequence where Element == Transaction {
     /// today, where All time reaches back to the first transaction of `selection`.
     func reportDays(of period: Period, in selection: WalletSelection, today: CalendarDay) -> DayRange {
         let days = period.days(today: today)
-        let firstTransaction = filter { selection.includes($0) }.firstDay
+        let firstTransaction = filter(selection.includes).firstDay
         return DayRange(first: days.first ?? firstTransaction ?? today, last: days.last ?? today)
     }
 }

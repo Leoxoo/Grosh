@@ -39,7 +39,7 @@ struct ReportPeriodControls: ViewModifier {
 
     /// The periods the strip offers for `selection`: back to its first transaction, never Future.
     private func strip(for selection: WalletSelection) -> [Period] {
-        let selected = transactions.filter { selection.includes($0) }
+        let selected = transactions.filter(selection.includes)
         return timeRange.periods(from: selected.firstDay, today: today).filter { $0 != .future }
     }
 

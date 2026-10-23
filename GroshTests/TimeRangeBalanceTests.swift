@@ -41,7 +41,7 @@ struct TimeRangeBalanceTests {
     }
 
     private func summaries(_ range: TimeRange) -> [PeriodSummary] {
-        range.periods(from: day(2026, 7, 1), today: today, firstWeekday: monday).map { summary(of: $0) }
+        range.periods(from: day(2026, 7, 1), today: today, firstWeekday: monday).map(summary(of:))
     }
 
     @Test(arguments: [TimeRange.day, .week, .month, .quarter, .year, .all])

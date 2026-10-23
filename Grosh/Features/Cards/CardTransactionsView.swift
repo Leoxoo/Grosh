@@ -50,7 +50,7 @@ struct CardTransactionsView: View {
         let period = card.period(containing: today).adding(-periodsBack)
         let shown = card.transactions(in: period)
         let leadIns = card.leadInTransactions(in: period)
-        let added = leadIns.filter { addedLeadIns.contains($0) }
+        let added = leadIns.filter(addedLeadIns.contains)
 
         return List {
             Section {
