@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Fail the run when the app logged an error, a fault or a runtime issue.
 
-    tools/check-logs --since EPOCH [--ui]
+    tools/check-logs --since EPOCH [--device UDID] [--ui]
 
-reads the iOS Simulator's log for the Grosh process from EPOCH (Unix seconds, the moment the test
+reads the log of the booted iOS Simulator, or of the one --device names, for the Grosh process
+from EPOCH (Unix seconds, the moment the test
 run started) and prints what the app logged at error or fault level, plus runtime issues (SwiftUI's
 "Publishing changes from within view updates is not allowed" and the like, which the system logs
 as faults in the com.apple.runtime-issues subsystem), apart from what tools/check-logs.ignore
@@ -129,15 +130,15 @@ def predicate(with_steps: bool) -> str:
     return f"({APP_PREDICATE}) OR ({STEPS_PREDICATE})"
 
 
-def simulator_command(since: float, with_steps: bool) -> list[str]:
-    command = ["xcrun", "simctl", "spawn", "booted", "log", "show", "--style", "ndjson"]
+def simulator_command(since: float, with_steps: bool, device: str = "booted") -> list[str]:
+    command = ["xcrun", "simctl", "spawn", device, "log", "show", "--style", "ndjson"]
     if with_steps:
         command.append("--info")  # the steps may be logged at info level, which log show leaves out unless asked
     return command + ["--start", start_argument(since), "--predicate", predicate(with_steps)]
 
 
-def read_simulator_log(since: float, with_steps: bool) -> list[str]:
-    command = simulator_command(since, with_steps)
+def read_simulator_log(since: float, with_steps: bool, device: str = "booted") -> list[str]:
+    command = simulator_command(since, with_steps, device)
     try:
         done = subprocess.run(command, capture_output=True, timeout=LOG_SHOW_TIMEOUT, check=False)
     except FileNotFoundError as error:
@@ -396,6 +397,8 @@ def parse_args(argv: Optional[list[str]]) -> argparse.Namespace:
                     "exits 1 after printing some, 2 when the check could not be made.")
     parser.add_argument("--since", type=epoch, required=True, metavar="EPOCH",
                         help="Unix time in seconds when the test run started")
+    parser.add_argument("--device", default="booted", metavar="UDID",
+                        help="the simulator whose log is read: the booted one (the default), or the one with this UDID")
     parser.add_argument("--ui", action="store_true",
                         help="the UI tests ran: also read the smoke walk's steps and name the step of each message")
     parser.add_argument("--from-file", metavar="FILE",
@@ -409,7 +412,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = parse_args(argv)
     try:
         ignored = load_ignore_list(args.ignore_file)
-        lines = read_log_file(args.from_file) if args.from_file else read_simulator_log(args.since, args.ui)
+        lines = (read_log_file(args.from_file) if args.from_file
+                 else read_simulator_log(args.since, args.ui, args.device))
         found = collect(lines, args.since, args.ui)
         if found.stray and not found.records:
             raise ToolError("the log is not ndjson. It starts: " + " | ".join(line[:100] for line in found.stray))

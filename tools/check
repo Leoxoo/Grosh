@@ -85,12 +85,17 @@ import os
 import re
 import subprocess
 import sys
+import time
 from urllib.parse import parse_qs, unquote, urlparse
 
 PREFERRED_SIMULATOR = "iPhone 17 Pro"
 UI_TESTS = "GroshUITests"
 FAILURES_PER_TEST = 5
 LONGEST_MESSAGE = 500
+CRASH_REPORTS = os.environ.get("GROSH_CRASH_REPORTS") or os.path.expanduser("~/Library/Logs/DiagnosticReports")
+CRASH_FRAMES = 8  # the frames of the crashed thread that are printed
+CRASH_REPORTS_SHOWN = 2
+CRASH_WAIT = 10  # seconds for macOS to write a crash report once the tests have ended
 
 # Where xcresulttool puts a failure's place: "ReimbursementTests.swift:42: Expectation failed: ...", or at the end in
 # parentheses.
@@ -381,14 +386,14 @@ def build_errors(build, root):
 
 
 def log_hints(log, limit=5):
-    """The few lines of the log that say why xcodebuild stopped, for when the result bundle cannot."""
+    """The log lines that say why xcodebuild stopped or a test trapped, for when the result bundle cannot."""
     hints = []
     try:
         with open(log, encoding="utf-8", errors="replace") as handle:
             after_testing_failed = False
             for raw in handle:
                 line = raw.strip()
-                if line.startswith(("xcodebuild: error:", "xcode-select: error:")):
+                if line.startswith(("xcodebuild: error:", "xcode-select: error:")) or "Fatal error:" in line:
                     hints.append(line)
                     after_testing_failed = False
                 elif line.startswith("Testing failed:"):
@@ -402,14 +407,78 @@ def log_hints(log, limit=5):
     return [shorten(hint) for hint in unique(hints)[:limit]]
 
 
-def check_logs(root, since, ui):
-    """Runs tools/check-logs, if it is there, for the errors Grosh logged while the tests ran."""
+def is_booted(device):
+    """Whether the simulator is booted now: check-logs reads the log of a booted simulator only."""
+    try:
+        listing = subprocess.run(
+            ["xcrun", "simctl", "list", "--json", "devices", "booted"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8", errors="replace",
+        )
+        runtimes = json.loads(listing.stdout).get("devices")
+    except (OSError, ValueError, AttributeError):
+        return False
+    if not isinstance(runtimes, dict):
+        return False
+    return any(isinstance(found, dict) and found.get("udid") == device
+               for devices in runtimes.values() if isinstance(devices, list) for found in devices)
+
+
+def crash_reports(since):
+    """The crash reports macOS wrote since the tests started, newest first."""
+    try:
+        paths = [os.path.join(CRASH_REPORTS, name) for name in os.listdir(CRASH_REPORTS) if name.endswith(".ips")]
+        fresh = [path for path in paths if os.path.getmtime(path) >= since]
+        return sorted(fresh, key=os.path.getmtime, reverse=True)
+    except OSError:
+        return []
+
+
+def crash_report_lines(path):
+    """The exception and the top frames of the thread that crashed, from one .ips report: a header line, then JSON."""
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        report = json.loads(handle.read().partition("\n")[2])
+    images = report.get("usedImages") or []
+    crashed = next((thread for thread in report.get("threads") or [] if thread.get("triggered")), {})
+    exception = report.get("exception") or {}
+    lines = ["crash report {}: {} ({}) in {}".format(
+        path, exception.get("type", "an exception"), exception.get("signal", "a signal"), report.get("procName", "?"))]
+    for number, frame in enumerate((crashed.get("frames") or [])[:CRASH_FRAMES]):
+        index = frame.get("imageIndex")
+        image = images[index].get("name", "?") if isinstance(index, int) and 0 <= index < len(images) else "?"
+        where = frame.get("symbol") or "offset {}".format(frame.get("imageOffset", "?"))
+        lines.append("  {} {} {}".format(number, image, where))
+    return lines
+
+
+def crash_lines(log, since):
+    """Why a test crashed: the runtime's Fatal error lines from the log, then the crashed thread of each new report."""
+    try:
+        lines = log_hints(log)
+        deadline = time.monotonic() + CRASH_WAIT
+        reports = crash_reports(since)
+        while not reports and time.monotonic() < deadline:
+            time.sleep(0.5)
+            reports = crash_reports(since)
+        if not reports:
+            lines.append("No crash report was written to {}.".format(CRASH_REPORTS))
+        for path in reports[:CRASH_REPORTS_SHOWN]:
+            lines.extend(crash_report_lines(path))
+        return lines
+    except Exception as error:  # the outcome stands whether or not the reports can be read
+        return ["tools/check could not read the crash reports: {}: {}".format(type(error).__name__, error)]
+
+
+def check_logs(root, since, ui, device):
+    """Runs tools/check-logs, if it is there, for the errors Grosh logged on the simulator the tests ran on."""
     tool = os.path.join(root, "tools", "check-logs")
     if not (os.path.isfile(tool) and os.access(tool, os.X_OK)):
         return 0, []
+    if not is_booted(device):
+        return 0, ["tools/check-logs skipped: the simulator the tests ran on is not booted, "
+                   "so there is no log to read."]
     try:
         run = subprocess.run(
-            [tool, "--since", since] + (["--ui"] if ui else []), cwd=root,
+            [tool, "--since", since, "--device", device] + (["--ui"] if ui else []), cwd=root,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8", errors="replace",
         )
     except OSError as error:
@@ -417,7 +486,7 @@ def check_logs(root, since, ui):
     return run.returncode, [line for line in run.stdout.splitlines() if line.strip()]
 
 
-def report(bundle, log, status, seconds, ui, only, results, root, since):
+def report(bundle, log, status, seconds, ui, only, results, root, since, device):
     status, seconds = int(status), int(seconds)
     ui, only = ui == "1", only != "0"
     full_log, result = "Full log: " + log, "Result: " + bundle
@@ -452,6 +521,9 @@ def report(bundle, log, status, seconds, ui, only, results, root, since):
              "Its JSON is saved in " + results, full_log, result])
         return 2
 
+    if any("crashed with signal" in line for line in lines):
+        lines.extend(crash_lines(log, int(since)))
+
     code = 1 if lines or failed else 0
     ui_ran = any(target == UI_TESTS for target, _ in cases)
     if not ran:
@@ -472,7 +544,7 @@ def report(bundle, log, status, seconds, ui, only, results, root, since):
 
     note = ""
     if ran:
-        logged_status, logged = check_logs(root, since, ui_ran)
+        logged_status, logged = check_logs(root, since, ui_ran, device)
         lines.extend(logged)
         if logged_status:
             code = max(code, 1)
@@ -593,5 +665,5 @@ status=$?
 xcodebuild_pid=
 elapsed=$((SECONDS - started))
 
-python3 -I -c "$helper" report "$bundle" "$log" "$status" "$elapsed" "$ui" "${#only[@]}" "$result_dir" "$root" "$since"
+python3 -I -c "$helper" report "$bundle" "$log" "$status" "$elapsed" "$ui" "${#only[@]}" "$result_dir" "$root" "$since" "$udid"
 exit $?

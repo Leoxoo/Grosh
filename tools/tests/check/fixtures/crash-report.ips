@@ -1,0 +1,20 @@
+{"app_name":"Grosh","timestamp":"2026-10-23 09:00:05.00 +0000","app_version":"1.0","bug_type":"309","name":"Grosh"}
+{
+  "procName": "Grosh",
+  "exception": {"type": "EXC_BREAKPOINT", "signal": "SIGTRAP"},
+  "faultingThread": 0,
+  "threads": [
+    {
+      "triggered": true,
+      "frames": [
+        {"imageIndex": 0, "imageOffset": 4096, "symbol": "NotDeletedTransactions.apply(_:)"},
+        {"imageIndex": 1, "imageOffset": 8192},
+        {"imageIndex": 0, "imageOffset": 12288, "symbol": "closure #1 in NotDeletedTransactions.init"}
+      ]
+    }
+  ],
+  "usedImages": [
+    {"name": "Grosh", "base": 4294967296},
+    {"name": "libswiftCore.dylib", "base": 4294967297}
+  ]
+}

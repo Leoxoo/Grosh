@@ -177,6 +177,11 @@ class SimulatorCommandTests(unittest.TestCase):
             "xcrun", "simctl", "spawn", "booted", "log", "show", "--style", "ndjson",
             "--start", "2025-10-09 03:53:20", "--predicate", self.APP])
 
+    def test_reads_the_simulator_it_is_given_rather_than_the_booted_one(self):
+        with local_timezone("EST5"):
+            command = check_logs.simulator_command(BASE, with_steps=False, device="PRO-UDID")
+        self.assertEqual(command[:5], ["xcrun", "simctl", "spawn", "PRO-UDID", "log"])
+
     def test_with_steps_it_also_asks_for_the_step_timeline_and_info_messages(self):
         with local_timezone("EST5"):
             command = check_logs.simulator_command(BASE, with_steps=True)

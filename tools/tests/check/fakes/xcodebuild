@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Stands in for xcodebuild in tools/tests/check/run.sh. A test run records its arguments in $FAKE_CALLS, prints lines
 # that tools/check must not show, sleeps $FAKE_SLEEP seconds, writes the result bundle (unless $FAKE_NO_BUNDLE is set)
-# and exits $FAKE_EXIT.
+# writes a crash report into $GROSH_CRASH_REPORTS when $FAKE_CRASH_REPORT is set, and exits $FAKE_EXIT.
 
 if [ "${1:-}" = -version ]; then
     echo "Xcode 26.4"
@@ -35,6 +35,10 @@ if [ -n "${FAKE_NO_BUNDLE:-}" ]; then
     echo "xcodebuild: error: Unable to find a device matching the provided destination specifier"
 else
     mkdir -p "$bundle"
+fi
+if [ -n "${FAKE_CRASH_REPORT:-}" ]; then
+    mkdir -p "$GROSH_CRASH_REPORTS"
+    cp "$(dirname "$0")/../fixtures/crash-report.ips" "$GROSH_CRASH_REPORTS/Grosh-2026-10-23.ips"
 fi
 echo "xcodebuild done" >>"$FAKE_CALLS"
 exit "${FAKE_EXIT:-0}"

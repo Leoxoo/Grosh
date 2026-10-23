@@ -35,7 +35,8 @@ Result: /var/folders/…/T/grosh-check.Ab12Cd/Grosh.xcresult
 
 - `FAIL <Suite>/<test>: <file>:<line>: <message>` for each failed expectation, up to five per test. A parameterized test names the failing arguments in brackets after the test.
 - `ERROR <file>:<line>: <message>` for each build error. The summary then reads `0 passed, 0 failed in 23s (the build failed)`.
-- Errors that Grosh logged during the run, from `tools/check-logs`, come just before the summary, which then ends in `; Grosh logged errors (tools/check-logs)`.
+- Errors that Grosh logged during the run, from `tools/check-logs`, come just before the summary, which then ends in `; Grosh logged errors (tools/check-logs)`. `tools/check-logs` reads the simulator the tests ran on, so when that simulator is no longer booted it is skipped, the output says so, and the outcome is not changed.
+- When a test crashed, the output adds why, after the failures: the runtime's `Fatal error:` lines from the log, then the crashed thread's top frames from the newest crash report macOS wrote during the run (in `~/Library/Logs/DiagnosticReports`; `GROSH_CRASH_REPORTS` names another folder). It waits up to ten seconds for that report.
 - Any other line says why the outcome could not be read: no simulator, xcodebuild stopping before it wrote a result bundle, JSON of an unexpected shape, or `GroshUITests did not run`. The full log has the details.
 
 The outcome comes from the result bundle, through `xcrun xcresulttool`, not from the log text. Nothing else from xcodebuild is printed. The folder on the last lines keeps the full log, the `.xcresult` bundle (open it in Xcode for attachments and screenshots), and the JSON that xcresulttool printed (`xcresult-*.json`).
@@ -68,7 +69,7 @@ Each xcodebuild boots simulators of its own, so runs from several worktrees at o
 
 ## Scheme and test plan
 
-The shared `Grosh` scheme tests with `Grosh.xctestplan`. Its one configuration, Default, is the plain run, with no extra arguments or environment. Both test targets are on in the plan. `tools/check` narrows each run with `-only-testing`: a plain run passes `-only-testing:GroshTests`, and `--ui` adds `-only-testing:GroshUITests`. So ⌘U in Xcode runs the UI tests as well as the unit tests. The UI tests run on the chosen simulator itself, not on clones of it, so `tools/check-logs` can read what they logged.
+The shared `Grosh` scheme tests with `Grosh.xctestplan`. Its one configuration, Default, is the plain run, with no extra arguments or environment. Both test targets are on in the plan. `tools/check` narrows each run with `-only-testing`: a plain run passes `-only-testing:GroshTests`, and `--ui` adds `-only-testing:GroshUITests`. So ⌘U in Xcode runs the UI tests as well as the unit tests. Both test targets run on the chosen simulator itself, not on clones of it (GroshTests is not parallelizable either), so `tools/check-logs` can read what they logged.
 
 If a run with `--ui` prints `GroshUITests did not run`, check that GroshUITests is still on in `Grosh.xctestplan`. Xcode may skip a target the plan turns off, even when `-only-testing` names it.
 

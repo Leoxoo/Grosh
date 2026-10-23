@@ -18,12 +18,12 @@ The tool's own tests need no simulator: `python3 -B -m unittest discover -s tool
 
 ## What it reads
 
-The log of the booted iOS Simulator (`xcrun simctl spawn booted log show --style ndjson`) for the process `Grosh`, from the moment the run started. The unit tests run inside that process as the app's test host, so one process covers both suites. It keeps:
+The log of the simulator the tests ran on (`xcrun simctl spawn <UDID> log show --style ndjson`, with `--device` naming it and `booted` by default) for the process `Grosh`, from the moment the run started. The unit tests run inside that process as the app's test host, so one process covers both suites. It keeps:
 
 - messages at `error` and `fault` level, from Grosh's own `Logger`s (subsystem `Leoxo.Grosh`) and from the frameworks it calls;
 - runtime issues, the purple ones. The system logs these as faults in the subsystem `com.apple.runtime-issues`, with the framework as the category (`SwiftUI`). The fault level catches them, and that subsystem is also read at any level.
 
-With `--ui` it also reads the UI smoke walk's step log (subsystem `Leoxo.GroshUITests`, category `Steps`, messages `begin <step>` and `end <step>`) to say where each message happened. It reads the one booted simulator, so that has to be the simulator the tests ran on, still booted when it reads. Run with parallel testing off, as the benchmarks do.
+With `--ui` it also reads the UI smoke walk's step log (subsystem `Leoxo.GroshUITests`, category `Steps`, messages `begin <step>` and `end <step>`) to say where each message happened. It reads the simulator the tests ran on, which tools/check names with `--device`. The unit tests run on that one simulator too (`Grosh.xctestplan` runs them without clones). That simulator has to be still booted when it reads: when it is not, tools/check skips this check and says so.
 
 ## Reading a failure
 
@@ -99,7 +99,7 @@ Run `tools/check --only <ThatSuite>`. It must fail and print `[Probe] probe`. De
 
 - That SwiftUI's runtime issues arrive as faults in `com.apple.runtime-issues` with the framework as category. This is from public write-ups and the `[SwiftUI]` prefix Xcode's console shows. The subsystem is read at any level, so a different level does not lose them, but an issue Xcode shows without writing it to the log is invisible to this check. Output a process prints to standard output or error (`print`) is not in the log either.
 - The `log show` command line, the predicate and the JSON field names (`eventMessage`, `messageType`, `subsystem`, `category`, `processImagePath`, `timestamp`). They follow the `log` man page and published sample records. A command `log show` rejects exits 2 and prints the command it ran, and output that is not ndjson exits 2 too. A wrong field name would collect nothing and pass in silence, which is what the probe above is for.
-- That `booted` is the simulator the tests ran on: with several booted, or tests run on parallel clones, it may not be.
+- That the simulator the tests ran on is still booted after the run. `xcodebuild` is expected to leave it booted, now that the unit tests run without clones as the UI tests do. If it does not, tools/check skips this check and says so, and the first run on a Mac shows it.
 - That the run's last messages can be read straight after it. If the probe's message is missing when logged at the very end of a run, wait a few seconds before reading.
 - That values logged without `privacy: .public` are readable in the simulator's log. If one shows as `<private>`, log it with `privacy: .public`, and do the same for the smoke walk's step names or the step tags will read `<private>`.
 - That step messages are read at any level: `--ui` adds `--info`, so info and above, not debug.

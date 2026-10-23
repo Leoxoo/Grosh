@@ -123,7 +123,7 @@ passing() {
     called "xcodebuild -project Grosh.xcodeproj -scheme Grosh -testPlan Grosh -destination platform=iOS Simulator,id=PRO-UDID"
     called "-collect-test-diagnostics never -only-testing:GroshTests test"
     never_called "GROSH_BENCHMARK"
-    called_like "^check-logs --since [0-9]+$"
+    called_like "^check-logs --since [0-9]+ --device PRO-UDID$"
 }
 
 failing() {
@@ -140,7 +140,7 @@ failing() {
         "Result: $work/results/Grosh.xcresult"
     prints_lines 7
     [ -s "$work/results/xcodebuild.log" ] || fails "kept no log"
-    called_like "^check-logs --since [0-9]+$"
+    called_like "^check-logs --since [0-9]+ --device PRO-UDID$"
 }
 
 build_failure() {
@@ -174,7 +174,7 @@ ui_tests() {
     run "$repo" FAKE_TESTS=tests-ui-passed --ui
     exits 0
     called "-only-testing:GroshTests -only-testing:GroshUITests test"
-    called_like "^check-logs --since [0-9]+ --ui$"
+    called_like "^check-logs --since [0-9]+ --device PRO-UDID --ui$"
 }
 
 ui_tests_missing() {
@@ -252,6 +252,28 @@ stale_lock() {
     never_says "Waiting for another tools/check run"
 }
 
+not_booted() {
+    repo=$(make_repo not-booted)
+    run "$repo" FAKE_BOOTED=simctl-none
+    exits 0
+    says "tools/check-logs skipped: the simulator the tests ran on is not booted, so there is no log to read." \
+        "412 passed in Ns (9 skipped)"
+    never_called "check-logs"
+}
+
+crash_diagnostics() {
+    repo=$(make_repo crash-diagnostics)
+    run "$repo" GROSH_CRASH_REPORTS="$work/reports" FAKE_CRASH_REPORT=1 FAKE_TESTS=tests-crashed \
+        FAKE_SUMMARY=summary-failed FAKE_EXIT=65
+    exits 1
+    says "FAIL ReimbursementTests/deletingAReimbursementDoesNotDeleteItsExpense(): Test crashed with signal trap." \
+        "  0 Grosh NotDeletedTransactions.apply(_:)" \
+        "  1 libswiftCore.dylib offset 8192" \
+        "  2 Grosh closure #1 in NotDeletedTransactions.init"
+    says_like "crash report .*/reports/Grosh-2026-10-23\.ips: EXC_BREAKPOINT \(SIGTRAP\) in Grosh"
+    called_like "^check-logs --since [0-9]+ --device PRO-UDID$"
+}
+
 test_case "without Xcode, nothing runs and it exits 3" without_xcode
 test_case "wrong arguments exit 64" bad_arguments
 test_case "a passing run prints three lines and runs the unit tests only" passing
@@ -267,6 +289,8 @@ test_case "without an iPhone it stops before building" no_iphone
 test_case "errors Grosh logged fail the run" logged_errors
 test_case "a second run waits for the first and says so" two_runs
 test_case "a lock left by a run that is gone is taken over" stale_lock
+test_case "a simulator that is not booted skips the log check and says so" not_booted
+test_case "a crash prints the crashed thread from its crash report" crash_diagnostics
 
 echo "$passed passed, $failed failed"
 [ "$failed" -eq 0 ]

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Stands in for xcrun in tools/tests/check/run.sh: prints the fixture JSON that simctl and xcresulttool would, chosen by
-# $FAKE_SIMCTL, $FAKE_BUILD, $FAKE_SUMMARY and $FAKE_TESTS, with @ROOT@ standing for the repository ($FAKE_ROOT).
+# $FAKE_SIMCTL, $FAKE_BOOTED, $FAKE_BUILD, $FAKE_SUMMARY and $FAKE_TESTS, with @ROOT@ standing for the repository
+# ($FAKE_ROOT).
 
 {
     printf 'xcrun'
@@ -10,6 +11,7 @@
 
 case "$*" in
     "simctl list --json devices available") fixture=${FAKE_SIMCTL:-simctl-devices} ;;
+    "simctl list --json devices booted") fixture=${FAKE_BOOTED:-simctl-booted} ;;
     "xcresulttool get build-results --path "*) fixture=${FAKE_BUILD:-build-succeeded} ;;
     "xcresulttool get test-results summary --path "*) fixture=${FAKE_SUMMARY:-summary-passed} ;;
     "xcresulttool get test-results tests --path "*) fixture=${FAKE_TESTS:-tests-passed} ;;
