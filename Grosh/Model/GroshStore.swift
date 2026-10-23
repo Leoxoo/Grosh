@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 
 /// Builds the app's SwiftData container. Local only for now; the models already follow CloudKit's rules
