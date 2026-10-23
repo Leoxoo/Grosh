@@ -8,6 +8,13 @@ enum GroshStore {
     ])
 
     static func makeContainer(inMemory: Bool = false) throws -> ModelContainer {
+        if !inMemory {
+            // A new install may have no Application Support folder yet. Core Data cannot create the store without
+            // one, and logs the failure, so the folder is made first.
+            _ = try FileManager.default.url(
+                for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
+            )
+        }
         let configuration = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: inMemory,
