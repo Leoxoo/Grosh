@@ -6,5 +6,17 @@
   {
     "pattern": "building pipeline primitive_color-\\S+ took [0-9.]+ seconds",
     "reason": "The graphics system logs at error level how long it took to build a Metal shader for a drawing. Not a Grosh error, and the time differs on every run."
+  },
+  {
+    "pattern": "Failed to send CA Event for app launch measurements",
+    "reason": "A simulator cannot send a launch measurement to Core Analytics, so the system logs an error while XCTest measures a launch. Grosh cannot change that, and the launch is still measured."
+  },
+  {
+    "pattern": "\\[AXRuntimeCommon\\] Unknown client: Grosh",
+    "reason": "The accessibility runtime logs this for the UI test runner's queries to the app. The walk's queries still get their answers."
+  },
+  {
+    "pattern": "\\[SystemGestureGate\\] .*System gesture gate timed out",
+    "reason": "The system's edge gesture gate logs this when a touch near a screen edge, such as a tab bar button, waits for the system's own gestures. The tab still opens."
   }
 ]
