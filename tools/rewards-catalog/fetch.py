@@ -59,6 +59,9 @@ DELAY_SECONDS = 1.0
 # A page with less visible text than this is a shell that a browser would fill in
 # (or a bot wall), not something we can extract rules from.
 MIN_TEXT_CHARS = 400
+# A card page says what it earns. Text with none of these words is a menu or a shell, however long it is.
+# Navigation says "Points Rewards"; a rewards description says what you earn. Only the latter counts.
+REWARD_WORDS = re.compile(r"\b(earn|earns|earning|receive)\b|\d+(\.\d+)?\s*%\s*cash ?back|\bfor every \$?1\b|\bper \$1\b", re.I)
 FAILURE_LIMIT = 0.25
 
 SKIPPED_TAGS = {"script", "style", "noscript", "template", "svg"}
@@ -361,7 +364,37 @@ class PageResult:
     embedded: bool = False  # the text includes what the page carried as data (embedded_text)
 
 
-def fetch_page(url: str, get, robots: Robots, throttle: Throttle, validators: dict[str, str]) -> PageResult:
+BROWSER_INSTALL = "python3 -m pip install playwright && python3 -m playwright install chromium"
+
+
+def render_with_browser(url: str, timeout_ms: int = 45_000) -> str:
+    """The page's HTML after its scripts have run, in a headless Chromium (Playwright).
+
+    Some issuer pages are built in the browser, so their HTML has no rewards text until a browser runs the
+    scripts. Needs the optional `playwright` package and its Chromium (BROWSER_INSTALL); without them this
+    raises RuntimeError saying what to install, and nothing else in the pipeline depends on it."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as problem:
+        raise RuntimeError(f"the browser option needs Playwright; install it with: {BROWSER_INSTALL}") from problem
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            try:
+                page = browser.new_page(user_agent=USER_AGENT)
+                page.goto(url, wait_until="networkidle", timeout=timeout_ms)
+                return page.content()
+            finally:
+                browser.close()
+    except Exception as problem:
+        if "Executable doesn't exist" in str(problem):
+            raise RuntimeError(f"Chromium for Playwright isn't installed; run: {BROWSER_INSTALL}") from problem
+        raise RuntimeError(f"the browser couldn't load the page: {type(problem).__name__}: {problem}") from problem
+
+
+def fetch_page(url: str, get, robots: Robots, throttle: Throttle, validators: dict[str, str], render=None) -> PageResult:
+    """Read one page. `render(url) -> html` is tried when the plain fetch comes back as a shell (needs-browser):
+    it can turn that into a read page, or leave it needs-browser with the reason."""
     if not robots.allowed(url):
         problem = robots.problems.get(robots.origin(url))
         return PageResult("failed", error=problem) if problem else PageResult("robots")
@@ -407,14 +440,24 @@ def fetch_page(url: str, get, robots: Robots, throttle: Throttle, validators: di
                     text, embedded = (f"{text}\n{data}".strip(), True) if data else (text, False)
             except (OSError, EOFError, ValueError, zlib.error) as problem:
                 return PageResult("failed", error=f"unreadable reply: {problem}")
-            return PageResult(
-                "ok" if len(text) >= MIN_TEXT_CHARS else "needs-browser",
+            result = PageResult(
+                "ok" if len(text) >= MIN_TEXT_CHARS and REWARD_WORDS.search(text) else "needs-browser",
                 text=text,
                 embedded=embedded and len(text) >= MIN_TEXT_CHARS,
                 final_url=response.url,
                 etag=response.headers.get("etag", ""),
                 last_modified=response.headers.get("last-modified", ""),
             )
+            if result.status == "needs-browser" and render is not None:
+                # The plain fetch saw a shell. Let a browser run the page's scripts, then judge what it shows.
+                try:
+                    rendered = visible_text(render(response.url))
+                except RuntimeError as problem:
+                    return PageResult("needs-browser", text=text, error=str(problem))
+                if len(rendered) >= MIN_TEXT_CHARS and REWARD_WORDS.search(rendered):
+                    return PageResult("ok", text=rendered, final_url=response.url, etag="", last_modified="")
+                return PageResult("needs-browser", text=text, error="the browser loaded the page, but it has no rewards description")
+            return result
         if status in (404, 410):
             return PageResult("gone", error=f"HTTP {status}")
         if status in (401, 403, 429):
@@ -463,7 +506,7 @@ def write_json(path: Path, value) -> None:
 
 def run(
     cards: list[dict], state: dict, cache: Path, get, throttle: Throttle, today: str, after_each=None,
-    before_each=None, should_stop=None,
+    before_each=None, should_stop=None, render=None,
 ) -> RunSummary:
     """Fetch the given cards' pages one at a time, update `state` and `cache` in place, and say what happened.
 
@@ -490,7 +533,9 @@ def run(
         # A validator describes one page. If the card now points somewhere else, it says nothing about this one.
         if validators.get("url") != url:
             validators = {}
-        page = fetch_page(url, get, robots, throttle, validators)
+        if render is not None and state.get(sharing[0]["id"], {}).get("lastStatus") == "needs-browser":
+            validators = {}  # last time the server's "not modified" hid a shell: ask for the whole page again
+        page = fetch_page(url, get, robots, throttle, validators, render=render)
         outcomes = [_record(card, url, page, state, cache, today) for card in sharing]
         summary.outcomes.extend(outcomes)
         if after_each:
@@ -537,6 +582,13 @@ def _record(card: dict, url: str, page: PageResult, state: dict, cache: Path, to
         return CardOutcome(card_id, url, status, detail)
 
     if page.status == "not-modified":
+        # The server says nothing changed, but the saved text is still judged by today's rules: a page saved
+        # before the reward-words check existed is a shell, and "not modified" must not keep it "ok".
+        saved = (cache / card_id / "latest.txt")
+        text = saved.read_text(encoding="utf-8") if saved.exists() else ""
+        if len(text) < MIN_TEXT_CHARS or not REWARD_WORDS.search(text):
+            state[card_id] = {**entry, "url": url, "lastStatus": "needs-browser"}
+            return CardOutcome(card_id, url, "needs-browser", "saved text has no rewards description")
         state[card_id] = {**entry, "url": url, "lastStatus": "ok"}
         return CardOutcome(card_id, url, "unchanged", "not modified since last fetch")
 
@@ -603,6 +655,7 @@ def main() -> int:
     parser.add_argument("--missing", action="store_true", help="only cards never fetched (resumes an interrupted run)")
     parser.add_argument("--retry", action="store_true", help="only cards whose last fetch failed, found the page gone, or came back too thin")
     parser.add_argument("--delay", type=float, default=DELAY_SECONDS, help="seconds between requests to one host")
+    parser.add_argument("--no-browser", action="store_true", help="don't load shell pages in headless Chromium (faster; needs Playwright otherwise)")
     args = parser.parse_args()
 
     cards = read_json(SEED, {"cards": []})["cards"]
@@ -622,7 +675,8 @@ def main() -> int:
             note = f"  {outcome.detail}" if outcome.detail else ""
             print(f"[{done}/{len(chosen)}] {outcome.status:<13} {outcome.card_id}{note}", flush=True)
 
-    summary = run(chosen, state, CACHE, http_get, Throttle(args.delay), date.today().isoformat(), checkpoint)
+    summary = run(chosen, state, CACHE, http_get, Throttle(args.delay), date.today().isoformat(), checkpoint,
+                  render=None if args.no_browser else render_with_browser)
 
     text = report(summary, len(chosen))
     CACHE.mkdir(parents=True, exist_ok=True)

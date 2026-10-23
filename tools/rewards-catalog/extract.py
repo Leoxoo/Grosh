@@ -46,7 +46,7 @@ import fetch  # noqa: E402
 CANDIDATES = fetch.CACHE / "candidates"
 SAVED_SETTINGS = fetch.CACHE / "ui-settings.json"
 MANUAL_RULES = Path(__file__).with_name("manual-rules.json")
-PROMPT_VERSION = "6"
+PROMPT_VERSION = "8"
 DEFAULT_URL = "http://localhost:1234/v1"
 DEFAULT_MODEL = "k2-horizon-7b-uno-uncensored"
 # A reasoning model "thinks" before it answers and can spend a small reply limit on that alone (the first
@@ -183,7 +183,12 @@ def chunk_lines(text: str, max_chars: int = CHUNK_CHARS, overlap: int = CHUNK_OV
     return chunks
 
 
-_RATE_LOOKING = re.compile(r"\d\s*(?:%|[xX]\b)|\bper (?:\$1|dollar)\b", re.I)
+# A rate: a percent, an X multiplier, or "per $1" / "for every $1" next to points or miles (or on its own).
+_RATE_LOOKING = re.compile(
+    r"\d\s*(?:%|[xX]\b)|\bper (?:\$1|dollar)\b|\b(?:for|every|per|each) (?:\$1|dollar)\b"
+    r"|\b\d+(?:\.\d+)?\s+(?:points?|miles?)\s+(?:per|for|every|each|on)\b",
+    re.I,
+)
 
 
 def has_rates(chunk: str) -> bool:
@@ -630,6 +635,7 @@ def accepted_rule(proposal: dict, url: str, page_hash: str | None, verified: str
         "validFrom": proposal["validFrom"],
         "validTo": proposal["validTo"],
         "firstMonths": proposal.get("firstMonths"),
+        "capUnknown": bool(proposal.get("capUnknown")),
         "needs": needs_of(proposal),
         "conditions": [c.strip() for c in proposal["conditions"]],
         "verified": verified,
@@ -658,6 +664,10 @@ def review_warnings(rules: list[dict]) -> list[str]:
         key = (rule["categories"][0], tuple(rule["requires"]), rule["validFrom"], rule["validTo"], rule["firstMonths"])
         groups.setdefault(key, set()).add(rule["rate"])
     warnings = [
+        f"{rule['categories'] or 'a rotating bonus'} at {rule['rate']:g}%: the page says it has a cap but doesn't state the amount"
+        for rule in rules if rule.get("capUnknown")
+    ]
+    warnings += [
         f"{key[0]} earns {' and '.join(f'{rate:g}' for rate in sorted(rates))} with nothing to tell them apart"
         for key, rates in sorted(groups.items(), key=lambda item: repr(item[0])) if len(rates) > 1
     ]
@@ -671,6 +681,21 @@ def _empty_candidate(card: dict, model: str, prompt_version: str | None, page_ha
         "cardId": card["id"], "model": model, "promptVersion": prompt_version, "pageHash": page_hash,
         "status": status, "needs": [], "warnings": [], "cardConditions": [], "rules": [], "rejected": [],
     }
+
+
+def _unstated_cap(proposal):
+    """A cap the quote doesn't state is not made up into a rule: the rate is kept and the cap is marked unknown.
+    The model sometimes invents a number ("up to the quarterly maximum" became $6,000); dropping the rule would
+    lose the rate, and keeping the number would state something the page doesn't. Unknown is what is true."""
+    if not isinstance(proposal, dict) or proposal.get("capAmount") is None or not isinstance(proposal.get("quote"), str):
+        return proposal
+    try:
+        cap = float(proposal["capAmount"])
+    except (TypeError, ValueError):
+        return proposal
+    if cap in numbers_in(proposal["quote"]):
+        return proposal
+    return {**proposal, "capAmount": None, "capPeriod": None, "capUnknown": True}
 
 
 def _fill_base_category(proposal):
@@ -716,7 +741,7 @@ def split_fixed(proposal) -> list:
     per category with the same quote, and each is then checked on its own. The model does this often
     ("3% on dining, groceries and streaming"); nothing about the rule changes. A "choose" or "top-spend" rule
     that picks as many categories as it lists is fixed in the same way."""
-    proposal = _retype_rotating(_fill_base_category(proposal))
+    proposal = _unstated_cap(_retype_rotating(_fill_base_category(proposal)))
     categories = proposal.get("categories") if isinstance(proposal, dict) else None
     picks = proposal.get("picks") if isinstance(proposal, dict) else None
     if (
@@ -749,12 +774,64 @@ def _conditions_about(conditions, category) -> list:
     return kept
 
 
+MAX_FOLLOW_UPS = 6
+_REWARD_SENTENCE = re.compile(r"\b(earn|earns|earning|cash back|points|miles)\b", re.I)
+
+
+# Lines the model needs to read a rate: reward words, exclusions and limits (footnotes often say "excludes ..." with no number).
+# Rates are found by has_rates; these words only catch the conditions and limits that sit beside a rate.
+_RELEVANT = re.compile(
+    r"\b(exclud\w*|not eligible|does not|may not|limit\w*|each (?:quarter|month|billing cycle)|activat\w*|enroll\w*)\b",
+    re.I,
+)
+
+
+def model_text(text: str) -> str:
+    """What the model reads: the lines that state a rate or a condition on one, and the line before and after
+    each. Navigation, legal boilerplate and marketing with no rate are left out. The quote checks still use the
+    whole saved page, so nothing here can make a quote look valid that isn't on the page."""
+    lines = text.splitlines()
+    keep: set[int] = set()
+    for i, line in enumerate(lines):
+        if has_rates(line) or _RELEVANT.search(line):
+            keep.update(j for j in (i - 1, i, i + 1) if 0 <= j < len(lines))
+    return "\n".join(lines[i] for i in sorted(keep) if lines[i].strip())
+
+
+def rate_sentences(text: str) -> list[str]:
+    """Sentences that state a reward rate (a percent or an X multiplier next to earn, cash back, points or miles)."""
+    found: list[str] = []
+    # Pages break a sentence across lines ("3% Cash Back at U.S." / "supermarkets"), so join the lines first.
+    # A split needs a capital or digit after the full stop, so "U.S. supermarkets" stays whole.
+    flat = " ".join(text.split())
+    for piece in re.split(r"(?<=[.!?])\s+(?=[A-Z0-9\"“‘])", flat):
+        piece = " ".join(piece.split())
+        if (
+            piece and len(piece) <= MAX_CONDITION_CHARS and has_rates(piece) and _REWARD_SENTENCE.search(piece)
+            and piece not in found
+        ):
+            found.append(piece)
+    return found
+
+
+def _covered(sentence: str, rules: list[dict]) -> bool:
+    """Whether an accepted rule's quote is this sentence (or part of it, or contains it)."""
+    flat = normalize(sentence)
+    return any(
+        normalize(rule["evidence"]["quote"]) in flat or flat in normalize(rule["evidence"]["quote"]) for rule in rules
+    )
+
+
 def extract_card(
-    card: dict, text: str, page_hash: str, complete, model: str, max_chars: int = CHUNK_CHARS, progress=None
+    card: dict, text: str, page_hash: str, complete, model: str, max_chars: int = CHUNK_CHARS, progress=None,
+    follow_up: bool = True,
 ) -> dict:
     """The candidate for one card: accepted rules, card-wide conditions, rejected proposals with reasons,
     and a status: ok, no-rules (the page states none), wrong-page (it doesn't name the card) or failed
-    (the model could not be read for at least one chunk, so the result is incomplete)."""
+    (the model could not be read for at least one chunk, so the result is incomplete).
+
+    After the chunks, each sentence that states a rate but that no accepted rule quotes is asked about
+    on its own (up to MAX_FOLLOW_UPS). The model skips sentences in a long chunk; asking alone catches them."""
     candidate = _empty_candidate(card, model, PROMPT_VERSION, page_hash, "ok")
     if not name_on_page(card["name"], text):
         candidate["status"] = "wrong-page"
@@ -762,25 +839,20 @@ def extract_card(
 
     page_norm = normalize(text)
     accepted: dict[tuple, dict] = {}
-    failures = 0
     errors: list[str] = []
-    to_ask = [c for c in chunk_lines(text, max_chars) if has_rates(c)]
-    for number, chunk in enumerate(to_ask, 1):
-        if progress:
-            progress(number, len(to_ask))  # may raise Stopped to end the card early
-        reply = None
+
+    def ask(chunk: str):
+        """The model's (proposals, card conditions) for one piece of text, or None after its attempts."""
         for _ in range(ATTEMPTS_PER_CHUNK):
             try:
-                reply = parse_reply(complete(build_messages(card, chunk)))
-                break
+                return parse_reply(complete(build_messages(card, chunk)))
             except (OSError, ValueError) as problem:
-                reply = None
                 message = f"{type(problem).__name__}: {problem}"[:700]
                 if message not in errors:
                     errors.append(message)
-        if reply is None:
-            failures += 1
-            continue
+        return None
+
+    def take(reply) -> None:
         proposals, card_conditions = reply
         for proposal in (split for raw in proposals for split in split_fixed(raw)):
             reason = validate_rule(proposal, page_norm)
@@ -802,9 +874,34 @@ def extract_card(
                 candidate["rejected"].append({"cardCondition": condition, "reason": problem})
             elif condition.strip() not in candidate["cardConditions"]:
                 candidate["cardConditions"].append(condition.strip())
+
+    failures = 0
+    to_ask = [c for c in chunk_lines(model_text(text), max_chars) if has_rates(c)]
+    for number, chunk in enumerate(to_ask, 1):
+        if progress:
+            progress(number, len(to_ask))  # may raise Stopped to end the card early
+        reply = ask(chunk)
+        if reply is None:
+            failures += 1
+        else:
+            take(reply)
+
+    uncovered = [s for s in rate_sentences(text) if not _covered(s, list(accepted.values()))][:MAX_FOLLOW_UPS] if follow_up else []
+    candidate["followUps"] = len(uncovered)
+    for sentence in uncovered:
+        reply = ask(sentence)  # a miss here is not a failure of the card: the chunks already covered the rest
+        if reply is not None:
+            take(reply)
+    still_missing = [s for s in rate_sentences(text) if not _covered(s, list(accepted.values()))]
+
     candidate["rules"] = sorted(accepted.values(), key=lambda r: (r["categories"][0] if r["categories"] else "~", -r["rate"]))  # "~" sorts rotating rules last
     candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
     candidate["warnings"] = review_warnings(candidate["rules"])
+    if still_missing:
+        # The page states these rates and the result doesn't have them: an "ok" that isn't complete must say so.
+        candidate["warnings"].append(
+            f"{len(still_missing)} rate sentence(s) on the page aren't in the result, e.g. {still_missing[0][:120]!r}"
+        )
     if failures:
         candidate["status"] = "failed"
         candidate["errors"] = errors
@@ -908,7 +1005,7 @@ def summarize_calls(calls: list[dict]) -> dict:
 
 def process_cards(
     chosen: list[dict], *, state: dict, manual: dict, client: ChatServer, chunk_chars: int, force: bool,
-    cache: Path, candidates: Path, emit, ensure_server=None, progress=None, should_stop=None,
+    cache: Path, candidates: Path, emit, ensure_server=None, progress=None, should_stop=None, follow_up: bool = True,
 ) -> dict[str, int]:
     """Extract rules for the chosen cards one at a time, saving each candidate as it finishes.
 
@@ -950,6 +1047,7 @@ def process_cards(
             candidate = extract_card(
                 card, text, page_hash, timed, client.model, chunk_chars,
                 progress=(lambda done, total, _id=card["id"]: progress(_id, done, total)) if progress else None,
+                follow_up=follow_up,
             )
             candidate["stats"] = summarize_calls(calls)
         fetch.write_json(path, candidate)

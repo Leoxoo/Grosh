@@ -127,6 +127,14 @@
         <label>Temperature (empty to leave out)<input type="number" id="temperature" min="0" max="2" step="0.1" style="width: 8em"></label>
       </div>
       <div class="row" style="margin-top: 8px">
+        <label><span>Sentence-by-sentence follow-up</span>
+          <select id="followUps"><option value="true">on (asks again about rate sentences the chunks missed)</option><option value="false">off (faster, one pass per chunk)</option></select></label>
+      </div>
+      <div class="row" style="margin-top: 8px">
+        <label style="flex: 1 1 280px"><span><input type="checkbox" id="browser" style="min-width: 0"> When a page is only a shell, load it in a browser (headless Chromium)</span></label>
+        <span class="small muted">Needs Playwright: <span class="mono">python3 -m pip install playwright && python3 -m playwright install chromium</span></span>
+      </div>
+      <div class="row" style="margin-top: 8px">
         <label style="flex: 1 1 280px">Extra request fields (JSON, optional)
           <input type="text" id="extraBody" spellcheck="false" autocomplete="off" placeholder='{"reasoning_effort": "low"}'></label>
         <label style="flex: 1 1 220px">Added to the end of every prompt (optional)
@@ -274,7 +282,9 @@ $("deleteProfile").onclick = async () => {
 
 // ---------- model panel ----------
 function fillSettings(s) {
+  $("browser").checked = !!s.browser;
   for (const key of ["baseUrl", "model", "chunkChars", "maxTokens", "timeoutSeconds", "extraBody", "promptSuffix", "responseMode", "tokenField"]) $(key).value = s[key];
+  $("followUps").value = String(s.followUps !== false);
   $("temperature").value = s.temperature ?? "";
   $("apiKey").value = ""; $("apiKey").placeholder = s.apiKeySet ? "saved: type to replace" : "none";
   $("clearKey").hidden = !s.apiKeySet;
@@ -284,7 +294,7 @@ function readSettings() {
     baseUrl: $("baseUrl").value, model: $("model").value, chunkChars: Number($("chunkChars").value),
     maxTokens: Number($("maxTokens").value), timeoutSeconds: Number($("timeoutSeconds").value),
     extraBody: $("extraBody").value, promptSuffix: $("promptSuffix").value,
-    responseMode: $("responseMode").value, tokenField: $("tokenField").value,
+    responseMode: $("responseMode").value, tokenField: $("tokenField").value, browser: $("browser").checked, followUps: $("followUps").value === "true",
     temperature: $("temperature").value === "" ? null : Number($("temperature").value),
     apiKey: $("apiKey").value,  // blank keeps the saved key
   };

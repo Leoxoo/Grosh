@@ -71,6 +71,8 @@ def default_settings() -> dict:
         "apiKey": os.environ.get("LLM_API_KEY", ""),
         "responseMode": "json_schema",
         "tokenField": "max_tokens",
+        "followUps": True,
+        "browser": True,  # a page that is only a shell is loaded in headless Chromium (needs Playwright; see fetch.py)
         "temperature": 0,
         "chunkChars": extract.CHUNK_CHARS,
         "maxTokens": extract.DEFAULT_MAX_TOKENS,
@@ -544,8 +546,10 @@ class App:
                 job.card_done(names.get(outcome.card_id, outcome.card_id), outcome.status, outcome.detail, "error" if bad else "info")
 
         try:
+            render = fetch.render_with_browser if self.settings()["browser"] else None
             fetch.run(chosen, state, self.paths.cache, self.http_get, fetch.Throttle(self.throttle_delay),
-                      date.today().isoformat(), after_each=after, before_each=before, should_stop=job.stop.is_set)
+                      date.today().isoformat(), after_each=after, before_each=before, should_stop=job.stop.is_set,
+                      render=render)
             job.finish("stopped" if job.stop.is_set() and job.done < job.total else "done")
         except Exception as problem:  # the page shows any failure instead of dying silently
             job.log(traceback.format_exc(limit=3), "error")
@@ -582,6 +586,7 @@ class App:
                 chosen, state=state, manual=manual, client=client, chunk_chars=settings["chunkChars"], force=force,
                 cache=self.paths.cache, candidates=self.paths.candidates, emit=emit,
                 ensure_server=lambda: extract.check_server(client), progress=progress, should_stop=job.stop.is_set,
+                follow_up=settings["followUps"],
             )
             job.finish("done")
         except extract.Stopped:

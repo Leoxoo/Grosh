@@ -172,6 +172,11 @@ class SettingsTests(AppCase):
         self.assertEqual(self.paths.settings.stat().st_mode & 0o777, 0o600)
         self.assertEqual(self.app.handle("GET", "/api/profiles", {}, {})[1]["profiles"], [])
 
+    def test_the_browser_option_is_saved_and_on_by_default(self):
+        self.assertTrue(self.app.settings()["browser"])
+        self.assertTrue(self.app.save_settings({"browser": True})["browser"])
+        self.assertTrue(self.app.settings()["browser"])
+
     def test_a_corrupt_settings_file_falls_back_to_defaults(self):
         self.paths.cache.mkdir(parents=True)
         self.paths.settings.write_text('{"chunkChars": 1}')

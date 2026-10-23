@@ -266,6 +266,88 @@ class WhatCountsAsWhatTests(unittest.TestCase):
         unclear = rule(categories=[], rate=3, quote="Earn 3% on dining.")
         self.assertEqual([p["categories"] for p in extract.split_fixed(unclear)], [["dining"]])
 
+    def test_a_sentence_broken_across_lines_is_one_sentence(self):
+        text = "3% Cash Back at U.S.\nsupermarkets\u2021\nCard Members can earn 3% cash back on eligible purchases at U.S.\nsupermarkets\u2021, on up to $6,000 per year."
+        sentences = extract.rate_sentences(text)
+        body = [s for s in sentences if "Card Members can earn 3% cash back" in s]
+        self.assertEqual(len(body), 1)  # the heading may run into it (no full stop between), the body is whole
+        self.assertIn("at U.S. supermarkets", body[0])
+        self.assertIn("on up to $6,000 per year.", body[0])
+
+    def test_a_rate_the_result_lacks_is_a_warning_even_when_the_card_is_ok(self):
+        page = "Blue Cash\nEarn 3% cash back at U.S. supermarkets, on up to $6,000 per year.\nEarn 1% cash back on other purchases."
+        only_base = rule(categories=["everything-else"], rate=1, quote="Earn 1% cash back on other purchases.")
+        result = extract_card({**CARD, "name": "Blue Cash"}, page, "h", FakeModel([only_base]), "m", follow_up=False)
+        self.assertEqual(result["status"], "ok")
+        self.assertTrue(any("aren't in the result" in w for w in result["warnings"]))
+
+    def test_the_model_reads_rates_conditions_and_their_neighbours_only(self):
+        menu = "\n".join(f"Locations and hours for branch {n}." for n in range(50))
+        page = "\n".join([menu, "Earn 3% cash back at U.S. supermarkets, on up to $6,000 per year.", "Member FDIC.",
+                           "Excludes superstores like Walmart and Target.", menu])
+        sent = extract.model_text(page)
+        self.assertIn("Earn 3% cash back", sent)
+        self.assertIn("Excludes superstores", sent)  # a condition with no number
+        self.assertNotIn("Locations and hours for branch 20.", sent)
+        self.assertLess(len(sent), len(page) // 4)
+
+    def test_quotes_are_still_checked_against_the_whole_page(self):
+        page = "Savor Rewards\n" + "".join(f"Branch hours item {n}.\n" for n in range(30)) + "Earn 3% on dining."
+        seen = []
+
+        def complete(messages):
+            seen.append(messages[-1]["content"])
+            return json.dumps({"cardConditions": [], "rules": [rule(categories=["dining"], rate=3, quote="Earn 3% on dining.")]})
+
+        result = extract_card(CARD, page, "h", complete, "m", follow_up=False)
+        self.assertEqual(len(result["rules"]), 1)  # accepted: the quote is on the full page
+        self.assertNotIn("Branch hours item 10.", seen[0])  # far from the name and the rate: not sent
+        self.assertIn("Branch hours item 29.", seen[0])  # the line just before the rate is sent as context
+
+    def test_rate_sentences_are_the_ones_that_state_a_reward(self):
+        text = "Earn 5% cash back on everyday purchases.\nAPR 18.74% variable.\nGet 3X points on travel. Earn 2% on gas"
+        self.assertEqual(extract.rate_sentences(text), ["Earn 5% cash back on everyday purchases.", "Get 3X points on travel.", "Earn 2% on gas"])
+
+    def test_a_rate_the_model_skipped_in_a_chunk_is_asked_about_alone(self):
+        sentence = "Earn 5% cash back on everyday purchases at different places you shop each quarter, up to the quarterly maximum when you activate."
+        page = "Discover It\nEarn 1% on all other purchases.\n" + sentence
+        base = rule(categories=["everything-else"], rate=1, quote="Earn 1% on all other purchases.")
+        bonus = rule(categories=[], selection="rotating", rate=5, quote=sentence, requires=["activation"])
+
+        def complete(messages):
+            body = messages[-1]["content"]
+            alone = '"""\n' + sentence + '\n"""' in body  # the follow-up sends the sentence by itself
+            return json.dumps({"cardConditions": [], "rules": [bonus if alone else base]})
+
+        discover = {**CARD, "name": "Discover It"}
+        result = extract_card(discover, page, "h", complete, "m", max_chars=10_000)
+        self.assertEqual(sorted((r["selection"], r["rate"]) for r in result["rules"]), [("fixed", 1), ("rotating", 5)])
+        self.assertEqual(result["followUps"], 1)
+        self.assertEqual(result["status"], "ok")
+
+    def test_covered_sentences_are_not_asked_again(self):
+        page = "Savor Rewards\nEarn unlimited 3% cash back on dining, entertainment and popular streaming services."
+        model = FakeModel([rule(quote="Earn unlimited 3% cash back on dining, entertainment and popular streaming services.")])
+        result = extract_card(CARD, page, "h", model, "m")
+        self.assertEqual(result["followUps"], 0)
+        self.assertEqual(len(model.asked), 1)
+
+    def test_a_cap_the_page_does_not_state_is_unknown_not_invented(self):
+        invented = rule(categories=[], selection="rotating", rate=5, quote=DISCOVER, requires=["activation"], capAmount=6000, capPeriod="quarter")
+        kept = extract.split_fixed(invented)[0]
+        self.assertIsNone(kept["capAmount"])
+        self.assertTrue(kept["capUnknown"])
+        page = PAGE + "\n" + DISCOVER
+        result = extract_card(CARD, page, "h", FakeModel([invented]), "m", follow_up=False)
+        rotating = [r for r in result["rules"] if r["selection"] == "rotating"]
+        self.assertEqual([(r["rate"], r["capAmount"], r["capUnknown"]) for r in rotating], [(5, None, True)])
+        self.assertTrue(any("cap but doesn't state the amount" in w for w in result["warnings"]))
+
+    def test_a_cap_the_page_states_is_kept(self):
+        stated = rule(categories=["dining"], rate=2, quote="You will earn 2% cash back on your first $1000 in combined purchases at restaurants.", capAmount=1000, capPeriod="quarter")
+        self.assertEqual(extract.split_fixed(stated)[0]["capAmount"], 1000)
+        self.assertNotIn("capUnknown", extract.split_fixed(stated)[0])
+
     def test_the_same_rule_worded_differently_is_one_rule_with_one_quote(self):
         a = rule(categories=["dining"], rate=3, quote="Earn 3% on dining at restaurants.")
         b = rule(categories=["dining"], rate=3, quote="You'll earn 3% Cash Back rewards on dining purchases.")
@@ -344,7 +426,7 @@ class ReviewWarningTests(unittest.TestCase):
                  rule(categories=["everything-else"], rate=3, quote="Earn unlimited 3% cash back on everything else.")]
         page = PAGE + "\nEarn unlimited 3% cash back on everything else."
         result = extract_card(CARD, page, "h", FakeModel(reply), "m")
-        self.assertEqual(result["warnings"], ["everything-else earns 1 and 3 with nothing to tell them apart"])
+        self.assertIn("everything-else earns 1 and 3 with nothing to tell them apart", result["warnings"])
         self.assertEqual(len(result["rules"]), 2)  # a warning flags, it never removes
 
 
@@ -415,6 +497,11 @@ class PageTextTests(unittest.TestCase):
         chunks = extract.chunk_lines("y" * 250, max_chars=100)
         self.assertEqual([len(c) for c in chunks], [100, 100, 50])
 
+    def test_points_for_every_dollar_is_a_rate(self):
+        self.assertTrue(extract.has_rates("Earn unlimited 1.5 points for every $1 you spend on everyday purchases."))
+        self.assertTrue(extract.has_rates("You earn 2 miles per dollar on travel."))
+        self.assertFalse(extract.has_rates("Call us about your points balance any time."))
+
     def test_only_chunks_that_could_state_a_rate_are_asked(self):
         self.assertTrue(extract.has_rates("Earn 3% back"))
         self.assertTrue(extract.has_rates("Get 2X points"))
@@ -445,7 +532,7 @@ class ExtractCardTests(unittest.TestCase):
 
     def test_keeps_valid_rules_and_lists_rejected_ones_with_reasons(self):
         made_up = rule(categories=["gas"], rate=4, quote="Earn 4% cash back on gas.")
-        result = self.run_card(FakeModel([rule(), made_up]))
+        result = self.run_card(FakeModel([rule(), made_up]), follow_up=False)
         self.assertEqual(result["status"], "ok")
         self.assertEqual([r["categories"] for r in result["rules"]], [["dining"]])
         self.assertEqual(result["rules"][0]["verified"], "page")
@@ -483,13 +570,13 @@ class ExtractCardTests(unittest.TestCase):
 
     def test_a_fixed_rule_listing_several_categories_becomes_one_rule_each(self):
         grouped = rule(categories=["dining", "groceries"], quote=EXCLUSION, rate=3)
-        result = self.run_card(FakeModel([grouped]))
+        result = self.run_card(FakeModel([grouped]), follow_up=False)
         self.assertEqual([r["categories"] for r in result["rules"]], [["dining"], ["groceries"]])
         self.assertEqual({r["evidence"]["quote"] for r in result["rules"]}, {EXCLUSION})
 
     def test_each_split_category_is_checked_on_its_own(self):
         grouped = rule(categories=["dining", "gas"], quote=EXCLUSION, rate=3)  # the quote never mentions gas
-        result = self.run_card(FakeModel([grouped]))
+        result = self.run_card(FakeModel([grouped]), follow_up=False)
         self.assertEqual([r["categories"] for r in result["rules"]], [["dining"]])
         self.assertEqual([r["reason"] for r in result["rejected"]], ["quote doesn't mention gas"])
 
@@ -567,11 +654,11 @@ class ExtractCardTests(unittest.TestCase):
 
     def test_bad_json_is_retried_once_then_the_card_fails(self):
         retried = FakeModel("not json", [rule()])
-        self.assertEqual(self.run_card(retried)["status"], "ok")
+        self.assertEqual(self.run_card(retried, follow_up=False)["status"], "ok")
         self.assertEqual(len(retried.asked), 2)
 
         broken = FakeModel("not json")
-        result = self.run_card(broken)
+        result = self.run_card(broken, follow_up=False)
         self.assertEqual((result["status"], len(broken.asked)), ("failed", 2))
 
     def test_a_failed_card_says_why(self):
@@ -620,7 +707,7 @@ class StatsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             cache = Path(tmp)
             (cache / CARD["id"]).mkdir()
-            (cache / CARD["id"] / "latest.txt").write_text(PAGE)
+            (cache / CARD["id"] / "latest.txt").write_text("Savor Rewards\nAPR 3% on purchases.")
             events = []
             extract.process_cards([CARD], state={CARD["id"]: {"hash": "h"}}, manual={}, client=server, chunk_chars=12000, force=True,
                                   cache=cache, candidates=cache / "c", emit=events.append)

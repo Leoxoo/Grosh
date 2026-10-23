@@ -144,6 +144,10 @@ class FetchPageTests(unittest.TestCase):
     def test_a_shell_page_needs_a_browser(self):
         self.assertEqual(self.fetch(page("<div id=app></div>"))[0].status, "needs-browser")
 
+    def test_a_long_menu_with_no_reward_words_is_not_a_page(self):
+        menu = "<p>Home</p><p>Cash Back Credit Cards</p><p>Points Rewards</p><p>Learn About Credit</p>" + "<p>Locations and hours of operation for branches near you.</p>" * 20
+        self.assertEqual(self.fetch(page(menu))[0].status, "needs-browser")
+
     def test_a_shell_page_with_embedded_data_is_read(self):
         data = json.dumps(["Earn %d%% back on category number %d every month." % (n, n) for n in range(1, 30)])
         result, _ = self.fetch(page(f'<div id=app></div><script type="application/json">{data}</script>'))
@@ -194,6 +198,58 @@ class FetchPageTests(unittest.TestCase):
         self.assertEqual(result.status, "failed")
         self.assertIn("offline", result.error)
         self.assertEqual(web.fetched(self.URL), 0)
+
+
+class BrowserTests(unittest.TestCase):
+    URL = "https://x.test/card"
+    MENU = "<p>Home</p><p>Cash Back Credit Cards</p>" + "<p>Locations near you.</p>" * 40
+    REWARDS = "".join(f"<p>Earn unlimited 1.5 points for every $1 you spend on everyday purchases, tier {n}.</p>" for n in range(10))
+
+    def fetch(self, render):
+        web = FakeWeb()
+        web.route("https://x.test/robots.txt", ALLOW)
+        web.route(self.URL, page(self.MENU))
+        return fetch.fetch_page(self.URL, web, fetch.Robots(web, throttle()), throttle(), {}, render=render)
+
+    def test_a_shell_is_rendered_and_read_when_a_browser_is_given(self):
+        result = self.fetch(lambda url: "<html><body>" + self.REWARDS + "</body></html>")
+        self.assertEqual(result.status, "ok")
+        self.assertIn("1.5 points for every $1", result.text)
+
+    def test_without_a_browser_a_shell_stays_needs_browser(self):
+        self.assertEqual(self.fetch(None).status, "needs-browser")
+
+    def test_a_browser_that_cannot_run_says_why_and_keeps_needs_browser(self):
+        def missing(url):
+            raise RuntimeError("the browser option needs Playwright; install it with: python3 -m pip install playwright")
+
+        result = self.fetch(missing)
+        self.assertEqual(result.status, "needs-browser")
+        self.assertIn("needs Playwright", result.error)
+
+    def test_a_rendered_page_still_without_rewards_is_not_ok(self):
+        result = self.fetch(lambda url: "<html><body>" + self.MENU + "</body></html>")
+        self.assertEqual(result.status, "needs-browser")
+
+    def test_the_browser_option_is_off_by_default_and_names_its_install(self):
+        self.assertIn("playwright install chromium", fetch.BROWSER_INSTALL)
+
+
+class NotModifiedTests(unittest.TestCase):
+    def test_not_modified_still_judges_the_saved_text(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp)
+            (cache / "x").mkdir()
+            (cache / "x" / "latest.txt").write_text("Home\nCash Back Credit Cards\n" + "Locations near you. " * 40)
+            (cache / "x" / "http.json").write_text(json.dumps({"url": "https://x.test/a", "etag": '"v1"'}))
+            web = FakeWeb()
+            web.route("https://x.test/robots.txt", ALLOW)
+            web.route("https://x.test/a", Response(304, {}, b"", "https://x.test/a"))
+            state = {"x": {"url": "https://x.test/a", "hash": "h", "lastStatus": "ok"}}
+            summary = fetch.run([{"id": "x", "sourceUrl": "https://x.test/a"}], state, cache, web, throttle(), "2026-10-22")
+            self.assertEqual(state["x"]["lastStatus"], "needs-browser")
+            self.assertEqual(summary.outcomes[0].status, "needs-browser")
+            self.assertEqual(state["x"]["hash"], "h")  # the last good hash is kept, as always
 
 
 class RunTests(unittest.TestCase):
