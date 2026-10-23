@@ -73,6 +73,8 @@ jobs:
       - name: Run the checks
         env:
           GROSH_CHECK_RESULT_DIR: ${{ runner.temp }}/check-results
+          # Only TEST_RUNNER_ variables reach the tests, without the prefix: this is how the snapshot tests see CI.
+          TEST_RUNNER_CI: 'true'
         run: |
           mkdir -p "$GROSH_CHECK_RESULT_DIR"
           ${{ matrix.command }}
