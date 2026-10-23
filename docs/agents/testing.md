@@ -1,0 +1,77 @@
+# Running the tests
+
+Agents run **`tools/check`**, never `xcodebuild test` directly. It builds Grosh, runs the tests on an iPhone simulator and prints only what failed, so a run costs a few lines instead of hundreds of kilobytes of log. It also skips the 600 s wait for simulator diagnostics that a failing `xcodebuild test` adds, and it takes turns with other runs on the same Mac.
+
+```
+tools/check                                  # the unit tests (GroshTests)
+tools/check --ui                             # the unit tests and the UI tests (GroshUITests)
+tools/check --only ReimbursementTests        # one suite
+tools/check --only 'ReimbursementTests/deletingAReimbursementDoesNotDeleteItsExpense()'   # one test
+```
+
+- Run it from anywhere in the repository. It needs Xcode, so it only runs on a Mac.
+- `--only` takes a suite's type name, or a test's function name with its parentheses and argument labels (`AmountEntryTests/parsesTypedAmounts(_:)`). Repeat it to run several. It looks in GroshTests, and in GroshUITests too when `--ui` is given. A name that starts with `GroshTests/` or `GroshUITests/` is used as it is.
+- The benchmarks stay skipped: tools/check never sets `GROSH_BENCHMARK`. To time a change, use the benchmark command in [architecture.md](architecture.md#performance-rules). It is the one place for raw `xcodebuild`, as it needs an optimized build.
+
+## What it prints
+
+A passing run prints three lines:
+
+```
+Simulator: iPhone 17 Pro (iOS 26.4)
+412 passed in 48s (9 skipped)
+Result: /var/folders/…/T/grosh-check.Ab12Cd/Grosh.xcresult
+```
+
+A failing run prints one line per failure, then the summary and where the full results are:
+
+```
+Simulator: iPhone 17 Pro (iOS 26.4)
+FAIL ReimbursementTests/deletingAReimbursementDoesNotDeleteItsExpense(): GroshTests/ReimbursementTests.swift:42: Expectation failed: (net → -1500) == 0
+410 passed, 2 failed in 48s (9 skipped)
+Full log: /var/folders/…/T/grosh-check.Ab12Cd/xcodebuild.log
+Result: /var/folders/…/T/grosh-check.Ab12Cd/Grosh.xcresult
+```
+
+- `FAIL <Suite>/<test>: <file>:<line>: <message>` for each failed expectation, up to five per test. A parameterized test names the failing arguments in brackets after the test.
+- `ERROR <file>:<line>: <message>` for each build error. The summary then reads `0 passed, 0 failed in 23s (the build failed)`.
+- Errors that Grosh logged during the run, from `tools/check-logs`, come just before the summary, which then ends in `; Grosh logged errors (tools/check-logs)`.
+- Any other line says why the outcome could not be read: no simulator, xcodebuild stopping before it wrote a result bundle, JSON of an unexpected shape, or `GroshUITests did not run`. The full log has the details.
+
+The outcome comes from the result bundle, through `xcrun xcresulttool`, not from the log text. Nothing else from xcodebuild is printed. The folder on the last lines keeps the full log, the `.xcresult` bundle (open it in Xcode for attachments and screenshots), and the JSON that xcresulttool printed (`xcresult-*.json`).
+
+## Exit status
+
+| Status | Meaning |
+| --- | --- |
+| 0 | Every test passed. |
+| 1 | A test failed, no test ran (check the `--only` names), `--ui` did not run the UI tests, or Grosh logged errors. |
+| 2 | The build failed, or the tests could not run: no simulator, xcodebuild stopped early, or the result bundle could not be read. |
+| 3 | xcodebuild is not installed (no Xcode, as in a Linux container), so nothing ran. |
+| 64 | The arguments are wrong. |
+
+## Where the results go
+
+Each run makes a new temporary folder, `$TMPDIR/grosh-check.XXXXXX`. When `GROSH_CHECK_RESULT_DIR` is set, the results go to that folder instead, which may already exist. CI makes it, and uploads it when a check fails. A run replaces the `Grosh.xcresult` and `xcodebuild.log` that an earlier run left there.
+
+## Simulator
+
+tools/check uses an available iPhone 17 Pro, otherwise the first available iPhone, on the newest iOS that is at least the app's deployment target. The first line it prints names the simulator.
+
+## One run at a time
+
+Each xcodebuild boots simulators of its own, so runs from several worktrees at once slow each other down. tools/check first takes a lock: the folder `$TMPDIR/grosh-tools-check.lock`, holding the owner's pid and repository folder, removed when the run ends, Ctrl-C included. A run that finds the lock taken waits for it, and prints `Waiting for another tools/check run (pid N, <folder>)` at once and every 30 seconds.
+
+- The wait counts against your command's timeout. Allow for another session's run ahead of yours: give the command 10 minutes, or run it in the background.
+- A lock whose pid has gone, as when a run was killed, is taken over. If a lock stays and its pid is not a tools/check run, remove the folder by hand.
+- Runs share the lock only when they share `TMPDIR`.
+
+## Scheme and test plan
+
+The shared `Grosh` scheme tests with `Grosh.xctestplan`. Its one configuration, Default, is the plain run, with no extra arguments or environment. GroshTests is on. GroshUITests is in the plan but off, so ⌘U in Xcode runs the unit tests only, and `--ui` adds it with `-only-testing:GroshUITests`. The UI tests run on the chosen simulator itself, not on clones of it, so `tools/check-logs` can read what they logged.
+
+If a run with `--ui` prints `GroshUITests did not run`, that Xcode does not let `-only-testing` run a target that the plan turns off. Turn GroshUITests on in the plan by deleting its `"enabled" : false`. tools/check names the targets it runs, so it needs no change.
+
+## Testing tools/check
+
+`tools/tests/check/run.sh` runs tools/check against stand-ins for xcodebuild, xcrun and tools/check-logs, so it needs no Xcode.

@@ -1,0 +1,38 @@
+{
+  "configurations" : [
+    {
+      "id" : "1AB5F1A2-C51C-4CD8-9764-FD9352412FF8",
+      "name" : "Default",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Grosh.xcodeproj",
+      "identifier" : "D8BF92692F8B41EB0082DDCE",
+      "name" : "Grosh"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:Grosh.xcodeproj",
+        "identifier" : "D8BF92762F8B41EC0082DDCE",
+        "name" : "GroshTests"
+      }
+    },
+    {
+      "enabled" : false,
+      "parallelizable" : false,
+      "target" : {
+        "containerPath" : "container:Grosh.xcodeproj",
+        "identifier" : "D8BF92802F8B41EC0082DDCE",
+        "name" : "GroshUITests"
+      }
+    }
+  ],
+  "version" : 1
+}
