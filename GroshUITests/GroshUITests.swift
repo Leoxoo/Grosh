@@ -59,8 +59,10 @@ final class GroshUITests: XCTestCase {
             walk.expect(list.cells.firstMatch, "the transaction list")
         }
         walk.step("Transactions → open a transaction") {
-            walk.firstRowOnScreen(of: app.collectionViews.firstMatch, "the transaction list").tap()
-            walk.expect(app.navigationBars["Transaction"], "the transaction's detail")
+            let row = walk.firstRowOnScreen(of: app.collectionViews.firstMatch, "the transaction list")
+            let tapped = row.label
+            row.tap()
+            walk.expect(app.navigationBars["Transaction"], "the transaction's detail after tapping \"\(tapped)\"")
         }
         walk.step("Transactions → back") {
             walk.back(from: "Transaction", to: "Transactions")
@@ -202,7 +204,12 @@ private final class Walk {
             )
         } else {
             let why = reason.map { " \($0)" } ?? ""
-            XCTFail("\(current): \(what) did not appear within \(Int(timeout)) seconds.\(why)")
+            let bars = app.navigationBars.allElementsBoundByIndex.map(\.identifier)
+            let shown = bars.isEmpty ? "none" : bars.joined(separator: ", ")
+            XCTFail(
+                "\(current): \(what) did not appear within \(Int(timeout)) seconds.\(why) "
+                    + "Navigation bars on screen: \(shown)."
+            )
         }
     }
 
@@ -235,20 +242,37 @@ private final class Walk {
         expect(app.navigationBars[parent], parent)
     }
 
+    /// Waits until `list` has stopped moving. A swipe leaves the list coasting, and a tap while it coasts only stops it,
+    /// so the row under the tap is not opened.
+    func settle(_ list: XCUIElement) {
+        let first = list.cells.firstMatch
+        guard first.exists else { return }
+        var position = first.frame
+        for _ in 0..<20 {
+            Thread.sleep(forTimeInterval: 0.25)
+            let now = first.frame
+            if now == position { return }
+            position = now
+        }
+    }
+
     /// Swipes `list` until `element` is on screen, down the list and then back up: a list makes only the rows in view.
     func reveal(_ element: XCUIElement, in list: XCUIElement) {
         for swipe in 0..<16 {
-            if element.exists && element.isHittable { return }
+            if element.exists && element.isHittable { break }
             if swipe < 8 {
                 list.swipeUp(velocity: .slow)
             } else {
                 list.swipeDown(velocity: .slow)
             }
         }
+        settle(list)
     }
 
-    /// The first row of `list` that is on screen: a list keeps a few rows ready past its edges.
+    /// The first row of `list` that is on screen once the list has stopped moving: a list keeps a few rows ready past
+    /// its edges.
     func firstRowOnScreen(of list: XCUIElement, _ what: String) -> XCUIElement {
+        settle(list)
         let rows = list.cells
         for index in 0..<min(rows.count, 30) where rows.element(boundBy: index).isHittable {
             return rows.element(boundBy: index)
