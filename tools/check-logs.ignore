@@ -18,5 +18,9 @@
   {
     "pattern": "\\[SystemGestureGate\\] .*System gesture gate timed out",
     "reason": "The system's edge gesture gate logs this when a touch near a screen edge, such as a tab bar button, waits for the system's own gestures. The tab still opens."
+  },
+  {
+    "pattern": "fopen failed for data file: errno = 2 \\(No such file or directory\\)",
+    "reason": "Core Data looks for the store's data file before it creates a store, and logs an error when the file is not there. A new simulator has no store until the app makes one, so it logs this on each run. Grosh cannot change that, and the store is then created as usual."
   }
 ]
