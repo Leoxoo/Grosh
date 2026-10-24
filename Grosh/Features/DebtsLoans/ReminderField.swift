@@ -6,6 +6,8 @@ import SwiftUI
 struct ReminderField: View {
     @Binding var day: CalendarDay?
 
+    @Environment(\.today) private var today
+
     var body: some View {
         Toggle("Reminder", systemImage: "bell", isOn: isOn)
         if let day = Binding($day) {
@@ -17,7 +19,7 @@ struct ReminderField: View {
         Binding {
             day != nil
         } set: { isOn in
-            day = isOn ? TransactionDefaults.reminderDay(from: .today) : nil
+            day = isOn ? TransactionDefaults.reminderDay(from: today) : nil
         }
     }
 }

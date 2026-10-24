@@ -52,14 +52,18 @@ enum MonthGraphComparison {
     ) -> [GraphSpan] {
         switch self {
         case .average:
-            guard let firstDay, let timeRange = period.timeRange,
-                  let firstCountedStart = GraphSpan(timeRange.period(containing: firstDay))?.first
+            guard let firstDay, let timeRange = period.timeRange, let shownStart = GraphSpan(period)?.first
             else { return [] }
+            // The earlier periods are laid out as the period shown is, so they line up with it whatever the
+            // calendar's first weekday is.
+            let firstWeekday = shownStart.weekday
+            let firstCounted = timeRange.period(containing: firstDay, firstWeekday: firstWeekday)
+            guard let firstCountedStart = GraphSpan(firstCounted)?.first else { return [] }
             var spans: [GraphSpan] = []
             var earlier = period
             for _ in 1...Self.averageMonthCount {
                 guard let start = GraphSpan(earlier)?.first else { break }
-                earlier = timeRange.period(containing: start.adding(days: -1))
+                earlier = timeRange.period(containing: start.adding(days: -1), firstWeekday: firstWeekday)
                 // Each earlier period is before the last, so once one is before the first that counts, the rest are too.
                 guard let span = GraphSpan(earlier), span.first >= firstCountedStart else { break }
                 spans.append(span)

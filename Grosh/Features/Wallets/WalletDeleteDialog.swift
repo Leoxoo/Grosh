@@ -36,6 +36,7 @@ private struct WalletDeleteDialog: ViewModifier {
             try wallet.delete()
             didDelete()
         } catch {
+            Log.store.failed("Deleting a wallet", error)
             errorMessage = error.localizedDescription
         }
     }

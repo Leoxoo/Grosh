@@ -91,6 +91,7 @@ struct MergeSheet<Target: Identifiable & Equatable, Row: View>: View {
             dismiss()
             onMerged()
         } catch {
+            Log.store.failed("Merging", error)
             errorMessage = error.localizedDescription
         }
     }

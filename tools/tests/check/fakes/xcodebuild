@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Stands in for xcodebuild in tools/tests/check/run.sh. A test run records its arguments in $FAKE_CALLS, prints lines
+# that tools/check must not show, sleeps $FAKE_SLEEP seconds, writes the result bundle (unless $FAKE_NO_BUNDLE is set)
+# writes a crash report into $GROSH_CRASH_REPORTS when $FAKE_CRASH_REPORT is set, another process's report when
+# $FAKE_OTHER_CRASH_REPORT is set, shuts the simulator down when
+# $FAKE_SHUT_DOWN is set, and exits $FAKE_EXIT.
+
+if [ "${1:-}" = -version ]; then
+    echo "Xcode 26.4"
+    echo "Build version 17E192"
+    exit 0
+fi
+
+{
+    printf 'xcodebuild'
+    printf ' %s' "$@"
+    printf '\n'
+    env | grep -E '^(TEST_RUNNER_)?GROSH_BENCHMARK='
+} >>"$FAKE_CALLS"
+
+bundle=
+while [ $# -gt 0 ]; do
+    if [ "$1" = -resultBundlePath ]; then
+        bundle=$2
+    fi
+    shift
+done
+if [ -e "$bundle" ]; then
+    echo "xcodebuild: error: Existing file at -resultBundlePath \"$bundle\""
+    exit 64
+fi
+
+echo "Test Suite 'All tests' started at 2026-10-23 09:00:00.000."
+echo "Test Case 'ReimbursementTests/deletingAnExpenseKeepsItsReimbursement()' passed (0.004 seconds)."
+sleep "${FAKE_SLEEP:-0}"
+if [ -n "${FAKE_NO_BUNDLE:-}" ]; then
+    echo "xcodebuild: error: Unable to find a device matching the provided destination specifier"
+else
+    mkdir -p "$bundle"
+fi
+if [ -n "${FAKE_CRASH_REPORT:-}" ]; then
+    mkdir -p "$GROSH_CRASH_REPORTS"
+    cp "$(dirname "$0")/../fixtures/crash-report.ips" "$GROSH_CRASH_REPORTS/Grosh-2026-10-23.ips"
+fi
+if [ -n "${FAKE_OTHER_CRASH_REPORT:-}" ]; then
+    mkdir -p "$GROSH_CRASH_REPORTS"
+    cp "$(dirname "$0")/../fixtures/crash-report.ips" "$GROSH_CRASH_REPORTS/searchd-2026-10-23.ips"
+fi
+if [ -n "${FAKE_SHUT_DOWN:-}" ]; then
+    rm -f "$(dirname "$FAKE_CALLS")/booted-now"
+fi
+echo "xcodebuild done" >>"$FAKE_CALLS"
+exit "${FAKE_EXIT:-0}"

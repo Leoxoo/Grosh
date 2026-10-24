@@ -37,11 +37,12 @@ enum TransactionDefaults {
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
         lastEntered.fetchLimit = 1
-        if let wallet = (try? context.fetch(lastEntered))?.first?.wallet {
+        let recent = Log.store.attempt("Reading the last-used wallet") { try context.fetch(lastEntered) }
+        if let wallet = recent?.first?.wallet {
             return wallet
         }
         var firstWallet = Wallet.unarchived
         firstWallet.fetchLimit = 1
-        return (try? context.fetch(firstWallet))?.first
+        return Log.store.attempt("Reading the first wallet") { try context.fetch(firstWallet) }?.first
     }
 }

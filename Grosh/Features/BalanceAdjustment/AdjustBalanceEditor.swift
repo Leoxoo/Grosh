@@ -10,6 +10,7 @@ struct AdjustBalanceEditor: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.today) private var today
 
     var body: some View {
         if let draft = startingDraft {
@@ -31,7 +32,9 @@ struct AdjustBalanceEditor: View {
     }
 
     private var startingDraft: BalanceAdjustmentDraft? {
-        try? TransactionDefaults.suggestBalanceAdjustment(on: .today, viewing: viewedWallet, in: context)
+        Log.store.attempt("Suggesting a balance adjustment") {
+            try TransactionDefaults.suggestBalanceAdjustment(on: today, viewing: viewedWallet, in: context)
+        }
     }
 }
 
@@ -111,6 +114,7 @@ private struct AdjustBalanceForm: View {
             try Transaction.adjustBalance(draft, in: context)
             dismiss()
         } catch {
+            Log.store.failed("Adjusting a balance", error)
             errorMessage = error.localizedDescription
         }
     }

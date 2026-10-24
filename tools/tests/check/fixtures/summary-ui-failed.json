@@ -1,0 +1,47 @@
+{
+  "devicesAndConfigurations" : [
+    {
+      "device" : {
+        "architecture" : "arm64",
+        "deviceId" : "PRO-UDID",
+        "deviceName" : "iPhone 17 Pro",
+        "modelName" : "iPhone 17 Pro",
+        "osVersion" : "26.4",
+        "platform" : "iOS Simulator"
+      },
+      "expectedFailures" : 0,
+      "failedTests" : 1,
+      "passedTests" : 1,
+      "skippedTests" : 0,
+      "testPlanConfiguration" : {
+        "configurationId" : "1",
+        "configurationName" : "Default"
+      }
+    }
+  ],
+  "environmentDescription" : "Grosh · Built with macOS 26.4",
+  "expectedFailures" : 0,
+  "failedTests" : 1,
+  "finishTime" : 1792731698.204,
+  "passedTests" : 1,
+  "result" : "Failed",
+  "skippedTests" : 0,
+  "startTime" : 1792731651.033,
+  "statistics" : [
+
+  ],
+  "testFailures" : [
+    {
+      "failureText" : "GroshUITests.swift:191: Failed to get matching snapshots: Error getting main window kAXErrorServerNotFound",
+      "targetName" : "GroshUITests",
+      "testIdentifier" : 1,
+      "testIdentifierString" : "GroshUITests/testWalkEveryScreen()",
+      "testName" : "testWalkEveryScreen()"
+    }
+  ],
+  "title" : "Test - Grosh",
+  "topInsights" : [
+
+  ],
+  "totalTestCount" : 2
+}

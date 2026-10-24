@@ -11,12 +11,26 @@ struct TransactionListView: View {
     /// The transaction whose detail is showing.
     @Binding var selectedTransaction: Transaction?
 
+    @Environment(\.today) private var today
+
+    var body: some View {
+        TransactionListContent(
+            selectedTransaction: $selectedTransaction, startingPeriod: .month(CalendarMonth(today))
+        )
+    }
+}
+
+/// The list behind ``TransactionListView``, holding the period it shows from the moment the tab opens.
+private struct TransactionListContent: View {
+    @Binding var selectedTransaction: Transaction?
+
     @NotDeletedTransactions private var transactions: [Transaction]
     @Query private var recurringTransactions: [RecurringTransaction]
+    @Environment(\.today) private var today
     @State private var walletSelection = WalletSelection.total
     /// How long each period in the strip is, chosen in the "…" menu.
     @State private var timeRange = TimeRange.month
-    @State private var period = Period.month(CalendarMonth(.today))
+    @State private var period: Period
     /// Whether the period's transactions are grouped by day or by category, chosen in the "…" menu.
     @State private var grouping = TransactionGrouping.day
     /// Search text and filters. Searching looks across all time and every wallet; filters narrow the period.
@@ -27,7 +41,10 @@ struct TransactionListView: View {
     @State private var isSelecting = false
     @State private var chosen = Set<Transaction>()
 
-    private var today: CalendarDay { .today }
+    init(selectedTransaction: Binding<Transaction?>, startingPeriod: Period) {
+        _selectedTransaction = selectedTransaction
+        _period = State(initialValue: startingPeriod)
+    }
 
     /// The selected wallet's transactions, or the wallet filter's when one is set, as ledger entries.
     private var selected: [LedgerEntry] {
@@ -45,7 +62,6 @@ struct TransactionListView: View {
     }
 
     var body: some View {
-        let today = today
         let selected = selected
         let periods = strip(for: selected)
         let shownDays = period.days(today: today)
@@ -102,9 +118,7 @@ struct TransactionListView: View {
                 if filter.isOn {
                     FilterSummaryFigures(filter: $filter, transactions: shown)
                 } else {
-                    PeriodSummaryView(
-                        summary: PeriodSummary(of: selected, in: period, today: today), period: period, today: today
-                    )
+                    PeriodSummaryView(summary: PeriodSummary(of: selected, in: period, today: today), period: period)
                 }
             }
             .padding(.vertical, 8)

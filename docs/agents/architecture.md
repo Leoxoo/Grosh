@@ -4,7 +4,7 @@ How Grosh is put together, and the performance rules every change has to keep. D
 
 ## The 16k store
 
-Design every change for **the 16k store**: about 16,000 transactions over six years, the size a long-time user or a Money Lover import reaches. Anything that touches each transaction once per frame, per row or per save is visible there, even when it is invisible in a fresh simulator. `GroshTests/PerformanceBenchmarks.swift` builds this store and times launch, every screen, scrolling, search and saving.
+Design every change for **the 16k store**: about 16,000 transactions over six years, the size a long-time user or a Money Lover import reaches. Anything that touches each transaction once per frame, per row or per save is visible there, even when it is invisible in a fresh simulator. `Grosh/Debug/BenchmarkStore.swift` builds this store, and `GroshTests/PerformanceBenchmarks.swift` times launch, every screen, scrolling, search and saving on it. The UI smoke walk opens the app on it too (`docs/agents/ui-smoke.md`).
 
 ## Components
 
@@ -13,6 +13,8 @@ Design every change for **the 16k store**: about 16,000 transactions over six ye
 | `Grosh/Model/` | SwiftData `@Model` classes, `Money`, `CalendarDay`, `GroshStore` (the container), `NotDeletedTransactions`. | Every property optional or defaulted, no `.unique`, every relationship optional with an inverse (ADR-0001). A new model goes into `GroshStore.schema`. |
 | `Grosh/Domain/<Concept>/` | The rules: extensions on the models, value types (drafts, summaries, `LedgerEntry`), and `FetchDescriptor`s named for what they read (`MonthGraphHistory.transactions(for:)`, `RecentlyDeleted.deletedTransactions`). | Plain Swift plus SwiftData: no SwiftUI. Value types stay free of `ModelContext`; whatever a calculation needs from the store is fetched by its caller and passed in. |
 | `Grosh/Features/<Area>/` | SwiftUI screens and rows, one folder per area of the app. | Views read data and call Domain rules. Arithmetic, eligibility and sign handling live in Domain, where tests reach them. |
+| `Grosh/Logging/` | `Log`, one `os.Logger` per area, and `Signpost`, the intervals Instruments shows. | A message names what failed and the error, never the data (`docs/agents/logging.md`). |
+| `Grosh/Debug/` | The 16k store generator and the UI test launch hook. | Wrapped in `#if DEBUG`, so the shipped app never carries them. |
 | `GroshTests/` | Swift Testing suites, one per behaviour, each with its own in-memory container (`GroshStore.makeContainer(inMemory: true)`), plus shared fixtures (`*Fixture.swift`). | A Domain rule ships with tests written first. |
 
 Startup work runs in `GroshApp` on `scenePhase == .active`: `RecentlyDeleted.purgeExpired` and `RecurringTransaction.catchUp`. Both are on the launch benchmark.
@@ -26,6 +28,10 @@ Pick the narrowest source that answers the question:
 3. **One answer from the whole store** (the earliest counted day, whether anything matches): a `FetchDescriptor` with a sort and `fetchLimit`, rather than loading everything and reducing in Swift.
 
 `@Query(Transaction.notDeleted)` re-reads all ~16k rows after every save, once per screen showing it. The Report screens still do this; moving them onto `@NotDeletedTransactions` is the known next step.
+
+## What day it is
+
+Screens read the day from `@Environment(\.today)`, a `CalendarDay`. The app sets it once at the root, from the real date, and moves it on when the day changes while the app is open (`Grosh/Views/Today.swift`). A test or a preview shows a screen as of a fixed day with `.environment(\.today, day)`. Views pass it into the Domain rules, which keep taking `today:` as an argument, so a view should not read `CalendarDay.today` or the clock to decide what day it is.
 
 ## Performance rules
 
@@ -48,6 +54,8 @@ TEST_RUNNER_GROSH_BENCHMARK=1 xcodebuild test -scheme Grosh -destination 'platfo
 ```
 
 Put the before → after milliseconds in the commit message, as cc60ff5 and d91cfa8 do.
+
+Each step has a budget in `GroshTests/BenchmarkBudgets.swift`, and a step over its budget fails the run on the setup the budgets were recorded on. To read a budget failure, or to record or change one, see `docs/agents/benchmarks.md`.
 
 ## House style
 

@@ -36,6 +36,7 @@ struct TransactionEditor: View {
     let mode: Mode
 
     @Environment(\.modelContext) private var context
+    @Environment(\.today) private var today
 
     var body: some View {
         TransactionForm(mode: mode, startingDraft: startingDraft)
@@ -43,9 +44,9 @@ struct TransactionEditor: View {
 
     private var startingDraft: TransactionDraft {
         switch mode {
-        case .add: TransactionDefaults.suggest(on: .today, in: context)
-        case .duplicate(let transaction): TransactionDraft(duplicating: transaction, on: .today)
-        case .payment(let recurring): TransactionDraft(paymentFor: recurring, on: .today)
+        case .add: TransactionDefaults.suggest(on: today, in: context)
+        case .duplicate(let transaction): TransactionDraft(duplicating: transaction, on: today)
+        case .payment(let recurring): TransactionDraft(paymentFor: recurring, on: today)
         case .edit(let transaction): TransactionDraft(editing: transaction)
         }
     }
@@ -124,10 +125,13 @@ private struct TransactionForm: View {
             fields.amountRow("Amount", currencyCode: currencyCode, tint: Money(cents: draft.sign).tint)
             CategoryPicker(title: "Category", type: draft.type, selection: $draft.category)
                 .disabled(draft.isLockedByPayments)
+                .accessibilityIdentifier("TransactionEditor.category")
             if draft.offersCard {
                 CardPicker(title: "Card", wallet: draft.wallet, selection: $draft.card)
+                    .accessibilityIdentifier("TransactionEditor.card")
             }
             fields.noteField($draft.note)
+                .accessibilityIdentifier("TransactionEditor.note")
             DayStepper(title: "Date", day: $draft.day)
         } footer: {
             if draft.wallet == nil {
@@ -181,18 +185,21 @@ private struct TransactionForm: View {
 
     private func save() {
         do {
-            switch mode {
-            case .add, .duplicate:
-                try Transaction.create(draftToSave, in: context)
-            case .payment(let recurring):
-                let transaction = try Transaction.create(draftToSave, in: context)
-                try recurring.attach(transaction, in: context)
-            case .edit(let transaction):
-                try transaction.update(with: draftToSave)
+            try Signpost.interval("Save transaction") {
+                switch mode {
+                case .add, .duplicate:
+                    try Transaction.create(draftToSave, in: context)
+                case .payment(let recurring):
+                    let transaction = try Transaction.create(draftToSave, in: context)
+                    try recurring.attach(transaction, in: context)
+                case .edit(let transaction):
+                    try transaction.update(with: draftToSave)
+                }
             }
             playSuccessCue()
             dismiss()
         } catch {
+            Log.store.failed("Saving a transaction", error)
             errorMessage = error.localizedDescription
         }
     }
@@ -218,7 +225,10 @@ struct WithNameSuggestions: View {
     @Environment(\.modelContext) private var context
 
     var body: some View {
-        ForEach((try? Transaction.withNames(matching: typed, limit: 3, in: context)) ?? [], id: \.self) { name in
+        let names = Log.store.attempt("Reading the With names") {
+            try Transaction.withNames(matching: typed, limit: 3, in: context)
+        } ?? []
+        ForEach(names, id: \.self) { name in
             Button {
                 onPick(name)
             } label: {

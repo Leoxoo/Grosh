@@ -15,7 +15,8 @@ struct LoanOrDebtSheet<Draft, Form: View>: View {
     @Environment(\.modelContext) private var context
 
     var body: some View {
-        if let draft = try? makeDraft(context) {
+        let draft = Log.store.attempt("Making the draft for a Loan or Debt") { try makeDraft(context) }
+        if let draft {
             form(draft)
         } else {
             NavigationStack {

@@ -13,6 +13,7 @@ struct ReportView: View {
     /// The screens pushed onto the Report, such as a side's details opened from a Category report tile.
     @State private var path = NavigationPath()
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.today) private var today
 
     /// The Report opens on `period`, the period Home's strip was showing.
     init(startingOn period: Period) {
@@ -23,12 +24,12 @@ struct ReportView: View {
         OtherIncomeReader { otherIncome in
             content(otherIncome: otherIncome)
         }
+        .onAppear { Signpost.opening("Open Report") }
     }
 
     /// The Report, with Other Income read once for everything it counts.
     @ViewBuilder
     private func content(otherIncome: Category) -> some View {
-        let today = CalendarDay.today
         let selected = transactions.filter(walletSelection.includes)
         let counted = transactions.counted(in: walletSelection, during: period, today: today, otherIncome: otherIncome)
         let summary = PeriodSummary(of: selected, in: period, today: today)

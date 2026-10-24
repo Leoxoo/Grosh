@@ -113,7 +113,7 @@ struct TransactionFilter: Equatable {
     /// ``listed(from:selection:on:)`` with the selection's transactions at hand already: `selected`, as
     /// ``transactions(in:from:)`` picks them from the ledger entries of `all`.
     func listed(from all: [Transaction], selected: [LedgerEntry], on days: DayRange) -> [Transaction] {
-        if isSearching { return all.matching(self) }
+        if isSearching { return Signpost.interval("Search") { all.matching(self) } }
         return selected.filter { days.contains(CalendarDay(rawValue: $0.dayRaw)) }.map(\.transaction).matching(self)
     }
 

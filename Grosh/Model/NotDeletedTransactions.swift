@@ -48,7 +48,9 @@ extension NotDeletedTransactions {
 
         private init(_ context: ModelContext) {
             self.context = context
-            let transactions = (try? context.fetch(Transaction.notDeleted)) ?? []
+            let transactions = Log.store.attempt("Reading every transaction") {
+                try context.fetch(Transaction.notDeleted)
+            } ?? []
             self.transactions = transactions
             entries = transactions.map(LedgerEntry.init)
             positions = Self.positions(of: transactions)
