@@ -86,5 +86,9 @@
   {
     "pattern": "\\[XPCErrors\\] non-launching port is incompatible with service identifier \"com\\.apple\\.PointerUI",
     "reason": "The system's XPC layer logs when the simulator's pointer service is given a port it cannot launch with. Grosh makes no XPC calls of its own."
+  },
+  {
+    "pattern": "HALC_ProxyIOContext::IOWorkLoop: skipping cycle due to overload",
+    "reason": "The simulator's audio hardware layer logs this when its audio work loop skips a cycle because the audio is overloaded. The walk hears it while the success cue plays after an Expense is saved, which Grosh's own code starts. The cue is a sound, and the simulator's audio layer, not Grosh, reports the overload."
   }
 ]
