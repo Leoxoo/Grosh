@@ -90,6 +90,14 @@ tools/check --only SnapshotTests
 - **Record a reference on purpose.** Delete the PNG to replace, or the whole `__Snapshots__/SnapshotTests` folder for all of them, then run. swift-snapshot-testing writes a missing reference and fails its test once, so run again to compare. Or turn on the library's record mode for one run, with the `record` argument of `assertSnapshot` (the pinned version's README describes it). That overwrites every reference the run draws. Take it out again before committing.
 - **Review the diff.** A changed screen fails its test, and `tools/check` prints the failure. Open the `Grosh.xcresult` it names in Xcode, and compare the reference with the new image in the failed test's attachments. In git, `git status` lists the changed PNGs: open the old and new files side by side, and commit only the changes you meant to make.
 
-## Testing tools/check
+## Testing the tools
 
-`tools/tests/check/run.sh` runs tools/check against stand-ins for xcodebuild, xcrun and tools/check-logs, so it needs no Xcode.
+These need no Xcode, and CI runs all three on every pull request (the Tools check):
+
+```
+tools/tests/check/run.sh                     # tools/check, against stand-ins for xcodebuild, xcrun and tools/check-logs
+tools/tests/run-checks/run.sh                # the Stop hook, .claude/hooks/run-checks.sh
+python3 -B -m unittest discover -s tools     # tools/check-logs
+```
+
+`tools/tests/run-checks/run.sh` runs the hook on a throwaway repository whose `tools/check` fails while a Swift file holds `BROKEN`, with stand-ins for xcodebuild, curl (LM Studio) and claude (the local model). It covers when the hook runs the tests and what it hands back, the three-failure limit, and the local fix: that a failed attempt leaves the worktree, the index and the stash list as they were. A change to the hook comes with a case there.

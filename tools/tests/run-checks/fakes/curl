@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Stands in for curl in tools/tests/run-checks/run.sh, where the hook asks whether LM Studio answers: records the call in
+# $FAKE_CALLS and exits $FAKE_CURL_EXIT, 0 (LM Studio answers) by default.
+
+printf 'curl %s\n' "$*" >>"$FAKE_CALLS"
+exit "${FAKE_CURL_EXIT:-0}"
