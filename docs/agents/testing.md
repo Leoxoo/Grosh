@@ -75,11 +75,13 @@ If a run with `--ui` prints `GroshUITests did not run`, check that GroshUITests 
 
 ## Snapshot tests
 
-`GroshTests/SnapshotTests.swift` draws each transaction row kind (Expense, Income, Transfer, Split, Reimbursement) and Home with its Month graph, in light, dark and the accessibility text size AX3, and compares each with a PNG in `GroshTests/__Snapshots__/SnapshotTests/`. It uses [swift-snapshot-testing](https://github.com/pointfreeco/swift-snapshot-testing), 1.17 or later, linked to GroshTests only. Each screen is drawn as of 12 October 2026, from fixed transactions, on a 402 × 874 screen in English (United States), so the same tree draws the same image on any day.
+`GroshTests/SnapshotTests.swift` draws each transaction row kind (Expense, Income, Transfer, Split, Reimbursement) and Home with its Month graph, in light, dark and the accessibility text size AX3, and compares each with a PNG in `GroshTests/__Snapshots__/SnapshotTests/`. It uses [swift-snapshot-testing](https://github.com/pointfreeco/swift-snapshot-testing), linked to GroshTests only and pinned to 1.19.7 by `Grosh.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`. A new version can draw differently, so updating it means recording the references again. Each screen is drawn as of 12 October 2026, from fixed transactions, on a 402 × 874 screen in English (United States), so the same tree draws the same image on any day.
 
-**References recorded on:** Mac (to be recorded), simulator (to be recorded), OS (to be recorded). Record and compare on that setup only. The simulator's language and region must be English (United States) too, since amounts and dates use the device's locale.
+**References recorded on:** a Mac16,7 (Apple M4 Pro) on macOS 27.2 with Xcode 27.1 (27A9275), on the iPhone 17 Pro simulator with iOS 27.0. Record and compare on that setup only. The simulator's language and region must be English (United States) too, since amounts and dates use the device's locale.
 
 CI skips the suite and prints one line saying so, because the references belong to a Mac.
+
+The AX3 references show the rows and Home as they are now, not as they should be: amounts break in the middle (`$3,000.0` then `0`, a minus sign on a line of its own), names are cut short, and on Home the + button covers Income. Fixing that layout changes those images, and that change is the one to review.
 
 ```
 tools/check --only SnapshotTests
