@@ -59,7 +59,7 @@ jobs:
           xcodebuild -version
           xcrun simctl list devices available
 
-      # Keyed on the project file and Package.resolved, which appears once the project has Swift packages.
+      # Keyed on the project file and Package.resolved, which pins the Swift packages.
       - name: Cache SwiftPM packages and DerivedData
         uses: actions/cache@v4
         with:
@@ -86,3 +86,24 @@ jobs:
           name: ${{ matrix.id }}-results
           path: ${{ runner.temp }}/check-results
           retention-days: 14
+
+  # The tools' own tests: tools/check and the Stop hook against stand-ins, and tools/check-logs on canned logs. They
+  # need no Xcode or simulator, so they report in a minute. On macOS, where the tools run.
+  tools:
+    name: Tools
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Test tools/check
+        run: tools/tests/check/run.sh
+
+      - name: Test the Stop hook
+        run: tools/tests/run-checks/run.sh
+
+      - name: Test tools/check-logs
+        run: python3 -B -m unittest discover -s tools
