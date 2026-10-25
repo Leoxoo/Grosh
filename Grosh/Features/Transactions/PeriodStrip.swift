@@ -64,6 +64,9 @@ struct PeriodStrip: View {
                 returnButton(to: current)
             }
         }
+        // Past AX1 a single tab can take most of an iPhone's width, so "Last month" and "This month" no longer fit
+        // side by side and one is cut off at the edge.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 
     private func tab(for period: Period) -> some View {

@@ -102,6 +102,8 @@ struct ReimbursementNetText: View {
         if transaction.reimbursedCents > 0 {
             Text(verbatim: "= " + transaction.net.signedFormatted())
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
                 .foregroundStyle(transaction.netCents > 0 ? transaction.net.tint : .secondary)
         }
     }

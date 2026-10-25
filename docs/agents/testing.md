@@ -81,8 +81,6 @@ If a run with `--ui` prints `GroshUITests did not run`, check that GroshUITests 
 
 CI skips the suite and prints one line saying so, because the references belong to a Mac.
 
-The AX3 references show the rows and Home as they are now, not as they should be: amounts break in the middle (`$3,000.0` then `0`, a minus sign on a line of its own), names are cut short, and on Home the + button covers Income. Fixing that layout changes those images, and that change is the one to review.
-
 ```
 tools/check --only SnapshotTests
 ```

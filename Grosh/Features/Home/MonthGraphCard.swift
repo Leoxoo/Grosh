@@ -176,7 +176,9 @@ struct MonthGraphCard: View {
                     .foregroundStyle(tabGraph.side.color)
                     .contentTransition(.numericText())
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(0.5)
+                    // Keeps Spent's and Income's totals apart when they shrink to fit.
+                    .padding(.horizontal, 4)
                 Capsule()
                     .fill(isShown ? tabGraph.side.color : Color.secondary.opacity(0.3))
                     .frame(height: 3)
