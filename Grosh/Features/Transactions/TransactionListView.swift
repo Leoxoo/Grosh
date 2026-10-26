@@ -35,7 +35,7 @@ private struct TransactionListContent: View {
     @State private var grouping = TransactionGrouping.day
     /// Search text and filters. Searching looks across all time and every wallet; filters narrow the period.
     @State private var filter = TransactionFilter()
-    /// Whether the search field is presented, which the toolbar's Search button turns on.
+    /// Whether the search field is open, which the toolbar's Search button turns on.
     @State private var isSearchPresented = false
     /// Whether the list is choosing transactions to delete, and the ones chosen so far.
     @State private var isSelecting = false
@@ -107,6 +107,9 @@ private struct TransactionListContent: View {
                 }
             }
         }
+        // The matches start at the top, and the period's list again once the search is cleared. Only the list starts
+        // over: the header with the period strip, below, keeps its place.
+        .id(filter.isSearching)
         .roundedSectionsListStyle()
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 4) {
@@ -124,7 +127,7 @@ private struct TransactionListContent: View {
             .padding(.vertical, 8)
             .background(.bar)
         }
-        .modifier(SearchWhileOpen(text: $filter.searchText, isOpen: $isSearchPresented))
+        .modifier(TransactionSearchField(text: $filter.searchText, isOpen: $isSearchPresented))
         .onChange(of: walletSelection) {
             // A wallet with a shorter history may not reach back to the period being shown.
             period.showCurrentPeriod(currentPeriod, unlessOfferedBy: strip(for: selected))
@@ -213,9 +216,10 @@ private struct TransactionCategoryHeader: View {
 }
 
 /// Adds the system search field. On iPhone and iPad it is there only while the Search button has it open, or search text
-/// is left to clear, so it doesn't take room from the header the rest of the time. Mac keeps its search field in the
-/// toolbar, and has no Search button.
-private struct SearchWhileOpen: ViewModifier {
+/// is left to clear, so it doesn't take room from the header the rest of the time. It hangs on an empty background
+/// rather than on the list: a modifier that comes and goes on the list itself rebuilds the list, which loses its place
+/// and redraws the period strip mid-animation. Mac keeps its search field in the toolbar, and has no Search button.
+private struct TransactionSearchField: ViewModifier {
     @Binding var text: String
     @Binding var isOpen: Bool
 
@@ -223,10 +227,11 @@ private struct SearchWhileOpen: ViewModifier {
         #if os(macOS)
         content.searchable(text: $text, prompt: "Note, category or amount")
         #else
-        if isOpen || !text.isEmpty {
-            content.searchable(text: $text, isPresented: $isOpen, prompt: "Note, category or amount")
-        } else {
-            content
+        content.background {
+            if isOpen || !text.isEmpty {
+                Color.clear
+                    .searchable(text: $text, isPresented: $isOpen, prompt: "Note, category or amount")
+            }
         }
         #endif
     }
