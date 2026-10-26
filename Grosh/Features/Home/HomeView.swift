@@ -85,6 +85,8 @@ private struct TotalBalanceView: View {
                 Text(isHidden ? "••••••" : total.formatted())
                     .font(.largeTitle.bold())
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .contentTransition(.numericText())
                     .accessibilityLabel(isHidden ? Text("Hidden") : Text(total.formatted()))
                 Button {
