@@ -6,6 +6,7 @@ import Testing
 /// Varying Bills: the transactions they make as estimates, when those are reminded of, and what confirming the amount
 /// clears.
 @MainActor
+@Suite(.namedInTheLog)
 struct EstimatedAmountTests {
     private let store: CategoryFixture
     private var context: ModelContext { store.context }

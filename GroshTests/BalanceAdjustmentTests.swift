@@ -5,6 +5,7 @@ import Testing
 
 /// Adjust Balance: typing a wallet's real balance records the difference as one balance adjustment.
 @MainActor
+@Suite(.namedInTheLog)
 struct BalanceAdjustmentTests {
     private let store: CategoryFixture
     private var context: ModelContext { store.context }

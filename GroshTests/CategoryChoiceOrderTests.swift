@@ -5,6 +5,7 @@ import Testing
 
 /// The order a category list shows its choices in, the most used lately first, and the search that narrows it.
 @MainActor
+@Suite(.namedInTheLog)
 struct CategoryChoiceOrderTests {
     private let fixture: CategoryFixture
     private let today = CalendarDay(year: 2026, month: 10, day: 16)

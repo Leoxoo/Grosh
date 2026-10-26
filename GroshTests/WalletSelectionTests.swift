@@ -4,6 +4,7 @@ import Testing
 
 /// The Transactions tab's wallet selector: the Total, or one wallet.
 @MainActor
+@Suite(.namedInTheLog)
 struct WalletSelectionTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }

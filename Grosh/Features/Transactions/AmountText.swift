@@ -13,7 +13,8 @@ extension Money {
     }
 }
 
-/// An amount in its color: green when it adds to a balance, red when it takes from it.
+/// An amount in its color: green when it adds to a balance, red when it takes from it. It stays on one line, shrinking
+/// rather than breaking in the middle of the number.
 struct AmountText: View {
     let amount: Money
     /// Whether to show "+" on amounts that add, as day totals and differences do.
@@ -24,6 +25,8 @@ struct AmountText: View {
     var body: some View {
         Text(showsPlusSign ? amount.signedFormatted() : amount.formatted())
             .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
             .foregroundStyle(showsColor ? amount.tint : .primary)
     }
 }

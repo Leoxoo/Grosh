@@ -2,6 +2,7 @@ import Testing
 @testable import Grosh
 
 @MainActor
+@Suite(.namedInTheLog)
 struct CategoryVisibilityTests {
     private let store: CategoryFixture
     private var catalog: CategoryCatalog { store.catalog }

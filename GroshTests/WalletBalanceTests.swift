@@ -4,6 +4,7 @@ import Testing
 @testable import Grosh
 
 @MainActor
+@Suite(.namedInTheLog)
 struct WalletBalanceTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }

@@ -70,6 +70,7 @@ struct LinkExistingTransactionView: View {
             try recurring.attach(transaction, in: context)
             dismiss()
         } catch {
+            Log.recurring.failed("Linking a transaction to a Recurring transaction", error)
             errorMessage = error.localizedDescription
         }
     }

@@ -14,7 +14,9 @@ struct CategoryMergeView: View {
     var body: some View {
         MergeSheet(
             sourceName: source.name,
-            targets: (try? catalog.mergeTargets(for: source)) ?? [],
+            targets: Log.store.attempt("Reading the categories to merge into") {
+                try catalog.mergeTargets(for: source)
+            } ?? [],
             targetName: \.name,
             consequences: consequences(into:),
             emptyDescription: String(localized: "There's no other \(source.type.title) category this one can be merged into."),

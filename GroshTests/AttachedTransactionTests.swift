@@ -6,6 +6,7 @@ import Testing
 /// Attaching existing transactions to a Recurring transaction and unlinking them: only the link changes, nothing is
 /// deleted, and the schedule keeps its place.
 @MainActor
+@Suite(.namedInTheLog)
 struct AttachedTransactionTests {
     private let store: CategoryFixture
     private var context: ModelContext { store.context }

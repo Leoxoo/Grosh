@@ -39,8 +39,11 @@ struct PeriodStrip: View {
         .defaultScrollAnchor(.trailing)
         // Any part of the tab on screen counts as in view, so the button waits until the tab is fully gone.
         .onScrollTargetVisibilityChange(idType: Period.self, threshold: 0.001) { visible in
+            // SwiftUI warns when this callback updates state more than once a frame, so only a change of the answer does.
+            let inView = visible.contains(current)
+            guard inView != isCurrentPeriodInView else { return }
             withAnimation {
-                isCurrentPeriodInView = visible.contains(current)
+                isCurrentPeriodInView = inView
             }
         }
         .onAppear { scrollToSelection() }
@@ -61,6 +64,9 @@ struct PeriodStrip: View {
                 returnButton(to: current)
             }
         }
+        // Past AX1 a single tab can take most of an iPhone's width, so "Last month" and "This month" no longer fit
+        // side by side and one is cut off at the edge.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 
     private func tab(for period: Period) -> some View {

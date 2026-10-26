@@ -6,6 +6,7 @@ import Testing
 /// Scheduled rows: the occurrences Future lists for a Recurring transaction that are still to come, the wallets they
 /// show for, and that they add to no day's total.
 @MainActor
+@Suite(.namedInTheLog)
 struct ScheduledOccurrenceTests {
     private let store: CategoryFixture
     private var context: ModelContext { store.context }

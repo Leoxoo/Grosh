@@ -1,0 +1,117 @@
+{
+  "devices" : [
+    {
+      "architecture" : "arm64",
+      "deviceId" : "PRO-UDID",
+      "deviceName" : "iPhone 17 Pro",
+      "modelName" : "iPhone 17 Pro",
+      "osVersion" : "26.4",
+      "platform" : "iOS Simulator"
+    }
+  ],
+  "testNodes" : [
+    {
+      "children" : [
+        {
+          "children" : [
+            {
+              "children" : [
+                {
+                  "children" : [
+                    {
+                      "name" : "ReimbursementTests.swift:42: Expectation failed: (net → -1500) == 0",
+                      "nodeType" : "Failure Message",
+                      "result" : "Failed"
+                    },
+                    {
+                      "name" : "ReimbursementTests.swift:45: Expectation failed: (expense.isDeleted → true) == false\nThe Expense stays when its Reimbursement is deleted",
+                      "nodeType" : "Failure Message",
+                      "result" : "Failed"
+                    }
+                  ],
+                  "duration" : "0,031s",
+                  "durationInSeconds" : 0.031,
+                  "name" : "deletingAReimbursementDoesNotDeleteItsExpense()",
+                  "nodeIdentifier" : "ReimbursementTests/deletingAReimbursementDoesNotDeleteItsExpense()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/Grosh/GroshTests/ReimbursementTests/deletingAReimbursementDoesNotDeleteItsExpense()",
+                  "nodeType" : "Test Case",
+                  "result" : "Failed"
+                },
+                {
+                  "duration" : "0,004s",
+                  "durationInSeconds" : 0.004,
+                  "name" : "deletingAnExpenseKeepsItsReimbursement()",
+                  "nodeIdentifier" : "ReimbursementTests/deletingAnExpenseKeepsItsReimbursement()",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "ReimbursementTests",
+              "nodeType" : "Test Suite",
+              "result" : "Failed"
+            },
+            {
+              "children" : [
+                {
+                  "children" : [
+                    {
+                      "name" : "\"12\"",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    },
+                    {
+                      "children" : [
+                        {
+                          "name" : "AmountEntryTests.swift:30: Expectation failed: (AmountEntry(typed: \"1,5\").cents → nil) == 150",
+                          "nodeType" : "Failure Message",
+                          "result" : "Failed"
+                        }
+                      ],
+                      "name" : "\"1,5\"",
+                      "nodeType" : "Arguments",
+                      "result" : "Failed"
+                    }
+                  ],
+                  "duration" : "0,002s",
+                  "durationInSeconds" : 0.002,
+                  "name" : "parsesTypedAmounts(_:)",
+                  "nodeIdentifier" : "AmountEntryTests/parsesTypedAmounts(_:)",
+                  "nodeType" : "Test Case",
+                  "result" : "Failed"
+                }
+              ],
+              "name" : "AmountEntryTests",
+              "nodeType" : "Test Suite",
+              "result" : "Failed"
+            },
+            {
+              "children" : [
+                {
+                  "name" : "launchOpensHome()",
+                  "nodeIdentifier" : "PerformanceBenchmarks/launchOpensHome()",
+                  "nodeType" : "Test Case",
+                  "result" : "Skipped"
+                }
+              ],
+              "name" : "PerformanceBenchmarks",
+              "nodeType" : "Test Suite",
+              "result" : "Skipped"
+            }
+          ],
+          "name" : "GroshTests",
+          "nodeType" : "Unit test bundle",
+          "result" : "Failed"
+        }
+      ],
+      "name" : "Grosh",
+      "nodeType" : "Test Plan",
+      "result" : "Failed"
+    }
+  ],
+  "testPlanConfigurations" : [
+    {
+      "configurationId" : "1",
+      "configurationName" : "Default"
+    }
+  ]
+}

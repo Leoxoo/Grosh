@@ -1,0 +1,445 @@
+#!/usr/bin/env python3
+"""Fail the run when the app logged an error, a fault or a runtime issue.
+
+    tools/check-logs --since EPOCH [--device UDID] [--ui]
+
+reads the log of the booted iOS Simulator, or of the one --device names, for the Grosh process
+from EPOCH (Unix seconds, the moment the test
+run started) and prints what the app logged at error or fault level, plus runtime issues (SwiftUI's
+"Publishing changes from within view updates is not allowed" and the like, which the system logs
+as faults in the com.apple.runtime-issues subsystem), apart from what tools/check-logs.ignore
+lists. With nothing left it prints nothing and exits 0; otherwise it prints what is left and exits 1.
+It exits 2 when it could not make the check at all (no log, a bad ignore file).
+
+Identical messages print once with a count, and each says where it happened:
+
+    Transactions → open a transaction: [SwiftUI] Publishing changes from within view updates ... ×3
+    14:03:22  [Import] Could not read the file
+
+[Import] is the category the message was logged under. The place is the unit test, or with --ui
+the step of the UI smoke walk, that was running when the message was logged. Each unit test logs
+"begin <Suite>/<test>" and "end <Suite>/<test>" in subsystem Leoxo.GroshTests, category Tests (its
+suite's .namedInTheLog trait does that), and the walk logs "begin <step>" and "end <step>" in
+subsystem Leoxo.GroshUITests, category Steps. A message within a couple of seconds after a test or
+step ended says "after <name>". Every other message carries its time.
+
+    tools/check-logs --since EPOCH [--ui] --from-file FILE
+
+reads `log show --style ndjson` output saved in FILE instead of asking the simulator.
+
+tools/check-logs.ignore (or --ignore-file) is a JSON list of messages to leave out, each with the
+reason Grosh cannot fix it:
+
+    [{"pattern": "regular expression", "reason": "why this is system noise"}]
+
+A pattern is searched for anywhere in the message as printed, "[category] text". The tool refuses
+to run when an entry has no reason, no pattern, or a pattern that would match every message.
+"""
+
+import argparse
+import io
+import json
+import re
+import shlex
+import subprocess
+import sys
+from collections.abc import Iterable, Iterator
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+from pathlib import Path, PurePosixPath
+from typing import Any, Optional, Union
+
+APP_PROCESS = "Grosh"
+RUNTIME_ISSUES_SUBSYSTEM = "com.apple.runtime-issues"
+STEPS_SUBSYSTEM = "Leoxo.GroshUITests"
+STEPS_CATEGORY = "Steps"
+TESTS_SUBSYSTEM = "Leoxo.GroshTests"
+TESTS_CATEGORY = "Tests"
+
+IGNORE_FILE = Path(__file__).resolve().with_name("check-logs.ignore")
+LOG_SHOW_TIMEOUT = 600  # seconds: reading a long window of a busy simulator's log is slow, a hung one is not
+AFTER_STEP = 2.0  # seconds after a test or step ends in which a message is still put down to it
+MAX_MESSAGE = 300  # characters of one message to print
+
+# log show reads the message type as a bare word: a quoted "error" is not understood.
+APP_PREDICATE = (
+    f'process == "{APP_PROCESS}" AND (messageType == error OR messageType == fault'
+    f' OR subsystem == "{RUNTIME_ISSUES_SUBSYSTEM}")'
+)
+STEPS_PREDICATE = f'subsystem == "{STEPS_SUBSYSTEM}" AND category == "{STEPS_CATEGORY}"'
+TESTS_PREDICATE = f'subsystem == "{TESTS_SUBSYSTEM}" AND category == "{TESTS_CATEGORY}"'
+
+_TIMESTAMP = re.compile(
+    r"(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?\s*(Z|[+-]\d{2}:?\d{2})?")
+_STEP = re.compile(r"(begin|end)\s+(\S.*)")
+_ADDRESS = re.compile(r"0x[0-9a-fA-F]{6,}")
+
+
+class ToolError(Exception):
+    """The check could not be made, as opposed to the app having logged something."""
+
+
+@dataclass
+class Message:
+    """One error, fault or runtime issue the app logged."""
+
+    time: float
+    clock: str
+    text: str
+    tag: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class StepMark:
+    """A unit test, or a step of the UI smoke walk, beginning or ending."""
+
+    time: float
+    begins: bool
+    name: str
+
+
+@dataclass
+class Collected:
+    messages: list[Message] = field(default_factory=list)
+    marks: list[StepMark] = field(default_factory=list)
+    records: int = 0  # JSON objects seen, whatever they held
+    stray: list[str] = field(default_factory=list)  # the first lines that were not JSON objects
+
+
+@dataclass(frozen=True)
+class IgnoreEntry:
+    pattern: "re.Pattern[str]"
+    reason: str
+
+
+@dataclass
+class Group:
+    """Identical messages, printed once."""
+
+    text: str
+    clock: str
+    tag: Optional[str]
+    count: int = 1
+
+
+def start_argument(since: float) -> str:
+    """`log show --start` takes the local time, to the second."""
+    return datetime.fromtimestamp(int(since)).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def predicate(with_steps: bool) -> str:
+    parts = [APP_PREDICATE, TESTS_PREDICATE] + ([STEPS_PREDICATE] if with_steps else [])
+    return " OR ".join(f"({part})" for part in parts)
+
+
+def simulator_command(since: float, with_steps: bool, device: str = "booted") -> list[str]:
+    command = ["xcrun", "simctl", "spawn", device, "log", "show", "--style", "ndjson"]
+    if with_steps:
+        command.append("--info")  # the steps may be logged at info level, which log show leaves out unless asked
+    return command + ["--start", start_argument(since), "--predicate", predicate(with_steps)]
+
+
+def read_simulator_log(since: float, with_steps: bool, device: str = "booted") -> list[str]:
+    command = simulator_command(since, with_steps, device)
+    try:
+        done = subprocess.run(command, capture_output=True, timeout=LOG_SHOW_TIMEOUT, check=False)
+    except FileNotFoundError as error:
+        raise ToolError("xcrun is not installed. The simulator's log needs Xcode; "
+                        "--from-file reads a saved log instead.") from error
+    except subprocess.TimeoutExpired as error:
+        raise ToolError(f"log show took more than {LOG_SHOW_TIMEOUT} seconds.") from error
+    except OSError as error:
+        raise ToolError(f"cannot run xcrun: {error.strerror}") from error
+    if done.returncode != 0:
+        detail = "\n".join(done.stderr.decode("utf-8", errors="replace").strip().splitlines()[:5])
+        raise ToolError(f"could not read the simulator's log (exit {done.returncode}): "
+                        f"{detail or 'no message'}\n  ran: {shlex.join(command)}\n"
+                        "  The simulator the tests ran on has to still be booted.")
+    return done.stdout.decode("utf-8", errors="replace").splitlines()
+
+
+def read_log_file(path: str) -> Iterator[str]:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            yield from handle
+    except OSError as error:
+        raise ToolError(f"cannot read {path}: {error.strerror}") from error
+
+
+def parse_timestamp(text: object) -> Optional[datetime]:
+    """An entry's `timestamp`, such as 2026-10-23 14:03:22.345678-0400, with the zone it was written in."""
+    match = _TIMESTAMP.fullmatch(text.strip()) if isinstance(text, str) else None
+    if not match:
+        return None
+    year, month, day, hour, minute, second = (int(match[number]) for number in range(1, 7))
+    microsecond = int((match[7] or "")[:6].ljust(6, "0"))
+    zone = match[8]
+    try:
+        if zone is None:
+            tzinfo = None
+        elif zone == "Z":
+            tzinfo = timezone.utc
+        else:
+            digits = zone[1:].replace(":", "")
+            offset = timedelta(hours=int(digits[:2]), minutes=int(digits[2:]))
+            tzinfo = timezone(-offset if zone[0] == "-" else offset)
+        when = datetime(year, month, day, hour, minute, second, microsecond, tzinfo)
+    except ValueError:
+        return None
+    return when if tzinfo else when.astimezone()
+
+
+def is_step_record(record: dict[str, Any]) -> bool:
+    return record.get("subsystem") == STEPS_SUBSYSTEM and record.get("category") == STEPS_CATEGORY
+
+
+def is_test_record(record: dict[str, Any]) -> bool:
+    return record.get("subsystem") == TESTS_SUBSYSTEM and record.get("category") == TESTS_CATEGORY
+
+
+def is_app_issue(record: dict[str, Any]) -> bool:
+    """An error or fault of the Grosh process, or a runtime issue at whatever level."""
+    path = record.get("processImagePath")
+    if isinstance(path, str) and path and PurePosixPath(path).name != APP_PROCESS:
+        return False
+    level = str(record.get("messageType", "")).lower()
+    return level in ("error", "fault") or record.get("subsystem") == RUNTIME_ISSUES_SUBSYSTEM
+
+
+def describe(record: dict[str, Any], text: str) -> str:
+    """The message as printed, led by the category it was logged under: [SwiftUI] Publishing changes ..."""
+    text = text.strip()
+    category = record.get("category")
+    if isinstance(category, str) and category and not text.startswith(f"[{category}]"):
+        text = f"[{category}] {text}".strip()
+    return text or "(empty message)"
+
+
+def step_mark(text: str, moment: float) -> Optional[StepMark]:
+    match = _STEP.fullmatch(text.strip())
+    if not match:
+        return None
+    return StepMark(moment, match[1] == "begin", match[2].strip())
+
+
+def collect(lines: Iterable[str], since: float, with_steps: bool) -> Collected:
+    """Sort `log show --style ndjson` lines into the app's messages and the unit tests' marks and, with
+    `with_steps`, the UI walk's step marks.
+
+    The predicate already narrows what the simulator returns; this checks the same things again so that a
+    saved or unfiltered log gives the same answer, and drops what came before `since` (log show starts at
+    a whole second).
+    """
+    found = Collected()
+    moment = since
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError:
+            record = None
+        if not isinstance(record, dict):
+            if len(found.stray) < 3:
+                found.stray.append(line)
+            continue
+        found.records += 1
+        text = record.get("eventMessage")  # the closing {"finished": ...} record has none
+        if not isinstance(text, str):
+            continue
+        when = parse_timestamp(record.get("timestamp"))
+        if when:
+            moment = when.timestamp()
+        if moment < since:
+            continue
+        if is_step_record(record) or is_test_record(record):
+            mark = step_mark(text, moment) if with_steps or is_test_record(record) else None
+            if mark:
+                found.marks.append(mark)
+        elif is_app_issue(record):
+            clock = when.strftime("%H:%M:%S") if when else "??:??:??"
+            found.messages.append(Message(moment, clock, describe(record, text)))
+    found.messages.sort(key=lambda message: message.time)
+    return found
+
+
+def tag_messages(messages: list[Message], marks: list[StepMark]) -> None:
+    """Set each message's tag to the unit test or step it was logged in.
+
+    That is the innermost test or step that had begun and not yet ended: a test inside its suite. A message with no step open, up to AFTER_STEP
+    seconds after one ended, is tagged "after <step>"; any other has no tag.
+    """
+    begin, between, end = 0, 1, 2  # what happens at the same instant: a step begins, messages are logged, a step ends
+    events: list[tuple[float, int, int, Union[StepMark, Message]]] = [
+        (mark.time, begin if mark.begins else end, index, mark) for index, mark in enumerate(marks)]
+    events += [(message.time, between, index, message) for index, message in enumerate(messages)]
+    events.sort(key=lambda event: event[:3])
+    open_steps: list[str] = []
+    last_ended: Optional[tuple[str, float]] = None
+    for moment, kind, _, item in events:
+        if isinstance(item, Message):
+            if open_steps:
+                item.tag = open_steps[-1]
+            elif last_ended and moment - last_ended[1] <= AFTER_STEP:
+                item.tag = f"after {last_ended[0]}"
+            continue
+        if item.name in open_steps:
+            # A step that begins again, or ends, takes with it any step inside it whose end never came.
+            del open_steps[len(open_steps) - 1 - open_steps[::-1].index(item.name):]
+            if kind == end:
+                last_ended = (item.name, moment)
+        if kind == begin:
+            open_steps.append(item.name)
+
+
+def load_ignore_list(path: Union[str, Path]) -> list[IgnoreEntry]:
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except OSError as error:
+        raise ToolError(f"cannot read {path}: {error.strerror}") from error
+    try:
+        data = json.loads(text)
+    except ValueError as error:
+        raise ToolError(f"{path} is not valid JSON ({error}). With nothing to ignore it holds []") from error
+    if not isinstance(data, list):
+        raise ToolError(f'{path} must hold a JSON list of {{"pattern": ..., "reason": ...}} entries.')
+    entries: list[IgnoreEntry] = []
+    problems: list[str] = []
+    for number, item in enumerate(data, start=1):
+        entry = ignore_entry(item, f"{path}, entry {number}", problems)
+        if entry:
+            entries.append(entry)
+    if problems:
+        raise ToolError("\n".join(problems))
+    return entries
+
+
+def ignore_entry(item: object, where: str, problems: list[str]) -> Optional[IgnoreEntry]:
+    if not isinstance(item, dict):
+        problems.append(f'{where}: must be an object with a "pattern" and a "reason".')
+        return None
+    pattern, reason = item.get("pattern"), item.get("reason")
+    if isinstance(pattern, str) and pattern.strip():
+        where = f"{where} ({pattern})"
+    found: list[str] = []
+    unknown = sorted(set(item) - {"pattern", "reason"})
+    if unknown:
+        found.append(f'has {", ".join(unknown)}, but an entry holds only "pattern" and "reason"')
+    compiled = None
+    if not isinstance(pattern, str) or not pattern.strip():
+        found.append('has no "pattern"')
+    else:
+        try:
+            compiled = re.compile(pattern)
+        except re.error as error:
+            found.append(f"the pattern is not a regular expression ({error})")
+        else:
+            if compiled.search(""):
+                found.append("the pattern matches an empty message, so it would ignore every message")
+    if not isinstance(reason, str) or not reason.strip():
+        found.append('has no "reason". Say in one line why Grosh cannot fix this message')
+    problems.extend(f"{where}: {problem}." for problem in found)
+    if found or compiled is None or not isinstance(reason, str):
+        return None
+    return IgnoreEntry(compiled, reason.strip())
+
+
+def is_ignored(text: str, entries: list[IgnoreEntry]) -> bool:
+    return any(entry.pattern.search(text) for entry in entries)
+
+
+def group_messages(messages: list[Message]) -> list[Group]:
+    """Identical messages (apart from memory addresses, which differ per run) once, in order of first sight.
+
+    A group says where it first happened in a step, if it ever did; otherwise when.
+    """
+    groups: dict[str, Group] = {}
+    for message in messages:
+        key = _ADDRESS.sub("0x", message.text)
+        group = groups.get(key)
+        if group is None:
+            groups[key] = Group(message.text, message.clock, message.tag)
+        else:
+            group.count += 1
+            group.tag = group.tag or message.tag
+    return list(groups.values())
+
+
+def shorten(text: str) -> str:
+    """The first line of a message, cut to MAX_MESSAGE characters; … shows there was more."""
+    lines = text.splitlines()
+    line = lines[0].strip() if lines else ""
+    cut = len(lines) > 1
+    if len(line) > MAX_MESSAGE:
+        line, cut = line[:MAX_MESSAGE].rstrip(), True
+    return f"{line} …" if cut else line
+
+
+def render(groups: list[Group]) -> list[str]:
+    lines = [("The app logged errors, faults or runtime issues that tools/check-logs.ignore does not cover. "
+              "See docs/agents/log-check.md.")]
+    for group in groups:
+        where = f"{group.tag}: " if group.tag else f"{group.clock}  "
+        count = f" ×{group.count}" if group.count > 1 else ""
+        lines.append(f"  {where}{shorten(group.text)}{count}")
+    return lines
+
+
+def epoch(text: str) -> float:
+    try:
+        value = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a number of seconds") from None
+    if not 0 <= value < 253_402_300_800:  # up to the year 9999; also turns away nan and inf
+        raise argparse.ArgumentTypeError(f"{text!r} is not a Unix time")
+    return value
+
+
+def parse_args(argv: Optional[list[str]]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="tools/check-logs",
+        description="Print the errors, faults and runtime issues the Grosh process logged since a time, "
+                    "apart from those in the ignore file. Prints nothing and exits 0 when there are none; "
+                    "exits 1 after printing some, 2 when the check could not be made.")
+    parser.add_argument("--since", type=epoch, required=True, metavar="EPOCH",
+                        help="Unix time in seconds when the test run started")
+    parser.add_argument("--device", default="booted", metavar="UDID",
+                        help="the simulator whose log is read: the booted one (the default), or the one with this UDID")
+    parser.add_argument("--ui", action="store_true",
+                        help="the UI tests ran: also read the smoke walk's steps and name the step of each message")
+    parser.add_argument("--from-file", metavar="FILE",
+                        help="read `log show --style ndjson` output from FILE instead of the booted simulator")
+    parser.add_argument("--ignore-file", default=IGNORE_FILE, metavar="FILE",
+                        help="the messages to leave out (default: tools/check-logs.ignore)")
+    return parser.parse_args(argv)
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    args = parse_args(argv)
+    try:
+        ignored = load_ignore_list(args.ignore_file)
+        lines = (read_log_file(args.from_file) if args.from_file
+                 else read_simulator_log(args.since, args.ui, args.device))
+        found = collect(lines, args.since, args.ui)
+        if found.stray and not found.records:
+            raise ToolError("the log is not ndjson. It starts: " + " | ".join(line[:100] for line in found.stray))
+    except ToolError as error:
+        print(f"check-logs: {error}", file=sys.stderr)
+        return 2
+    tag_messages(found.messages, found.marks)
+    remaining = [message for message in found.messages if not is_ignored(message.text, ignored)]
+    if not remaining:
+        return 0
+    output = render(group_messages(remaining))
+    if args.ui and not found.marks:
+        output.append("  (No UI test steps were logged, so these carry only their time.)")
+    print("\n".join(output))
+    return 1
+
+
+if __name__ == "__main__":
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+    sys.exit(main())

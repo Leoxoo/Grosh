@@ -12,12 +12,12 @@ struct CustomRangeEditor: View {
     @State private var first: CalendarDay
     @State private var last: CalendarDay
 
-    /// Starts from `days`, or from today for an open end.
-    init(days: DayRange, latest: CalendarDay? = nil, choose: @escaping (DayRange) -> Void) {
+    /// Starts from `days`, or from `today` for an open end.
+    init(days: DayRange, today: CalendarDay, latest: CalendarDay? = nil, choose: @escaping (DayRange) -> Void) {
         self.choose = choose
         self.latest = latest
-        _first = State(initialValue: days.first ?? .today)
-        _last = State(initialValue: days.last ?? .today)
+        _first = State(initialValue: days.first ?? today)
+        _last = State(initialValue: days.last ?? today)
     }
 
     var body: some View {

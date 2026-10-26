@@ -3,7 +3,7 @@ import SwiftData
 
 /// What the editor of one transfer half holds: its amount (entered positive; the half sets the sign), date and
 /// note. Its wallet and category stay as the transfer recorded them.
-struct TransferHalfDraft {
+nonisolated struct TransferHalfDraft {
     var amount: Money
     var day: CalendarDay
     var note: String

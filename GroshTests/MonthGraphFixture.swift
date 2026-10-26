@@ -9,6 +9,7 @@ struct MonthGraphFixture {
     let today = day(2026, 10, 12)
     private let categories: CategoryFixture
     var context: ModelContext { categories.context }
+    var container: ModelContainer { categories.container }
     var checking: Wallet { categories.wallet }
 
     init() throws {

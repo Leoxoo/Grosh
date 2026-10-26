@@ -9,6 +9,18 @@ struct ReimbursementEditor: View {
     /// The entry being edited, or `nil` when adding one.
     var editing: Reimbursement?
 
+    @Environment(\.today) private var today
+
+    var body: some View {
+        ReimbursementForm(expense: expense, editing: editing, startingDay: today)
+    }
+}
+
+/// The form behind ``ReimbursementEditor``, holding the draft from the moment the sheet opens.
+private struct ReimbursementForm: View {
+    let expense: Transaction
+    let editing: Reimbursement?
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
@@ -16,10 +28,10 @@ struct ReimbursementEditor: View {
     @State private var entry: AmountEntry
     @State private var errorMessage: String?
 
-    init(expense: Transaction, editing: Reimbursement? = nil) {
+    init(expense: Transaction, editing: Reimbursement?, startingDay: CalendarDay) {
         self.expense = expense
         self.editing = editing
-        let startingDraft = editing.map(ReimbursementDraft.init(editing:)) ?? ReimbursementDraft(day: .today)
+        let startingDraft = editing.map(ReimbursementDraft.init(editing:)) ?? ReimbursementDraft(day: startingDay)
         _draft = State(initialValue: startingDraft)
         _entry = State(initialValue: editing == nil ? AmountEntry() : AmountEntry(cents: startingDraft.amount.cents))
     }
@@ -60,6 +72,7 @@ struct ReimbursementEditor: View {
             }
             dismiss()
         } catch {
+            Log.store.failed("Saving a Reimbursement", error)
             errorMessage = error.localizedDescription
         }
     }

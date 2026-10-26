@@ -3,7 +3,7 @@ import SwiftData
 
 /// The amount a varying Bill's transactions start at, before the real one is entered: the average of the most recent
 /// usable transactions filed under the Bill's category.
-enum AmountEstimate {
+nonisolated enum AmountEstimate {
     /// How many of the most recent usable transactions the average is taken over.
     static let sampleSize = 12
 

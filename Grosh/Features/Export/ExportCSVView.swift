@@ -5,6 +5,7 @@ import SwiftUI
 /// share sheet. Import from MoneyLover restores the file with "Replace all data".
 struct ExportCSVView: View {
     @Environment(\.modelContext) private var context
+    @Environment(\.today) private var today
     /// The written file, once it is ready to share.
     @State private var file: URL?
     @State private var errorMessage: String?
@@ -37,10 +38,11 @@ struct ExportCSVView: View {
     /// Writes the export to a temporary file named for today.
     private func write() {
         do {
-            let url = URL.temporaryDirectory.appending(path: GroshCSVExport.fileName(on: .today))
+            let url = URL.temporaryDirectory.appending(path: GroshCSVExport.fileName(on: today))
             try GroshCSVExport.csv(in: context).write(to: url, atomically: true, encoding: .utf8)
             file = url
         } catch {
+            Log.store.failed("Writing the CSV export", error)
             errorMessage = error.localizedDescription
         }
     }

@@ -2,6 +2,7 @@ import Testing
 @testable import Grosh
 
 /// Which days each period of the Transactions tab covers, and the strip of periods it steps through.
+@Suite(.namedInTheLog)
 struct PeriodTests {
     private let today = CalendarDay(year: 2026, month: 10, day: 9)
 

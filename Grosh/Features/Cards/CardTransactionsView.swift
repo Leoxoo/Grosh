@@ -10,6 +10,7 @@ import SwiftUI
 struct CardTransactionsView: View {
     let card: Card
 
+    @Environment(\.today) private var today
     /// How many periods before the current one is showing: 0 for the current period, negative for a later one holding
     /// a transaction dated after today.
     @State private var periodsBack = 0
@@ -46,11 +47,10 @@ struct CardTransactionsView: View {
 
     /// The period being shown, its count and total, then its transactions by day and its lead-in transactions.
     private var periodList: some View {
-        let today = CalendarDay.today
         let period = card.period(containing: today).adding(-periodsBack)
         let shown = card.transactions(in: period)
         let leadIns = card.leadInTransactions(in: period)
-        let added = leadIns.filter(addedLeadIns.contains)
+        let added = leadIns.filter { addedLeadIns.contains($0) }
 
         return List {
             Section {

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Stands in for tools/check-logs in tools/tests/check/run.sh: records its arguments in $FAKE_CALLS, prints $FAKE_LOGGED
+# and exits $FAKE_LOGGED_EXIT.
+
+{
+    printf 'check-logs'
+    printf ' %s' "$@"
+    printf '\n'
+} >>"$FAKE_CALLS"
+
+if [ -n "${FAKE_LOGGED:-}" ]; then
+    printf '%s\n' "$FAKE_LOGGED"
+fi
+exit "${FAKE_LOGGED_EXIT:-0}"

@@ -6,6 +6,7 @@ import Testing
 /// The Transactions tab's list: only days that have transactions, newest day first, the most recently entered
 /// transaction on top within a day, and each day's net total.
 @MainActor
+@Suite(.namedInTheLog)
 struct TransactionDayTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
@@ -74,6 +75,7 @@ struct TransactionDayTests {
 
 /// The order within a day survives closing and reopening the store.
 @MainActor
+@Suite(.namedInTheLog)
 struct TransactionOrderAcrossLaunchesTests {
     private let storeURL = URL.temporaryDirectory
         .appending(path: "GroshTests-\(UUID().uuidString)", directoryHint: .isDirectory)

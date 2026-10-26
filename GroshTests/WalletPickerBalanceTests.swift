@@ -6,6 +6,7 @@ import Testing
 /// The balances a wallet picker shows when it opts in, as the Transfer sheet's From and To do: the chosen wallet's
 /// balance today on a Balance row of its own under the picker, and each wallet's balance today in its dropdown option.
 @MainActor
+@Suite(.namedInTheLog)
 struct WalletPickerBalanceTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }

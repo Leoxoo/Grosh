@@ -5,6 +5,7 @@ import Testing
 /// What the Wallet selector lists when opened: the Total, the wallets included in it and those left out, each with its
 /// balance today.
 @MainActor
+@Suite(.namedInTheLog)
 struct WalletSelectorChoicesTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }

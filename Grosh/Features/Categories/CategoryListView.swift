@@ -197,6 +197,7 @@ struct CategoryListView: View {
         do {
             try change()
         } catch {
+            Log.store.failed("Changing a category", error)
             errorMessage = error.localizedDescription
         }
     }

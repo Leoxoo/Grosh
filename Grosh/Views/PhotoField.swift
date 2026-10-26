@@ -33,11 +33,13 @@ struct PhotoField: View {
     var body: some View {
         LabeledContent {
             HStack(spacing: 12) {
+                // The picker's label is a Sendable closure, so it reads a copy rather than the main-actor binding.
+                let hasPhoto = data != nil
                 if let data, let image = CroppedPhoto.image(from: data) {
                     CroppedPhotoImage(image: image, shape: shape, height: 32)
                 }
                 PhotosPicker(selection: $pickerItem, matching: .images) {
-                    Text(data == nil ? "Choose Photo" : "Replace")
+                    Text(hasPhoto ? "Replace" : "Choose Photo")
                 }
                 if data != nil {
                     Button("Remove", role: .destructive) {

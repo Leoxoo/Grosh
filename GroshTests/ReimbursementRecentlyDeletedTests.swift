@@ -6,6 +6,7 @@ import Testing
 /// An Expense's Reimbursements go with it: to Recently Deleted, where they count in nothing, back when it is restored,
 /// and out of the store for good when it is.
 @MainActor
+@Suite(.namedInTheLog)
 struct ReimbursementRecentlyDeletedTests {
     private let store: MonthGraphFixture
     private var context: ModelContext { store.context }

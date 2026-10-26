@@ -9,7 +9,7 @@ struct RecentTransactionsSection: View {
 
     @Query private var transactions: [Transaction]
 
-    init(today: CalendarDay = .today) {
+    init(today: CalendarDay) {
         _transactions = Query(Transaction.recent(limit: Self.limit, asOf: today))
     }
 

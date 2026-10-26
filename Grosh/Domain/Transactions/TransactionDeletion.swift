@@ -24,7 +24,7 @@ extension Transaction {
     }
 }
 
-extension Collection where Element == Transaction {
+nonisolated extension Collection where Element == Transaction {
     /// The transactions linked to these ones that aren't among them: the links deleting only these would break.
     /// Listed newest first.
     func related(in context: ModelContext) throws -> [Transaction] {

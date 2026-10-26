@@ -6,6 +6,7 @@ import Testing
 /// The estimate a varying Bill's transactions start at: the average of the last twelve usable transactions filed under
 /// its category, or under its subcategories when the parent is chosen.
 @MainActor
+@Suite(.namedInTheLog)
 struct AmountEstimateTests {
     private let store: CategoryFixture
     private var context: ModelContext { store.context }

@@ -41,7 +41,7 @@ struct ForgiveDraft {
 /// The mark a forgiven Loan or Debt carries (ADR-0004): how much was forgiven, when, and under which category it counts
 /// in reports. Forgiving adds no transaction and never changes any balance; the original and its payments stay as
 /// they are.
-struct Forgiveness {
+nonisolated struct Forgiveness {
     /// What was forgiven, above zero: what was outstanding when it was forgiven.
     let amount: Money
     let day: CalendarDay

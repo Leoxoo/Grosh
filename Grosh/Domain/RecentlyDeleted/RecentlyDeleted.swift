@@ -4,7 +4,7 @@ import SwiftData
 /// Account → Recently Deleted: the wallets, Recurring transactions and transactions deleted in the last 30 days, waiting
 /// to be restored or removed for good. A deleted wallet is one item holding the transactions and Recurring transactions
 /// deleted with it. Nothing in it counts in any balance, list, search or report.
-struct RecentlyDeleted {
+nonisolated struct RecentlyDeleted {
     /// How long an item waits before it is removed for good.
     static let keptDays = 30
 
@@ -192,6 +192,7 @@ extension Wallet {
     /// Brings the wallet back from Recently Deleted with the transactions and Recurring transactions deleted with it.
     /// Transactions deleted on their own before it stay in the bin. Its Recurring transactions skip what fell due while
     /// it was away, so nothing is backfilled. Saves.
+    @MainActor
     func restore(today: CalendarDay = .today) throws {
         guard isInRecentlyDeleted else { throw RecentlyDeletedError.notDeleted }
         for transaction in transactionsDeletedWithIt {
@@ -226,6 +227,7 @@ extension RecurringTransaction {
 
     /// Brings a schedule deleted on its own back from Recently Deleted, with its settings. What fell due while it was
     /// away is not made: it is skipped through `today`, as saving a schedule today skips the days before it. Saves.
+    @MainActor
     func restore(today: CalendarDay = .today) throws {
         if let restoreBlocker { throw restoreBlocker }
         skipOccurrences(through: today)
@@ -273,7 +275,8 @@ extension Transaction {
             return false
         }
         let linked = FetchDescriptor<Transaction>(predicate: #Predicate { $0.linkID == link && $0.deletedAt == nil })
-        return ((try? context.fetch(linked)) ?? []).contains { $0.isForgiven && $0.loanOrDebtKind?.paymentRole == role }
+        let linkedTransactions = Log.store.attempt("Reading the transactions linked to a payment") { try context.fetch(linked) } ?? []
+        return linkedTransactions.contains { $0.isForgiven && $0.loanOrDebtKind?.paymentRole == role }
     }
 
     /// Brings a transaction deleted on its own back from Recently Deleted, linked as before. One deleted with its
@@ -292,7 +295,8 @@ extension Transaction {
     var paymentsInRecentlyDeleted: [Transaction] {
         guard let kind = loanOrDebtKind, let link = linkID, let context = modelContext else { return [] }
         let deleted = FetchDescriptor<Transaction>(predicate: #Predicate { $0.linkID == link && $0.deletedAt != nil })
-        return ((try? context.fetch(deleted)) ?? []).filter { $0.category?.lockedRole == kind.paymentRole }
+        let found = Log.store.attempt("Reading the payments in Recently Deleted") { try context.fetch(deleted) } ?? []
+        return found.filter { $0.category?.lockedRole == kind.paymentRole }
     }
 
     /// Delete Forever: removes a transaction deleted on its own for good. Saves.
@@ -303,7 +307,7 @@ extension Transaction {
     }
 }
 
-extension Sequence where Element == Transaction {
+nonisolated extension Sequence where Element == Transaction {
     /// The transactions outside Recently Deleted.
     var notDeleted: [Transaction] { filter { !$0.isInRecentlyDeleted } }
 }

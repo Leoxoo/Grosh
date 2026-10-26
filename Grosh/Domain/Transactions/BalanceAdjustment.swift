@@ -3,7 +3,7 @@ import SwiftData
 
 /// What the Adjust Balance sheet holds: the wallet's real balance on a day. Saving records the difference from
 /// what the wallet's transactions add up to as one balance adjustment.
-struct BalanceAdjustmentDraft {
+nonisolated struct BalanceAdjustmentDraft {
     /// Changing it starts the real balance again from this wallet's recorded one: what was typed belonged to the
     /// other wallet.
     var wallet: Wallet? {

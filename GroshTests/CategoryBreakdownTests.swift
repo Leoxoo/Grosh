@@ -6,6 +6,7 @@ import Testing
 /// The Category report's split of a side's period total by parent category: what each donut slice and each Breakdown row
 /// holds. Subcategories add into their parent, and the five largest parents get a slice each, the rest sharing one.
 @MainActor
+@Suite(.namedInTheLog)
 struct CategoryBreakdownTests {
     private let store: MonthGraphFixture
     private var context: ModelContext { store.context }

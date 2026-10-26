@@ -6,6 +6,7 @@ import Testing
 /// Import from MoneyLover ("Replace all data"): a MoneyLover CSV export replaces every wallet, Card and transaction,
 /// keeping the categories. Every fixture here is made up.
 @MainActor
+@Suite(.namedInTheLog)
 struct MoneyLoverImportTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
@@ -272,7 +273,7 @@ struct MoneyLoverImportTests {
             return "\(original.wallet?.name ?? "") \(original.day.month)/\(original.day.day) \(original.amountCents)"
         }
         let all = try DebtsAndLoans(in: context)
-        return (Set(all.open.map(describe)), Set(all.settled.map(describe)))
+        return (Set(all.open.map { describe($0) }), Set(all.settled.map { describe($0) }))
     }
 
     @Test func eachDebtCollectionSettlesTheEarliestOpenLoanOfItsWalletAndAmount() throws {

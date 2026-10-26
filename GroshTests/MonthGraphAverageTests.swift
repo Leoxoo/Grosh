@@ -5,6 +5,7 @@ import Testing
 /// The gray line of Home's Spent and Income cards: the Average of up to three complete months before the month shown,
 /// each laid out across the month shown.
 @MainActor
+@Suite(.namedInTheLog)
 struct MonthGraphAverageTests {
     private let store: MonthGraphFixture
     private var context: ModelContext { store.context }

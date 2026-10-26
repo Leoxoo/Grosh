@@ -6,6 +6,7 @@ import Testing
 /// Select multiple → Delete in the Transactions tab's "…" menu. It goes through the same delete scopes as deleting
 /// one transaction, so a link is never broken silently.
 @MainActor
+@Suite(.namedInTheLog)
 struct MultiDeleteTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }

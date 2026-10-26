@@ -3,6 +3,7 @@ import Testing
 @testable import Grosh
 
 /// Reading a MoneyLover CSV export. Every fixture here is made up.
+@Suite(.namedInTheLog)
 struct MoneyLoverCSVTests {
     private static let header = "Id,Date,Category,Amount,Currency,Wallet,Note,With,Event,Exclude from report,Members"
 

@@ -6,6 +6,7 @@ import Testing
 /// Where an Expense's Reimbursements count: balances, Opening and Ending balances, day totals and the transaction list
 /// use the net, while a Card's statement and the Card filter's total still use what the Card was charged.
 @MainActor
+@Suite(.namedInTheLog)
 struct ReimbursementBalanceTests {
     private let store: MonthGraphFixture
     private var context: ModelContext { store.context }
