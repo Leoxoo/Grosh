@@ -98,5 +98,9 @@
   {
     "pattern": "^\\[general\\] NSPredicate: -\\[NSPredicate copy\\] called on a predicate that has _evaluationBlocked set\\.",
     "reason": "Foundation logs this fault in the app's process when XCTest's automation support copies a query predicate it decoded from the UI test runner. A UI test that only launches Grosh and waits for Home logs it, and the same launch without XCTest does not, so it comes from the test runner's queries, not from Grosh."
+  },
+  {
+    "pattern": "^\\[Invalid Configuration\\] glassEffect\\(\\) tried to update multiple times per frame\\.$",
+    "reason": "On iOS 27, SwiftUI logs this when the Category picker's search field gets focus inside the Add Transaction sheet. The picker uses a plain .searchable, and the fault still came with both of Grosh's own glass buttons (the + and the period strip's return button) switched to non-glass styles, so the glass is SwiftUI's own search field. A glass button of Grosh's that misbehaves logs the same words, so look again if one is added."
   }
 ]
