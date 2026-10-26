@@ -7,6 +7,7 @@ import Testing
 /// The day screens treat as today, which they read from the SwiftUI environment so a screen can be shown as of a fixed
 /// day.
 @MainActor
+@Suite(.namedInTheLog)
 struct TodayEnvironmentTests {
     @Test func theDefaultIsTheRealToday() {
         let before = CalendarDay.today

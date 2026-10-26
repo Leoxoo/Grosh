@@ -16,12 +16,12 @@ Identical messages print once with a count, and each says where it happened:
     Transactions → open a transaction: [SwiftUI] Publishing changes from within view updates ... ×3
     14:03:22  [Import] Could not read the file
 
-[Import] is the category the message was logged under. With --ui the place is the step of the UI
-smoke walk that was active when the message was logged: the walk logs "begin <step>" and
-"end <step>" in subsystem Leoxo.GroshUITests, category Steps. A message within a couple of seconds
-after a step ended says "after <step>". Every other message, including every message of a unit test
-run, carries its time: no marker in the log is known to say which unit test was running, and Swift
-Testing runs tests side by side, so time alone does not name one.
+[Import] is the category the message was logged under. The place is the unit test, or with --ui
+the step of the UI smoke walk, that was running when the message was logged. Each unit test logs
+"begin <Suite>/<test>" and "end <Suite>/<test>" in subsystem Leoxo.GroshTests, category Tests (its
+suite's .namedInTheLog trait does that), and the walk logs "begin <step>" and "end <step>" in
+subsystem Leoxo.GroshUITests, category Steps. A message within a couple of seconds after a test or
+step ended says "after <name>". Every other message carries its time.
 
     tools/check-logs --since EPOCH [--ui] --from-file FILE
 
@@ -53,10 +53,12 @@ APP_PROCESS = "Grosh"
 RUNTIME_ISSUES_SUBSYSTEM = "com.apple.runtime-issues"
 STEPS_SUBSYSTEM = "Leoxo.GroshUITests"
 STEPS_CATEGORY = "Steps"
+TESTS_SUBSYSTEM = "Leoxo.GroshTests"
+TESTS_CATEGORY = "Tests"
 
 IGNORE_FILE = Path(__file__).resolve().with_name("check-logs.ignore")
 LOG_SHOW_TIMEOUT = 600  # seconds: reading a long window of a busy simulator's log is slow, a hung one is not
-AFTER_STEP = 2.0  # seconds after a step ends in which a message is still put down to it
+AFTER_STEP = 2.0  # seconds after a test or step ends in which a message is still put down to it
 MAX_MESSAGE = 300  # characters of one message to print
 
 # log show reads the message type as a bare word: a quoted "error" is not understood.
@@ -65,6 +67,7 @@ APP_PREDICATE = (
     f' OR subsystem == "{RUNTIME_ISSUES_SUBSYSTEM}")'
 )
 STEPS_PREDICATE = f'subsystem == "{STEPS_SUBSYSTEM}" AND category == "{STEPS_CATEGORY}"'
+TESTS_PREDICATE = f'subsystem == "{TESTS_SUBSYSTEM}" AND category == "{TESTS_CATEGORY}"'
 
 _TIMESTAMP = re.compile(
     r"(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?\s*(Z|[+-]\d{2}:?\d{2})?")
@@ -88,7 +91,7 @@ class Message:
 
 @dataclass(frozen=True)
 class StepMark:
-    """The UI smoke walk beginning or ending a step."""
+    """A unit test, or a step of the UI smoke walk, beginning or ending."""
 
     time: float
     begins: bool
@@ -125,9 +128,8 @@ def start_argument(since: float) -> str:
 
 
 def predicate(with_steps: bool) -> str:
-    if not with_steps:
-        return APP_PREDICATE
-    return f"({APP_PREDICATE}) OR ({STEPS_PREDICATE})"
+    parts = [APP_PREDICATE, TESTS_PREDICATE] + ([STEPS_PREDICATE] if with_steps else [])
+    return " OR ".join(f"({part})" for part in parts)
 
 
 def simulator_command(since: float, with_steps: bool, device: str = "booted") -> list[str]:
@@ -191,6 +193,10 @@ def is_step_record(record: dict[str, Any]) -> bool:
     return record.get("subsystem") == STEPS_SUBSYSTEM and record.get("category") == STEPS_CATEGORY
 
 
+def is_test_record(record: dict[str, Any]) -> bool:
+    return record.get("subsystem") == TESTS_SUBSYSTEM and record.get("category") == TESTS_CATEGORY
+
+
 def is_app_issue(record: dict[str, Any]) -> bool:
     """An error or fault of the Grosh process, or a runtime issue at whatever level."""
     path = record.get("processImagePath")
@@ -217,7 +223,8 @@ def step_mark(text: str, moment: float) -> Optional[StepMark]:
 
 
 def collect(lines: Iterable[str], since: float, with_steps: bool) -> Collected:
-    """Sort `log show --style ndjson` lines into the app's messages and, with `with_steps`, the step marks.
+    """Sort `log show --style ndjson` lines into the app's messages and the unit tests' marks and, with
+    `with_steps`, the UI walk's step marks.
 
     The predicate already narrows what the simulator returns; this checks the same things again so that a
     saved or unfiltered log gives the same answer, and drops what came before `since` (log show starts at
@@ -246,8 +253,8 @@ def collect(lines: Iterable[str], since: float, with_steps: bool) -> Collected:
             moment = when.timestamp()
         if moment < since:
             continue
-        if is_step_record(record):
-            mark = step_mark(text, moment) if with_steps else None
+        if is_step_record(record) or is_test_record(record):
+            mark = step_mark(text, moment) if with_steps or is_test_record(record) else None
             if mark:
                 found.marks.append(mark)
         elif is_app_issue(record):
@@ -258,9 +265,9 @@ def collect(lines: Iterable[str], since: float, with_steps: bool) -> Collected:
 
 
 def tag_messages(messages: list[Message], marks: list[StepMark]) -> None:
-    """Set each message's tag to the step it was logged in.
+    """Set each message's tag to the unit test or step it was logged in.
 
-    That is the innermost step that had begun and not yet ended. A message with no step open, up to AFTER_STEP
+    That is the innermost test or step that had begun and not yet ended: a test inside its suite. A message with no step open, up to AFTER_STEP
     seconds after one ended, is tagged "after <step>"; any other has no tag.
     """
     begin, between, end = 0, 1, 2  # what happens at the same instant: a step begins, messages are logged, a step ends

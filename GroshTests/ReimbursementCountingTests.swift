@@ -7,6 +7,7 @@ import Testing
 /// while the net is below zero, nothing at zero, and above zero the extra as Income under Other Income, all on the
 /// Expense's own day.
 @MainActor
+@Suite(.namedInTheLog)
 struct ReimbursementCountingTests {
     private let store: MonthGraphFixture
     private var context: ModelContext { store.context }

@@ -5,6 +5,7 @@ import Testing
 
 /// Settling Loans and Debts (ADR-0003, ADR-0004): Outstanding, Record payment, overpayment and Forgive the rest.
 @MainActor
+@Suite(.namedInTheLog)
 struct DebtLoanTests {
     private let store: CategoryFixture
     private var context: ModelContext { store.context }

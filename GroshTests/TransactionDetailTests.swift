@@ -5,6 +5,7 @@ import Testing
 
 /// The transaction detail: its Related transactions, whether it can be edited, and deleting it.
 @MainActor
+@Suite(.namedInTheLog)
 struct TransactionDetailTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }

@@ -5,6 +5,7 @@ import Testing
 
 /// Home's Recent transactions.
 @MainActor
+@Suite(.namedInTheLog)
 struct RecentTransactionsTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }

@@ -13,7 +13,7 @@ import UIKit
 /// tree gives the same images on any day. The references are PNG files in `__Snapshots__`, recorded on the developer's
 /// Mac: `docs/agents/testing.md` says how to record them and review a change.
 @MainActor
-@Suite(.serialized, .enabled(if: snapshotsRunHere))
+@Suite(.namedInTheLog, .serialized, .enabled(if: snapshotsRunHere))
 struct SnapshotTests {
     @Test func expenseRow() throws {
         let fixture = try MonthGraphFixture()

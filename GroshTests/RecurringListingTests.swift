@@ -6,6 +6,7 @@ import Testing
 /// The Recurring tab's wallet filter: every wallet's schedules, or only those paid from the chosen wallet, still grouped
 /// by Kind. The filter changes only which schedules are listed.
 @MainActor
+@Suite(.namedInTheLog)
 struct RecurringListingTests {
     private let store: CategoryFixture
     private var context: ModelContext { store.context }

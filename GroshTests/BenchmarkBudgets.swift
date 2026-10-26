@@ -274,6 +274,7 @@ func printBench(_ line: String) {
 
 /// What decides whether a benchmark run passes, on timings made up here. The benchmarks themselves are skipped in a
 /// normal test run.
+@Suite(.namedInTheLog)
 struct BenchmarkBudgetTests {
     @Test func aStepOverItsBudgetNamesTheMedianTheBudgetAndHowFarOver() {
         let step = BenchmarkStep(name: "open Home", median: 212, budget: 150)

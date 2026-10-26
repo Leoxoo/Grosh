@@ -5,6 +5,7 @@ import Testing
 /// The Month graph generalized to a week, month, quarter or year, as the Income and Spent details' comparison card draws
 /// it: the Average of up to three complete earlier periods of the same length, and the Wallet selector's choice.
 @MainActor
+@Suite(.namedInTheLog)
 struct PeriodGraphTests {
     private let store: MonthGraphFixture
     private var today: CalendarDay { store.today }
