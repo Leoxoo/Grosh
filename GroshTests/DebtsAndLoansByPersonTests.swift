@@ -8,6 +8,7 @@ import Testing
 /// out of the figures; people with something outstanding first, then Settled; hidden people listed while anything is
 /// outstanding.
 @MainActor
+@Suite(.namedInTheLog)
 struct DebtsAndLoansByPersonTests {
     private let fixture: ExpectationFixture
     private var context: ModelContext { fixture.context }

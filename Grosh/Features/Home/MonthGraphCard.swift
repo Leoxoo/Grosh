@@ -176,7 +176,9 @@ struct MonthGraphCard: View {
                     .foregroundStyle(tabGraph.side.color)
                     .contentTransition(.numericText())
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(0.5)
+                    // Keeps Spent's and Income's totals apart when they shrink to fit.
+                    .padding(.horizontal, 4)
                 Capsule()
                     .fill(isShown ? tabGraph.side.color : Color.secondary.opacity(0.3))
                     .frame(height: 3)
@@ -206,10 +208,19 @@ extension SpentOrIncome {
 }
 
 #Preview {
-    List {
-        HomeMonthGraph(
-            today: .today, period: .constant(.month(CalendarMonth(.today))), isShowingReport: .constant(false)
-        )
+    HomeMonthGraphPreview()
+        .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+}
+
+/// Home's Month graph on the month of the day the preview shows.
+private struct HomeMonthGraphPreview: View {
+    @Environment(\.today) private var today
+
+    var body: some View {
+        List {
+            HomeMonthGraph(
+                today: today, period: .constant(.month(CalendarMonth(today))), isShowingReport: .constant(false)
+            )
+        }
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
 }

@@ -35,6 +35,7 @@ struct EstimatedAmountEditor: View {
             try transaction.confirmAmount(cents: entry.cents ?? 0)
             dismiss()
         } catch {
+            Log.recurring.failed("Confirming an estimated amount", error)
             errorMessage = error.localizedDescription
         }
     }

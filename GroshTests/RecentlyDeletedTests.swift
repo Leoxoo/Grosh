@@ -6,6 +6,7 @@ import Testing
 /// Recently Deleted: deleted transactions and wallets wait there for 30 days, counting in no balance, list or Total,
 /// until they are restored or removed for good.
 @MainActor
+@Suite(.namedInTheLog)
 struct RecentlyDeletedTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }

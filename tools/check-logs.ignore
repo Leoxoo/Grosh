@@ -1,0 +1,106 @@
+[
+  {
+    "pattern": "failed to create (thumbnail \\[-50\\]|image \\[-62\\])|could not find plugin for image source \\[11 bytes\\] 6E 6F 74 20 61 20 70 68|CGImageSourceCreate(Thumbnail|Image)AtIndex\\w*:\\d+",
+    "reason": "ImageIO logs an error when data is not an image. CroppedPhotoTests gives it \"not a photo\" on purpose, and CroppedPhoto must answer nil for it."
+  },
+  {
+    "pattern": "building pipeline \\S+ took [0-9.]+ seconds",
+    "reason": "The graphics system logs at error level how long it took to build a Metal shader for a drawing. Not a Grosh error, and the time differs on every run."
+  },
+  {
+    "pattern": "Failed to send CA Event for app launch measurements",
+    "reason": "A simulator cannot send a launch measurement to Core Analytics, so the system logs an error while XCTest measures a launch. Grosh cannot change that, and the launch is still measured."
+  },
+  {
+    "pattern": "\\[AXRuntimeCommon\\] Unknown client: Grosh",
+    "reason": "The accessibility runtime logs this for the UI test runner's queries to the app. The walk's queries still get their answers."
+  },
+  {
+    "pattern": "\\[SystemGestureGate\\] .*System gesture gate timed out",
+    "reason": "The system's edge gesture gate logs this when a touch near a screen edge, such as a tab bar button, waits for the system's own gestures. The tab still opens."
+  },
+  {
+    "pattern": "fopen failed for data file: errno = 2 \\(No such file or directory\\)",
+    "reason": "Core Data looks for the store's data file before it creates a store, and logs an error when the file is not there. A new simulator has no store until the app makes one, so it logs this on each run. Grosh cannot change that, and the store is then created as usual."
+  },
+  {
+    "pattern": "Automation type mismatch; legacy system derived element type \\d+ from class UIAccessibilityElementKBKey:",
+    "reason": "The accessibility runtime logs this when it describes the system keyboard's keys while the keyboard is on screen. The keyboard is the system's, and Grosh cannot change how it describes its keys."
+  },
+  {
+    "pattern": "Automation type mismatch; legacy system derived element type \\d+ from class (SwiftUI\\.VerticalTextView:UITextView|SwiftUI\\.AccessibilityNode:(UIResponder|NSObject)|_UIEditMenuListViewCell:_UIEditMenuListViewCell),",
+    "reason": "The accessibility runtime logs this when its type for SwiftUI's text views and the edit menu's cells differs from the legacy one. SwiftUI and UIKit own those views, and Grosh cannot change how the system describes them."
+  },
+  {
+    "pattern": "hapticpatternlibrary\\.plist",
+    "reason": "The keyboard's key feedback asks Core Haptics for a system pattern from a library the simulator does not have, and Core Haptics logs the error. Grosh does not ask for that pattern, and cannot change the keyboard."
+  },
+  {
+    "pattern": "_dictationButton not yet initialized",
+    "reason": "The keyboard's setup asserts that its dictation button is not yet there when it prepares the large content viewer. The keyboard is the system's, and Grosh cannot change it."
+  },
+  {
+    "pattern": "UIKeyboardLayoutStar implements focusItemsInRect",
+    "reason": "UIKit's focus system notes that the keyboard's layout limits how it caches focus while the keyboard is on screen. The keyboard is the system's, and Grosh cannot change its layout."
+  },
+  {
+    "pattern": "\\[KeyboardTaskQueue\\] -\\[UIKeyboardTaskQueue _lockWhenReadyForMainThread\\] Keyboard queue task timeout detected",
+    "reason": "The keyboard's task queue logs a timeout when a keyboard task waits too long for the main thread. The keyboard is the system's, and Grosh cannot change its queue."
+  },
+  {
+    "pattern": "\\[CandidateGeneration\\] (Result accumulator timeout|Attempted to update accumulator)",
+    "reason": "The keyboard's candidate generation, which builds predictive text and corrections, logs its own accumulator timeouts. The keyboard is the system's, and Grosh cannot change how it builds candidates."
+  },
+  {
+    "pattern": "perform input operation requires a valid sessionID",
+    "reason": "The system's remote text input logs an emoji search operation that has no session. Grosh never sends that operation, and cannot change the system's text input."
+  },
+  {
+    "pattern": "^\\[Client\\] XPC connection interrupted$",
+    "reason": "The system's XPC client logs a connection to one of its services that dropped. Grosh makes no XPC calls of its own."
+  },
+  {
+    "pattern": "\\[plugin\\] AddInstanceForFactory: No factory registered",
+    "reason": "Core Foundation's plug-in loader logs when no factory is registered for a plug-in the simulator asks for. Grosh loads no plug-ins."
+  },
+  {
+    "pattern": "\\[AQ\\] LoudnessManager\\.mm:\\d+",
+    "reason": "The audio system's loudness manager finds no hardware calibration on the simulator, and logs that when a sound is prepared for playback. Grosh cannot supply the calibration."
+  },
+  {
+    "pattern": "AudioConverterOOP\\.cpp:\\d+\\s+Failed to prepare AudioConverterService: -\\d+",
+    "reason": "The simulator's audio converter service cannot start (an error such as -302 or -304), and the system logs it when a sound is prepared for playback. Grosh cannot change the simulator's audio."
+  },
+  {
+    "pattern": "EnhanceDialogueProcessor\\.cpp:\\d+",
+    "reason": "The audio system's dialogue enhancement has no tuning for the simulator's device, and logs that when a sound is prepared for playback. Grosh cannot supply that tuning."
+  },
+  {
+    "pattern": "\\[UIKBRenderingLog\\] \\S+ may only be set for UIKBDynamicRenderFactory",
+    "reason": "The system keyboard logs when a layout value is set on a renderer of the wrong kind, and drops the change. The keyboard is the system's, and Grosh cannot change the keyboard's layout code."
+  },
+  {
+    "pattern": "\\[carc\\] Invalidation handler: Connection cannot be formed",
+    "reason": "The system's analytics client logs when it cannot form its connection on the simulator. Grosh has no analytics code."
+  },
+  {
+    "pattern": "\\[XPCErrors\\] non-launching port is incompatible with service identifier \"com\\.apple\\.PointerUI",
+    "reason": "The system's XPC layer logs when the simulator's pointer service is given a port it cannot launch with. Grosh makes no XPC calls of its own."
+  },
+  {
+    "pattern": "HALC_ProxyIOContext::IOWorkLoop: skipping cycle due to overload",
+    "reason": "The simulator's audio hardware layer logs this when its audio work loop skips a cycle because the audio is overloaded. The walk hears it while the success cue plays after an Expense is saved, which Grosh's own code starts. The cue is a sound, and the simulator's audio layer, not Grosh, reports the overload."
+  },
+  {
+    "pattern": "^\\[API\\] cannot add handler to 0 from 0 - dropping$",
+    "reason": "Core Animation logs this as an API error while an app launches on the iOS 27 simulator. Settings, Reminders and Health log it too when they launch, so it is the system's, and Grosh cannot change it."
+  },
+  {
+    "pattern": "^\\[general\\] NSPredicate: -\\[NSPredicate copy\\] called on a predicate that has _evaluationBlocked set\\.",
+    "reason": "Foundation logs this fault in the app's process when XCTest's automation support copies a query predicate it decoded from the UI test runner. A UI test that only launches Grosh and waits for Home logs it, and the same launch without XCTest does not, so it comes from the test runner's queries, not from Grosh."
+  },
+  {
+    "pattern": "^\\[Invalid Configuration\\] glassEffect\\(\\) tried to update multiple times per frame\\.$",
+    "reason": "On iOS 27, SwiftUI logs this when the Category picker's search field gets focus inside the Add Transaction sheet. The picker uses a plain .searchable, and the fault still came with both of Grosh's own glass buttons (the + and the period strip's return button) switched to non-glass styles, so the glass is SwiftUI's own search field. A glass button of Grosh's that misbehaves logs the same words, so look again if one is added."
+  }
+]

@@ -11,23 +11,40 @@ struct TransactionListView: View {
     /// The transaction whose detail is showing.
     @Binding var selectedTransaction: Transaction?
 
+    @Environment(\.today) private var today
+
+    var body: some View {
+        TransactionListContent(
+            selectedTransaction: $selectedTransaction, startingPeriod: .month(CalendarMonth(today))
+        )
+    }
+}
+
+/// The list behind ``TransactionListView``, holding the period it shows from the moment the tab opens.
+private struct TransactionListContent: View {
+    @Binding var selectedTransaction: Transaction?
+
     @NotDeletedTransactions private var transactions: [Transaction]
     @Query private var recurringTransactions: [RecurringTransaction]
+    @Environment(\.today) private var today
     @State private var walletSelection = WalletSelection.total
     /// How long each period in the strip is, chosen in the "…" menu.
     @State private var timeRange = TimeRange.month
-    @State private var period = Period.month(CalendarMonth(.today))
+    @State private var period: Period
     /// Whether the period's transactions are grouped by day or by category, chosen in the "…" menu.
     @State private var grouping = TransactionGrouping.day
     /// Search text and filters. Searching looks across all time and every wallet; filters narrow the period.
     @State private var filter = TransactionFilter()
-    /// Whether the search field is presented, which the toolbar's Search button turns on.
+    /// Whether the search field is open, which the toolbar's Search button turns on.
     @State private var isSearchPresented = false
     /// Whether the list is choosing transactions to delete, and the ones chosen so far.
     @State private var isSelecting = false
     @State private var chosen = Set<Transaction>()
 
-    private var today: CalendarDay { .today }
+    init(selectedTransaction: Binding<Transaction?>, startingPeriod: Period) {
+        _selectedTransaction = selectedTransaction
+        _period = State(initialValue: startingPeriod)
+    }
 
     /// Which amount the rows and totals show: in the Total with no wallet filter, an Expense's net less what was paid back
     /// into other wallets there (ADR-0010); in a wallet, its own net.
@@ -51,7 +68,6 @@ struct TransactionListView: View {
     }
 
     var body: some View {
-        let today = today
         let selected = selected
         let periods = strip(for: selected)
         let shownDays = period.days(today: today)
@@ -100,6 +116,9 @@ struct TransactionListView: View {
                 }
             }
         }
+        // The matches start at the top, and the period's list again once the search is cleared. Only the list starts
+        // over: the header with the period strip, below, keeps its place.
+        .id(filter.isSearching)
         .roundedSectionsListStyle()
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 4) {
@@ -111,15 +130,13 @@ struct TransactionListView: View {
                 if filter.isOn {
                     FilterSummaryFigures(filter: $filter, transactions: shown)
                 } else {
-                    PeriodSummaryView(
-                        summary: PeriodSummary(of: selected, in: period, today: today), period: period, today: today
-                    )
+                    PeriodSummaryView(summary: PeriodSummary(of: selected, in: period, today: today), period: period)
                 }
             }
             .padding(.vertical, 8)
             .background(.bar)
         }
-        .modifier(SearchWhileOpen(text: $filter.searchText, isOpen: $isSearchPresented))
+        .modifier(TransactionSearchField(text: $filter.searchText, isOpen: $isSearchPresented))
         .onChange(of: walletSelection) {
             // A wallet with a shorter history may not reach back to the period being shown.
             period.showCurrentPeriod(currentPeriod, unlessOfferedBy: strip(for: selected))
@@ -210,9 +227,10 @@ private struct TransactionCategoryHeader: View {
 }
 
 /// Adds the system search field. On iPhone and iPad it is there only while the Search button has it open, or search text
-/// is left to clear, so it doesn't take room from the header the rest of the time. Mac keeps its search field in the
-/// toolbar, and has no Search button.
-private struct SearchWhileOpen: ViewModifier {
+/// is left to clear, so it doesn't take room from the header the rest of the time. It hangs on an empty background
+/// rather than on the list: a modifier that comes and goes on the list itself rebuilds the list, which loses its place
+/// and redraws the period strip mid-animation. Mac keeps its search field in the toolbar, and has no Search button.
+private struct TransactionSearchField: ViewModifier {
     @Binding var text: String
     @Binding var isOpen: Bool
 
@@ -220,10 +238,11 @@ private struct SearchWhileOpen: ViewModifier {
         #if os(macOS)
         content.searchable(text: $text, prompt: "Note, category or amount")
         #else
-        if isOpen || !text.isEmpty {
-            content.searchable(text: $text, isPresented: $isOpen, prompt: "Note, category or amount")
-        } else {
-            content
+        content.background {
+            if isOpen || !text.isEmpty {
+                Color.clear
+                    .searchable(text: $text, isPresented: $isOpen, prompt: "Note, category or amount")
+            }
         }
         #endif
     }

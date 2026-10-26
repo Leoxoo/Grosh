@@ -6,6 +6,7 @@ import SwiftUI
 /// neither. Use inside a `List`.
 struct OwesMeSection: View {
     let transaction: Transaction
+    @Environment(\.today) private var today
 
     var body: some View {
         let expectations = transaction.orderedExpectations
@@ -15,7 +16,7 @@ struct OwesMeSection: View {
                     NavigationLink {
                         ExpectedReimbursementDetailView(expectation: expectation)
                     } label: {
-                        ExpectedReimbursementRow(expectation: expectation, today: .today)
+                        ExpectedReimbursementRow(expectation: expectation, today: today)
                     }
                 }
             } header: {

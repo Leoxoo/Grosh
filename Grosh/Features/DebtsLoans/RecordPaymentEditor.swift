@@ -7,12 +7,14 @@ struct RecordPaymentEditor: View {
     /// The Loan or Debt being paid.
     let original: Transaction
 
+    @Environment(\.today) private var today
+
     var body: some View {
         LoanOrDebtSheet(
             unavailableTitle: "Can't Record Payment",
             unavailableMessage: "Only a Loan or a Debt can be paid back."
         ) { context in
-            try DebtPaymentDraft(settling: original, on: .today, in: context)
+            try DebtPaymentDraft(settling: original, on: today, in: context)
         } form: { draft in
             RecordPaymentForm(startingDraft: draft)
         }
@@ -94,6 +96,7 @@ private struct RecordPaymentForm: View {
             try DebtPayment.record(draftToSave, in: context)
             dismiss()
         } catch {
+            Log.store.failed("Recording a payment", error)
             errorMessage = error.localizedDescription
         }
     }

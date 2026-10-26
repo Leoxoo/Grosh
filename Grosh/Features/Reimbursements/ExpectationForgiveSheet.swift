@@ -7,9 +7,15 @@ struct ExpectationForgiveSheet: View {
     let expectation: ExpectedReimbursement
 
     @Environment(\.dismiss) private var dismiss
-    @State private var day = CalendarDay.today
+    @State private var day: CalendarDay
     @State private var note = ""
     @State private var errorMessage: String?
+
+    /// `today` is the day it starts on, from the presenting screen's environment.
+    init(expectation: ExpectedReimbursement, today: CalendarDay) {
+        self.expectation = expectation
+        _day = State(initialValue: today)
+    }
 
     var body: some View {
         NavigationStack {

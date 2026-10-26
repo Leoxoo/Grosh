@@ -11,6 +11,7 @@ struct NetIncomeDetailsView: View {
     @Binding var period: Period
 
     @Query(Transaction.notDeleted) private var transactions: [Transaction]
+    @Environment(\.today) private var today
 
     var body: some View {
         OtherIncomeReader { otherIncome in
@@ -21,7 +22,6 @@ struct NetIncomeDetailsView: View {
     /// The details, with Other Income read once for everything it counts.
     @ViewBuilder
     private func content(otherIncome: Category) -> some View {
-        let today = CalendarDay.today
         let counted = transactions.counted(in: walletSelection, during: period, today: today, otherIncome: otherIncome)
         let rows = stepRows(counted: counted, today: today)
         List {

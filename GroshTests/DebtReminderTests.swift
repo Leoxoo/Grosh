@@ -6,6 +6,7 @@ import Testing
 /// Reminders on Loans and Debts: which are due (the Home bell), which notifications are pending, and the order of
 /// Account → Debts & Loans.
 @MainActor
+@Suite(.namedInTheLog)
 struct DebtReminderTests {
     private let store: CategoryFixture
     private var context: ModelContext { store.context }

@@ -6,6 +6,7 @@ import Testing
 /// Opening a store made before people (ADR-0009): the With names typed then become one Person each, ignoring case, and
 /// no transaction loses its With.
 @MainActor
+@Suite(.namedInTheLog)
 struct WithMigrationTests {
     private let store: CategoryFixture
     private var context: ModelContext { store.context }

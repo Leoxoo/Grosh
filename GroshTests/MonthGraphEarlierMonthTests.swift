@@ -5,6 +5,7 @@ import Testing
 /// The month strip above Home's Spent and Income cards, and an earlier month picked in it: complete, compared with the
 /// three complete months before it, and selected on its last day to start with.
 @MainActor
+@Suite(.namedInTheLog)
 struct MonthGraphEarlierMonthTests {
     private let store: MonthGraphFixture
     private var context: ModelContext { store.context }

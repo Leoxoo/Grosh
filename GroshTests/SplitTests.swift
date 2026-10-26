@@ -6,6 +6,7 @@ import Testing
 /// Split: dividing an Expense or Income into linked parts that each take their own amount, category, day, note, With
 /// and Event, and Undo split, which merges them back.
 @MainActor
+@Suite(.namedInTheLog)
 struct SplitTests {
     private let store: CategoryFixture
     private var context: ModelContext { store.context }

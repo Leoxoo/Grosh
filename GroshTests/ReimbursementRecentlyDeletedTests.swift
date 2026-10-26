@@ -6,6 +6,7 @@ import Testing
 /// An Expense's Reimbursements go with it: to Recently Deleted, where they count in nothing, back when it is restored,
 /// and out of the store for good when it is.
 @MainActor
+@Suite(.namedInTheLog)
 struct ReimbursementRecentlyDeletedTests {
     private let store: MonthGraphFixture
     private var context: ModelContext { store.context }
@@ -124,8 +125,8 @@ struct ReimbursementRecentlyDeletedTests {
     @Test func deletingAReimbursementDoesNotDeleteItsExpense() throws {
         let dinner = try reimbursedDinner()
 
-        // The first entered: the $20, so the $60 dinner keeps the $15 paid back.
-        try #require(dinner.orderedReimbursements.first).delete()
+        // The $20, so the $60 dinner keeps the $15 paid back.
+        try #require(dinner.orderedReimbursements.first { $0.amountCents == 20_00 }).delete()
 
         #expect(!dinner.isInRecentlyDeleted)
         #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 1)

@@ -3,6 +3,7 @@ import Testing
 @testable import Grosh
 
 /// The cents-first keypad: digits fill the amount from the cents up, like a card terminal.
+@Suite(.namedInTheLog)
 struct AmountEntryTests {
     private let usEnglish = Locale(identifier: "en_US")
 

@@ -5,6 +5,7 @@ import Testing
 /// The Month graph generalized to a week, month, quarter or year, as the Income and Spent details' comparison card draws
 /// it: the Average of up to three complete earlier periods of the same length, and the Wallet selector's choice.
 @MainActor
+@Suite(.namedInTheLog)
 struct PeriodGraphTests {
     private let store: MonthGraphFixture
     private var today: CalendarDay { store.today }
@@ -45,6 +46,18 @@ struct PeriodGraphTests {
 
         let week = try graph(.spent, .week(startingOn: day(2026, 9, 28)))
         #expect(week.comparisonLine?.last?.total == Money(cents: 90_00))
+    }
+
+    /// A week that starts on a Sunday takes the Sunday weeks before it, so the 35 in the week shown is not one of them:
+    /// 140 and 60 make 100, whichever day the calendar's weeks start on.
+    @Test func aWeekStartingOnASundayAveragesTheSundayWeeksBeforeIt() throws {
+        try store.record(-60_00, "Café", on: day(2026, 9, 15))
+        try store.record(-140_00, "Café", on: day(2026, 9, 22))
+        try store.record(-35_00, "Café", on: day(2026, 9, 27))
+
+        let week = try graph(.spent, .week(startingOn: day(2026, 9, 27)))
+        #expect(week.headline == Money(cents: 35_00))
+        #expect(week.comparisonLine?.last?.total == Money(cents: 100_00))
     }
 
     /// A quarter's earlier quarters are each stretched to its length: 300, nothing and 50, a mean of 116.67 at its end.

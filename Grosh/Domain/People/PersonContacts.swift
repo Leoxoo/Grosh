@@ -28,6 +28,7 @@ extension Person {
     /// no Person is linked. Saves when something changed.
     ///
     /// Done when the With menu opens and when iOS reports a change to Contacts.
+    @MainActor
     static func refreshFromContacts(using lookup: some ContactLookup, in context: ModelContext) async throws {
         let everyone = try context.fetch(FetchDescriptor<Person>())
         let linked = everyone.filter { $0.contactIdentifier != nil }

@@ -70,6 +70,7 @@ struct ImportFromMoneyLoverView: View {
             let text = try String(contentsOf: url, encoding: .utf8)
             picked = PickedExport(fileName: url.lastPathComponent, rows: try MoneyLoverCSV.rows(in: text))
         } catch {
+            Log.importing.failed("Reading the picked file", error, expected: true)
             errorMessage = error.localizedDescription
         }
     }

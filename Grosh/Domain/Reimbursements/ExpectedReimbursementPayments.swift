@@ -3,7 +3,7 @@ import SwiftData
 
 /// What the Record payment sheet holds for an Expected reimbursement: an amount, the day the money was received, an
 /// optional note and the wallet it came into.
-struct ExpectationPaymentDraft {
+nonisolated struct ExpectationPaymentDraft {
     /// Entered positive. Starts at what is outstanding, so paying in full is one tap; blank (zero) for an open amount.
     var amount: Money
     var day: CalendarDay
@@ -21,7 +21,7 @@ struct ExpectationPaymentDraft {
 }
 
 /// What Record payment made.
-enum RecordedPayment {
+nonisolated enum RecordedPayment {
     /// A Reimbursement on the Expense, netted into its own wallet on its own day.
     case onExpense(Reimbursement)
     /// A transaction in another wallet, dated the day received, linked to the Expense (ADR-0010).

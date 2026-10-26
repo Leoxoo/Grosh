@@ -35,7 +35,7 @@ extension Transaction {
     }
 }
 
-extension ReimbursementDraft {
+nonisolated extension ReimbursementDraft {
     /// The entry that moving `deposit` in makes: its amount, its day and its note.
     init(movingIn deposit: Transaction) {
         self.init(amount: deposit.amount, day: deposit.day, note: deposit.note)

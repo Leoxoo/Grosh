@@ -8,6 +8,7 @@ import Testing
 /// in its own wallet, is hidden from the Total list, and the Expense shows its net in the Total while its own wallet keeps
 /// the full amount.
 @MainActor
+@Suite(.namedInTheLog)
 struct ReimbursementIntoOtherWalletTests {
     private let fixture: ExpectationFixture
     private var context: ModelContext { fixture.context }

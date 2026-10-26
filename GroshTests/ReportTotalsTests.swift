@@ -6,6 +6,7 @@ import Testing
 /// The Report's Income, Spent and Net income for a period and a wallet selection. They count as Home's Month graph
 /// counts them, except that the Report counts the selection it is given rather than always the Total.
 @MainActor
+@Suite(.namedInTheLog)
 struct ReportTotalsTests {
     private let store: MonthGraphFixture
     private var context: ModelContext { store.context }

@@ -5,6 +5,7 @@ import Testing
 
 /// Saving what the Add Transaction sheet holds: signs, required fields and the Card rule.
 @MainActor
+@Suite(.namedInTheLog)
 struct AddTransactionTests {
     private let store: CategoryFixture
     private var context: ModelContext { store.context }

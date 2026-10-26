@@ -113,12 +113,13 @@ struct DebtsLoansView: View {
 /// An Expected reimbursement that opens its detail.
 struct ExpectedReimbursementLink: View {
     let expectation: ExpectedReimbursement
+    @Environment(\.today) private var today
 
     var body: some View {
         NavigationLink {
             ExpectedReimbursementDetailView(expectation: expectation)
         } label: {
-            ExpectedReimbursementRow(expectation: expectation, today: .today)
+            ExpectedReimbursementRow(expectation: expectation, today: today)
         }
     }
 }
@@ -126,12 +127,13 @@ struct ExpectedReimbursementLink: View {
 /// A Loan or Debt that opens its transaction detail.
 struct LoanOrDebtLink: View {
     let loanOrDebt: LoanOrDebt
+    @Environment(\.today) private var today
 
     var body: some View {
         NavigationLink {
             TransactionDetailView(transaction: loanOrDebt.original)
         } label: {
-            LoanOrDebtRow(loanOrDebt: loanOrDebt, today: .today)
+            LoanOrDebtRow(loanOrDebt: loanOrDebt, today: today)
         }
     }
 }

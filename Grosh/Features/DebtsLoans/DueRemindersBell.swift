@@ -15,12 +15,13 @@ private struct DueRemindersBell: ViewModifier {
     @Query(DebtsAndLoans.transactions) private var transactions: [Transaction]
     @Query(EstimatedAmounts.transactions) private var estimates: [Transaction]
     @Query(ExpectedReimbursements.all) private var expectations: [ExpectedReimbursement]
+    @Environment(\.today) private var today
     @State private var isShowingList = false
 
     func body(content: Content) -> some View {
-        let dueCount = DebtsAndLoans(transactions).due(on: .today).count
-            + EstimatedAmounts(estimates).due(on: .today).count
-            + ExpectedReimbursements(expectations).due(on: .today).count
+        let dueCount = DebtsAndLoans(transactions).due(on: today).count
+            + EstimatedAmounts(estimates).due(on: today).count
+            + ExpectedReimbursements(expectations).due(on: today).count
         content
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
@@ -41,11 +42,11 @@ private struct DueRemindersList: View {
     @Query(EstimatedAmounts.transactions) private var estimates: [Transaction]
     @Query(ExpectedReimbursements.all) private var expectations: [ExpectedReimbursement]
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.today) private var today
     /// The estimate whose amount editor is open, while it is.
     @State private var estimateBeingEntered: Transaction?
 
     var body: some View {
-        let today = CalendarDay.today
         let due = DebtsAndLoans(transactions).due(on: today)
         let estimatesDue = EstimatedAmounts(estimates).due(on: today)
         let owedDue = ExpectedReimbursements(expectations).due(on: today)

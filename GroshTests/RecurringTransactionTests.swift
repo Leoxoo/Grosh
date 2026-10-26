@@ -6,6 +6,7 @@ import Testing
 /// Recurring transactions: which transactions a schedule makes, on which day and with which fields, and what editing
 /// or deleting it changes.
 @MainActor
+@Suite(.namedInTheLog)
 struct RecurringTransactionTests {
     private let store: CategoryFixture
     private var context: ModelContext { store.context }

@@ -266,7 +266,7 @@ extension Category {
     var isTransferHalf: Bool { lockedRole == .outgoingTransfer || lockedRole == .incomingTransfer }
 }
 
-extension CategoryType {
+nonisolated extension CategoryType {
     /// Expense and Income categories are the user's own; Debt/Loan and system categories are fixed.
     var isUserManaged: Bool { self == .expense || self == .income }
 }

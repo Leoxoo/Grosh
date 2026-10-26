@@ -8,6 +8,7 @@ import Testing
 /// until it is settled, and gone once it is paid, closed, forgiven or deleted. Loan, Debt and Estimated-amount reminders
 /// are not touched.
 @MainActor
+@Suite(.namedInTheLog)
 struct ExpectedReimbursementReminderTests {
     private let fixture: ExpectationFixture
     private var context: ModelContext { fixture.context }

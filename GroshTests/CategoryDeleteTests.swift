@@ -2,6 +2,7 @@ import Testing
 @testable import Grosh
 
 @MainActor
+@Suite(.namedInTheLog)
 struct CategoryDeleteTests {
     private let store: CategoryFixture
     private var catalog: CategoryCatalog { store.catalog }

@@ -87,7 +87,7 @@ extension Person {
 /// The people in the store found by name (ignoring case), for code that looks many up or adds many, such as the
 /// With names migration and the import: a name is found in a dictionary rather than by fetching again. The caller reads
 /// the people from the store once and passes them in.
-struct PeopleByName {
+nonisolated struct PeopleByName {
     private var byKey: [String: Person]
 
     /// No one yet, for code that adds every Person it needs.
@@ -120,7 +120,7 @@ struct PeopleByName {
 }
 
 /// What the With menu lists for the text typed in its search field: the Previous section, and the name "Add" offers.
-struct PreviousPeople {
+nonisolated struct PreviousPeople {
     /// The Previous section: the people who aren't hidden whose names contain what was typed (ignoring case and
     /// accents), in the order given, or all of them while nothing is typed.
     let people: [Person]

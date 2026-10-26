@@ -7,6 +7,7 @@ import Testing
 /// in Debts & Loans, never changes a balance or a report, goes to Recently Deleted and back with its Expense, and an edit
 /// that would break it is refused.
 @MainActor
+@Suite(.namedInTheLog)
 struct ExpectedReimbursementTests {
     private let fixture: ExpectationFixture
     private var context: ModelContext { fixture.context }

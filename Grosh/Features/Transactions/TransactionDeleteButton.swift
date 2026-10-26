@@ -17,6 +17,7 @@ struct TransactionDeleteButton: View {
             do {
                 prompt = try TransactionDeletePrompt(for: [transaction], in: context)
             } catch {
+                Log.store.failed("Reading what deleting a transaction takes", error)
                 errorMessage = error.localizedDescription
             }
         }
@@ -105,6 +106,7 @@ private struct TransactionDeleteDialog: ViewModifier {
             try transactions.delete(scope, in: context)
             didDelete()
         } catch {
+            Log.store.failed("Deleting a transaction", error)
             errorMessage = error.localizedDescription
         }
     }

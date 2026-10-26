@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Stands in for xcrun in tools/tests/check/run.sh: prints the fixture JSON that simctl and xcresulttool would, chosen by
+# $FAKE_SIMCTL, $FAKE_BOOTED, $FAKE_BUILD, $FAKE_SUMMARY and $FAKE_TESTS, with @ROOT@ standing for the repository
+# ($FAKE_ROOT). A simulator that $FAKE_BOOTED says is down is booted by simctl bootstatus, and down again by simctl
+# shutdown: a flag beside the calls records that.
+
+{
+    printf 'xcrun'
+    printf ' %s' "$@"
+    printf '\n'
+} >>"$FAKE_CALLS"
+
+booted_now=$(dirname "$FAKE_CALLS")/booted-now
+
+case "$*" in
+    "simctl list --json devices available") fixture=${FAKE_SIMCTL:-simctl-devices} ;;
+    "simctl list --json devices booted")
+        fixture=${FAKE_BOOTED:-simctl-booted}
+        [ -e "$booted_now" ] && fixture=simctl-booted
+        ;;
+    "simctl bootstatus "*)
+        if [ "${FAKE_BOOT_STATUS:-0}" != 0 ]; then
+            echo "fake simctl: the device would not boot" >&2
+            exit "$FAKE_BOOT_STATUS"
+        fi
+        touch "$booted_now"
+        exit 0
+        ;;
+    "simctl shutdown "*)
+        rm -f "$booted_now"
+        exit 0
+        ;;
+    "xcresulttool get build-results --path "*) fixture=${FAKE_BUILD:-build-succeeded} ;;
+    "xcresulttool get test-results summary --path "*) fixture=${FAKE_SUMMARY:-summary-passed} ;;
+    "xcresulttool get test-results tests --path "*) fixture=${FAKE_TESTS:-tests-passed} ;;
+    *)
+        echo "fake xcrun: unexpected arguments: $*" >&2
+        exit 64
+        ;;
+esac
+
+if [ "$1" = xcresulttool ] && [ ! -d "${!#}" ]; then
+    echo "Error: There is no result bundle at ${!#}" >&2
+    exit 1
+fi
+
+fixtures=$(cd "$(dirname "$0")/../fixtures" && pwd)
+sed "s|@ROOT@|${FAKE_ROOT:-}|g" "$fixtures/$fixture.json"

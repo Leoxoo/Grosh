@@ -6,6 +6,7 @@ import Testing
 /// The Transactions tab viewed by category: the period's transactions grouped under the category each is filed
 /// under, with each category's total.
 @MainActor
+@Suite(.namedInTheLog)
 struct TransactionCategoryGroupTests {
     private let store: CategoryFixture
 

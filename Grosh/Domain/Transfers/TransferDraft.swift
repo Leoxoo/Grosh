@@ -1,7 +1,7 @@
 import Foundation
 
 /// What the Transfer sheet holds before it is saved: money moved from one of the user's wallets to another.
-struct TransferDraft {
+nonisolated struct TransferDraft {
     /// The wallet the money leaves: it gets the Outgoing transfer.
     var from: Wallet?
     /// The wallet the money goes to: it gets the Incoming transfer.
@@ -40,7 +40,7 @@ extension TransferRuleError: LocalizedError {
     }
 }
 
-extension TransferDraft {
+nonisolated extension TransferDraft {
     /// Checks the draft against the transfer rules before anything is saved.
     func validate() throws {
         guard let from else { throw TransferRuleError.missingSourceWallet }

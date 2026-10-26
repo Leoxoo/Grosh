@@ -73,7 +73,7 @@ nonisolated enum ExpectationStatus: Hashable, Sendable {
 }
 
 /// One payment recorded against an Expected reimbursement, whichever way it was kept.
-struct ExpectationPayment: Identifiable {
+nonisolated struct ExpectationPayment: Identifiable {
     let id: PersistentIdentifier
     let amount: Money
     let day: CalendarDay
@@ -193,6 +193,7 @@ extension ExpectedReimbursement {
     }
 
     /// Closes an open-amount expectation by hand on `day`: nothing more is expected. Saves.
+    @MainActor
     func close(on day: CalendarDay = .today) throws {
         guard isOpen else { throw ExpectedReimbursementRuleError.notOpen }
         guard hasOpenAmount else { throw ExpectedReimbursementRuleError.hasAnAmount }
@@ -210,6 +211,7 @@ extension ExpectedReimbursement {
     /// Forgive: the money won't come back. It is marked Forgiven on `day` with an optional note and counts as settled
     /// (ADR-0004). No transaction is added and nothing in any balance or report changes, since an expectation never
     /// counted in either. Saves.
+    @MainActor
     func forgive(on day: CalendarDay = .today, note: String = "") throws {
         guard isOpen else { throw ExpectedReimbursementRuleError.notOpen }
         forgivenDay = day
@@ -289,7 +291,7 @@ extension Transaction {
     }
 }
 
-extension TransactionDraft {
+nonisolated extension TransactionDraft {
     /// Whether the Add sheet offers + Owes me: only on an ordinary Expense.
     var offersOwesMe: Bool {
         type == .expense && offersCard && !isBalanceAdjustment

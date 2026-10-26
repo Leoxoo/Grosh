@@ -8,14 +8,26 @@ struct GroshApp: App {
     /// The notification center holds its delegate weakly, so the app keeps it.
     private let reminderActions: ReminderActionHandler
     @Environment(\.scenePhase) private var scenePhase
+    /// The day the screens treat as today: the real one, moved on when it changes while the app is open.
+    @State private var today = CalendarDay.today
 
     init() {
+        container = Self.openStore()
+        reminderActions = ReminderActionHandler.install(inbox: textThemInbox, context: container.mainContext)
+    }
+
+    /// The user's store or, when a UI test asks for it, the 16k store in its place (UITestStore).
+    private static func openStore() -> ModelContainer {
         do {
-            container = try GroshStore.makeSeededContainer()
+            #if DEBUG
+            if let uiTestStore = try UITestStore.containerIfAsked() {
+                return uiTestStore
+            }
+            #endif
+            return try GroshStore.makeSeededContainer()
         } catch {
             fatalError("Couldn't open the Grosh store: \(error)")
         }
-        reminderActions = ReminderActionHandler.install(inbox: textThemInbox, context: container.mainContext)
     }
 
     var body: some Scene {
@@ -27,14 +39,35 @@ struct GroshApp: App {
                     // make the days that came due while the app was closed, whenever the app opens or comes back to the
                     // foreground; nothing runs in the background.
                     if phase == .active {
-                        try? RecentlyDeleted.purgeExpired(in: container.mainContext)
-                        try? RecurringTransaction.catchUp(in: container.mainContext)
+                        Signpost.interval("Launch") {
+                            Log.store.attempt("Removing what Recently Deleted kept for good") {
+                                try RecentlyDeleted.purgeExpired(in: container.mainContext)
+                            }
+                            Log.recurring.attempt("Making the Recurring transactions that came due") {
+                                try RecurringTransaction.catchUp(in: container.mainContext)
+                            }
+                        }
                     }
+                }
+                .environment(\.today, today)
+                // A day that changed while the app was in the background.
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active { refreshToday() }
+                }
+                // Midnight passing while the app is open.
+                .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+                    refreshToday()
                 }
         }
         .modelContainer(container)
         .commands {
             NewTransactionCommands()
         }
+    }
+
+    /// Moves `today` on to the real day when it has changed.
+    private func refreshToday() {
+        let now = CalendarDay.today
+        if now != today { today = now }
     }
 }

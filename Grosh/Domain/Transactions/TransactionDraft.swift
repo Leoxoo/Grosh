@@ -3,7 +3,7 @@ import SwiftData
 
 /// What the Add Transaction sheet holds before it is saved. The amount is entered positive; the category
 /// sets the sign.
-struct TransactionDraft {
+nonisolated struct TransactionDraft {
     /// Expense, Income or Debt/Loan. Switching it drops a category of the old type. Switching onto or off
     /// Debt/Loan also swaps the Exclude from report switch: to the value the user left there before, or else
     /// to the new type's default. Switching between Expense and Income leaves it alone.
@@ -104,7 +104,7 @@ struct TransactionDraft {
     }
 
     /// The transaction as it is, to edit.
-    init(editing transaction: Transaction) {
+    @MainActor init(editing transaction: Transaction) {
         self.init(copying: transaction, day: transaction.day)
         eventName = transaction.eventName
         isBalanceAdjustment = transaction.isBalanceAdjustment
@@ -115,7 +115,9 @@ struct TransactionDraft {
         owes = originalExpectations.compactMap(OwesMeDraft.init(editing:))
         walletKeptByPaybacks = transaction.hasPaybacksElsewhere ? transaction.wallet : nil
         let deletedPayments = transaction.paymentsInRecentlyDeleted
-        if let context = transaction.modelContext, let loanOrDebt = try? LoanOrDebt(transaction, in: context),
+        // A transaction that isn't a Loan or Debt gives nil, not an error: ?? nil flattens the two nils into one.
+        if let context = transaction.modelContext,
+           let loanOrDebt = Log.store.attempt("Reading a Loan or Debt", { try LoanOrDebt(transaction, in: context) }) ?? nil,
            !loanOrDebt.payments.isEmpty || transaction.isForgiven || !deletedPayments.isEmpty {
             let deletedCents = deletedPayments.reduce(0) { $0 + abs($1.amountCents) }
             paymentLock = PaymentLock(
@@ -185,7 +187,7 @@ extension TransactionRuleError: LocalizedError {
     }
 }
 
-extension TransactionDraft {
+nonisolated extension TransactionDraft {
     /// Checks the draft against the transaction rules before anything is saved.
     func validate() throws {
         guard wallet != nil else { throw TransactionRuleError.missingWallet }
@@ -266,7 +268,7 @@ extension Transaction {
     }
 }
 
-extension TransactionDraft {
+nonisolated extension TransactionDraft {
 
     /// Whether the amount adds to the wallet (`1`) or takes from it (`-1`): the category's ``Category/sign``, or
     /// before one is chosen, the type's. `0` while a Debt/Loan has neither Loan nor Debt picked.

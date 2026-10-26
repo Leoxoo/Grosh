@@ -7,6 +7,7 @@ import Testing
 /// and counts as settled, and can be un-forgiven. It adds no transaction and, as the expectation never counted in any
 /// balance or report, changes none (ADR-0004, ADR-0010).
 @MainActor
+@Suite(.namedInTheLog)
 struct ExpectedReimbursementForgiveTests {
     private let fixture: ExpectationFixture
     private var context: ModelContext { fixture.context }

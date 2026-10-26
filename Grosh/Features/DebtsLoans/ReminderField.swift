@@ -9,6 +9,8 @@ struct ReminderField: View {
     /// its Expense.
     var turnsOnAt: CalendarDay?
 
+    @Environment(\.today) private var today
+
     var body: some View {
         Toggle("Reminder", systemImage: "bell", isOn: isOn)
         if let day = Binding($day) {
@@ -20,7 +22,7 @@ struct ReminderField: View {
         Binding {
             day != nil
         } set: { isOn in
-            day = isOn ? turnsOnAt ?? TransactionDefaults.reminderDay(from: .today) : nil
+            day = isOn ? turnsOnAt ?? TransactionDefaults.reminderDay(from: today) : nil
         }
     }
 }

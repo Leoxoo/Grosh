@@ -5,6 +5,7 @@ import Testing
 /// The "vs last year" switch of Home's Spent and Income cards: with it on, the gray line is the same month 12 months
 /// before the month shown when that card has something counted in it, and the Average when it doesn't.
 @MainActor
+@Suite(.namedInTheLog)
 struct MonthGraphLastYearTests {
     private let store: MonthGraphFixture
     private var context: ModelContext { store.context }

@@ -30,6 +30,7 @@ struct TransactionsView: View {
             }
             .id(selectedTransaction?.persistentModelID)
         }
+        .onAppear { Signpost.opening("Open Transactions") }
         #if os(macOS)
         // The app's sidebar floats over the tab, and a split view laid out under it pushes its detail the sidebar's
         // width away from the list. Beside the sidebar, the split view lays out as it does while the sidebar is closed.

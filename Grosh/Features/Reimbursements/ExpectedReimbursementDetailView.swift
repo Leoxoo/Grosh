@@ -7,6 +7,7 @@ import SwiftUI
 struct ExpectedReimbursementDetailView: View {
     let expectation: ExpectedReimbursement
 
+    @Environment(\.today) private var today
     @State private var isRecordingPayment = false
     @State private var isForgiving = false
     @State private var errorMessage: String?
@@ -24,10 +25,10 @@ struct ExpectedReimbursementDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .sheet(isPresented: $isRecordingPayment) {
-            ExpectationPaymentEditor(expectation: expectation)
+            ExpectationPaymentEditor(expectation: expectation, today: today)
         }
         .sheet(isPresented: $isForgiving) {
-            ExpectationForgiveSheet(expectation: expectation)
+            ExpectationForgiveSheet(expectation: expectation, today: today)
         }
         .errorAlert("Couldn't Change Owes Me", message: $errorMessage)
     }

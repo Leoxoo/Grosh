@@ -5,6 +5,7 @@ import Testing
 /// Filters: wallet, category (with its subcategories), Card, type, date range, amount range and excluded only.
 /// They combine with each other and with the selected period.
 @MainActor
+@Suite(.namedInTheLog)
 struct TransactionFilterTests {
     private let fixture: CategoryFixture
     private var context: ModelContext { fixture.context }

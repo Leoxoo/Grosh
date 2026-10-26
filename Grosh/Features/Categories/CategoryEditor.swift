@@ -76,7 +76,9 @@ struct CategoryEditor: View {
     }
 
     private var parentOptions: [Category] {
-        (try? catalog.parentOptions(of: draft.type, for: editing)) ?? []
+        Log.store.attempt("Reading the parent categories to choose from") {
+            try catalog.parentOptions(of: draft.type, for: editing)
+        } ?? []
     }
 
     private var canSave: Bool { !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -240,6 +242,7 @@ struct CategoryEditor: View {
             try change()
             dismiss()
         } catch {
+            Log.store.failed("Changing a category", error)
             errorMessage = error.localizedDescription
         }
     }

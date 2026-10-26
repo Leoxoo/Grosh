@@ -214,6 +214,7 @@ struct CardEditor: View {
             try change()
             dismiss()
         } catch {
+            Log.store.failed("Changing a card", error)
             errorMessage = error.localizedDescription
         }
     }

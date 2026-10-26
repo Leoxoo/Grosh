@@ -33,11 +33,14 @@ enum MoneyLoverImport {
         guard !rows.isEmpty else { throw MoneyLoverImportError.noTransactions }
         var importer = try Importer(rows: rows, context: context, now: now)
         do {
-            try removeAllData(in: context)
-            let summary = try importer.run()
-            try context.save()
-            return summary
+            return try Signpost.interval("Import CSV") {
+                try removeAllData(in: context)
+                let summary = try importer.run()
+                try context.save()
+                return summary
+            }
         } catch {
+            Log.importing.failed("Importing from MoneyLover", error)
             context.rollback()
             throw error
         }

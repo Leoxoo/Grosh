@@ -1,4 +1,4 @@
-extension Sequence where Element == Transaction {
+nonisolated extension Sequence where Element == Transaction {
     /// What the transactions add to or take from the balance together: every one counts, excluded from report or
     /// not, each as its net (``Transaction/netCents``). A day's or a category's total in the list, or what a search or
     /// filter matches. A Card's total is ``charged`` instead.

@@ -5,6 +5,7 @@ import Testing
 /// Tapping a Card shows its transactions one period at a time with their total: by statement period for a Credit card
 /// with a statement date, by calendar month for any other Card.
 @MainActor
+@Suite(.namedInTheLog)
 struct CardTransactionsTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }

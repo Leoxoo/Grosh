@@ -7,6 +7,7 @@ import Testing
 /// transaction is with any number of them, except a Loan or Debt, which is with exactly one. Typing a name makes the
 /// Person or reuses the one who has it, ignoring case.
 @MainActor
+@Suite(.namedInTheLog)
 struct PersonTests {
     private let store: CategoryFixture
     private var context: ModelContext { store.context }

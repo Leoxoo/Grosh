@@ -52,6 +52,7 @@ struct ReimbursementSection: View {
         do {
             try entry.delete()
         } catch {
+            Log.store.failed("Deleting a Reimbursement", error)
             errorMessage = error.localizedDescription
         }
     }
@@ -106,6 +107,8 @@ struct ReimbursementNetText: View {
             if net.cents != transaction.amountCents {
                 Text(verbatim: "= " + net.signedFormatted())
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .foregroundStyle(net.cents > 0 ? net.tint : .secondary)
             }
         }

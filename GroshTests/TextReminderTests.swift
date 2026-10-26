@@ -7,6 +7,7 @@ import Testing
 /// between the Person's contact's live phone and the stored one; the compose sheet or, where texting is unavailable, copy
 /// or share. The Messages sheet itself never sends: it only opens prefilled, and the user taps Send.
 @MainActor
+@Suite(.namedInTheLog)
 struct TextReminderTests {
     private let fixture: ExpectationFixture
     private var context: ModelContext { fixture.context }

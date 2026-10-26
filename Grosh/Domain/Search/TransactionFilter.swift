@@ -3,7 +3,7 @@ import SwiftData
 
 /// What a transaction list is narrowed to: search text and filters. Everything left empty matches every
 /// transaction.
-struct TransactionFilter: Equatable {
+nonisolated struct TransactionFilter: Equatable {
     /// Finds the text in a transaction's note, its category's name or the name of any of the people in its With,
     /// ignoring case and accents. A number also finds amounts: `973` finds $973.17.
     var searchText = ""
@@ -133,7 +133,7 @@ struct TransactionFilter: Equatable {
         from all: [Transaction], selected: [LedgerEntry], on days: DayRange,
         hidingPaybacksIn selection: WalletSelection? = nil
     ) -> [Transaction] {
-        if isSearching { return all.matching(self) }
+        if isSearching { return Signpost.interval("Search") { all.matching(self) } }
         let inDays = selected.filter { days.contains(CalendarDay(rawValue: $0.dayRaw)) }.map(\.transaction)
         let shown = selection == WalletSelection.total ? inDays.filter { !$0.isHiddenInTotal } : inDays
         return shown.matching(self)
@@ -162,7 +162,7 @@ struct TransactionFilter: Equatable {
     }
 }
 
-extension Sequence where Element == Transaction {
+nonisolated extension Sequence where Element == Transaction {
     /// The transactions that pass `filter`.
     func matching(_ filter: TransactionFilter) -> [Transaction] {
         let search = TransactionFilter.Search(filter)

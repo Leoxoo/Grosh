@@ -6,6 +6,7 @@ import Testing
 /// A category's own Kind and the default Kind it gives its Recurring transactions. A subcategory with no Kind of its own
 /// follows its parent; one that has set its own keeps it.
 @MainActor
+@Suite(.namedInTheLog)
 struct CategoryKindTests {
     private let store: CategoryFixture
 

@@ -3,6 +3,7 @@ import Testing
 
 /// The transactions a Net income or Trend row lists for its Step: what counts in its days, toward one side or both.
 @MainActor
+@Suite(.namedInTheLog)
 struct PeriodTransactionsTests {
     private let store: MonthGraphFixture
 

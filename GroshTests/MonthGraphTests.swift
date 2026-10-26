@@ -6,6 +6,7 @@ import Testing
 /// Home's Spent and Income cards: what counts toward each, the running total of the month so far, and the day the
 /// marker is on.
 @MainActor
+@Suite(.namedInTheLog)
 struct MonthGraphTests {
     private let store: MonthGraphFixture
     private var context: ModelContext { store.context }

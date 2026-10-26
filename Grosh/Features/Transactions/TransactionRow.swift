@@ -3,7 +3,8 @@ import SwiftUI
 /// One transaction as every list shows it: category icon and name, note, Estimated and Forgiven badges, the Card's
 /// symbol or image, the wallet icon, and the amount in color. A forgiven Loan or Debt keeps its true amount. An Expense
 /// that was paid back keeps its original amount, lists its Reimbursements under the title and shows its net, except on
-/// a Card's statement, which shows only what the Card was charged.
+/// a Card's statement, which shows only what the Card was charged. At the accessibility text sizes the amount moves
+/// under the name, so neither is cut short.
 struct TransactionRow: View {
     let transaction: Transaction
     /// Shows the transaction's day, for lists not grouped by day.
@@ -14,54 +15,83 @@ struct TransactionRow: View {
     /// the net also takes off what was paid back into other wallets there; in a wallet the row notes it instead.
     var listed = ListedAmount.net
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
-        HStack(spacing: 12) {
+        // At the accessibility text sizes the amounts go under the name, where they have the row's full width.
+        let stacks = dynamicTypeSize.isAccessibilitySize
+        HStack(alignment: stacks ? .top : .center, spacing: 12) {
             CategoryIcon(category: transaction.category, subscriptionIcon: transaction.recurring?.subscriptionIcon)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(transaction.categoryName)
-                    .lineLimit(1)
-                if showsDay {
-                    Text(transaction.day.date().formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).year()))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            if stacks {
+                VStack(alignment: .leading, spacing: 4) {
+                    details(nameLines: 3)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 6) { amounts }
+                        VStack(alignment: .leading, spacing: 2) { amounts }
+                    }
+                    HStack(spacing: 6) { marks }
                 }
-                if !transaction.note.isEmpty {
-                    Text(transaction.note)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                ReimbursementEntriesText(transaction: transaction, listed: listed)
-            }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 4) {
-                HStack(spacing: 6) {
-                    AmountText(amount: transaction.amount)
-                    if listed != .charged {
-                        ReimbursementNetText(transaction: transaction, listed: listed)
-                    }
-                }
-                HStack(spacing: 6) {
-                    if transaction.isEstimated {
-                        EstimatedBadge()
-                    }
-                    if transaction.isForgiven {
-                        ForgivenBadge()
-                    }
-                    if let card = transaction.card {
-                        CardIndicator(card: card)
-                    }
-                    if showsWalletIcon, let wallet = transaction.wallet {
-                        Image(systemName: wallet.symbolName)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .accessibilityLabel(wallet.name)
-                    }
+                Spacer(minLength: 0)
+            } else {
+                details(nameLines: 1)
+                Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 4) {
+                    HStack(spacing: 6) { amounts }
+                    HStack(spacing: 6) { marks }
                 }
             }
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+    }
+
+    /// The category name, with the day, note and Reimbursements under it.
+    private func details(nameLines: Int) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(transaction.categoryName)
+                .lineLimit(nameLines)
+            if showsDay {
+                Text(transaction.day.date().formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).year()))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if !transaction.note.isEmpty {
+                Text(transaction.note)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            ReimbursementEntriesText(transaction: transaction, listed: listed)
+        }
+    }
+
+    /// The amount, and a paid-back Expense's net when the row shows it.
+    @ViewBuilder
+    private var amounts: some View {
+        AmountText(amount: transaction.amount)
+        if listed != .charged {
+            ReimbursementNetText(transaction: transaction, listed: listed)
+        }
+    }
+
+    /// The Estimated and Forgiven badges, the Card, and the wallet icon.
+    @ViewBuilder
+    private var marks: some View {
+        if transaction.isEstimated {
+            EstimatedBadge()
+        }
+        if transaction.isForgiven {
+            ForgivenBadge()
+        }
+        if let card = transaction.card {
+            CardIndicator(card: card)
+        }
+        if showsWalletIcon, let wallet = transaction.wallet {
+            Image(systemName: wallet.symbolName)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(wallet.name)
+        }
     }
 }
 

@@ -84,6 +84,7 @@ struct PastOccurrencesView: View {
             try recurring.makeTransactions(on: days.filter { selected.contains($0) }, in: context)
             dismiss()
         } catch {
+            Log.recurring.failed("Making transactions for past days", error)
             errorMessage = error.localizedDescription
         }
     }

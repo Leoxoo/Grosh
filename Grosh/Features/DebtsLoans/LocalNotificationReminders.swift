@@ -7,7 +7,12 @@ import UserNotifications
 struct LocalNotificationReminders: ReminderScheduler {
     func requestPermission() async -> Bool {
         let options: UNAuthorizationOptions = [.alert, .sound]
-        return (try? await UNUserNotificationCenter.current().requestAuthorization(options: options)) ?? false
+        do {
+            return try await UNUserNotificationCenter.current().requestAuthorization(options: options)
+        } catch {
+            Log.reminders.failed("Asking to send notifications", error)
+            return false
+        }
     }
 
     func replacePending<Reminder: PendingReminder>(_ reminders: [Reminder]) async {
@@ -34,7 +39,11 @@ struct LocalNotificationReminders: ReminderScheduler {
                 content: content,
                 trigger: reminder.trigger
             )
-            try? await center.add(request)
+            do {
+                try await center.add(request)
+            } catch {
+                Log.reminders.failed("Scheduling a reminder", error)
+            }
         }
     }
 }
@@ -75,6 +84,7 @@ private extension PendingReminder {
 /// notifications.
 private struct ReminderSync<Source: ReminderSource>: ViewModifier {
     @Query private var records: [Source.Record]
+    @Environment(\.today) private var today
     /// What the last sync handed over, so a reminder set for today after 09:00 arrives once.
     @State private var earlier: [Source.Reminder]?
 
@@ -84,9 +94,10 @@ private struct ReminderSync<Source: ReminderSource>: ViewModifier {
 
     func body(content: Content) -> some View {
         let source = Source(records)
-        let reminders = source.reminders(from: .today)
+        let reminders = source.reminders(from: today)
         content
             .task(id: reminders) {
+                // The moment, not just the day: once 09:00 has passed, a reminder for today arrives right away.
                 await source.reschedule(at: .now, after: earlier, using: LocalNotificationReminders())
                 earlier = reminders
             }

@@ -33,7 +33,7 @@ nonisolated struct LedgerEntry: DatedAmount {
     }
 }
 
-extension Sequence where Element: DatedAmount {
+nonisolated extension Sequence where Element: DatedAmount {
     /// The earliest day any of them is dated, or `nil` when there are none: where a period strip of them starts.
     var firstDay: CalendarDay? {
         map(\.dayRaw).min().map(CalendarDay.init(rawValue:))

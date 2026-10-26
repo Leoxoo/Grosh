@@ -52,6 +52,7 @@ private struct TransactionSelectionMode: ViewModifier {
         do {
             deletePrompt = try TransactionDeletePrompt(for: Array(chosen).inListOrder(), in: context)
         } catch {
+            Log.store.failed("Reading what deleting transactions takes", error)
             errorMessage = error.localizedDescription
         }
     }

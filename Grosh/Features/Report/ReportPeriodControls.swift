@@ -29,9 +29,8 @@ struct ReportPeriodControls: ViewModifier {
     /// Whether the Wallet selector sits above the strip. A details screen follows the Report's selection without one.
     let showsWalletSelector: Bool
 
+    @Environment(\.today) private var today
     @State private var isPickingCustomRange = false
-
-    private var today: CalendarDay { .today }
 
     /// The Current period: the period of the time range that holds today.
     private var currentPeriod: Period {

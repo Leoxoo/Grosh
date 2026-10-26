@@ -6,6 +6,7 @@ import Testing
 /// Search finds the name of any Person in a transaction's With, and the With filter keeps the transactions that have a
 /// Person among them (ADR-0009).
 @MainActor
+@Suite(.namedInTheLog)
 struct PersonSearchTests {
     private let fixture: CategoryFixture
     private var context: ModelContext { fixture.context }

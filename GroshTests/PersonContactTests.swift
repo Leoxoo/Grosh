@@ -7,6 +7,7 @@ import Testing
 /// Person as an identifier with a name and phone snapshot, and the snapshots are refreshed from the contact while it
 /// resolves. Everything here runs on the stand-in, never on the real Contacts.
 @MainActor
+@Suite(.namedInTheLog)
 struct PersonContactTests {
     private let store: CategoryFixture
     private var context: ModelContext { store.context }

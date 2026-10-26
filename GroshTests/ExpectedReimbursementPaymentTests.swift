@@ -8,6 +8,7 @@ import Testing
 /// with an amount closes itself when covered, an open amount stays open until closed by hand, and paying more than
 /// expected follows the Reimbursement excess rule.
 @MainActor
+@Suite(.namedInTheLog)
 struct ExpectedReimbursementPaymentTests {
     private let fixture: ExpectationFixture
     private var context: ModelContext { fixture.context }

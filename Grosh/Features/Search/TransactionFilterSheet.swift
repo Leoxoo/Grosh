@@ -89,8 +89,10 @@ private struct OptionalDayRow: View {
     let title: LocalizedStringKey
     @Binding var day: CalendarDay?
 
+    @Environment(\.today) private var today
+
     var body: some View {
-        Toggle(title, isOn: Binding(get: { day != nil }, set: { day = $0 ? .today : nil }))
+        Toggle(title, isOn: Binding(get: { day != nil }, set: { day = $0 ? today : nil }))
         if let day = Binding($day) {
             DayPicker(title: title, day: day)
                 .labelsHidden()

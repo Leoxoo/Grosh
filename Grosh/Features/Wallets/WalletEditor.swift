@@ -14,20 +14,33 @@ struct WalletEditor: View {
 
     let mode: EditorMode<Wallet>
 
+    @Environment(\.today) private var today
+
+    var body: some View {
+        WalletForm(mode: mode, startingDay: today)
+    }
+}
+
+/// The form behind ``WalletEditor``, holding the draft from the moment the sheet opens.
+private struct WalletForm: View {
+    let mode: EditorMode<Wallet>
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.today) private var today
 
     @State private var draft: WalletDraft
     @State private var startingAmountText = ""
-    @State private var startingDay = CalendarDay.today
+    @State private var startingDay: CalendarDay
     @State private var errorMessage: String?
     @State private var isAdjustingBalance = false
     /// The wallet waiting for the user to confirm deleting it.
     @State private var deleting: Wallet?
 
-    init(mode: EditorMode<Wallet>) {
+    init(mode: EditorMode<Wallet>, startingDay: CalendarDay) {
         self.mode = mode
-        _draft = State(initialValue: mode.editing.map(WalletDraft.init) ?? WalletDraft())
+        _draft = State(initialValue: mode.editing.map { WalletDraft($0) } ?? WalletDraft())
+        _startingDay = State(initialValue: startingDay)
     }
 
     /// The Starting balance typed so far; an empty field means $0.
@@ -57,7 +70,7 @@ struct WalletEditor: View {
                 }
 
                 Section("Icon") {
-                    SymbolGrid(symbols: Self.symbolChoices, selection: $draft.symbolName, color: draft.color)
+                    SymbolGrid(symbols: WalletEditor.symbolChoices, selection: $draft.symbolName, color: draft.color)
                 }
 
                 Section("Color") {
@@ -76,11 +89,11 @@ struct WalletEditor: View {
                     Section {
                         if wallet.isArchived {
                             Button("Unarchive Wallet", systemImage: "tray.and.arrow.up") {
-                                perform { try wallet.unarchive() }
+                                perform { try wallet.unarchive(today: today) }
                             }
                         } else {
                             Button("Archive Wallet", systemImage: "archivebox") {
-                                perform { try wallet.archive() }
+                                perform { try wallet.archive(today: today) }
                             }
                         }
                     } footer: {
@@ -150,6 +163,7 @@ struct WalletEditor: View {
             try change()
             dismiss()
         } catch {
+            Log.store.failed("Changing a wallet", error)
             errorMessage = error.localizedDescription
         }
     }

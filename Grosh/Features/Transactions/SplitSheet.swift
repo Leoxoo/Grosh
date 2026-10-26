@@ -165,6 +165,7 @@ struct SplitSheet: View {
             try transaction.split(draft, in: context)
             dismiss()
         } catch {
+            Log.store.failed("Splitting a transaction", error)
             errorMessage = error.localizedDescription
         }
     }

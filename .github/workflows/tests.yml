@@ -1,0 +1,109 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels that pull request's runs still in progress.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# The Xcode must ship the SDK the app deploys to (iOS 26.4), and the runner image below must carry
+# that Xcode and its simulator runtime. Check both against GitHub's runner image list before relying on them.
+env:
+  XCODE_VERSION: "26.4"
+
+# Benchmarks and snapshot tests are not run on CI: their budgets and reference images belong to
+# the developer's Mac.
+jobs:
+  checks:
+    # One check per entry, so the unit tests and the UI tests each show on the pull request.
+    # A failure in one does not stop the other.
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Unit tests
+            id: unit
+            command: tools/check
+          - name: UI tests
+            id: ui
+            command: tools/check --ui
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Select the pinned Xcode
+        run: |
+          xcode_app="/Applications/Xcode_${XCODE_VERSION}.app"
+          if [ ! -d "$xcode_app" ]; then
+            echo "::error::Xcode ${XCODE_VERSION} is not on this runner image. Set XCODE_VERSION to one of the versions listed below."
+            ls -d /Applications/Xcode*.app
+            exit 1
+          fi
+          sudo xcode-select --switch "$xcode_app/Contents/Developer"
+
+      - name: Show the Xcode and the simulators in use
+        run: |
+          sw_vers
+          xcodebuild -version
+          xcrun simctl list devices available
+
+      # Keyed on the project file and Package.resolved, which pins the Swift packages.
+      - name: Cache SwiftPM packages and DerivedData
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/Developer/Xcode/DerivedData
+          key: ${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-${{ hashFiles('Grosh.xcodeproj/project.pbxproj', '**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-xcode${{ env.XCODE_VERSION }}-
+
+      - name: Run the checks
+        env:
+          GROSH_CHECK_RESULT_DIR: ${{ runner.temp }}/check-results
+          # Only TEST_RUNNER_ variables reach the tests, without the prefix: this is how the snapshot tests see CI.
+          TEST_RUNNER_CI: 'true'
+        run: |
+          mkdir -p "$GROSH_CHECK_RESULT_DIR"
+          ${{ matrix.command }}
+
+      - name: Upload the results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.id }}-results
+          path: ${{ runner.temp }}/check-results
+          retention-days: 14
+
+  # The tools' own tests: tools/check and the Stop hook against stand-ins, and tools/check-logs on canned logs. They
+  # need no Xcode or simulator, so they report in a minute. On macOS, where the tools run.
+  tools:
+    name: Tools
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Test tools/check
+        run: tools/tests/check/run.sh
+
+      - name: Test the Stop hook
+        run: tools/tests/run-checks/run.sh
+
+      - name: Test tools/check-logs
+        run: python3 -B -m unittest discover -s tools

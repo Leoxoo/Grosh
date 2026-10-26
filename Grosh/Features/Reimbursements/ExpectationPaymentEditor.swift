@@ -14,9 +14,10 @@ struct ExpectationPaymentEditor: View {
     @State private var entry: AmountEntry
     @State private var errorMessage: String?
 
-    init(expectation: ExpectedReimbursement) {
+    /// `today` is the day the payment starts on, from the presenting screen's environment.
+    init(expectation: ExpectedReimbursement, today: CalendarDay) {
         self.expectation = expectation
-        let startingDraft = ExpectationPaymentDraft(paying: expectation, on: .today)
+        let startingDraft = ExpectationPaymentDraft(paying: expectation, on: today)
         _draft = State(initialValue: startingDraft)
         // An open amount has nothing outstanding to start from, so the keypad starts blank.
         _entry = State(
