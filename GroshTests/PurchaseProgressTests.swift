@@ -6,6 +6,7 @@ import Testing
 /// Purchases: their optional total, the progress their attached transactions show, the payments that count toward it,
 /// and what a payment is prefilled from.
 @MainActor
+@Suite(.namedInTheLog)
 struct PurchaseProgressTests {
     private let store: CategoryFixture
     private var context: ModelContext { store.context }

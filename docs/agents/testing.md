@@ -35,7 +35,7 @@ Result: /var/folders/…/T/grosh-check.Ab12Cd/Grosh.xcresult
 
 - `FAIL <Suite>/<test>: <file>:<line>: <message>` for each failed expectation, up to five per test. A parameterized test names the failing arguments in brackets after the test.
 - `ERROR <file>:<line>: <message>` for each build error. The summary then reads `0 passed, 0 failed in 23s (the build failed)`.
-- Errors that Grosh logged during the run, from `tools/check-logs`, come just before the summary, which then ends in `; Grosh logged errors (tools/check-logs)`. `tools/check-logs` reads the simulator the tests ran on. tools/check boots that simulator when it is down, and shuts it down once the log is read. If it is still not booted, the check is skipped, the output says so, and the outcome is not changed.
+- Errors that Grosh logged during the run, from `tools/check-logs`, come just before the summary, each led by the test that was running (`docs/agents/log-check.md`). A new suite gets `@Suite(.namedInTheLog)`, as every suite has, or its messages carry only their time. The summary then ends in `; Grosh logged errors (tools/check-logs)`. `tools/check-logs` reads the simulator the tests ran on. tools/check boots that simulator when it is down, and shuts it down once the log is read. If it is still not booted, the check is skipped, the output says so, and the outcome is not changed.
 - When a test crashed, or a UI test failed, the output adds why, after the failures: the runtime's `Fatal error:` lines from the log, then the crashed thread's top frames from the newest crash report of Grosh that macOS wrote during the run (in `~/Library/Logs/DiagnosticReports`; `GROSH_CRASH_REPORTS` names another folder). It waits up to ten seconds for that report, and says so when none was written.
 - Any other line says why the outcome could not be read: no simulator, xcodebuild stopping before it wrote a result bundle, JSON of an unexpected shape, or `GroshUITests did not run`. The full log has the details.
 
@@ -77,7 +77,7 @@ If a run with `--ui` prints `GroshUITests did not run`, check that GroshUITests 
 
 `GroshTests/SnapshotTests.swift` draws each transaction row kind (Expense, Income, Transfer, Split, Reimbursement) and Home with its Month graph, in light, dark and the accessibility text size AX3, and compares each with a PNG in `GroshTests/__Snapshots__/SnapshotTests/`. It uses [swift-snapshot-testing](https://github.com/pointfreeco/swift-snapshot-testing), linked to GroshTests only and pinned to 1.19.7 by `Grosh.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`. A new version can draw differently, so updating it means recording the references again. Each screen is drawn as of 12 October 2026, from fixed transactions, on a 402 × 874 screen in English (United States), so the same tree draws the same image on any day.
 
-**References recorded on:** a Mac16,7 (Apple M4 Pro) on macOS 27.2 with Xcode 27.1 (27A9275), on the iPhone 17 Pro simulator with iOS 27.0. Record and compare on that setup only. The simulator's language and region must be English (United States) too, since amounts and dates use the device's locale.
+**References recorded on:** a Mac16,7 (Apple M4 Pro) on macOS 27.2 with Xcode 27.1 (27A9275), on the iPhone 17 Pro simulator with iOS 27.0 (24A434). Record and compare on that setup only. The simulator's language and region must be English (United States) too, since amounts and dates use the device's locale.
 
 CI skips the suite and prints one line saying so, because the references belong to a Mac.
 

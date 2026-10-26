@@ -79,6 +79,11 @@ def step(kind, name, at):
                  subsystem="Leoxo.GroshUITests", category="Steps")
 
 
+def test_mark(kind, name, at):
+    """A unit test, or its suite, logging `begin <name>` or `end <name>` from inside the Grosh process."""
+    return entry(f"{kind} {name}", at, level="Default", subsystem="Leoxo.GroshTests", category="Tests")
+
+
 def ndjson(*records):
     """What log show prints: a line per entry, then the record that says the log is finished."""
     return "\n".join([json.dumps(record, ensure_ascii=False) for record in records] + ['{"finished":1}']) + "\n"
@@ -162,6 +167,7 @@ class SimulatorCommandTests(unittest.TestCase):
     APP = ('process == "Grosh" AND (messageType == error OR messageType == fault '
            'OR subsystem == "com.apple.runtime-issues")')
     STEPS = 'subsystem == "Leoxo.GroshUITests" AND category == "Steps"'
+    TESTS = 'subsystem == "Leoxo.GroshTests" AND category == "Tests"'
 
     def test_start_is_the_local_time_to_the_second(self):
         with local_timezone("JST-9"):
@@ -170,12 +176,12 @@ class SimulatorCommandTests(unittest.TestCase):
             self.assertEqual(check_logs.start_argument(BASE), "2025-10-09 03:53:20")
             self.assertEqual(check_logs.start_argument(BASE + 0.9), "2025-10-09 03:53:20")
 
-    def test_asks_the_booted_simulator_for_the_apps_errors_faults_and_runtime_issues(self):
+    def test_asks_the_booted_simulator_for_the_apps_errors_faults_and_runtime_issues_and_the_tests_marks(self):
         with local_timezone("EST5"):
             command = check_logs.simulator_command(BASE, with_steps=False)
         self.assertEqual(command, [
             "xcrun", "simctl", "spawn", "booted", "log", "show", "--style", "ndjson",
-            "--start", "2025-10-09 03:53:20", "--predicate", self.APP])
+            "--start", "2025-10-09 03:53:20", "--predicate", f"({self.APP}) OR ({self.TESTS})"])
 
     def test_reads_the_simulator_it_is_given_rather_than_the_booted_one(self):
         with local_timezone("EST5"):
@@ -187,7 +193,8 @@ class SimulatorCommandTests(unittest.TestCase):
             command = check_logs.simulator_command(BASE, with_steps=True)
         self.assertEqual(command, [
             "xcrun", "simctl", "spawn", "booted", "log", "show", "--style", "ndjson", "--info",
-            "--start", "2025-10-09 03:53:20", "--predicate", f"({self.APP}) OR ({self.STEPS})"])
+            "--start", "2025-10-09 03:53:20", "--predicate",
+            f"({self.APP}) OR ({self.TESTS}) OR ({self.STEPS})"])
 
 
 class CollectTests(unittest.TestCase):
@@ -252,6 +259,15 @@ class CollectTests(unittest.TestCase):
         self.assertEqual([(m.begins, m.name) for m in collect(*records).marks], [(True, WALK), (False, WALK)])
         self.assertEqual(collect(*records, with_steps=False).marks, [])
 
+    def test_reads_the_unit_tests_marks_with_or_without_steps(self):
+        records = (test_mark("begin", "AmountEntryTests/parses()", 1), test_mark("end", "AmountEntryTests/parses()", 2))
+        for with_steps in (True, False):
+            self.assertEqual([(m.begins, m.name) for m in collect(*records, with_steps=with_steps).marks],
+                             [(True, "AmountEntryTests/parses()"), (False, "AmountEntryTests/parses()")])
+
+    def test_a_unit_tests_mark_is_not_a_message(self):
+        self.assertEqual(collect(test_mark("begin", "AmountEntryTests", 1)).messages, [])
+
     def test_a_steps_entry_that_is_not_a_begin_or_an_end_is_not_a_mark(self):
         self.assertEqual(collect(step("middle of", WALK, 1), step("begin", "", 2)).marks, [])
 
@@ -260,6 +276,15 @@ class TaggingTests(unittest.TestCase):
     def test_a_message_is_tagged_with_the_step_it_was_logged_in(self):
         self.assertEqual(tagged(
             step("begin", WALK, 10), entry("inside", 11), step("end", WALK, 12)), [("[Import] inside", WALK)])
+
+    def test_a_message_is_tagged_with_the_unit_test_inside_its_suite(self):
+        test = "SnapshotTests/expenseRow()"
+        self.assertEqual(tagged(
+            test_mark("begin", "SnapshotTests", 10), test_mark("begin", test, 11), entry("inside", 12),
+            test_mark("end", test, 13), entry("between tests", 14), test_mark("end", "SnapshotTests", 15),
+            entry("after the suite", 16)),
+            [("[Import] inside", test), ("[Import] between tests", "SnapshotTests"),
+             ("[Import] after the suite", "after SnapshotTests")])
 
     def test_a_message_outside_a_step_has_no_tag(self):
         found = tagged(entry("before", 1), step("begin", WALK, 10), step("end", WALK, 12), entry("long after", 60))

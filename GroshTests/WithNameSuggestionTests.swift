@@ -5,6 +5,7 @@ import Testing
 
 /// The With field autocompletes from names used before.
 @MainActor
+@Suite(.namedInTheLog)
 struct WithNameSuggestionTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }

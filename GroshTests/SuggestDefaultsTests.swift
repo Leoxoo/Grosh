@@ -5,6 +5,7 @@ import Testing
 
 /// "Suggest defaults": where every starting value of the Add Transaction sheet comes from.
 @MainActor
+@Suite(.namedInTheLog)
 struct SuggestDefaultsTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }

@@ -3,6 +3,7 @@ import Testing
 @testable import Grosh
 
 @MainActor
+@Suite(.namedInTheLog)
 struct CategoryMergeTests {
     private let store: CategoryFixture
     private var catalog: CategoryCatalog { store.catalog }

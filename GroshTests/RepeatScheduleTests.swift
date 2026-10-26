@@ -3,6 +3,7 @@ import Testing
 
 /// When a Recurring transaction falls due: the due days of each repeat, where its end cuts them off, and which one
 /// comes next. The expected days are worked out by hand from the calendar, not by the code under test.
+@Suite(.namedInTheLog)
 @MainActor
 struct RepeatScheduleTests {
     @Test func dailyRepeatFallsOnEveryDay() {

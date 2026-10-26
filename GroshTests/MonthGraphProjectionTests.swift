@@ -6,6 +6,7 @@ import Testing
 /// The dotted line of Home's Spent and Income cards: what the Recurring transactions still have due from today to the
 /// end of the current month, Expected by month end, and the popup on a day still to come.
 @MainActor
+@Suite(.namedInTheLog)
 struct MonthGraphProjectionTests {
     private let store: MonthGraphFixture
     private var context: ModelContext { store.context }

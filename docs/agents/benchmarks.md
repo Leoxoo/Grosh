@@ -98,9 +98,6 @@ A part that can't be read shows as `unknown Mac`, `unknown Xcode` or `not a simu
 
 ## Where things stand
 
-No budgets are recorded yet: `steps` is empty and `recordedSetup` says `not yet recorded`, because they have to be measured on a Mac. Until then every step fails with `no budget recorded`; each message carries the median of that one run.
+The budgets were recorded on 25 October 2026, on the setup `recordedSetup` names: a Mac16,7 (Apple M4 Pro), the iPhone 17 Pro simulator (iPhone18,1) with iOS 27.0 (24A434), Xcode 27.1 (27A9275), optimized. Five runs gave each step's numbers, and five more with the table in place all passed.
 
-Two things are left for the first Mac run:
-
-- **The headroom.** It has not been chosen; step 4 above is how. Whoever records the first budgets replaces this bullet with the headroom they chose.
-- **The setup line.** Read it before recording: none of its parts should say `unknown`. The code that reads it has not run on a Mac yet.
+**The headroom** is 25% over the slowest of the five medians, and at least 5 ms over it: `budget = max(slowest × 1.25, slowest + 5)`, rounded up to a whole millisecond. The 5 ms floor is for the short steps (9 to 30 ms), where a few milliseconds of noise is a large share. Use the same rule when you record a step again.

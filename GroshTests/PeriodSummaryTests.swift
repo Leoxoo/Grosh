@@ -4,6 +4,7 @@ import Testing
 
 /// The Opening balance, Ending balance and difference at the top of the Transactions tab.
 @MainActor
+@Suite(.namedInTheLog)
 struct PeriodSummaryTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }

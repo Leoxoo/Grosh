@@ -23,7 +23,7 @@ import UIKit
 /// a setup other than the one the budgets were measured on, a step over its budget is a warning instead. The run ends
 /// with a summary line. See `docs/agents/benchmarks.md`.
 @MainActor
-@Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["GROSH_BENCHMARK"] != nil), .checkingBudgets)
+@Suite(.namedInTheLog, .serialized, .enabled(if: ProcessInfo.processInfo.environment["GROSH_BENCHMARK"] != nil), .checkingBudgets)
 struct PerformanceBenchmarks {
     /// About 16,000 transactions over six years, as a long-time user (or a Money Lover import) has.
     static let years = 6

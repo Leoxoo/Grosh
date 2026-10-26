@@ -6,6 +6,7 @@ import Testing
 /// A Recurring transaction's Kind: a new one takes its category's default and keeps it when that default changes, and
 /// the Recurring tab groups the schedules by it.
 @MainActor
+@Suite(.namedInTheLog)
 struct RecurringKindTests {
     private let store: CategoryFixture
     private var context: ModelContext { store.context }

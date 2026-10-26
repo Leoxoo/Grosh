@@ -61,22 +61,12 @@ The walk finds screens by their navigation bar titles and tabs by their names. T
 - `Launch: Home did not appear within 300 seconds.` The store opened, but Home did not show: the launch hung, or the screen changed.
 - `Failed to get matching snapshots: … kAXErrorServerNotFound`, at any step. XCTest found no running app to query: it had crashed or quit, or it was still in its launch. `tools/check` prints the crash report of a failed UI test. With none written, the app quit or hung without crashing.
 
-## Written without a Mac
+## Launch baseline
 
-This was written where there is no Xcode and no simulator, so none of it has compiled or run. The first run on a Mac settles the points below. Delete this section once it has.
+`Launch → measure` compares the launch's average with a baseline in `Grosh.xcodeproj/xcshareddata/xcbaselines/`, recorded on a Mac16,7 (Apple M4 Pro) with the iPhone 17 Pro simulator on iOS 27.0, Xcode 27.1: 3.45 s, the average of five launches of a Debug build on the 16k store. Two walks on that setup averaged 3.45 s and 2.96 s, so the baseline is the slower of the two, and ordinary noise stays within its 10%. XCTest fails the step when the average is more than 10% over it, or when the five launches spread by more than 10% (relative standard deviation; 2% when it was recorded). A baseline belongs to the Mac and the simulator it was recorded on, so on any other, CI among them, launch is measured and reported but never fails.
 
-- **It compiles, and the walk passes.**
-- **The launch baseline.** It has to be recorded on a Mac and checked in. Run the walk in Xcode. In the test report, open the launch metric's result, click Set Baseline, and commit `Grosh.xcodeproj/xcshareddata/xcbaselines/`. A baseline belongs to the Mac and the simulator it was recorded on, so other machines, CI among them, have nothing to compare against. Until a baseline is recorded, launch is measured and reported but never fails the test.
-- **How long it takes.** Once the day's store is made, it should finish in a few minutes on a laptop.
-- **Making the store.** The `make` launch quits once the store is made, and a launch that finds the store made already quits after three seconds, so that XCTest sees it running. Check both on a laptop and on CI, and that 900 seconds is enough for a Debug build. If it isn't, raise the `Launch` step's first timeout.
-- **What the walk looks for.** Each of these comes from reading the views, not from the accessibility tree:
-  - navigation bars named by their screen's title, and tab bar buttons by the tab's name;
-  - the back button first in its navigation bar;
-  - a row's label joining its texts, so a row holds "Dinner with Sam", and a wallet's row starts with its name;
-  - the form's Category and Card rows as buttons that carry their identifiers;
-  - the Card menu's choices as buttons named for the Cards;
-  - the keypad's keys labelled 4 and 2;
-  - the category list's search field;
-  - "Don’t Allow" on the notifications prompt.
-- **Animations off.** Check that turning them off in `GroshApp.init` takes effect.
-- **The step log.** Check that it reaches the simulator's log and that `tools/check-logs --ui` tags messages with it. `docs/agents/log-check.md` has a probe for this.
+To record it again (after a deliberate change to launch, or on a new setup): run the walk in Xcode, open the launch metric's result in the test report and click Set Baseline, or edit `baselineAverage` in the `.plist` beside `Info.plist` to the average of the five measurements the result bundle holds (`xcrun xcresulttool get test-results metrics --path <Grosh.xcresult>`). Commit the change with the before and after.
+
+## On a Mac
+
+The walk has run on a Mac16,7 (Apple M4 Pro) with Xcode 27.1 and the iPhone 17 Pro simulator on iOS 27.0, and on CI (Xcode 26.4, iOS 26.4). With the day's store made, `tools/check --ui --only GroshUITests/GroshUITests` takes about three and a half minutes, build included. Everything the walk looks for, listed in the sections above, was found as written.

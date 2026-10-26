@@ -6,6 +6,7 @@ import Testing
 /// Reimbursements: money someone paid back against an Expense, kept as entries on it. The Expense's net is its amount
 /// plus its entries, and no transaction is made.
 @MainActor
+@Suite(.namedInTheLog)
 struct ReimbursementTests {
     private let store: MonthGraphFixture
     private var context: ModelContext { store.context }

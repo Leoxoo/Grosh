@@ -6,6 +6,7 @@ import Testing
 /// A cropped photo: which part of a picked photo the window shows, the JPEG a crop is saved as, a copy shrunk for a
 /// small mark, the color a photo averages to, and when a Subscription's icon shows on its Recurring transaction.
 @MainActor
+@Suite(.namedInTheLog)
 struct CroppedPhotoTests {
     private let wide = CGSize(width: 1000, height: 400)
     private let tall = CGSize(width: 400, height: 1000)

@@ -6,6 +6,7 @@ import Testing
 /// Import from MoneyLover ("Replace all data"): a MoneyLover CSV export replaces every wallet, Card and transaction,
 /// keeping the categories. Every fixture here is made up.
 @MainActor
+@Suite(.namedInTheLog)
 struct MoneyLoverImportTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }

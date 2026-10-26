@@ -6,6 +6,7 @@ import Testing
 /// Transfers between wallets (ADR-0002): two linked transactions, an Outgoing transfer in the source wallet and an
 /// Incoming transfer in the destination.
 @MainActor
+@Suite(.namedInTheLog)
 struct TransferTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }

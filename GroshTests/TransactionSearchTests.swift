@@ -4,6 +4,7 @@ import Testing
 
 /// Search: note text, category name and amount, across all time.
 @MainActor
+@Suite(.namedInTheLog)
 struct TransactionSearchTests {
     private let fixture: CategoryFixture
     private var context: ModelContext { fixture.context }

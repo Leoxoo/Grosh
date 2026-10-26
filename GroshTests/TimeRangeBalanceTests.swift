@@ -4,6 +4,7 @@ import Testing
 
 /// The Opening and Ending balances at the top of the Transactions tab, for every time range of the "…" menu.
 @MainActor
+@Suite(.namedInTheLog)
 struct TimeRangeBalanceTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }

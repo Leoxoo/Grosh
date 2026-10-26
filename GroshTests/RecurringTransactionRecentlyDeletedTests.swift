@@ -6,6 +6,7 @@ import Testing
 /// Recurring transactions with their wallet and in Recently Deleted: deleting one moves it to the bin and unlinks what
 /// it made, restoring one skips what fell due meanwhile, and a deleted or paused schedule makes nothing.
 @MainActor
+@Suite(.namedInTheLog)
 struct RecurringTransactionRecentlyDeletedTests {
     private let store: CategoryFixture
     private var context: ModelContext { store.context }

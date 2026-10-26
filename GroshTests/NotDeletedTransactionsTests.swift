@@ -8,6 +8,7 @@ import Testing
 /// The transactions outside Recently Deleted that Home, the Transactions tab, search and Link Existing share: read once,
 /// then kept in step with every save, so they always hold what `@Query(Transaction.notDeleted)` would.
 @MainActor
+@Suite(.namedInTheLog)
 struct NotDeletedTransactionsTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }

@@ -3,6 +3,7 @@ import Testing
 
 /// The rows a Net income or Trend screen lists, one per Step: each Step's totals, which together make up the period's.
 @MainActor
+@Suite(.namedInTheLog)
 struct StepRowsTests {
     private let store: MonthGraphFixture
     private var today: CalendarDay { store.today }

@@ -90,5 +90,17 @@
   {
     "pattern": "HALC_ProxyIOContext::IOWorkLoop: skipping cycle due to overload",
     "reason": "The simulator's audio hardware layer logs this when its audio work loop skips a cycle because the audio is overloaded. The walk hears it while the success cue plays after an Expense is saved, which Grosh's own code starts. The cue is a sound, and the simulator's audio layer, not Grosh, reports the overload."
+  },
+  {
+    "pattern": "^\\[API\\] cannot add handler to 0 from 0 - dropping$",
+    "reason": "Core Animation logs this as an API error while an app launches on the iOS 27 simulator. Settings, Reminders and Health log it too when they launch, so it is the system's, and Grosh cannot change it."
+  },
+  {
+    "pattern": "^\\[general\\] NSPredicate: -\\[NSPredicate copy\\] called on a predicate that has _evaluationBlocked set\\.",
+    "reason": "Foundation logs this fault in the app's process when XCTest's automation support copies a query predicate it decoded from the UI test runner. A UI test that only launches Grosh and waits for Home logs it, and the same launch without XCTest does not, so it comes from the test runner's queries, not from Grosh."
+  },
+  {
+    "pattern": "^\\[Invalid Configuration\\] glassEffect\\(\\) tried to update multiple times per frame\\.$",
+    "reason": "On iOS 27, SwiftUI logs this when the Category picker's search field gets focus inside the Add Transaction sheet. The picker uses a plain .searchable, and the fault still came with both of Grosh's own glass buttons (the + and the period strip's return button) switched to non-glass styles, so the glass is SwiftUI's own search field. A glass button of Grosh's that misbehaves logs the same words, so look again if one is added."
   }
 ]

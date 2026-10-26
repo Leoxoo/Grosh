@@ -6,6 +6,7 @@ import Testing
 /// Moving an existing deposit into an Expense as a Reimbursement: the deposit's amount, day and note become the entry, and
 /// the deposit goes to Recently Deleted. Also how the row lists an Expense's entries.
 @MainActor
+@Suite(.namedInTheLog)
 struct ReimbursementMovingInTests {
     private let store: MonthGraphFixture
     private var context: ModelContext { store.context }

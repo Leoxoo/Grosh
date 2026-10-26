@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Grosh
 
+@Suite(.namedInTheLog)
 struct CalendarDayConversionTests {
     private let newYork: Calendar = {
         var calendar = Calendar(identifier: .gregorian)

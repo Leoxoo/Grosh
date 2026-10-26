@@ -4,6 +4,7 @@ import Testing
 /// The transactions a Breakdown row opens: what counts toward a side under a parent category, subcategories included, in
 /// the days of the period. Their total is the row's amount.
 @MainActor
+@Suite(.namedInTheLog)
 struct CategoryTransactionsTests {
     private let store: MonthGraphFixture
     private var today: CalendarDay { store.today }

@@ -6,6 +6,7 @@ import Testing
 /// Account → Export CSV, and restoring the export with Import from MoneyLover ("Replace all data"). Every fixture here
 /// is made up.
 @MainActor
+@Suite(.namedInTheLog)
 struct GroshCSVExportTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
