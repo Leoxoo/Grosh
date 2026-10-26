@@ -94,5 +94,9 @@
   {
     "pattern": "^\\[API\\] cannot add handler to 0 from 0 - dropping$",
     "reason": "Core Animation logs this as an API error while an app launches on the iOS 27 simulator. Settings, Reminders and Health log it too when they launch, so it is the system's, and Grosh cannot change it."
+  },
+  {
+    "pattern": "^\\[general\\] NSPredicate: -\\[NSPredicate copy\\] called on a predicate that has _evaluationBlocked set\\.",
+    "reason": "Foundation logs this fault in the app's process when XCTest's automation support copies a query predicate it decoded from the UI test runner. A UI test that only launches Grosh and waits for Home logs it, and the same launch without XCTest does not, so it comes from the test runner's queries, not from Grosh."
   }
 ]
