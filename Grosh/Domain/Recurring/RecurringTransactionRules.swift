@@ -48,7 +48,7 @@ extension AddTransactionNowError: LocalizedError {
 }
 
 /// The editable fields of a Recurring transaction, as its form holds them before the rules check and save them.
-struct RecurringDraft {
+nonisolated struct RecurringDraft {
     var name = ""
     /// Entered positive; the category sets the sign.
     var amount = Money(cents: 0)

@@ -2,7 +2,7 @@ import SwiftUI
 
 extension CategoryType {
     /// The types the user sees, in order: the segments of Account → Categories and of the Add sheet.
-    static let segments: [CategoryType] = [.expense, .income, .debtLoan]
+    nonisolated static let segments: [CategoryType] = [.expense, .income, .debtLoan]
 
     var title: String {
         switch self {

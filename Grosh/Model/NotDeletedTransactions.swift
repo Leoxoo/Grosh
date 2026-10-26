@@ -52,7 +52,7 @@ extension NotDeletedTransactions {
                 try context.fetch(Transaction.notDeleted)
             } ?? []
             self.transactions = transactions
-            entries = transactions.map { LedgerEntry($0) }
+            entries = transactions.map(LedgerEntry.init)
             positions = Self.positions(of: transactions)
             saves = NotificationCenter.default.addObserver(
                 forName: ModelContext.didSave, object: context, queue: nil
@@ -120,7 +120,7 @@ extension NotDeletedTransactions {
                 entries = kept.map { entries[$0] }
             }
             transactions += joining
-            entries += joining.map { LedgerEntry($0) }
+            entries += joining.map(LedgerEntry.init)
             positions = Self.positions(of: transactions)
             self.transactions = transactions
             self.entries = entries

@@ -31,7 +31,7 @@ private struct ReimbursementForm: View {
     init(expense: Transaction, editing: Reimbursement?, startingDay: CalendarDay) {
         self.expense = expense
         self.editing = editing
-        let startingDraft = editing.map { ReimbursementDraft(editing: $0) } ?? ReimbursementDraft(day: startingDay)
+        let startingDraft = editing.map(ReimbursementDraft.init(editing:)) ?? ReimbursementDraft(day: startingDay)
         _draft = State(initialValue: startingDraft)
         _entry = State(initialValue: editing == nil ? AmountEntry() : AmountEntry(cents: startingDraft.amount.cents))
     }

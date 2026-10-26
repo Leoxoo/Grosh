@@ -4,7 +4,7 @@ import SwiftData
 /// Account → Recently Deleted: the wallets, Recurring transactions and transactions deleted in the last 30 days, waiting
 /// to be restored or removed for good. A deleted wallet is one item holding the transactions and Recurring transactions
 /// deleted with it. Nothing in it counts in any balance, list, search or report.
-struct RecentlyDeleted {
+nonisolated struct RecentlyDeleted {
     /// How long an item waits before it is removed for good.
     static let keptDays = 30
 
@@ -307,7 +307,7 @@ extension Transaction {
     }
 }
 
-extension Sequence where Element == Transaction {
+nonisolated extension Sequence where Element == Transaction {
     /// The transactions outside Recently Deleted.
     var notDeleted: [Transaction] { filter { !$0.isInRecentlyDeleted } }
 }

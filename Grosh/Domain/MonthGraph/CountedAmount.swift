@@ -5,7 +5,7 @@ nonisolated enum SpentOrIncome: CaseIterable, Sendable {
 }
 
 /// An amount that counts on the Month graph: toward Spent or Income, on the day it counts.
-struct CountedAmount {
+nonisolated struct CountedAmount {
     let side: SpentOrIncome
     let day: CalendarDay
     /// What it adds to its tab's total. A refund takes away from Spent, so it is below zero there.
@@ -14,7 +14,7 @@ struct CountedAmount {
     let category: Category
 }
 
-extension CountedAmount {
+nonisolated extension CountedAmount {
     /// `amount`, as it moves a wallet, filed under `category` on `day`. Under an Expense category it counts toward Spent
     /// turned around, so money going out adds to Spent and a refund takes away from it; under an Income category it
     /// counts toward Income as it is. Under any other category, a Debt/Loan one or one of the app's own such as

@@ -22,7 +22,7 @@ enum TransactionDefaults {
     }
 
     /// Whether a transaction of `type` starts excluded from report. Loan and Debt (the Debt/Loan tab) do.
-    static func isExcludedFromReport(_ type: CategoryType) -> Bool {
+    nonisolated static func isExcludedFromReport(_ type: CategoryType) -> Bool {
         type == .debtLoan
     }
 

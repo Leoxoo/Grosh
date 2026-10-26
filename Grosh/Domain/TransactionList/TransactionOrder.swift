@@ -19,7 +19,7 @@ extension Transaction {
 
 /// What ``Transaction/listOrder`` sorts a transaction by, read once: a model's stored properties are slow to read, and
 /// a sort reads them for every comparison.
-private struct ListPosition {
+nonisolated private struct ListPosition {
     let dayRaw: Int
     let createdAt: Date
     let transaction: Transaction
@@ -39,10 +39,10 @@ private struct ListPosition {
     }
 }
 
-extension Sequence where Element == Transaction {
+nonisolated extension Sequence where Element == Transaction {
     /// The transactions in the order every transaction list shows them: newest day first and, within a day,
     /// the most recently entered first.
     func inListOrder() -> [Transaction] {
-        map { ListPosition($0) }.sorted { $0.isListed(before: $1) }.map(\.transaction)
+        map(ListPosition.init).sorted { $0.isListed(before: $1) }.map(\.transaction)
     }
 }

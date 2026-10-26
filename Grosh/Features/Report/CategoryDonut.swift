@@ -242,7 +242,7 @@ struct CategoryDonut: View {
 
 /// An arc of a donut from one fraction of the way round to another, clockwise from the top, with a half-degree gap at
 /// each end.
-private struct DonutSegment: Shape {
+nonisolated private struct DonutSegment: Shape {
     let startFraction: Double
     let endFraction: Double
     /// The inner radius as a share of the outer one.

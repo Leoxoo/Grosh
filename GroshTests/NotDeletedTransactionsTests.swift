@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 import SwiftData
 import Testing
 @testable import Grosh
@@ -112,13 +113,14 @@ struct NotDeletedTransactionsTests {
         let coffee = record("coffee")
         try context.save()
         let store = shared
-        var listChanged = false
-        withObservationTracking { _ = store.transactions } onChange: { listChanged = true }
+        // onChange is a Sendable closure, so the flag it sets is behind a lock.
+        let listChanged = OSAllocatedUnfairLock(initialState: false)
+        withObservationTracking { _ = store.transactions } onChange: { listChanged.withLock { $0 = true } }
 
         coffee.amountCents = -7_50
         try context.save()
 
-        #expect(!listChanged)
+        #expect(!listChanged.withLock { $0 })
         #expect(store.transactions.map(\.amountCents) == [-7_50])
     }
 
@@ -131,12 +133,13 @@ struct NotDeletedTransactionsTests {
         try context.save()
         let store = shared
 
-        var ledgerChanged = false
-        withObservationTracking { _ = store.entries } onChange: { ledgerChanged = true }
+        // onChange is a Sendable closure, so the flag it sets is behind a lock.
+        let ledgerChanged = OSAllocatedUnfairLock(initialState: false)
+        withObservationTracking { _ = store.entries } onChange: { ledgerChanged.withLock { $0 = true } }
         coffee.amountCents = -7_50
         #expect(store.entries.map(\.netCents) == [-5_00])
         try context.save()
-        #expect(ledgerChanged)
+        #expect(ledgerChanged.withLock { $0 })
         #expect(store.entries.map(\.netCents) == [-7_50])
 
         coffee.wallet = savings
@@ -151,13 +154,14 @@ struct NotDeletedTransactionsTests {
         let coffee = record("coffee")
         try context.save()
         let store = shared
-        var ledgerChanged = false
-        withObservationTracking { _ = store.entries } onChange: { ledgerChanged = true }
+        // onChange is a Sendable closure, so the flag it sets is behind a lock.
+        let ledgerChanged = OSAllocatedUnfairLock(initialState: false)
+        withObservationTracking { _ = store.entries } onChange: { ledgerChanged.withLock { $0 = true } }
 
         coffee.note = "espresso"
         try context.save()
 
-        #expect(!ledgerChanged)
+        #expect(!ledgerChanged.withLock { $0 })
     }
 
     @Test func eachContextHasItsOwn() throws {
