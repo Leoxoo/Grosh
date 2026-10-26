@@ -102,5 +102,9 @@
   {
     "pattern": "^\\[Invalid Configuration\\] glassEffect\\(\\) tried to update multiple times per frame\\.$",
     "reason": "On iOS 27, SwiftUI logs this when the Category picker's search field gets focus inside the Add Transaction sheet. The picker uses a plain .searchable, and the fault still came with both of Grosh's own glass buttons (the + and the period strip's return button) switched to non-glass styles, so the glass is SwiftUI's own search field. A glass button of Grosh's that misbehaves logs the same words, so look again if one is added."
+  },
+  {
+    "pattern": "^\\[UIKBFeedbackGenerator\\] <_UIKBFeedbackGenerator: 0x[0-9a-fA-F]+>: (Error: Cannot start engine because it does not exist\\.|Engine is not running\\. Can't play feedback\\.)$",
+    "reason": "The system keyboard plays a haptic on each key a test taps, and the simulator has no haptics: the keyboard logs \"Haptics: unsupported\" when it comes up, then these two errors on every key. Tapping a letter on the Category picker's ordinary search keyboard logs them as well as tapping the number pad's digits. Tests that type with typeText press no keys, so they never log it."
   }
 ]

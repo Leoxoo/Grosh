@@ -50,11 +50,12 @@ struct SystemNumberPad: UIViewRepresentable {
     }
 }
 
-/// What the number pad types into: an invisible view that takes the keyboard's keys and hands them to the entry.
-final class NumberPadInput: UIView, UIKeyInput {
+/// What the number pad types into: an invisible, empty text field that takes the keyboard's keys and hands them to the
+/// entry. A text field rather than a plain view taking keys, so the system describes it as one thing to VoiceOver and
+/// to UI tests; it never holds text of its own.
+final class NumberPadInput: UITextField, UITextFieldDelegate {
     private let coordinator: SystemNumberPad.Coordinator
     private let row: UIHostingController<OperationsRow>
-    var keyboardType: UIKeyboardType = .numberPad
 
     init(coordinator: SystemNumberPad.Coordinator) {
         self.coordinator = coordinator
@@ -63,6 +64,12 @@ final class NumberPadInput: UIView, UIKeyInput {
         row.view.autoresizingMask = .flexibleWidth
         row.view.backgroundColor = .clear
         super.init(frame: .zero)
+        keyboardType = .numberPad
+        autocorrectionType = .no
+        spellCheckingType = .no
+        tintColor = .clear
+        inputAccessoryView = row.view
+        delegate = self
     }
 
     @available(*, unavailable)
@@ -74,18 +81,19 @@ final class NumberPadInput: UIView, UIKeyInput {
         row.rootView = OperationsRow(isCalculation: isCalculation, perform: coordinator.perform)
     }
 
-    override var canBecomeFirstResponder: Bool { true }
-    override var inputAccessoryView: UIView? { row.view }
+    /// Always, so the delete key stays on while the field itself is empty.
+    override var hasText: Bool { true }
 
-    var hasText: Bool { true }
-
-    func insertText(_ text: String) {
-        for digit in text.compactMap(\.wholeNumberValue) {
+    /// The digits typed go to the entry, and the field stays empty.
+    func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+        for digit in string.compactMap(\.wholeNumberValue) {
             coordinator.perform(.press(.digit(digit)))
         }
+        return false
     }
 
-    func deleteBackward() {
+    /// The delete key, which an empty field still hears.
+    override func deleteBackward() {
         coordinator.perform(.press(.backspace))
     }
 
