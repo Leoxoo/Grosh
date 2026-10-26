@@ -1,5 +1,5 @@
 /// Whose transactions a list shows: the Total (every wallet counted in it) or one wallet.
-enum WalletSelection: Hashable {
+nonisolated enum WalletSelection: Hashable {
     case total
     case wallet(Wallet)
 

@@ -4,6 +4,7 @@ import Testing
 
 /// How a Net income or Trend screen splits its span into Steps, and how each Step is named.
 @Suite(.namedInTheLog)
+@MainActor
 struct StepTests {
     /// Weeks start on Monday, as `Calendar.firstWeekday` numbers it (2 is Monday), so the tests don't depend on the
     /// device's locale.

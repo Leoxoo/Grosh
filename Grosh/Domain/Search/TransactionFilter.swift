@@ -2,7 +2,7 @@ import Foundation
 
 /// What a transaction list is narrowed to: search text and filters. Everything left empty matches every
 /// transaction.
-struct TransactionFilter: Equatable {
+nonisolated struct TransactionFilter: Equatable {
     /// Finds the text in a transaction's note or its category's name, ignoring case and accents. A number also
     /// finds amounts: `973` finds $973.17.
     var searchText = ""
@@ -135,7 +135,7 @@ struct TransactionFilter: Equatable {
     }
 }
 
-extension Sequence where Element == Transaction {
+nonisolated extension Sequence where Element == Transaction {
     /// The transactions that pass `filter`.
     func matching(_ filter: TransactionFilter) -> [Transaction] {
         let search = TransactionFilter.Search(filter)

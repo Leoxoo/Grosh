@@ -27,7 +27,7 @@ nonisolated extension LockedRole {
     }
 }
 
-extension ModelContext {
+nonisolated extension ModelContext {
     /// The locked category that plays `role`, such as Starting balance or Outgoing transfer.
     func lockedCategory(_ role: LockedRole) throws -> Category {
         let raw: String? = role.rawValue

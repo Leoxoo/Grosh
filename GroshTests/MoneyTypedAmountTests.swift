@@ -3,6 +3,7 @@ import Testing
 @testable import Grosh
 
 @Suite(.namedInTheLog)
+@MainActor
 struct MoneyTypedAmountTests {
     private static let unitedStates = Locale(identifier: "en_US")
     private static let germany = Locale(identifier: "de_DE")

@@ -3,7 +3,7 @@ import SwiftData
 
 /// One part of a Split being set up: what a part takes of its own. Every part shares the wallet and Card of the
 /// transaction split, so a part holds neither.
-struct SplitPart {
+nonisolated struct SplitPart {
     /// Entered positive; the category decides whether it adds to or takes from the wallet.
     var amount: Money
     var category: Category?
@@ -35,13 +35,13 @@ struct SplitPart {
 }
 
 /// A part of a split being set up: the transaction being split, or a new part by its place in ``SplitDraft/parts``.
-enum SplitPartRef: Hashable {
+nonisolated enum SplitPartRef: Hashable {
     case original
     case part(Int)
 }
 
 /// A Reimbursement of the transaction being split and the part it goes to, `nil` until the user chooses.
-struct SplitReimbursement {
+nonisolated struct SplitReimbursement {
     let reimbursement: Reimbursement
     var part: SplitPartRef?
 }
@@ -49,7 +49,7 @@ struct SplitReimbursement {
 /// What the Split sheet holds before it is applied: the transaction being split as a part of its own, and the parts
 /// added to it. The transaction's amount is always what the other parts leave of the total; typing over it changes
 /// the total.
-struct SplitDraft {
+nonisolated struct SplitDraft {
     /// What the transaction came to before it was split.
     let was: Money
     /// The transaction being split. Its `amount` is the remainder, which the draft keeps as parts are added, changed
@@ -265,7 +265,7 @@ extension Transaction {
     }
 }
 
-extension Sequence where Element == Transaction {
+nonisolated extension Sequence where Element == Transaction {
     /// The original among the parts of one Split: the oldest, the transaction the user split from, which kept its
     /// identity. A part split off later is never older. `nil` when there are none.
     var splitOriginal: Transaction? { self.min { $0.createdAt < $1.createdAt } }

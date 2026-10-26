@@ -81,7 +81,7 @@ struct SnapshotTests {
     /// its reference. The looks share the environment and the screen size, so only appearance and text size differ.
     private func assertLooks(
         of screen: some View, in fixture: MonthGraphFixture,
-        file: StaticString = #file, testName: String = #function, line: UInt = #line
+        filePath: StaticString = #filePath, testName: String = #function, line: UInt = #line
     ) {
         // Home's preferences come from a suite of their own, so a Total hidden on the simulator doesn't change Home.
         let framed = screen
@@ -102,7 +102,7 @@ struct SnapshotTests {
                 as: .image(
                     drawHierarchyInKeyWindow: true, layout: .fixed(width: 402, height: 874), traits: look.traits
                 ),
-                named: look.name, file: file, testName: testName, line: line
+                named: look.name, file: filePath, testName: testName, line: line
             )
         }
     }

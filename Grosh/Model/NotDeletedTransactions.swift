@@ -71,7 +71,7 @@ extension NotDeletedTransactions {
         }
 
         /// The models a save inserted, updated and deleted, by their identifiers.
-        private struct Changes: @unchecked Sendable {
+        nonisolated private struct Changes: @unchecked Sendable {
             let changed: [PersistentIdentifier]
             let deleted: Set<PersistentIdentifier>
 

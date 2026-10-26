@@ -219,6 +219,7 @@ final class Hosted {
     let window: UIWindow
     let controller: UIViewController
 
+    @MainActor
     init(_ view: some View, container: ModelContainer, frame: CGRect = PerformanceBenchmarks.screen) {
         window = UIWindow(frame: frame)
         controller = UIHostingController(rootView: view.modelContainer(container))

@@ -54,7 +54,7 @@ extension CardRuleError: LocalizedError {
     }
 }
 
-extension CardDraft {
+nonisolated extension CardDraft {
     /// The Card's current fields, ready to edit.
     init(_ card: Card) {
         self.init(
