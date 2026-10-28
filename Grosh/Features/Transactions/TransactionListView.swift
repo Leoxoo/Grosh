@@ -37,6 +37,8 @@ private struct TransactionListContent: View {
     @State private var filter = TransactionFilter()
     /// Whether the search field is open, which the toolbar's Search button turns on.
     @State private var isSearchPresented = false
+    /// How far the list is pulled down past its top, which the header follows.
+    @State private var pull = PullDistance()
     /// Whether the list is choosing transactions to delete, and the ones chosen so far.
     @State private var isSelecting = false
     @State private var chosen = Set<Transaction>()
@@ -111,6 +113,11 @@ private struct TransactionListContent: View {
         // over: the header with the period strip, below, keeps its place.
         .id(filter.isSearching)
         .roundedSectionsListStyle()
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            max(0, -(geometry.contentOffset.y + geometry.contentInsets.top))
+        } action: { _, distance in
+            pull.distance = distance
+        }
         // A bar rather than an inset, so the content scrolling under it fades as it does under the system bar.
         .safeAreaBar(edge: .top, spacing: 0) {
             VStack(spacing: 4) {
@@ -126,6 +133,9 @@ private struct TransactionListContent: View {
                 }
             }
             .padding(.vertical, 8)
+            // A pull down at the top moves the large title down with the list, so the header goes with them rather
+            // than letting the title slide across it.
+            .modifier(FollowingPull(pull: pull))
         }
         .modifier(TransactionSearchField(text: $filter.searchText, isOpen: $isSearchPresented))
         .onChange(of: walletSelection) {
@@ -195,6 +205,22 @@ private struct TransactionListContent: View {
         selectedTransaction = nil
         chosen = []
         isSelecting = true
+    }
+}
+
+/// How far a list is pulled down past its top: 0 unless it is pulled. Its own object, so that only the view that follows
+/// the pull reads it, and the list isn't drawn again on every frame of the pull.
+@Observable
+private final class PullDistance {
+    var distance: CGFloat = 0
+}
+
+/// Moves the content down by as much as the list is pulled past its top.
+private struct FollowingPull: ViewModifier {
+    let pull: PullDistance
+
+    func body(content: Content) -> some View {
+        content.offset(y: pull.distance)
     }
 }
 

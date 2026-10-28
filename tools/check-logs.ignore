@@ -102,5 +102,9 @@
   {
     "pattern": "^\\[Invalid Configuration\\] glassEffect\\(\\) tried to update multiple times per frame\\.$",
     "reason": "On iOS 27, SwiftUI logs this when the Category picker's search field gets focus inside the Add Transaction sheet. The picker uses a plain .searchable, and the fault still came with both of Grosh's own glass buttons (the + and the period strip's return button) switched to non-glass styles, so the glass is SwiftUI's own search field. A glass button of Grosh's that misbehaves logs the same words, so look again if one is added."
+  },
+  {
+    "pattern": "^\\[API\\] Failed to create \\d+x0 image slot \\(alpha=\\d wide=\\d\\) \\(client=0x[0-9a-fA-F]+\\) \\[0x5 \\(os/kern\\) failure\\]$",
+    "reason": "Core Animation logs this on the iOS 27 simulator when a screen with a large title goes back to it while the title has slid away: it tries to draw the title's zero-height row for the transition. Settings logs the same line when it goes back from a row with its own large title slid away, so it is the system's."
   }
 ]
