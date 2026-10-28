@@ -47,20 +47,20 @@ private struct ReimbursementForm: View {
 
     var body: some View {
         KeypadSheet(
-            title: editing == nil ? Text("Someone Paid Me Back") : Text("Edit Reimbursement"),
+            title: editing == nil ? Text(Strings.Reimbursements.someonePaidMeBackTitle) : Text(Strings.Reimbursements.editReimbursement),
             entry: $entry,
             canSave: (try? draftToSave.validate()) != nil,
             save: save
         ) { fields in
             Section {
-                fields.amountRow("Amount", currencyCode: currencyCode, tint: Money(cents: 1).tint)
-                DayStepper(title: "Date", day: $draft.day)
+                fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: Money(cents: 1).tint)
+                DayStepper(title: Strings.Common.date, day: $draft.day)
                 fields.noteField($draft.note)
             } footer: {
-                Text("It is kept on the expense, which then counts what is left of it. No transaction is made.")
+                Text(Strings.Reimbursements.editorFooter)
             }
         }
-        .errorAlert("Couldn't Save Reimbursement", message: $errorMessage)
+        .errorAlert(Strings.Reimbursements.couldntSave, message: $errorMessage)
     }
 
     private func save() {

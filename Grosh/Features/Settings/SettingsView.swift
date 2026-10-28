@@ -17,7 +17,7 @@ struct SettingsView: View {
                     LabeledContent {
                         Text(currencyCode)
                     } label: {
-                        Label("Currency", systemImage: "dollarsign.circle")
+                        Label(Strings.Screens.currency, systemImage: "dollarsign.circle")
                     }
                 }
             }
@@ -25,25 +25,25 @@ struct SettingsView: View {
             if SoundsAndHaptics.isOffered(on: .current) {
                 Section {
                     Toggle(isOn: $soundsOn) {
-                        Label("Sounds", systemImage: "speaker.wave.2")
+                        Label(Strings.Settings.sounds, systemImage: "speaker.wave.2")
                     }
                     Toggle(isOn: $hapticsOn) {
-                        Label("Haptics", systemImage: "hand.tap")
+                        Label(Strings.Settings.haptics, systemImage: "hand.tap")
                     }
                     Picker(selection: $chime) {
                         ForEach(SuccessCue.Chime.allCases, id: \.self) { chime in
                             Text(chime.title).tag(chime)
                         }
                     } label: {
-                        Label("Chime", systemImage: "music.note")
+                        Label(Strings.Settings.chime, systemImage: "music.note")
                     }
                 } header: {
-                    Text("Sounds & Haptics")
+                    Text(Strings.Settings.soundsAndHaptics)
                 }
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("Settings")
+        .navigationTitle(Strings.Screens.settings)
         .onChange(of: preferences) { old, new in
             playSample(changingFrom: old, to: new)
         }
@@ -72,9 +72,9 @@ private extension SuccessCue.Chime {
     /// The chime's name, as the Chime picker shows it.
     var title: String {
         switch self {
-        case .marimba: String(localized: "Marimba")
-        case .glassBells: String(localized: "Glass bells")
-        case .bubblePops: String(localized: "Bubble pops")
+        case .marimba: String(localized: Strings.Settings.marimba)
+        case .glassBells: String(localized: Strings.Settings.glassBells)
+        case .bubblePops: String(localized: Strings.Settings.bubblePops)
         }
     }
 }

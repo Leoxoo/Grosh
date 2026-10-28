@@ -23,7 +23,7 @@ struct MonthGraphChart: View {
     var body: some View {
         let popup = graph.popup(on: selection)
         Chart {
-            RuleMark(x: .value("Day", graph.position(of: selection)))
+            RuleMark(x: .value(Strings.Common.day, graph.position(of: selection)))
                 .foregroundStyle(Color.secondary.opacity(0.5))
                 .lineStyle(StrokeStyle(lineWidth: 1))
                 .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
@@ -96,16 +96,16 @@ struct MonthGraphChart: View {
     private func line(_ points: [MonthGraph.Point], series: String) -> some ChartContent {
         ForEach(points, id: \.position) { point in
             LineMark(
-                x: .value("Day", point.position),
-                y: .value("Total", Double(point.total.cents)),
-                series: .value("Line", series)
+                x: .value(Strings.Common.day, point.position),
+                y: .value(Strings.Common.total, Double(point.total.cents)),
+                series: .value(Strings.Common.line, series)
             )
         }
     }
 
     /// A dot on the selected day at `total`.
     private func marker(at total: Money) -> some ChartContent {
-        PointMark(x: .value("Day", graph.position(of: selection)), y: .value("Total", Double(total.cents)))
+        PointMark(x: .value(Strings.Common.day, graph.position(of: selection)), y: .value(Strings.Common.total, Double(total.cents)))
     }
 
     /// The days named along the bottom: every seventh day from the 1st.
@@ -156,7 +156,7 @@ private struct MonthGraphPopup: View {
                     .monospacedDigit()
             }
             if let expected = popup.expected {
-                Text("Expected \(expected.formatted())")
+                Text(Strings.Home.expected(expected.formatted()))
                     .font(.subheadline.weight(.semibold))
                     .monospacedDigit()
             }

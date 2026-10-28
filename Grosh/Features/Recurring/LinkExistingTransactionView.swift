@@ -30,9 +30,9 @@ struct LinkExistingTransactionView: View {
                         NoMatchingTransactionsView(filter: filter)
                     } else {
                         ContentUnavailableView(
-                            "No Transactions to Link",
+                            Strings.Recurring.noTransactionsToLink,
                             systemImage: "tray",
-                            description: Text("Transactions that no Recurring transaction holds appear here.")
+                            description: Text(Strings.Recurring.noTransactionsToLinkDescription)
                         )
                     }
                 } else {
@@ -48,20 +48,20 @@ struct LinkExistingTransactionView: View {
                     }
                 }
             }
-            .navigationTitle("Link Transaction")
+            .navigationTitle(Strings.Recurring.linkTransaction)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .searchable(text: $filter.searchText, prompt: "Note, category or amount")
+            .searchable(text: $filter.searchText, prompt: Strings.Common.searchPrompt)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .primaryAction) {
                     TransactionFilterButton(filter: $filter)
                 }
             }
-            .errorAlert("Couldn't Link Transaction", message: $errorMessage)
+            .errorAlert(Strings.Recurring.couldntLink, message: $errorMessage)
         }
     }
 

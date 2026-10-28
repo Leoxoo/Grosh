@@ -3,7 +3,7 @@ import SwiftUI
 /// A date picker for a ``CalendarDay``, the one way a form picks a day from a calendar. ``DayStepper`` adds buttons
 /// that step one day back or forward.
 struct DayPicker: View {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     @Binding var day: CalendarDay
     /// When set, the first day that can be picked.
     var earliest: CalendarDay?

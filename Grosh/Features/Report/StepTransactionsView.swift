@@ -27,7 +27,7 @@ struct StepTransactionsView: View {
         List {
             Section {
                 HStack {
-                    Text(side?.title ?? String(localized: "Net income"))
+                    Text(side?.title ?? String(localized: Strings.Screens.netIncome))
                         .foregroundStyle(.secondary)
                     Spacer()
                     Text(listed.total.formatted())
@@ -40,9 +40,9 @@ struct StepTransactionsView: View {
             if listed.transactions.isEmpty {
                 Section {
                     ContentUnavailableView(
-                        "No Transactions",
+                        Strings.Common.noTransactions,
                         systemImage: "tray",
-                        description: Text("Nothing was recorded in this period.")
+                        description: Text(Strings.Common.nothingRecordedInPeriod)
                     )
                 }
             }

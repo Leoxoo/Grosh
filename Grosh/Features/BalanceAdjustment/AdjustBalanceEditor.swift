@@ -18,13 +18,13 @@ struct AdjustBalanceEditor: View {
         } else {
             NavigationStack {
                 ContentUnavailableView(
-                    "Can't Adjust Balance",
+                    Strings.BalanceAdjustment.cantAdjust,
                     systemImage: "exclamationmark.triangle",
-                    description: Text("The Other Income and Other Expense categories are missing.")
+                    description: Text(Strings.BalanceAdjustment.categoriesMissing)
                 )
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }
+                        Button(Strings.Common.cancel) { dismiss() }
                     }
                 }
             }
@@ -52,7 +52,7 @@ private struct AdjustBalanceForm: View {
 
     var body: some View {
         KeypadSheet(
-            title: Text("Adjust Balance"),
+            title: Text(Strings.BalanceAdjustment.adjustBalance),
             entry: $draft.realBalanceEntry,
             canSave: draft.canSave,
             save: save,
@@ -61,34 +61,34 @@ private struct AdjustBalanceForm: View {
             balanceSection(fields)
             reasonSection(fields)
         }
-        .errorAlert("Couldn't Adjust Balance", message: $errorMessage)
+        .errorAlert(Strings.BalanceAdjustment.couldntAdjust, message: $errorMessage)
     }
 
     private func balanceSection(_ fields: KeypadSheetFields) -> some View {
         Section {
-            WalletPicker(title: "Wallet", selection: $draft.wallet)
-            DayStepper(title: "Date", day: $draft.day)
+            WalletPicker(title: Strings.Common.wallet, selection: $draft.wallet)
+            DayStepper(title: Strings.Common.date, day: $draft.day)
             if let recorded = draft.recordedBalance {
-                LabeledContent("Recorded balance") {
+                LabeledContent(Strings.BalanceAdjustment.recordedBalance) {
                     AmountText(amount: recorded, showsColor: false)
                 }
             }
             fields.amountRow(
-                "Real balance", currencyCode: draft.currencyCode, tint: Money(cents: draft.realBalance?.cents ?? 0).tint
+                Strings.BalanceAdjustment.realBalance, currencyCode: draft.currencyCode, tint: Money(cents: draft.realBalance?.cents ?? 0).tint
             )
             ChangeSignButton(entry: $draft.realBalanceEntry)
         } footer: {
             if draft.wallet == nil {
-                Text("Add a wallet first, in Account → Wallets.")
+                Text(Strings.Common.addWalletFirst)
             } else {
-                Text("Type what the wallet really holds on this date. The difference is recorded as one transaction.")
+                Text(Strings.BalanceAdjustment.typeRealBalanceFooter)
             }
         }
     }
 
     private func reasonSection(_ fields: KeypadSheetFields) -> some View {
         Section {
-            LabeledContent("Difference") {
+            LabeledContent(Strings.Common.difference) {
                 AmountText(
                     amount: draft.difference ?? Money(cents: 0, currencyCode: draft.currencyCode),
                     showsPlusSign: true,
@@ -96,15 +96,15 @@ private struct AdjustBalanceForm: View {
                 )
             }
             if let reasonType = draft.reasonType {
-                CategoryPicker(title: "Reason", type: reasonType, selection: $draft.category)
+                CategoryPicker(title: Strings.BalanceAdjustment.reason, type: reasonType, selection: $draft.category)
             }
             fields.noteField($draft.note)
-            Toggle("Exclude from report", isOn: $draft.isExcludedFromReport)
+            Toggle(Strings.Common.excludeFromReport, isOn: $draft.isExcludedFromReport)
         } footer: {
             if draft.reasonType == nil {
-                Text("The recorded balance already matches. Type the real balance to adjust it.")
+                Text(Strings.BalanceAdjustment.alreadyMatchesFooter)
             } else {
-                Text("The reason is any Income category when the balance goes up, or any Expense category when it goes down. It counts in reports unless excluded, and never needs a Card.")
+                Text(Strings.BalanceAdjustment.reasonFooter)
             }
         }
     }

@@ -8,7 +8,7 @@ nonisolated enum AttachError: Error, Equatable {
 
 extension AttachError: LocalizedError {
     var errorDescription: String? {
-        String(localized: "That transaction is in Recently Deleted or already belongs to a Recurring transaction.")
+        String(localized: Strings.Recurring.alreadyAttached)
     }
 }
 

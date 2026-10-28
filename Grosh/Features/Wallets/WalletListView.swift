@@ -22,15 +22,15 @@ struct WalletListView: View {
                     }
                     .buttonStyle(.plain)
                     .swipeActions {
-                        Button("Delete", systemImage: "trash") { deleting = wallet }
+                        Button(Strings.Common.delete, systemImage: "trash") { deleting = wallet }
                             .tint(.red)
-                        Button("Archive", systemImage: "archivebox") { perform { try wallet.archive(today: today) } }
+                        Button(Strings.Common.archive, systemImage: "archivebox") { perform { try wallet.archive(today: today) } }
                             .tint(.orange)
                     }
                     .contextMenu {
-                        Button("Edit", systemImage: "pencil") { editorMode = .edit(wallet) }
-                        Button("Archive", systemImage: "archivebox") { perform { try wallet.archive(today: today) } }
-                        Button("Delete", systemImage: "trash", role: .destructive) { deleting = wallet }
+                        Button(Strings.Common.edit, systemImage: "pencil") { editorMode = .edit(wallet) }
+                        Button(Strings.Common.archive, systemImage: "archivebox") { perform { try wallet.archive(today: today) } }
+                        Button(Strings.Common.delete, systemImage: "trash", role: .destructive) { deleting = wallet }
                     }
                 }
                 .onMove { source, destination in
@@ -38,7 +38,7 @@ struct WalletListView: View {
                 }
             } footer: {
                 if wallets.count > 1 {
-                    Text("Drag to reorder. Home and every wallet picker use this order.")
+                    Text(Strings.Wallets.reorderFooter)
                 }
             }
 
@@ -53,42 +53,42 @@ struct WalletListView: View {
                         }
                         .buttonStyle(.plain)
                         .swipeActions {
-                            Button("Delete", systemImage: "trash") { deleting = wallet }
+                            Button(Strings.Common.delete, systemImage: "trash") { deleting = wallet }
                                 .tint(.red)
-                            Button("Unarchive", systemImage: "tray.and.arrow.up") {
+                            Button(Strings.Common.unarchive, systemImage: "tray.and.arrow.up") {
                                 perform { try wallet.unarchive(today: today) }
                             }
                             .tint(.green)
                         }
                         .contextMenu {
-                            Button("Unarchive", systemImage: "tray.and.arrow.up") {
+                            Button(Strings.Common.unarchive, systemImage: "tray.and.arrow.up") {
                                 perform { try wallet.unarchive(today: today) }
                             }
-                            Button("Delete", systemImage: "trash", role: .destructive) { deleting = wallet }
+                            Button(Strings.Common.delete, systemImage: "trash", role: .destructive) { deleting = wallet }
                         }
                     }
                 } header: {
-                    Text("Archived")
+                    Text(Strings.Common.archived)
                 } footer: {
-                    Text("Archived wallets are left out of the Total and the pickers. Their transactions are kept.")
+                    Text(Strings.Wallets.archivedSectionFooter)
                 }
             }
         }
         .overlay {
             if wallets.isEmpty && archivedWallets.isEmpty {
                 ContentUnavailableView {
-                    Label("No Wallets", systemImage: "wallet.bifold")
+                    Label(Strings.Wallets.noWallets, systemImage: "wallet.bifold")
                 } description: {
-                    Text("Add a wallet for each place you keep money.")
+                    Text(Strings.Wallets.noWalletsDescription)
                 } actions: {
-                    Button("Add Wallet") { editorMode = .add }
+                    Button(Strings.Wallets.addWallet) { editorMode = .add }
                 }
             }
         }
-        .navigationTitle("Wallets")
+        .navigationTitle(Strings.Screens.wallets)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Add Wallet", systemImage: "plus") { editorMode = .add }
+                Button(Strings.Wallets.addWallet, systemImage: "plus") { editorMode = .add }
             }
             #if os(iOS)
             ToolbarItem(placement: .topBarTrailing) {
@@ -100,7 +100,7 @@ struct WalletListView: View {
             WalletEditor(mode: mode)
         }
         .walletDeleteDialog($deleting)
-        .errorAlert("Couldn't Change Wallet", message: $errorMessage)
+        .errorAlert(Strings.Wallets.couldntChange, message: $errorMessage)
     }
 
     /// Runs a change, or shows why it was refused.

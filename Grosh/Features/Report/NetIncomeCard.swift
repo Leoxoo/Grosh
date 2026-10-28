@@ -10,7 +10,7 @@ struct NetIncomeCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 6) {
-                Text("Net income")
+                Text(Strings.Screens.netIncome)
                     .font(.headline)
                 Button {
                     isExplaining = true
@@ -19,7 +19,7 @@ struct NetIncomeCard: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
-                .accessibilityLabel("What Net income counts")
+                .accessibilityLabel(Strings.Report.whatNetIncomeCounts)
                 .popover(isPresented: $isExplaining) {
                     Text(Self.explanation)
                         .font(.subheadline)
@@ -40,7 +40,7 @@ struct NetIncomeCard: View {
             }
 
             NavigationLink(value: ReportScreen.details(.netIncome)) {
-                Text("See details")
+                Text(Strings.Report.seeDetails)
                     .font(.subheadline)
             }
         }
@@ -50,7 +50,7 @@ struct NetIncomeCard: View {
 
     /// What Net income counts, in one sentence.
     static let explanation = String(
-        localized: "Income less Spent: what came in less what went out, not counting transfers, starting balances, Loan and Debt payments, or anything excluded from report."
+        localized: Strings.Report.netIncomeExplanation
     )
 }
 

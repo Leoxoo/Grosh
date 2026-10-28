@@ -10,6 +10,6 @@ struct DueRemindersButton: View {
         Button(action: action) {
             Image(systemName: dueCount == 0 ? "bell" : "bell.badge")
         }
-        .accessibilityLabel(dueCount == 0 ? Text("Reminders") : Text("\(dueCount) Due Reminders"))
+        .accessibilityLabel(dueCount == 0 ? Text(Strings.Screens.reminders) : Text(Strings.DebtsLoans.dueReminders(dueCount)))
     }
 }

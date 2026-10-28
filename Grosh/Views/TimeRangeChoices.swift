@@ -8,7 +8,7 @@ struct TimeRangeChoices: View {
     let pickCustom: () -> Void
 
     var body: some View {
-        Picker("Time Range", selection: presetSelection) {
+        Picker(Strings.Common.timeRange, selection: presetSelection) {
             ForEach(TimeRange.presets, id: \.self) { range in
                 Text(range.title).tag(Optional(range))
             }
@@ -17,9 +17,9 @@ struct TimeRangeChoices: View {
 
         Button(action: pickCustom) {
             if case .custom = timeRange {
-                Label("Custom…", systemImage: "checkmark")
+                Label(Strings.Common.customEllipsis, systemImage: "checkmark")
             } else {
-                Text("Custom…")
+                Text(Strings.Common.customEllipsis)
             }
         }
     }

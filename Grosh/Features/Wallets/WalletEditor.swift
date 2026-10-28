@@ -58,68 +58,68 @@ private struct WalletForm: View {
                 Section {
                     HStack(spacing: 12) {
                         SymbolCircle(symbolName: draft.symbolName, color: draft.color, size: 40)
-                        TextField("Name", text: $draft.name)
+                        TextField(Strings.Common.name, text: $draft.name)
                     }
-                    Toggle("Include in Total", isOn: $draft.includeInTotal)
+                    Toggle(Strings.Wallets.includeInTotal, isOn: $draft.includeInTotal)
                 } footer: {
-                    Text("The Total on Home adds up the wallets that are included.")
+                    Text(Strings.Wallets.includeFooter)
                 }
 
                 if mode.isAdding {
                     startingBalanceSection
                 }
 
-                Section("Icon") {
+                Section(Strings.Common.icon) {
                     SymbolGrid(symbols: WalletEditor.symbolChoices, selection: $draft.symbolName, color: draft.color)
                 }
 
-                Section("Color") {
+                Section(Strings.Common.color) {
                     PaletteColorGrid(selection: $draft.color)
                 }
 
                 if let wallet = mode.editing, !wallet.isArchived {
                     Section {
-                        Button("Adjust Balance", systemImage: "plusminus") { isAdjustingBalance = true }
+                        Button(Strings.BalanceAdjustment.adjustBalance, systemImage: "plusminus") { isAdjustingBalance = true }
                     } footer: {
-                        Text("Type what the wallet really holds; the difference is recorded as one transaction.")
+                        Text(Strings.Wallets.adjustBalanceFooter)
                     }
                 }
 
                 if let wallet = mode.editing {
                     Section {
                         if wallet.isArchived {
-                            Button("Unarchive Wallet", systemImage: "tray.and.arrow.up") {
+                            Button(Strings.Wallets.unarchiveWallet, systemImage: "tray.and.arrow.up") {
                                 perform { try wallet.unarchive(today: today) }
                             }
                         } else {
-                            Button("Archive Wallet", systemImage: "archivebox") {
+                            Button(Strings.Wallets.archiveWallet, systemImage: "archivebox") {
                                 perform { try wallet.archive(today: today) }
                             }
                         }
                     } footer: {
-                        Text("An archived wallet leaves the Total and the pickers but keeps its transactions. Its Recurring transactions pause until it is unarchived.")
+                        Text(Strings.Wallets.archivedFooter)
                     }
 
                     Section {
-                        Button("Delete Wallet", systemImage: "trash", role: .destructive) { deleting = wallet }
+                        Button(Strings.Wallets.deleteWallet, systemImage: "trash", role: .destructive) { deleting = wallet }
                             .foregroundStyle(.red)
                     } footer: {
-                        Text("Deleting moves the wallet, its transactions and its Recurring transactions to Recently Deleted for \(RecentlyDeleted.keptDays) days.")
+                        Text(Strings.Wallets.deletingFooter(RecentlyDeleted.keptDays))
                     }
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle(mode.isAdding ? "Add Wallet" : "Edit Wallet")
+            .navigationTitle(mode.isAdding ? Strings.Wallets.addWallet : Strings.Wallets.editWallet)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(mode.isAdding ? "Add" : "Save", action: save)
+                    Button(mode.isAdding ? Strings.Common.add : Strings.Common.save, action: save)
                         .disabled(!canSave)
                 }
             }
-            .errorAlert("Couldn't Save Wallet", message: $errorMessage)
+            .errorAlert(Strings.Wallets.couldntSave, message: $errorMessage)
             .walletDeleteDialog($deleting) { dismiss() }
             .sheet(isPresented: $isAdjustingBalance) {
                 AdjustBalanceEditor(viewedWallet: mode.editing)
@@ -129,19 +129,19 @@ private struct WalletForm: View {
 
     private var startingBalanceSection: some View {
         Section {
-            TextField("Current balance", text: $startingAmountText, prompt: Text(Money(cents: 0).formatted()))
+            TextField(Strings.Wallets.currentBalance, text: $startingAmountText, prompt: Text(Money(cents: 0).formatted()))
                 #if os(iOS)
                 .keyboardType(.numbersAndPunctuation)
                 #endif
-            DayStepper(title: "Date", day: $startingDay)
+            DayStepper(title: Strings.Common.date, day: $startingDay)
         } header: {
-            Text("Starting balance")
+            Text(Strings.Wallets.startingBalance)
         } footer: {
             if startingBalance == nil {
-                Text("Enter an amount such as 1,250.00.")
+                Text(Strings.Wallets.amountExample)
                     .foregroundStyle(.red)
             } else {
-                Text("The money this wallet holds now. It becomes the wallet's first transaction and is excluded from report.")
+                Text(Strings.Wallets.startingBalanceFooter)
             }
         }
     }

@@ -10,9 +10,9 @@ nonisolated struct PurchaseProgress: Equatable, Sendable {
     /// "$400.00 of $1,200.00 paid", or "$400.00 paid" without a total.
     var summary: String {
         guard let total else {
-            return String(localized: "\(paid.formatted()) paid")
+            return String(localized: Strings.Recurring.paid(paid.formatted()))
         }
-        return String(localized: "\(paid.formatted()) of \(total.formatted()) paid")
+        return String(localized: Strings.Recurring.paidOfTotal(paid.formatted(), total.formatted()))
     }
 }
 

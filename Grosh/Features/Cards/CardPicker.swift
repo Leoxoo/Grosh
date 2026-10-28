@@ -7,12 +7,12 @@ import SwiftUI
 /// past transaction). Clear the selection when the transaction's wallet changes. A filter picks from every Card,
 /// archived ones included, or none.
 struct CardPicker: View {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     @Binding var selection: Card?
     /// The Cards of one wallet, or every Card.
     private let offered: Offered
     /// The first choice, which picks no Card.
-    private let noneTitle: LocalizedStringKey
+    private let noneTitle: LocalizedStringResource
 
     @Query(sort: Card.userOrder) private var allCards: [Card]
     @Environment(\.displayScale) private var displayScale
@@ -23,15 +23,15 @@ struct CardPicker: View {
     }
 
     /// A transaction's Card: the unarchived Cards paid from `wallet`, or "None".
-    init(title: LocalizedStringKey, wallet: Wallet?, selection: Binding<Card?>) {
+    init(title: LocalizedStringResource, wallet: Wallet?, selection: Binding<Card?>) {
         self.title = title
         _selection = selection
         offered = .paidFrom(wallet)
-        noneTitle = "None"
+        noneTitle = Strings.Common.none
     }
 
     /// Any Card, archived ones included, or none (`noneTitle`, such as "Any"): for filters.
-    init(title: LocalizedStringKey, everyCardOr noneTitle: LocalizedStringKey, selection: Binding<Card?>) {
+    init(title: LocalizedStringResource, everyCardOr noneTitle: LocalizedStringResource, selection: Binding<Card?>) {
         self.title = title
         _selection = selection
         offered = .every
@@ -43,7 +43,7 @@ struct CardPicker: View {
             Text(noneTitle).tag(Card?.none)
             ForEach(choices) { card in
                 Label {
-                    Text(card.isArchived ? "\(card.displayName) (Archived)" : card.displayName)
+                    Text(card.isArchived ? String(localized: Strings.Common.archivedName(card.displayName)) : card.displayName)
                 } icon: {
                     mark(of: card)
                 }

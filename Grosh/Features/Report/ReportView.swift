@@ -36,10 +36,10 @@ struct ReportView: View {
         NavigationStack(path: $path) {
             List {
                 Section {
-                    LabeledContent("Opening balance") {
+                    LabeledContent(Strings.Common.openingBalance) {
                         Text(summary.openingBalance.formatted()).monospacedDigit()
                     }
-                    LabeledContent("Ending balance") {
+                    LabeledContent(Strings.Common.endingBalance) {
                         Text(summary.endingBalance.formatted()).monospacedDigit()
                     }
                 }
@@ -60,7 +60,7 @@ struct ReportView: View {
             .reportPeriodControls(
                 walletSelection: $walletSelection, timeRange: $timeRange, period: $period, transactions: transactions
             )
-            .navigationTitle("Report")
+            .navigationTitle(Strings.Screens.report)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -69,7 +69,7 @@ struct ReportView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    Button(Strings.Common.close) { dismiss() }
                 }
             }
         }

@@ -21,7 +21,7 @@ struct ComingSoonCard: View {
                     .font(.largeTitle)
                     .foregroundStyle(.tertiary)
                     .padding(.bottom, 4)
-                Text("Coming Soon")
+                Text(Strings.Common.comingSoon)
                     .font(.headline)
                 Text(placeholder.message)
                     .font(.subheadline)

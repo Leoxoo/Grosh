@@ -19,7 +19,7 @@ struct CategoryMergeView: View {
             } ?? [],
             targetName: \.name,
             consequences: consequences(into:),
-            emptyDescription: String(localized: "There's no other \(source.type.title) category this one can be merged into."),
+            emptyDescription: String(localized: Strings.Categories.nothingToMergeInto(source.type.title)),
             row: { CategoryLabel(category: $0) },
             merge: { try catalog.merge(source, into: $0) },
             onMerged: onMerged
@@ -27,15 +27,15 @@ struct CategoryMergeView: View {
     }
 
     private func consequences(into target: Category?) -> String {
-        let destination = target.map { "“\($0.name)”" } ?? String(localized: "the category you pick")
+        let destination = target.map { "“\($0.name)”" } ?? String(localized: Strings.Categories.theCategoryYouPick)
         let transactions = (source.transactions ?? []).notDeleted.count
         let subcategories = source.children?.count ?? 0
         var text = transactions == 1
-            ? String(localized: "Its transaction moves to \(destination)")
-            : String(localized: "Its \(transactions) transactions move to \(destination)")
+            ? String(localized: Strings.Merge.itsTransactionMovesTo(destination))
+            : String(localized: Strings.Merge.itsTransactionsMoveTo(transactions, destination))
         if subcategories > 0 {
-            text += String(localized: " and its \(subcategories) subcategories move under it")
+            text += String(localized: Strings.Categories.subcategoriesMoveUnder(subcategories))
         }
-        return text + String(localized: ". Then “\(source.name)” is removed.")
+        return text + String(localized: Strings.Merge.thenRemoved(source.name))
     }
 }

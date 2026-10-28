@@ -5,7 +5,7 @@ struct BudgetsView: View {
     var body: some View {
         NavigationStack {
             ComingSoonScreen(placeholder: .budgets)
-                .tabRootTitle("Budgets")
+                .tabRootTitle(Strings.Screens.budgets)
         }
     }
 }

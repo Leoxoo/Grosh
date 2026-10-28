@@ -115,21 +115,21 @@ struct CardIndicator: View {
 /// A small capsule marking a transaction whose amount is still an estimate, until the real one is entered.
 struct EstimatedBadge: View {
     var body: some View {
-        Text("est.")
+        Text(Strings.Transactions.estimatedShort)
             .font(.caption2.weight(.medium))
             .lineLimit(1)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .foregroundStyle(.orange)
             .background(Color.orange.opacity(0.15), in: Capsule())
-            .accessibilityLabel("Estimated")
+            .accessibilityLabel(Strings.Transactions.estimated)
     }
 }
 
 /// A small capsule saying a Loan or Debt was forgiven.
 struct ForgivenBadge: View {
     var body: some View {
-        Label("Forgiven", systemImage: "hand.raised.fill")
+        Label(Strings.Common.forgiven, systemImage: "hand.raised.fill")
             .labelStyle(.titleAndIcon)
             .font(.caption2.weight(.medium))
             .lineLimit(1)
@@ -148,6 +148,6 @@ extension Transaction {
 extension Category {
     /// `category`'s name, or "Uncategorized" for none.
     static func name(of category: Category?) -> String {
-        category?.name ?? String(localized: "Uncategorized")
+        category?.name ?? String(localized: Strings.Common.uncategorized)
     }
 }

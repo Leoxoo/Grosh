@@ -22,14 +22,14 @@ nonisolated enum CategoryRuleError: Error, Equatable {
 extension CategoryRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .locked: String(localized: "The app relies on this category. Only its icon can be changed.")
-        case .differentType: String(localized: "Pick a category of the same type.")
-        case .sameCategory: String(localized: "Pick a different category.")
-        case .tooDeep: String(localized: "Categories nest at most two levels deep.")
-        case .hasTransactions: String(localized: "This category has transactions. Merge it into another category instead.")
-        case .nameRequired: String(localized: "Enter a name.")
-        case .nameTaken: String(localized: "Another category of this type already has this name.")
-        case .fixedType: String(localized: "Only Expense and Income categories can be added or moved.")
+        case .locked: String(localized: Strings.Categories.lockedError)
+        case .differentType: String(localized: Strings.Categories.differentType)
+        case .sameCategory: String(localized: Strings.Categories.sameCategory)
+        case .tooDeep: String(localized: Strings.Categories.tooDeep)
+        case .hasTransactions: String(localized: Strings.Categories.hasTransactions)
+        case .nameRequired: String(localized: Strings.Categories.nameRequired)
+        case .nameTaken: String(localized: Strings.Categories.nameTaken)
+        case .fixedType: String(localized: Strings.Categories.fixedType)
         }
     }
 }

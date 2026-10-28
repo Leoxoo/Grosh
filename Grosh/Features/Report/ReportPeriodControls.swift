@@ -70,7 +70,7 @@ struct ReportPeriodControls: ViewModifier {
                     Menu {
                         TimeRangeChoices(timeRange: $timeRange) { isPickingCustomRange = true }
                     } label: {
-                        Label("Time Range", systemImage: "calendar")
+                        Label(Strings.Common.timeRange, systemImage: "calendar")
                     }
                 }
             }

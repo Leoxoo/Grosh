@@ -35,7 +35,7 @@ struct WalletSelector: View {
             .controlSize(.regular)
             .imageScale(.medium)
             .fixedSize()
-            .accessibilityLabel("Wallet")
+            .accessibilityLabel(Strings.Common.wallet)
             .accessibilityValue(selection.name)
             .sheet(isPresented: $isChoosing) {
                 SelectWalletSheet(selection: $selection, today: today)
@@ -56,7 +56,7 @@ extension WalletSelection {
     /// "Total", or the wallet's name.
     var name: String {
         switch self {
-        case .total: String(localized: "Total")
+        case .total: String(localized: Strings.Common.total)
         case .wallet(let wallet): wallet.name
         }
     }

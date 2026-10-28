@@ -26,7 +26,7 @@ struct RelatedTransactionsSection: View {
     var body: some View {
         let related = transaction.related(among: linked)
         if !related.isEmpty {
-            Section("Related transactions") {
+            Section(Strings.Transactions.relatedTransactions) {
                 ForEach(related) { other in
                     NavigationLink {
                         TransactionDetailView(transaction: other)
@@ -35,18 +35,18 @@ struct RelatedTransactionsSection: View {
                     }
                 }
                 if isSplitPart {
-                    Button("Undo Split", systemImage: "arrow.uturn.backward") {
+                    Button(Strings.Transactions.undoSplit, systemImage: "arrow.uturn.backward") {
                         isConfirmingUndoSplit = true
                     }
                     .confirmationDialog(
-                        "Undo this split?", isPresented: $isConfirmingUndoSplit, titleVisibility: .visible
+                        Strings.Transactions.undoSplitQuestion, isPresented: $isConfirmingUndoSplit, titleVisibility: .visible
                     ) {
-                        Button("Undo Split", role: .destructive, action: undoSplit)
-                        Button("Cancel", role: .cancel) {}
+                        Button(Strings.Transactions.undoSplit, role: .destructive, action: undoSplit)
+                        Button(Strings.Common.cancel, role: .cancel) {}
                     } message: {
-                        Text("The parts merge back into the original, which takes the sum of their amounts.")
+                        Text(Strings.Transactions.undoSplitMessage)
                     }
-                    .errorAlert("Couldn't Undo Split", message: $errorMessage)
+                    .errorAlert(Strings.Transactions.couldntUndoSplit, message: $errorMessage)
                 }
             }
         }

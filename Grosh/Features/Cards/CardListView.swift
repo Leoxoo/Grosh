@@ -21,13 +21,13 @@ struct CardListView: View {
                 ForEach(cards) { card in
                     row(card)
                         .swipeActions {
-                            Button("Archive", systemImage: "archivebox") { perform { try card.archive() } }
+                            Button(Strings.Common.archive, systemImage: "archivebox") { perform { try card.archive() } }
                                 .tint(.orange)
                         }
                 }
             } footer: {
                 if !cards.isEmpty {
-                    Text("A Card is only a label for what an expense was paid with. It never changes any balance.")
+                    Text(Strings.Cards.onlyALabelListFooter)
                 }
             }
 
@@ -37,32 +37,32 @@ struct CardListView: View {
                         row(card)
                             .foregroundStyle(.secondary)
                             .swipeActions {
-                                Button("Unarchive", systemImage: "tray.and.arrow.up") { perform { try card.unarchive() } }
+                                Button(Strings.Common.unarchive, systemImage: "tray.and.arrow.up") { perform { try card.unarchive() } }
                                     .tint(.green)
                             }
                     }
                 } header: {
-                    Text("Archived")
+                    Text(Strings.Common.archived)
                 } footer: {
-                    Text("Archived Cards leave the pickers but stay on their transactions.")
+                    Text(Strings.Cards.archivedSectionFooter)
                 }
             }
         }
         .overlay {
             if cards.isEmpty && archivedCards.isEmpty {
                 ContentUnavailableView {
-                    Label("No Cards", systemImage: "creditcard")
+                    Label(Strings.Cards.noCards, systemImage: "creditcard")
                 } description: {
-                    Text("Add the cards you pay with to see which one each expense went on.")
+                    Text(Strings.Cards.noCardsDescription)
                 } actions: {
-                    Button("Add Card") { editorMode = .add }
+                    Button(Strings.Cards.addCard) { editorMode = .add }
                 }
             }
         }
-        .navigationTitle("Cards")
+        .navigationTitle(Strings.Screens.cards)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Add Card", systemImage: "plus") { editorMode = .add }
+                Button(Strings.Cards.addCard, systemImage: "plus") { editorMode = .add }
             }
         }
         .sheet(item: $editorMode) { mode in
@@ -71,7 +71,7 @@ struct CardListView: View {
         .sheet(item: $mergeSource) { card in
             CardMergeView(source: card)
         }
-        .errorAlert("Couldn't Change Card", message: $errorMessage)
+        .errorAlert(Strings.Cards.couldntChange, message: $errorMessage)
     }
 
     private func row(_ card: Card) -> some View {
@@ -81,13 +81,13 @@ struct CardListView: View {
             CardRow(card: card)
         }
         .contextMenu {
-            Button("Edit", systemImage: "pencil") { editorMode = .edit(card) }
+            Button(Strings.Common.edit, systemImage: "pencil") { editorMode = .edit(card) }
             if card.isArchived {
-                Button("Unarchive", systemImage: "tray.and.arrow.up") { perform { try card.unarchive() } }
+                Button(Strings.Common.unarchive, systemImage: "tray.and.arrow.up") { perform { try card.unarchive() } }
             } else {
-                Button("Archive", systemImage: "archivebox") { perform { try card.archive() } }
+                Button(Strings.Common.archive, systemImage: "archivebox") { perform { try card.archive() } }
             }
-            Button("Merge into Another Card…", systemImage: "arrow.triangle.merge") { mergeSource = card }
+            Button(Strings.Cards.mergeIntoAnother, systemImage: "arrow.triangle.merge") { mergeSource = card }
         }
     }
 

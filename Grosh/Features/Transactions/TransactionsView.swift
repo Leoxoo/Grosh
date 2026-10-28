@@ -22,9 +22,9 @@ struct TransactionsView: View {
                     }
                 } else {
                     ContentUnavailableView(
-                        "No Transaction Selected",
+                        Strings.Transactions.noTransactionSelected,
                         systemImage: "list.bullet.rectangle",
-                        description: Text("Select a transaction to see its details.")
+                        description: Text(Strings.Transactions.selectTransactionDescription)
                     )
                 }
             }
@@ -32,7 +32,7 @@ struct TransactionsView: View {
             #if os(macOS)
             // The window takes its title from the detail, which has none while nothing is selected, so the window
             // would show the app's name. It names the tab instead, with a transaction open too.
-            .navigationTitle("Transactions")
+            .navigationTitle(Strings.Common.transactions)
             #endif
         }
         .onAppear { Signpost.opening("Open Transactions") }

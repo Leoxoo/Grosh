@@ -58,31 +58,31 @@ struct CardEditor: View {
                         CardMark(image: draft.imageData.flatMap(CroppedPhoto.image(from:)), height: 26) {
                             SymbolCircle(symbolName: Card.symbolName, color: draft.color, size: 40)
                         }
-                        TextField("Name", text: $draft.name)
+                        TextField(Strings.Common.name, text: $draft.name)
                     }
-                    Picker("Kind", selection: $draft.kind) {
+                    Picker(Strings.Common.kind, selection: $draft.kind) {
                         ForEach(CardKind.allCases, id: \.self) { kind in
                             Text(kind.title).tag(kind)
                         }
                     }
                     .pickerStyle(.segmented)
-                    WalletPicker(title: "Paying wallet", selection: $draft.payingWallet)
+                    WalletPicker(title: Strings.Cards.payingWallet, selection: $draft.payingWallet)
                         .disabled(isPayingWalletFixed)
-                    TextField("Last 4 digits (optional)", text: lastFourDigits)
+                    TextField(Strings.Cards.lastFourDigits, text: lastFourDigits)
                         #if os(iOS)
                         .keyboardType(.numberPad)
                         #endif
                     PhotoField(shape: .creditCard, data: imageData)
                 } footer: {
                     if wallets.isEmpty && draft.payingWallet == nil {
-                        Text("Add a wallet first. A Card is paid from a wallet and only offered on its transactions.")
+                        Text(Strings.Cards.addWalletFirstFooter)
                     } else if isPayingWalletFixed {
                         Text(CardRuleError.payingWalletHasTransactions.localizedDescription)
                     } else if let validationError, validationError != .missingName {
                         Text(validationError.localizedDescription)
                             .foregroundStyle(.red)
                     } else {
-                        Text("A Card is only a label: it never changes any balance. It is offered on its paying wallet's transactions.")
+                        Text(Strings.Cards.onlyALabelFooter)
                     }
                 }
 
@@ -94,10 +94,10 @@ struct CardEditor: View {
                     PaletteColorGrid(selection: $draft.color)
                         .disabled(draft.imageData != nil)
                 } header: {
-                    Text("Color")
+                    Text(Strings.Common.color)
                 } footer: {
                     if draft.imageData != nil {
-                        Text("A Card with an image takes its color from the image.")
+                        Text(Strings.Cards.imageColorFooter)
                     }
                 }
 
@@ -106,13 +106,13 @@ struct CardEditor: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle(mode.isAdding ? "Add Card" : "Edit Card")
+            .navigationTitle(mode.isAdding ? Strings.Cards.addCard : Strings.Cards.editCard)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(mode.isAdding ? "Add" : "Save", action: save)
+                    Button(mode.isAdding ? Strings.Common.add : Strings.Common.save, action: save)
                         .disabled(validationError != nil)
                 }
             }
@@ -126,7 +126,7 @@ struct CardEditor: View {
                     CardMergeView(source: card) { dismiss() }
                 }
             }
-            .errorAlert("Couldn't Save Card", message: $errorMessage)
+            .errorAlert(Strings.Cards.couldntSave, message: $errorMessage)
         }
     }
 
@@ -148,9 +148,9 @@ struct CardEditor: View {
 
     private var statementSection: some View {
         Section {
-            Toggle("Statement date", isOn: $hasStatementDate)
+            Toggle(Strings.Cards.statementDate, isOn: $hasStatementDate)
             if hasStatementDate {
-                Picker("Closes on the", selection: $statementDay) {
+                Picker(Strings.Cards.closesOnThe, selection: $statementDay) {
                     ForEach(1...31, id: \.self) { day in
                         Text(Card.ordinalDay(day)).tag(day)
                     }
@@ -158,9 +158,9 @@ struct CardEditor: View {
             }
         } footer: {
             if hasStatementDate {
-                Text("The statement closes on this day each month, or on the month's last day when the month is shorter.")
+                Text(Strings.Cards.statementDayFooter)
             } else {
-                Text("Add the day this card's statement closes to see its transactions by statement period.")
+                Text(Strings.Cards.addStatementDayFooter)
             }
         }
     }
@@ -169,30 +169,30 @@ struct CardEditor: View {
     private func manageSection(_ card: Card) -> some View {
         Section {
             if card.isArchived {
-                Button("Unarchive Card", systemImage: "tray.and.arrow.up") {
+                Button(Strings.Cards.unarchiveCard, systemImage: "tray.and.arrow.up") {
                     perform { try card.unarchive() }
                 }
             } else {
-                Button("Archive Card", systemImage: "archivebox") {
+                Button(Strings.Cards.archiveCard, systemImage: "archivebox") {
                     perform { try card.archive() }
                 }
             }
-            Button("Merge into Another Card…", systemImage: "arrow.triangle.merge") {
+            Button(Strings.Cards.mergeIntoAnother, systemImage: "arrow.triangle.merge") {
                 isMerging = true
             }
             if !card.hasTransactions {
-                Button("Delete Card", systemImage: "trash", role: .destructive) {
+                Button(Strings.Cards.deleteCard, systemImage: "trash", role: .destructive) {
                     isConfirmingDelete = true
                 }
-                .confirmationDialog("Delete “\(card.name)”?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
-                    Button("Delete Card", role: .destructive) { perform { try card.delete(in: context) } }
+                .confirmationDialog(Strings.Common.deleteNamed(card.name), isPresented: $isConfirmingDelete, titleVisibility: .visible) {
+                    Button(Strings.Cards.deleteCard, role: .destructive) { perform { try card.delete(in: context) } }
                 }
             }
         } footer: {
             if card.hasTransactions {
-                Text("An archived Card leaves the pickers but stays on its transactions. To remove this Card, merge it into another one: its transactions move there.")
+                Text(Strings.Cards.archivedMergeFooter)
             } else {
-                Text("An archived Card leaves the pickers but stays on its transactions.")
+                Text(Strings.Cards.archivedFooter)
             }
         }
     }

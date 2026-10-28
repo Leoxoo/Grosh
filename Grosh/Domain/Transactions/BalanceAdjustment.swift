@@ -125,11 +125,11 @@ extension BalanceAdjustmentRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingRealBalance:
-            String(localized: "Enter what the wallet really holds.")
+            String(localized: Strings.BalanceAdjustment.enterRealBalance)
         case .nothingToAdjust:
-            String(localized: "The wallet already has this balance.")
+            String(localized: Strings.BalanceAdjustment.alreadyThisBalance)
         case .reasonDoesNotMatchDifference:
-            String(localized: "Choose an Income category when the balance goes up, or an Expense category when it goes down.")
+            String(localized: Strings.BalanceAdjustment.reasonCategoryType)
         }
     }
 }

@@ -84,11 +84,11 @@ private struct TransactionListContent: View {
             } else if shown.isEmpty && scheduled.isEmpty {
                 Section {
                     ContentUnavailableView(
-                        "No Transactions",
+                        Strings.Common.noTransactions,
                         systemImage: "tray",
                         description: Text(period == .future
-                            ? "Transactions dated after today show up here."
-                            : "Nothing was recorded in this period.")
+                            ? Strings.Transactions.futureEmpty
+                            : Strings.Common.nothingRecordedInPeriod)
                     )
                 }
             }
@@ -147,9 +147,9 @@ private struct TransactionListContent: View {
             period = currentPeriod
         }
         .transactionSelectionMode(
-            isSelecting: $isSelecting, chosen: $chosen, title: String(localized: "Transactions")
+            isSelecting: $isSelecting, chosen: $chosen, title: String(localized: Strings.Common.transactions)
         )
-        .tabRootTitle("Transactions", scroll: scroll, showsSmallTitle: isSelecting) {
+        .tabRootTitle(Strings.Common.transactions, scroll: scroll, showsSmallTitle: isSelecting) {
             WalletSelector(selection: $walletSelection, today: today, fillsWidth: false)
         }
         .toolbar {
@@ -162,7 +162,7 @@ private struct TransactionListContent: View {
                 }
                 #if os(iOS)
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Search", systemImage: "magnifyingglass") { isSearchPresented = true }
+                    Button(Strings.Screens.search, systemImage: "magnifyingglass") { isSearchPresented = true }
                 }
                 #endif
                 #if !os(iOS)
@@ -218,7 +218,7 @@ private struct TransactionCategoryHeader: View {
     var body: some View {
         HStack(spacing: 8) {
             CategoryIcon(category: group.category, size: 20)
-            Text(group.category?.name ?? String(localized: "Uncategorized"))
+            Text(group.category?.name ?? String(localized: Strings.Common.uncategorized))
             Spacer()
             AmountText(amount: group.total, showsPlusSign: true, showsColor: false)
         }
@@ -236,12 +236,12 @@ private struct TransactionSearchField: ViewModifier {
 
     func body(content: Content) -> some View {
         #if os(macOS)
-        content.searchable(text: $text, prompt: "Note, category or amount")
+        content.searchable(text: $text, prompt: Strings.Common.searchPrompt)
         #else
         content.background {
             if isOpen || !text.isEmpty {
                 Color.clear
-                    .searchable(text: $text, isPresented: $isOpen, prompt: "Note, category or amount")
+                    .searchable(text: $text, isPresented: $isOpen, prompt: Strings.Common.searchPrompt)
             }
         }
         #endif

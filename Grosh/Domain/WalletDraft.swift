@@ -35,7 +35,7 @@ nonisolated enum WalletRuleError: Error, Equatable {
 extension WalletRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .missingName: String(localized: "Give the wallet a name.")
+        case .missingName: String(localized: Strings.Wallets.missingName)
         }
     }
 }

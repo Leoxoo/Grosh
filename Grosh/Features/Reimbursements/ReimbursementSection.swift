@@ -30,21 +30,21 @@ struct ReimbursementSection: View {
                     }
                     .buttonStyle(.plain)
                     .swipeActions(edge: .trailing) {
-                        Button("Delete", role: .destructive) { delete(entry) }
+                        Button(Strings.Common.delete, role: .destructive) { delete(entry) }
                     }
                     .contextMenu {
-                        Button("Edit", systemImage: "pencil") { action = .edit(entry) }
-                        Button("Delete", systemImage: "trash", role: .destructive) { delete(entry) }
+                        Button(Strings.Common.edit, systemImage: "pencil") { action = .edit(entry) }
+                        Button(Strings.Common.delete, systemImage: "trash", role: .destructive) { delete(entry) }
                     }
                 }
-                Button("Someone paid me back", systemImage: "plus.circle") { action = .paidBack }
-                Button("Move an existing transaction in", systemImage: "arrow.down.circle") { action = .moveIn }
+                Button(Strings.Reimbursements.someonePaidMeBack, systemImage: "plus.circle") { action = .paidBack }
+                Button(Strings.Reimbursements.moveExistingIn, systemImage: "arrow.down.circle") { action = .moveIn }
             } header: {
-                Text("Reimbursements")
+                Text(Strings.Common.reimbursements)
             } footer: {
-                Text("Money paid back is kept on this expense. Its net, what is left of it, is what counts in your balance and reports.")
+                Text(Strings.Reimbursements.sectionFooter)
             }
-            .errorAlert("Couldn't Delete Reimbursement", message: $errorMessage)
+            .errorAlert(Strings.Reimbursements.couldntDelete, message: $errorMessage)
         }
     }
 

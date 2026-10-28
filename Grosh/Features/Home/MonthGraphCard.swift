@@ -36,7 +36,7 @@ struct HomeMonthGraph: View {
         Section {
             HStack {
                 Spacer()
-                Button("See reports") { isShowingReport = true }
+                Button(Strings.Home.seeReports) { isShowingReport = true }
                     .font(.subheadline)
             }
             .listRowBackground(Color.clear)
@@ -196,8 +196,8 @@ extension SpentOrIncome {
     /// The tab's name on Home.
     var title: String {
         switch self {
-        case .spent: String(localized: "Spent")
-        case .income: String(localized: "Income")
+        case .spent: String(localized: Strings.Common.spent)
+        case .income: String(localized: Strings.Common.income)
         }
     }
 

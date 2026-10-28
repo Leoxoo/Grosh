@@ -90,14 +90,14 @@ private struct TransactionForm: View {
 
     var body: some View {
         KeypadSheet(
-            title: isEditing ? Text("Edit Transaction") : Text("Add Transaction"),
+            title: isEditing ? Text(Strings.Transactions.editTransaction) : Text(Strings.Transactions.addTransaction),
             entry: $entry,
             canSave: draftToSave.canSave,
             save: save,
             macHeight: (640, 720)
         ) { fields in
             Section {
-                Picker("Type", selection: $draft.type) {
+                Picker(Strings.Common.type, selection: $draft.type) {
                     ForEach(draft.types, id: \.self) { type in
                         Text(type.title).tag(type)
                     }
@@ -115,41 +115,41 @@ private struct TransactionForm: View {
                 isShowingDetails = true
             }
         }
-        .errorAlert("Couldn't Save Transaction", message: $errorMessage)
+        .errorAlert(Strings.Transactions.couldntSave, message: $errorMessage)
     }
 
     private func mainSection(_ fields: KeypadSheetFields) -> some View {
         Section {
-            WalletPicker(title: "Wallet", selection: $draft.wallet)
+            WalletPicker(title: Strings.Common.wallet, selection: $draft.wallet)
                 .disabled(draft.isLockedByPayments)
-            fields.amountRow("Amount", currencyCode: currencyCode, tint: Money(cents: draft.sign).tint)
-            CategoryPicker(title: "Category", type: draft.type, selection: $draft.category)
+            fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: Money(cents: draft.sign).tint)
+            CategoryPicker(title: Strings.Common.category, type: draft.type, selection: $draft.category)
                 .disabled(draft.isLockedByPayments)
                 .accessibilityIdentifier("TransactionEditor.category")
             if draft.offersCard {
-                CardPicker(title: "Card", wallet: draft.wallet, selection: $draft.card)
+                CardPicker(title: Strings.Common.card, wallet: draft.wallet, selection: $draft.card)
                     .accessibilityIdentifier("TransactionEditor.card")
             }
             fields.noteField($draft.note)
                 .accessibilityIdentifier("TransactionEditor.note")
-            DayStepper(title: "Date", day: $draft.day)
+            DayStepper(title: Strings.Common.date, day: $draft.day)
         } footer: {
             if draft.wallet == nil {
-                Text("Add a wallet first, in Account → Wallets.")
+                Text(Strings.Common.addWalletFirst)
             } else if draft.paymentLock?.forgivenOwed != nil {
-                Text("It's forgiven, so it keeps its amount, wallet and category until it's un-forgiven.")
+                Text(Strings.Transactions.forgivenLockFooter)
             } else if let paymentLock = draft.paymentLock {
-                Text("Its payments keep the wallet and category. The amount can't be less than the \(paymentLock.paid.formatted()) already paid back.")
+                Text(Strings.Transactions.paymentsLockFooter(paymentLock.paid.formatted()))
             } else if draftToSave.requiresCard && draft.card == nil {
-                Text("Choose the Card this expense was paid with. Expenses need a Card when their wallet has one.")
+                Text(Strings.Transactions.cardRequiredFooter)
             }
         }
     }
 
     private func detailsSection(_ fields: KeypadSheetFields) -> some View {
         Section {
-            DisclosureGroup("Add more details", isExpanded: $isShowingDetails) {
-                TextField("With", text: $draft.withName)
+            DisclosureGroup(Strings.Transactions.addMoreDetails, isExpanded: $isShowingDetails) {
+                TextField(Strings.Common.with, text: $draft.withName)
                     .focused(fields.focus, equals: .withName)
                 if fields.focus.wrappedValue == .withName {
                     WithNameSuggestions(typed: draft.withName) { name in
@@ -157,28 +157,28 @@ private struct TransactionForm: View {
                         fields.focus.wrappedValue = nil
                     }
                 }
-                Toggle("Exclude from report", isOn: $draft.isExcludedFromReport)
+                Toggle(Strings.Common.excludeFromReport, isOn: $draft.isExcludedFromReport)
                 if draft.offersReminder {
                     ReminderField(day: $draft.reminderDay)
                 }
                 LabeledContent {
-                    Text("Coming soon")
+                    Text(Strings.Transactions.comingSoon)
                 } label: {
-                    Label("Location", systemImage: "mappin.and.ellipse")
+                    Label(Strings.Transactions.location, systemImage: "mappin.and.ellipse")
                 }
                 .foregroundStyle(.tertiary)
                 LabeledContent {
-                    Text(draft.eventName.isEmpty ? String(localized: "None") : draft.eventName)
+                    Text(draft.eventName.isEmpty ? String(localized: Strings.Common.none) : draft.eventName)
                 } label: {
-                    Label("Event", systemImage: "calendar")
+                    Label(Strings.Common.event, systemImage: "calendar")
                 }
                 .foregroundStyle(.tertiary)
             }
         } footer: {
             if draft.isMissingWith {
-                Text("A Loan or Debt needs a With: who you lent to or borrowed from.")
+                Text(Strings.Transactions.withRequiredFooter)
             } else if isShowingDetails {
-                Text("A transaction excluded from report still counts in balances, just not in income and spending.")
+                Text(Strings.Transactions.excludedEditorFooter)
             }
         }
     }

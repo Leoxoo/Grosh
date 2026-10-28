@@ -11,14 +11,14 @@ struct DebtsLoansView: View {
         let list = DebtsAndLoans(transactions)
         List {
             if !list.open.isEmpty {
-                Section("Open") {
+                Section(Strings.DebtsLoans.open) {
                     ForEach(list.open) { loanOrDebt in
                         LoanOrDebtLink(loanOrDebt: loanOrDebt, today: today)
                     }
                 }
             }
             if !list.settled.isEmpty {
-                Section("Settled") {
+                Section(Strings.Common.settled) {
                     ForEach(list.settled) { loanOrDebt in
                         LoanOrDebtLink(loanOrDebt: loanOrDebt, today: today)
                     }
@@ -28,13 +28,13 @@ struct DebtsLoansView: View {
         .overlay {
             if list.open.isEmpty && list.settled.isEmpty {
                 ContentUnavailableView(
-                    "No Debts or Loans",
+                    Strings.DebtsLoans.noDebtsOrLoans,
                     systemImage: "person.2",
-                    description: Text("Add a Loan or a Debt on the Debt/Loan tab of Add Transaction.")
+                    description: Text(Strings.DebtsLoans.noDebtsOrLoansDescription)
                 )
             }
         }
-        .navigationTitle("Debts & Loans")
+        .navigationTitle(Strings.Screens.debtsAndLoans)
     }
 }
 
@@ -70,7 +70,7 @@ struct LoanOrDebtRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if !loanOrDebt.isSettled, let due = original.reminderDay {
-                    Text("\(Image(systemName: "bell")) Due \(due.date().formatted(date: .abbreviated, time: .omitted))")
+                    Text("\(Image(systemName: "bell")) \(Text(Strings.DebtsLoans.due(due.date().formatted(date: .abbreviated, time: .omitted))))")
                         .font(.caption)
                         .foregroundStyle(due <= today ? .red : .secondary)
                 }
@@ -86,14 +86,14 @@ struct LoanOrDebtRow: View {
                     Text(loanOrDebt.owed.formatted())
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
-                    Text("Settled")
+                    Text(Strings.Common.settled)
                         .font(.caption)
                         .foregroundStyle(.green)
                 } else {
                     Text(loanOrDebt.outstanding.formatted())
                         .monospacedDigit()
                         .foregroundStyle(loanOrDebt.kind.outstandingColor)
-                    Text("of \(loanOrDebt.owed.formatted())")
+                    Text(Strings.DebtsLoans.ofOwed(loanOrDebt.owed.formatted()))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

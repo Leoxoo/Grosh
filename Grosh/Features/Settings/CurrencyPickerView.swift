@@ -9,7 +9,7 @@ struct CurrencyPickerView: View {
 
     var body: some View {
         Form {
-            Picker("Currency", selection: $currencyCode) {
+            Picker(Strings.Screens.currency, selection: $currencyCode) {
                 ForEach(Self.offeredCurrencyCodes, id: \.self) { code in
                     Text(Locale.current.localizedString(forCurrencyCode: code).map { "\($0) (\(code))" } ?? code)
                         .tag(code)
@@ -18,6 +18,6 @@ struct CurrencyPickerView: View {
             .pickerStyle(.inline)
         }
         .formStyle(.grouped)
-        .navigationTitle("Currency")
+        .navigationTitle(Strings.Screens.currency)
     }
 }

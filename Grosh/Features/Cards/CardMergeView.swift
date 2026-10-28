@@ -16,7 +16,7 @@ struct CardMergeView: View {
             targets: source.mergeTargets,
             targetName: \.name,
             consequences: consequences(into:),
-            emptyDescription: String(localized: "A Card merges into another unarchived Card paid from the same wallet."),
+            emptyDescription: String(localized: Strings.Cards.mergeEmpty),
             row: { CardRow(card: $0) },
             merge: { try source.merge(into: $0, in: context) },
             onMerged: onMerged
@@ -24,11 +24,11 @@ struct CardMergeView: View {
     }
 
     private func consequences(into target: Card?) -> String {
-        let destination = target.map { "“\($0.name)”" } ?? String(localized: "the Card you pick")
+        let destination = target.map { "“\($0.name)”" } ?? String(localized: Strings.Cards.theCardYouPick)
         let transactions = (source.transactions ?? []).notDeleted.count
         let text = transactions == 1
-            ? String(localized: "Its transaction moves to \(destination)")
-            : String(localized: "Its \(transactions) transactions move to \(destination)")
-        return text + String(localized: ". Then “\(source.name)” is removed.")
+            ? String(localized: Strings.Merge.itsTransactionMovesTo(destination))
+            : String(localized: Strings.Merge.itsTransactionsMoveTo(transactions, destination))
+        return text + String(localized: Strings.Merge.thenRemoved(source.name))
     }
 }

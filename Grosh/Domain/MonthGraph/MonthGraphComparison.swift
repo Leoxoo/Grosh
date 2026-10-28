@@ -21,8 +21,8 @@ enum MonthGraphComparison {
     /// What the legend and the popup call the gray line.
     var name: String {
         switch self {
-        case .average: String(localized: "Average")
-        case .lastYear: String(localized: "Last year")
+        case .average: String(localized: Strings.Home.average)
+        case .lastYear: String(localized: Strings.Common.lastYear)
         }
     }
 

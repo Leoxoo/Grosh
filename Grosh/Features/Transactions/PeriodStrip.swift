@@ -113,7 +113,7 @@ struct PeriodStrip: View {
         .buttonStyle(.glass)
         .buttonBorderShape(.capsule)
         .controlSize(.small)
-        .accessibilityLabel("Back to \(title)")
+        .accessibilityLabel(Strings.Transactions.backTo(title))
         .padding(.trailing)
         .transition(.opacity)
     }
