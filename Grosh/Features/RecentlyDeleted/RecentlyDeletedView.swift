@@ -261,7 +261,7 @@ private struct DeletedTransactionRow: View {
             HStack {
                 if transaction.restoreBlocker == .walletIsDeleted {
                     Text(Strings.RecentlyDeleted.restoreWalletFirst)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.attention)
                 }
                 Spacer()
                 DaysLeftText(deletedAt: transaction.deletedAt, now: now)
@@ -294,7 +294,7 @@ private struct DeletedRecurringRow: View {
             HStack {
                 if recurring.restoreBlocker == .walletIsDeleted {
                     Text(Strings.RecentlyDeleted.restoreWalletFirst)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.attention)
                 }
                 Spacer()
                 DaysLeftText(deletedAt: recurring.deletedAt, now: now)

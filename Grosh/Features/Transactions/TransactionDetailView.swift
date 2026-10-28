@@ -195,7 +195,7 @@ private struct ExcludedFromReportBanner: View {
             }
         } icon: {
             Image(systemName: "eye.slash")
-                .foregroundStyle(.orange)
+                .foregroundStyle(.attention)
         }
     }
 }

@@ -120,8 +120,8 @@ struct EstimatedBadge: View {
             .lineLimit(1)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .foregroundStyle(.orange)
-            .background(Color.orange.opacity(0.15), in: Capsule())
+            .foregroundStyle(.attention)
+            .background(Color.attention.opacity(0.15), in: Capsule())
             .accessibilityLabel(Strings.Transactions.estimated)
     }
 }
@@ -135,8 +135,8 @@ struct ForgivenBadge: View {
             .lineLimit(1)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .foregroundStyle(.green)
-            .background(Color.green.opacity(0.15), in: Capsule())
+            .foregroundStyle(.settled)
+            .background(Color.settled.opacity(0.15), in: Capsule())
     }
 }
 

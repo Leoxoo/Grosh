@@ -21,7 +21,7 @@ struct TransactionDeleteButton: View {
                 errorMessage = error.localizedDescription
             }
         }
-        .foregroundStyle(.red)
+        .foregroundStyle(.destructive)
         .transactionDeleteDialog($prompt, didDelete: didDelete)
         .errorAlert(Strings.Transactions.couldntDelete, message: $errorMessage)
     }

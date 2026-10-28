@@ -80,7 +80,7 @@ struct CardEditor: View {
                         Text(CardRuleError.payingWalletHasTransactions.localizedDescription)
                     } else if let validationError, validationError != .missingName {
                         Text(validationError.localizedDescription)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(.invalid)
                     } else {
                         Text(Strings.Cards.onlyALabelFooter)
                     }

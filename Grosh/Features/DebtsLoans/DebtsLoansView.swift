@@ -88,7 +88,7 @@ struct LoanOrDebtRow: View {
                         .foregroundStyle(.secondary)
                     Text(Strings.Common.settled)
                         .font(.caption)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(.settled)
                 } else {
                     Text(loanOrDebt.outstanding.formatted())
                         .monospacedDigit()

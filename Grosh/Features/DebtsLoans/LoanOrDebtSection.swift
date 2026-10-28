@@ -44,7 +44,7 @@ struct LoanOrDebtSection: View {
                     ReminderField(day: reminderDay)
                 } else if loanOrDebt.forgiveness == nil {
                     Label(Strings.Common.settled, systemImage: "checkmark.seal.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(.settled)
                 }
             } header: {
                 Text(loanOrDebt.kind.name)
@@ -92,7 +92,7 @@ private struct ForgivenRows: View {
             Text(forgiveness.day.date().formatted(date: .abbreviated, time: .omitted))
         } label: {
             Label(Strings.Common.forgiven, systemImage: "hand.raised.fill")
-                .foregroundStyle(.green)
+                .foregroundStyle(.settled)
         }
         LabeledContent(Strings.DebtsLoans.countsAs) {
             HStack(spacing: 6) {

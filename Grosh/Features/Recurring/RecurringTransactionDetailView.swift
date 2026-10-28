@@ -137,7 +137,7 @@ struct RecurringTransactionDetailView: View {
                 Button(Strings.Recurring.deleteRecurring, systemImage: "trash", role: .destructive) {
                     isConfirmingDelete = true
                 }
-                .foregroundStyle(.red)
+                .foregroundStyle(.destructive)
             }
         }
         .navigationTitle(recurring.name)

@@ -102,7 +102,7 @@ private struct WalletForm: View {
 
                     Section {
                         Button(Strings.Wallets.deleteWallet, systemImage: "trash", role: .destructive) { deleting = wallet }
-                            .foregroundStyle(.red)
+                            .foregroundStyle(.destructive)
                     } footer: {
                         Text(Strings.Wallets.deletingFooter(RecentlyDeleted.keptDays))
                     }
@@ -139,7 +139,7 @@ private struct WalletForm: View {
         } footer: {
             if startingBalance == nil {
                 Text(Strings.Wallets.amountExample)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.invalid)
             } else {
                 Text(Strings.Wallets.startingBalanceFooter)
             }
