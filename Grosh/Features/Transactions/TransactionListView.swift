@@ -37,8 +37,8 @@ private struct TransactionListContent: View {
     @State private var filter = TransactionFilter()
     /// Whether the search field is open, which the toolbar's Search button turns on.
     @State private var isSearchPresented = false
-    /// How far the list is pulled down past its top, which the header follows.
-    @State private var pull = PullDistance()
+    /// How far the list has scrolled from its top, which the title fades with and the header rises with.
+    @State private var scroll = TabRootScroll()
     /// Whether the list is choosing transactions to delete, and the ones chosen so far.
     @State private var isSelecting = false
     @State private var chosen = Set<Transaction>()
@@ -113,11 +113,7 @@ private struct TransactionListContent: View {
         // over: the header with the period strip, below, keeps its place.
         .id(filter.isSearching)
         .roundedSectionsListStyle()
-        .onScrollGeometryChange(for: CGFloat.self) { geometry in
-            max(0, -(geometry.contentOffset.y + geometry.contentInsets.top))
-        } action: { _, distance in
-            pull.distance = distance
-        }
+        .tracksTabRootScroll(scroll)
         // A bar rather than an inset, so the content scrolling under it fades as it does under the system bar.
         .safeAreaBar(edge: .top, spacing: 0) {
             VStack(spacing: 4) {
@@ -133,9 +129,8 @@ private struct TransactionListContent: View {
                 }
             }
             .padding(.vertical, 8)
-            // A pull down at the top moves the large title down with the list, so the header goes with them rather
-            // than letting the title slide across it.
-            .modifier(FollowingPull(pull: pull))
+            // Rises into the title's place as the list scrolls up, and moves down with the title on a pull.
+            .modifier(RisingWithTitle(scroll: scroll))
         }
         .modifier(TransactionSearchField(text: $filter.searchText, isOpen: $isSearchPresented))
         .onChange(of: walletSelection) {
@@ -152,13 +147,13 @@ private struct TransactionListContent: View {
         .transactionSelectionMode(
             isSelecting: $isSelecting, chosen: $chosen, title: String(localized: "Transactions")
         )
-        .tabRootTitle(showsSmallTitle: isSelecting)
+        .tabRootTitle("Transactions", scroll: scroll, showsSmallTitle: isSelecting)
         .toolbar {
             if !isSelecting {
                 ToolbarItem(placement: .primaryAction) {
                     TransactionsMenu(
                         walletSelection: walletSelection, timeRange: $timeRange, grouping: $grouping,
-                        startSelecting: startSelecting
+                        startSelecting: startSelecting, filter: $filter
                     )
                 }
                 #if os(iOS)
@@ -166,9 +161,13 @@ private struct TransactionListContent: View {
                     Button("Search", systemImage: "magnifyingglass") { isSearchPresented = true }
                 }
                 #endif
+                #if !os(iOS)
+                // On iPhone and iPad, Filters is in the "…" menu: beside the tab's title the bar has room for two
+                // buttons (ADR-0009).
                 ToolbarItem(placement: .primaryAction) {
                     TransactionFilterButton(filter: $filter)
                 }
+                #endif
             }
         }
         .addTransactionButton()
@@ -208,19 +207,13 @@ private struct TransactionListContent: View {
     }
 }
 
-/// How far a list is pulled down past its top: 0 unless it is pulled. Its own object, so that only the view that follows
-/// the pull reads it, and the list isn't drawn again on every frame of the pull.
-@Observable
-private final class PullDistance {
-    var distance: CGFloat = 0
-}
-
-/// Moves the content down by as much as the list is pulled past its top.
-private struct FollowingPull: ViewModifier {
-    let pull: PullDistance
+/// Moves the header up into the title's place, a point for each point the list scrolls until the title is gone, and
+/// down with a pull past the list's top, as the title moves.
+private struct RisingWithTitle: ViewModifier {
+    let scroll: TabRootScroll
 
     func body(content: Content) -> some View {
-        content.offset(y: pull.distance)
+        content.offset(y: scroll.pull - scroll.progress * TabRootScroll.titleRise)
     }
 }
 

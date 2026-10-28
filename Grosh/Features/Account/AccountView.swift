@@ -61,7 +61,7 @@ struct AccountView: View {
                 }
             }
             .navigationTitle("Account")
-            .tabRootTitle()
+            .tabRootTitle("Account")
         }
     }
 }
