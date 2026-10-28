@@ -39,7 +39,7 @@ private struct TransactionListContent: View {
     @State private var isSearchPresented = false
     /// How far the list has scrolled from its top, which the title fades with and the header rises with.
     /// Rises far enough that the Total reaches the middle of the bar's row, where the bar shows it in its place.
-    @State private var scroll = TabRootScroll(rise: 63)
+    @State private var scroll = TabRootScroll(rise: 63, shortensHeader: true)
     /// Whether the list is choosing transactions to delete, and the ones chosen so far.
     @State private var isSelecting = false
     @State private var chosen = Set<Transaction>()
@@ -132,7 +132,7 @@ private struct TransactionListContent: View {
             }
             .padding(.vertical, 8)
             // Rises into the title's place as the list scrolls up, and moves down with the title on a pull.
-            .modifier(RisingWithTitle(scroll: scroll))
+            .risingWithTabRootTitle(scroll)
         }
         .modifier(TransactionSearchField(text: $filter.searchText, isOpen: $isSearchPresented))
         .onChange(of: walletSelection) {
@@ -208,16 +208,6 @@ private struct TransactionListContent: View {
         selectedTransaction = nil
         chosen = []
         isSelecting = true
-    }
-}
-
-/// Moves the header up into the title's place, a point for each point the list scrolls until the title is gone, and
-/// down with a pull past the list's top, as the title moves.
-private struct RisingWithTitle: ViewModifier {
-    let scroll: TabRootScroll
-
-    func body(content: Content) -> some View {
-        content.offset(y: scroll.pull - scroll.progress * scroll.rise)
     }
 }
 

@@ -7,12 +7,18 @@ import SwiftUI
 final class TabRootScroll {
     /// How far the list scrolls while the title fades away, and a header that rises with it moves up.
     let rise: CGFloat
+    /// Whether the screen's header gets shorter by as much as it rises (``SwiftUI/View/risingWithTabRootTitle(_:)``).
+    let shortensHeader: Bool
 
     var offset: CGFloat = 0
 
-    init(rise: CGFloat = 44) {
+    init(rise: CGFloat = 44, shortensHeader: Bool = false) {
         self.rise = rise
+        self.shortensHeader = shortensHeader
     }
+
+    /// How much shorter the header is now: what it has risen, up to ``rise``.
+    var shortening: CGFloat { shortensHeader ? progress * rise : 0 }
 
     /// From 0 with the list at its top to 1 once it has scrolled ``rise``.
     var progress: CGFloat { min(1, max(0, offset / rise)) }
@@ -31,8 +37,17 @@ extension View {
         onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top
         } action: { _, offset in
-            scroll.offset = offset
+            // A header that gets shorter as it rises takes that much off the list's top inset, which the scroll
+            // geometry counts; it is added back so the offset is measured from the list's real top.
+            scroll.offset = offset + scroll.shortening
         }
+    }
+
+    /// Moves a pinned header up into the title's place, a point for each point the list scrolls until the title has
+    /// gone, getting as much shorter, so the blur under it rises with it and the rows it uncovers are clear. On a pull
+    /// past the list's top it moves down with the title. `scroll` is made with `shortensHeader`.
+    func risingWithTabRootTitle(_ scroll: TabRootScroll) -> some View {
+        modifier(RisingWithTitle(scroll: scroll))
     }
 
     /// The title of a tab's first screen, in the large title's style on the row of the bar's buttons, as standard apps
@@ -70,6 +85,9 @@ private struct TabRootTitleModifier<Risen: View>: ViewModifier {
         content
             .modifier(TrackingUnlessGiven(scroll: own, isGiven: given != nil))
             .navigationBarTitleDisplayMode(.inline)
+            // A soft edge, fading the content under the bar, rather than the band with a hard bottom edge iOS draws
+            // under an inline bar, which reads as a row left for a title that isn't there.
+            .scrollEdgeEffectStyle(.soft, for: .top)
             // Removed rather than covered with an empty item, which would hold the bar's middle and leave the large
             // title half the bar.
             .toolbar(removing: showsSmallTitle ? nil : .title)
@@ -132,6 +150,16 @@ extension View {
     /// it has reached it, so the two are never both there.
     func hiddenOnceRisen(_ scroll: TabRootScroll) -> some View {
         modifier(HiddenOnceRisen(scroll: scroll))
+    }
+}
+
+private struct RisingWithTitle: ViewModifier {
+    let scroll: TabRootScroll
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.top, -scroll.shortening)
+            .offset(y: scroll.pull)
     }
 }
 
