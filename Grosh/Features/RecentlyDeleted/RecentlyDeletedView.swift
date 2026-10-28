@@ -245,9 +245,7 @@ private struct DeletedWalletRow: View {
     }
 
     private var transactionSummary: String {
-        transactionCount == 1
-            ? String(localized: Strings.RecentlyDeleted.oneTransaction)
-            : String(localized: Strings.RecentlyDeleted.transactionCount(transactionCount))
+        String(localized: Strings.RecentlyDeleted.transactionCount(transactionCount))
     }
 }
 
@@ -315,7 +313,7 @@ private struct DaysLeftText: View {
 
     var body: some View {
         let days = deletedAt.map { RecentlyDeleted.daysLeft(since: $0, now: now) } ?? RecentlyDeleted.keptDays
-        Text(days == 1 ? String(localized: Strings.RecentlyDeleted.oneDayLeft) : String(localized: Strings.RecentlyDeleted.daysLeft(days)))
+        Text(Strings.RecentlyDeleted.daysLeft(days))
             .font(.caption)
             .monospacedDigit()
             .foregroundStyle(days <= 3 ? .red : .secondary)

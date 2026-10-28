@@ -178,7 +178,7 @@ private struct TransactionForm: View {
             if draft.isMissingWith {
                 Text(Strings.Transactions.withRequiredFooter)
             } else if isShowingDetails {
-                Text(Strings.Transactions.excludedEditorFooter)
+                Text(Strings.Common.excludedFromReportFooter)
             }
         }
     }

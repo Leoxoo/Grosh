@@ -79,7 +79,7 @@ nonisolated enum Period: Hashable, Sendable {
             return "Q\(quarter) \(year)"
         case .year(let year):
             if year == today.year { return String(localized: Strings.Periods.thisYear) }
-            if year == today.year - 1 { return String(localized: Strings.Common.lastYear) }
+            if year == today.year - 1 { return String(localized: Strings.Periods.lastYear) }
             return String(year)
         case .all:
             return String(localized: Strings.Periods.allTime)

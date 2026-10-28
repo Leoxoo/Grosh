@@ -189,7 +189,7 @@ private struct ExcludedFromReportBanner: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(Strings.Common.excludedFromReport)
                     .font(.headline)
-                Text(Strings.Transactions.excludedFooter)
+                Text(Strings.Common.excludedFromReportFooter)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

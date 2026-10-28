@@ -20,12 +20,12 @@ struct SelectWalletSheet: View {
                         .groupedRow(.only)
                 }
                 if !choices.includedInTotal.isEmpty {
-                    Section(Strings.Transactions.includedInTotal) {
+                    Section(Strings.Common.includedInTotal) {
                         GroupedForEach(choices.includedInTotal) { row($0) }
                     }
                 }
                 if !choices.notInTotal.isEmpty {
-                    Section(Strings.Transactions.notInTotal) {
+                    Section(Strings.Common.notInTotal) {
                         GroupedForEach(choices.notInTotal) { row($0) }
                     }
                 }

@@ -37,7 +37,7 @@ struct WalletRow: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(wallet.name)
             if showsTotalStatus && !wallet.includeInTotal {
-                Text(Strings.Wallets.notInTotal)
+                Text(Strings.Common.notInTotal)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

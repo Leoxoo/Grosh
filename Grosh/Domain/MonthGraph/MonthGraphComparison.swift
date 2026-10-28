@@ -22,7 +22,7 @@ enum MonthGraphComparison {
     var name: String {
         switch self {
         case .average: String(localized: Strings.Home.average)
-        case .lastYear: String(localized: Strings.Common.lastYear)
+        case .lastYear: String(localized: Strings.Periods.lastYear)
         }
     }
 

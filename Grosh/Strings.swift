@@ -65,6 +65,9 @@ nonisolated enum Strings {
         static let chooseTwoDifferentWallets: LocalizedStringResource = "Choose two different wallets."
         static let excludeFromReport: LocalizedStringResource = "Exclude from report"
         static let excludedFromReport: LocalizedStringResource = "Excluded from report"
+        static let excludedFromReportFooter: LocalizedStringResource = "Left out of income and spending. It still counts in the wallet's balance."
+        static let includedInTotal: LocalizedStringResource = "Included in Total"
+        static let notInTotal: LocalizedStringResource = "Not in Total"
         static let noTransactions: LocalizedStringResource = "No Transactions"
         static let nothingRecordedInPeriod: LocalizedStringResource = "Nothing was recorded in this period."
         static let addWalletFirst: LocalizedStringResource = "Add a wallet first, in Account → Wallets."
@@ -73,7 +76,6 @@ nonisolated enum Strings {
         static let timeRange: LocalizedStringResource = "Time Range"
         static let custom: LocalizedStringResource = "Custom"
         static let customEllipsis: LocalizedStringResource = "Custom…"
-        static let lastYear: LocalizedStringResource = "Last year"
         static let openingBalance: LocalizedStringResource = "Opening balance"
         static let endingBalance: LocalizedStringResource = "Ending balance"
         static let difference: LocalizedStringResource = "Difference"
@@ -122,6 +124,7 @@ nonisolated enum Strings {
         static let lastMonth: LocalizedStringResource = "Last month"
         static let thisQuarter: LocalizedStringResource = "This quarter"
         static let lastQuarter: LocalizedStringResource = "Last quarter"
+        static let lastYear: LocalizedStringResource = "Last year"
         static let thisYear: LocalizedStringResource = "This year"
         static let allTime: LocalizedStringResource = "All time"
         static let future: LocalizedStringResource = "Future"
@@ -172,11 +175,9 @@ nonisolated enum Strings {
         static let comingSoon: LocalizedStringResource = "Coming soon"
         static let location: LocalizedStringResource = "Location"
         static let withRequiredFooter: LocalizedStringResource = "A Loan or Debt needs a With: who you lent to or borrowed from."
-        static let excludedEditorFooter: LocalizedStringResource = "A transaction excluded from report still counts in balances, just not in income and spending."
         static let enterAmount: LocalizedStringResource = "Enter Amount"
         static let estimatedFooter: LocalizedStringResource = "This amount is the average of recent transactions in its category. Enter the real amount to confirm it."
         static let duplicateFooter: LocalizedStringResource = "Duplicate opens a new transaction with the same details, dated today."
-        static let excludedFooter: LocalizedStringResource = "Left out of income and spending. It still counts in the wallet's balance."
         static let customRange: LocalizedStringResource = "Custom Range"
         static let projectedBalance: LocalizedStringResource = "Projected balance"
         static let relatedTransactions: LocalizedStringResource = "Related transactions"
@@ -185,8 +186,6 @@ nonisolated enum Strings {
         static let undoSplitMessage: LocalizedStringResource = "The parts merge back into the original, which takes the sum of their amounts."
         static let couldntUndoSplit: LocalizedStringResource = "Couldn't Undo Split"
         static let scheduled: LocalizedStringResource = "Scheduled"
-        static let includedInTotal: LocalizedStringResource = "Included in total"
-        static let notInTotal: LocalizedStringResource = "Not in total"
         static let selectWallet: LocalizedStringResource = "Select Wallet"
         static let thisTransaction: LocalizedStringResource = "This transaction"
         static let thisTransactionTitle: LocalizedStringResource = "This Transaction"
@@ -299,7 +298,6 @@ nonisolated enum Strings {
         static let noWallets: LocalizedStringResource = "No Wallets"
         static let noWalletsDescription: LocalizedStringResource = "Add a wallet for each place you keep money."
         static let couldntChange: LocalizedStringResource = "Couldn't Change Wallet"
-        static let notInTotal: LocalizedStringResource = "Not in Total"
         static func deleteMessage(_ name: String, _ days: Int) -> LocalizedStringResource { "“\(name)” and all its transactions and Recurring transactions will be deleted and moved to Recently Deleted, where they can be restored for \(days) days." }
         static func deletingFooter(_ days: Int) -> LocalizedStringResource { "Deleting moves the wallet, its transactions and its Recurring transactions to Recently Deleted for \(days) days." }
     }
@@ -365,11 +363,11 @@ nonisolated enum Strings {
     /// Categories: adding, editing, hiding, merging and picking them.
     enum Categories {
         static let lockedError: LocalizedStringResource = "The app relies on this category. Only its icon can be changed."
-        static let differentType: LocalizedStringResource = "Pick a category of the same type."
-        static let sameCategory: LocalizedStringResource = "Pick a different category."
+        static let differentType: LocalizedStringResource = "Choose a category of the same type."
+        static let sameCategory: LocalizedStringResource = "Choose a different category."
         static let tooDeep: LocalizedStringResource = "Categories nest at most two levels deep."
         static let hasTransactions: LocalizedStringResource = "This category has transactions. Merge it into another category instead."
-        static let nameRequired: LocalizedStringResource = "Enter a name."
+        static let nameRequired: LocalizedStringResource = "Give the category a name."
         static let nameTaken: LocalizedStringResource = "Another category of this type already has this name."
         static let fixedType: LocalizedStringResource = "Only Expense and Income categories can be added or moved."
         static let addCategory: LocalizedStringResource = "Add Category"
@@ -526,7 +524,6 @@ nonisolated enum Strings {
         static let estimate: LocalizedStringResource = "Estimate"
         static let estimateFooter: LocalizedStringResource = "Each transaction starts as an estimate, the average of recent transactions in its category, until you enter the real amount. The amount above is used only when the category has no history yet."
         static let noneYet: LocalizedStringResource = "None yet"
-        static let remindOneDayLater: LocalizedStringResource = "Remind me 1 day later"
         static let totalPrice: LocalizedStringResource = "Total price"
         static let totalPriceFooter: LocalizedStringResource = "Payments attached to it count as paid toward this total. Leave it at zero when there isn't one."
         static let unit: LocalizedStringResource = "Unit"
@@ -659,9 +656,7 @@ nonisolated enum Strings {
         static let recurringRemovalMessage: LocalizedStringResource = "The recurring transaction will be removed for good. Its transactions stay in your wallets. This can't be undone."
         static let transactionRemovalMessage: LocalizedStringResource = "The transaction will be removed for good. This can't be undone."
         static let everythingRemovalMessage: LocalizedStringResource = "Every wallet, recurring transaction and transaction in Recently Deleted will be removed for good. This can't be undone."
-        static let oneTransaction: LocalizedStringResource = "1 transaction"
         static let restoreWalletFirst: LocalizedStringResource = "Restore its wallet first"
-        static let oneDayLeft: LocalizedStringResource = "1 day left"
         static func emptyDescription(_ days: Int) -> LocalizedStringResource { "Deleted wallets, recurring transactions and transactions wait here for \(days) days before they're removed for good." }
         static func footer(_ days: Int) -> LocalizedStringResource { "Items are removed for good after \(days) days. Swipe an item to restore it or delete it forever." }
         static func transactionCount(_ count: Int) -> LocalizedStringResource { "\(count) transactions" }

@@ -189,9 +189,7 @@ private struct RecurringForm: View {
     }
 
     private var remindAfterText: String {
-        draft.remindAfterDays == 1
-            ? String(localized: Strings.Recurring.remindOneDayLater)
-            : String(localized: Strings.Recurring.remindDaysLater(draft.remindAfterDays))
+        String(localized: Strings.Recurring.remindDaysLater(draft.remindAfterDays))
     }
 
     /// A Purchase's optional total price. Payments attached to it count as paid toward it; the schedule doesn't change.
