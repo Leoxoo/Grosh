@@ -38,7 +38,8 @@ private struct TransactionListContent: View {
     /// Whether the search field is open, which the toolbar's Search button turns on.
     @State private var isSearchPresented = false
     /// How far the list has scrolled from its top, which the title fades with and the header rises with.
-    @State private var scroll = TabRootScroll()
+    /// Rises far enough that the Total reaches the middle of the bar's row, where the bar shows it in its place.
+    @State private var scroll = TabRootScroll(rise: 63)
     /// Whether the list is choosing transactions to delete, and the ones chosen so far.
     @State private var isSelecting = false
     @State private var chosen = Set<Transaction>()
@@ -119,6 +120,7 @@ private struct TransactionListContent: View {
             VStack(spacing: 4) {
                 VStack(spacing: 4) {
                     WalletSelector(selection: $walletSelection, today: today)
+                        .hiddenOnceRisen(scroll)
                     PeriodStrip(periods: periods, selection: $period, current: currentPeriod, today: today)
                 }
                 .hiddenWhileSearching(filter)
@@ -147,7 +149,9 @@ private struct TransactionListContent: View {
         .transactionSelectionMode(
             isSelecting: $isSelecting, chosen: $chosen, title: String(localized: "Transactions")
         )
-        .tabRootTitle("Transactions", scroll: scroll, showsSmallTitle: isSelecting)
+        .tabRootTitle("Transactions", scroll: scroll, showsSmallTitle: isSelecting) {
+            WalletSelector(selection: $walletSelection, today: today, fillsWidth: false)
+        }
         .toolbar {
             if !isSelecting {
                 ToolbarItem(placement: .primaryAction) {
@@ -213,7 +217,7 @@ private struct RisingWithTitle: ViewModifier {
     let scroll: TabRootScroll
 
     func body(content: Content) -> some View {
-        content.offset(y: scroll.pull - scroll.progress * TabRootScroll.titleRise)
+        content.offset(y: scroll.pull - scroll.progress * scroll.rise)
     }
 }
 
