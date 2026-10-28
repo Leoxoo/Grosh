@@ -111,7 +111,8 @@ private struct TransactionListContent: View {
         // over: the header with the period strip, below, keeps its place.
         .id(filter.isSearching)
         .roundedSectionsListStyle()
-        .safeAreaInset(edge: .top, spacing: 0) {
+        // A bar rather than an inset, so the content scrolling under it fades as it does under the system bar.
+        .safeAreaBar(edge: .top, spacing: 0) {
             VStack(spacing: 4) {
                 VStack(spacing: 4) {
                     WalletSelector(selection: $walletSelection, today: today)
@@ -125,7 +126,6 @@ private struct TransactionListContent: View {
                 }
             }
             .padding(.vertical, 8)
-            .background(.bar)
         }
         .modifier(TransactionSearchField(text: $filter.searchText, isOpen: $isSearchPresented))
         .onChange(of: walletSelection) {
@@ -142,9 +142,7 @@ private struct TransactionListContent: View {
         .transactionSelectionMode(
             isSelecting: $isSelecting, chosen: $chosen, title: String(localized: "Transactions")
         )
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .tabRootTitle(showsSmallTitle: isSelecting)
         .toolbar {
             if !isSelecting {
                 ToolbarItem(placement: .primaryAction) {

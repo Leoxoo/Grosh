@@ -12,7 +12,7 @@ struct WalletSelector: View {
     @State private var isChoosing = false
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(alignment: .leading, spacing: 2) {
             Button {
                 isChoosing = true
             } label: {
@@ -37,7 +37,9 @@ struct WalletSelector: View {
                 .monospacedDigit()
                 .contentTransition(.numericText())
         }
-        .frame(maxWidth: .infinity)
+        // Under the tab's title, lined up with it.
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal)
     }
 }
 
