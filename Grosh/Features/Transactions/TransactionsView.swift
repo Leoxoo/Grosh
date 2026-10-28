@@ -29,6 +29,11 @@ struct TransactionsView: View {
                 }
             }
             .id(selectedTransaction?.persistentModelID)
+            #if os(macOS)
+            // The window takes its title from the detail, which has none while nothing is selected, so the window
+            // would show the app's name. It names the tab instead, with a transaction open too.
+            .navigationTitle("Transactions")
+            #endif
         }
         .onAppear { Signpost.opening("Open Transactions") }
         #if os(macOS)

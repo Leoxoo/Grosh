@@ -63,6 +63,7 @@ private struct HomeContent: View {
                 RecentTransactionsSection(today: today)
             }
             .navigationTitle("Home")
+            .tabRootTitle("Home")
             // Presented from the list itself, not from a row of it, so the Report opens on the month the strip shows.
             .reportPresentation(isPresented: $isShowingReport) {
                 ReportView(startingOn: monthPeriod)

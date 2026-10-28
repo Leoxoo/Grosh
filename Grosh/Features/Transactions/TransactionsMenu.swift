@@ -11,13 +11,34 @@ struct TransactionsMenu: View {
     @Binding var grouping: TransactionGrouping
     /// Starts choosing transactions to delete.
     let startSelecting: () -> Void
+    /// The list's search text and filters, which Filters sets on iPhone and iPad, where the bar has no room for a
+    /// Filters button of its own beside the tab's title.
+    @Binding var filter: TransactionFilter
 
     @State private var isPickingCustomRange = false
     @State private var isTransferring = false
     @State private var isAdjustingBalance = false
+    @State private var isFiltering = false
 
     var body: some View {
         Menu("More", systemImage: "ellipsis.circle") {
+            #if os(iOS)
+            Section {
+                Button {
+                    isFiltering = true
+                } label: {
+                    Label(
+                        "Filters",
+                        systemImage: filter.hasFilters
+                            ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
+                    )
+                    if filter.hasFilters {
+                        Text("On")
+                    }
+                }
+            }
+            #endif
+
             Section {
                 Menu {
                     TimeRangeChoices(timeRange: $timeRange) { isPickingCustomRange = true }
@@ -47,6 +68,9 @@ struct TransactionsMenu: View {
         }
         .sheet(isPresented: $isAdjustingBalance) {
             AdjustBalanceEditor(viewedWallet: viewedWallet)
+        }
+        .sheet(isPresented: $isFiltering) {
+            TransactionFilterSheet(filter: $filter)
         }
     }
 

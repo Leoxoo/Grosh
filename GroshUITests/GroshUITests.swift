@@ -281,7 +281,8 @@ private final class Walk {
         let rows = list.cells
         for index in 0..<min(rows.count, 30) {
             let row = rows.element(boundBy: index)
-            if row.isHittable, row.frame.midY >= top, row.frame.midY <= bottom {
+            // A day's header is a cell too, with no link to open: a transaction's row holds one.
+            if row.isHittable, row.buttons.count > 0, row.frame.midY >= top, row.frame.midY <= bottom {
                 return row
             }
         }
