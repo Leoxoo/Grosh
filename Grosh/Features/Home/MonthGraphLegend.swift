@@ -15,7 +15,7 @@ struct MonthGraphLegend: View {
                 // Already localized: shown as they are.
                 entry(Text(verbatim: graph.lineName), color: graph.side.color)
                 if graph.comparisonLine != nil {
-                    entry(Text(verbatim: graph.comparison.name), color: MonthGraphChart.comparisonColor)
+                    entry(Text(verbatim: graph.comparison.name), color: .comparison)
                 }
                 Spacer(minLength: 0)
                 if graph.offersLastYear {

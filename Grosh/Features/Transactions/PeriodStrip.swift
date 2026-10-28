@@ -81,7 +81,7 @@ struct PeriodStrip: View {
                 .overlay(alignment: .bottom) {
                     if isSelected {
                         Capsule()
-                            .fill(.green)
+                            .fill(.brand)
                             .frame(height: 2)
                     }
                 }

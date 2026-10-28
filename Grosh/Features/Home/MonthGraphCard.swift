@@ -200,11 +200,6 @@ extension SpentOrIncome {
         case .income: String(localized: Strings.Common.income)
         }
     }
-
-    /// The color amounts going out (Spent) or coming in (Income) have everywhere in the app.
-    var color: Color {
-        Money(cents: self == .spent ? -1 : 1).tint
-    }
 }
 
 #Preview {

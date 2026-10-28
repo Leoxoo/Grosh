@@ -203,7 +203,7 @@ private struct SplitPartRow: View {
             Spacer(minLength: 8)
             Text(part.amount.formatted())
                 .monospacedDigit()
-                .foregroundStyle(part.amount.cents > 0 ? Money(cents: part.category?.sign ?? 0).tint : .red)
+                .foregroundStyle(part.amount.cents > 0 ? Money(cents: part.category?.sign ?? 0).tint : .invalid)
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)

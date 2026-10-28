@@ -121,7 +121,7 @@ private struct KeypadButtonStyle: ButtonStyle {
         switch role {
         case .digit: AnyShapeStyle(.fill.tertiary)
         case .function: AnyShapeStyle(.fill.secondary)
-        case .operation: AnyShapeStyle(Color.green.gradient)
+        case .operation: AnyShapeStyle(Color.brand.gradient)
         }
     }
 }

@@ -23,9 +23,9 @@ struct WalletListView: View {
                     .buttonStyle(.plain)
                     .swipeActions {
                         Button(Strings.Common.delete, systemImage: "trash") { deleting = wallet }
-                            .tint(.red)
+                            .tint(.destructive)
                         Button(Strings.Common.archive, systemImage: "archivebox") { perform { try wallet.archive(today: today) } }
-                            .tint(.orange)
+                            .tint(.archiveAction)
                     }
                     .contextMenu {
                         Button(Strings.Common.edit, systemImage: "pencil") { editorMode = .edit(wallet) }
@@ -54,11 +54,11 @@ struct WalletListView: View {
                         .buttonStyle(.plain)
                         .swipeActions {
                             Button(Strings.Common.delete, systemImage: "trash") { deleting = wallet }
-                                .tint(.red)
+                                .tint(.destructive)
                             Button(Strings.Common.unarchive, systemImage: "tray.and.arrow.up") {
                                 perform { try wallet.unarchive(today: today) }
                             }
-                            .tint(.green)
+                            .tint(.unarchiveAction)
                         }
                         .contextMenu {
                             Button(Strings.Common.unarchive, systemImage: "tray.and.arrow.up") {

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The words and colors that differ between a Loan and a Debt on screen and in notifications.
+/// The words that differ between a Loan and a Debt on screen and in notifications.
 extension LoanOrDebtKind {
     /// "Loan" or "Debt".
     var name: LocalizedStringResource {
@@ -15,14 +15,6 @@ extension LoanOrDebtKind {
         switch self {
         case .loan: Strings.DebtsLoans.lentTo
         case .debt: Strings.DebtsLoans.borrowedFrom
-        }
-    }
-
-    /// What is outstanding: green for money coming back, red for money owed.
-    var outstandingColor: Color {
-        switch self {
-        case .loan: .green
-        case .debt: .red
         }
     }
 

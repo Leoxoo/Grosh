@@ -6,8 +6,6 @@ import SwiftUI
 /// still scheduled, and a marker with a popup on the selected day. Scrubbing across the chart moves the marker from day
 /// to day. A few days are named along the bottom, and a few amounts up the right side, shortened as in "5K".
 struct MonthGraphChart: View {
-    /// The gray of the line the month is compared with, the Average or Last year, which the legend matches.
-    static let comparisonColor = Color.gray
     /// The dots of the line of what is still scheduled, which the legend matches.
     static let scheduledStroke = StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round, dash: [0, 5])
 
@@ -32,7 +30,7 @@ struct MonthGraphChart: View {
 
             if let comparisonLine = graph.comparisonLine {
                 line(comparisonLine, series: "Comparison")
-                    .foregroundStyle(Self.comparisonColor)
+                    .foregroundStyle(.comparison)
                     .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
             }
 
@@ -50,7 +48,7 @@ struct MonthGraphChart: View {
 
             if let comparison = popup.comparison {
                 marker(at: comparison)
-                    .foregroundStyle(Self.comparisonColor)
+                    .foregroundStyle(.comparison)
             }
             // On the line through today, or on the dotted line after it.
             if let total = popup.total ?? popup.expected {

@@ -14,7 +14,7 @@ struct AddTransactionButton: View {
         }
         .buttonStyle(.glassProminent)
         .buttonBorderShape(.circle)
-        .tint(.green)
+        .tint(.brand)
         .accessibilityLabel(Strings.Transactions.addTransaction)
         .disabled(isAdding == nil)
     }
@@ -50,7 +50,7 @@ private struct AddTransactionButtonPlacement: ViewModifier {
                         Button(Strings.Transactions.addTransaction, systemImage: "plus") {
                             isAdding?.wrappedValue = true
                         }
-                        .tint(.green)
+                        .tint(.brand)
                         .disabled(isAdding == nil)
                     }
                 }

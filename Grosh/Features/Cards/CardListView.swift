@@ -22,7 +22,7 @@ struct CardListView: View {
                     row(card)
                         .swipeActions {
                             Button(Strings.Common.archive, systemImage: "archivebox") { perform { try card.archive() } }
-                                .tint(.orange)
+                                .tint(.archiveAction)
                         }
                 }
             } footer: {
@@ -38,7 +38,7 @@ struct CardListView: View {
                             .foregroundStyle(.secondary)
                             .swipeActions {
                                 Button(Strings.Common.unarchive, systemImage: "tray.and.arrow.up") { perform { try card.unarchive() } }
-                                    .tint(.green)
+                                    .tint(.unarchiveAction)
                             }
                     }
                 } header: {

@@ -20,7 +20,7 @@ struct AmountRow: View {
                 }
                 Text(result)
                     .font(.title2.weight(.semibold))
-                    .foregroundStyle(entry.cents == nil ? .red : tint)
+                    .foregroundStyle(entry.cents == nil ? .invalid : tint)
                     .contentTransition(.numericText())
             }
             .monospacedDigit()

@@ -182,14 +182,14 @@ struct CategoryListView: View {
                 Button(Strings.Common.delete, systemImage: "trash", role: .destructive) { deleting = category }
             }
             Button(Strings.Common.merge, systemImage: "arrow.triangle.merge") { merging = category }
-                .tint(.indigo)
+                .tint(.mergeAction)
             Button(
                 category.isHidden ? Strings.Common.unhide : Strings.Common.hide,
                 systemImage: category.isHidden ? "eye" : "eye.slash"
             ) {
                 perform { try catalog.setHidden(category, !category.isHidden) }
             }
-            .tint(.gray)
+            .tint(.hideAction)
         }
     }
 

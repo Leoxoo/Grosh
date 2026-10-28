@@ -42,7 +42,7 @@ struct RecentlyDeletedView: View {
                                     Button(Strings.Common.restore, systemImage: "arrow.uturn.backward") {
                                         perform { try wallet.restore(today: today) }
                                     }
-                                    .tint(.blue)
+                                    .tint(.restoreAction)
                                 }
                                 .contextMenu {
                                     Button(Strings.Common.restore, systemImage: "arrow.uturn.backward") {
@@ -75,7 +75,7 @@ struct RecentlyDeletedView: View {
                                     Button(Strings.Common.restore, systemImage: "arrow.uturn.backward") {
                                         perform { try schedule.restore(today: today) }
                                     }
-                                    .tint(.blue)
+                                    .tint(.restoreAction)
                                 }
                             }
                             .contextMenu {
@@ -109,7 +109,7 @@ struct RecentlyDeletedView: View {
                                     Button(Strings.Common.restore, systemImage: "arrow.uturn.backward") {
                                         perform { try transaction.restore() }
                                     }
-                                    .tint(.blue)
+                                    .tint(.restoreAction)
                                 }
                             }
                             .contextMenu {
@@ -316,7 +316,7 @@ private struct DaysLeftText: View {
         Text(Strings.RecentlyDeleted.daysLeft(days))
             .font(.caption)
             .monospacedDigit()
-            .foregroundStyle(days <= 3 ? .red : .secondary)
+            .foregroundStyle(days <= 3 ? .urgent : .secondary)
     }
 }
 
