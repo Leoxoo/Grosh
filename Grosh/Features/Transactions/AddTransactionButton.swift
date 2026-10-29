@@ -10,6 +10,7 @@ struct AddTransactionButton: View {
         } label: {
             Image(systemName: "plus")
                 .font(.title2.weight(.semibold))
+                .foregroundStyle(.onBrand)
                 .frame(width: 56, height: 56)
         }
         .buttonStyle(.glassProminent)
