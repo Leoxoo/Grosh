@@ -108,7 +108,7 @@ private struct KeypadButtonStyle: ButtonStyle {
         configuration.label
             .font(.title2.weight(role == .operation ? .semibold : .regular))
             .monospacedDigit()
-            .foregroundStyle(role == .operation ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+            .foregroundStyle(role == .operation ? AnyShapeStyle(.onBrand) : AnyShapeStyle(.primary))
             .background(background, in: .rect(cornerRadius: 12))
             .opacity(configuration.isPressed ? 0.6 : 1)
             .contentShape(.rect(cornerRadius: 12))
