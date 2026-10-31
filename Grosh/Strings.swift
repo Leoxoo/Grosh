@@ -292,8 +292,7 @@ nonisolated enum Strings {
         static let couldntSave: LocalizedStringResource = "Couldn't Save Wallet"
         static let currentBalance: LocalizedStringResource = "Current balance"
         static let startingBalance: LocalizedStringResource = "Starting balance"
-        static let amountExample: LocalizedStringResource = "Enter an amount such as 1,250.00."
-        static let startingBalanceFooter: LocalizedStringResource = "The money this wallet holds now. It becomes the wallet's first transaction and is excluded from report."
+        static let startingBalanceFooter: LocalizedStringResource = "The money this wallet holds now, below zero if it is in debt. It becomes the wallet's first transaction and is excluded from report."
         static let reorderFooter: LocalizedStringResource = "Drag to reorder. Home and every wallet picker use this order."
         static let archivedSectionFooter: LocalizedStringResource = "Archived wallets are left out of the Total and the pickers. Their transactions are kept."
         static let noWallets: LocalizedStringResource = "No Wallets"
@@ -694,17 +693,17 @@ nonisolated enum Strings {
         static func unmatchedRow(_ line: Int, _ day: String, _ wallet: String) -> LocalizedStringResource { "Line \(line) · \(day) · \(wallet)" }
     }
 
-    /// The amount keypad's keys, as shown and as VoiceOver reads them.
+    /// The Keypad's keys, as shown and as VoiceOver reads them.
     enum Keypad {
-        static let allClearKey: LocalizedStringResource = "AC"
-        static let doubleZero: LocalizedStringResource = "Double zero"
-        static let allClear: LocalizedStringResource = "All clear"
+        static let clearKey: LocalizedStringResource = "C"
+        static let clear: LocalizedStringResource = "Clear"
+        static let decimalPoint: LocalizedStringResource = "Decimal point"
         static let plus: LocalizedStringResource = "Plus"
         static let minus: LocalizedStringResource = "Minus"
         static let times: LocalizedStringResource = "Times"
         static let dividedBy: LocalizedStringResource = "Divided by"
         static let equals: LocalizedStringResource = "Equals"
-        static let changeSign: LocalizedStringResource = "Change Sign"
+        static let hideKeyboard: LocalizedStringResource = "Hide Keyboard"
     }
 
     /// Settings and the screens not built yet.

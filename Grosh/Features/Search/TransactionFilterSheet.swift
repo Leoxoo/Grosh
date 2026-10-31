@@ -9,6 +9,7 @@ struct TransactionFilterSheet: View {
     @Binding var filter: TransactionFilter
 
     @Environment(\.dismiss) private var dismiss
+    @State private var keypad = KeypadTarget()
 
     var body: some View {
         NavigationStack {
@@ -36,8 +37,8 @@ struct TransactionFilterSheet: View {
                 }
 
                 Section {
-                    AmountBoundField(title: Strings.Search.atLeast, amount: $filter.minimumAmount)
-                    AmountBoundField(title: Strings.Search.atMost, amount: $filter.maximumAmount)
+                    AmountBoundField(title: Strings.Search.atLeast, field: "minimum", amount: $filter.minimumAmount)
+                    AmountBoundField(title: Strings.Search.atMost, field: "maximum", amount: $filter.maximumAmount)
                 } header: {
                     Text(Strings.Search.amountRange)
                 } footer: {
@@ -49,6 +50,7 @@ struct TransactionFilterSheet: View {
                 }
             }
             .formStyle(.grouped)
+            .keypad(keypad)
             .navigationTitle(Strings.Screens.filters)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -100,45 +102,47 @@ private struct OptionalDayRow: View {
     }
 }
 
-/// One end of the amount range, typed as a plain amount such as `50` or `12.50`. Empty means any.
+/// One end of the amount range, typed on the Keypad. Empty, until a digit is typed and again after C, means any.
 private struct AmountBoundField: View {
     let title: LocalizedStringResource
+    let field: String
     @Binding var amount: Money?
 
-    @State private var text: String
+    @State private var entry: AmountEntry
 
-    init(title: LocalizedStringResource, amount: Binding<Money?>) {
+    init(title: LocalizedStringResource, field: String, amount: Binding<Money?>) {
         self.title = title
+        self.field = field
         _amount = amount
-        _text = State(initialValue: amount.wrappedValue.map(Self.text(for:)) ?? "")
+        _entry = State(initialValue: Self.entry(for: amount.wrappedValue))
     }
 
     var body: some View {
-        LabeledContent(title) {
-            TextField(title, text: $text, prompt: Text(Strings.Common.any))
-                .labelsHidden()
-                .multilineTextAlignment(.trailing)
-                .monospacedDigit()
-                #if os(iOS)
-                .keyboardType(.decimalPad)
-                #endif
-        }
-        .onChange(of: text) {
-            amount = Self.amount(in: text)
-        }
-        .onChange(of: amount) {
-            // Clear empties the field.
-            if Self.amount(in: text) != amount {
-                text = amount.map(Self.text(for:)) ?? ""
+        AmountRow(title, field: field, entry: $entry, placeholder: Strings.Common.any, font: .body)
+            .onChange(of: entry) {
+                amount = Self.amount(of: entry)
             }
+            .onChange(of: amount) {
+                // Clear empties the field.
+                if Self.amount(of: entry) != amount {
+                    entry = Self.entry(for: amount)
+                }
+            }
+    }
+
+    /// What was typed as a bound: nothing is any amount, and so is a calculation that can't be worked out.
+    private static func amount(of entry: AmountEntry) -> Money? {
+        guard !entry.isEmpty, let cents = entry.cents else { return nil }
+        return Money(cents: cents)
+    }
+
+    /// `amount` on the Keypad, with a bound of zero shown as 0 rather than as any.
+    private static func entry(for amount: Money?) -> AmountEntry {
+        guard let amount else { return AmountEntry() }
+        var entry = AmountEntry(cents: amount.cents)
+        if amount.cents == 0 {
+            entry.press(.digit(0))
         }
-    }
-
-    private static func amount(in text: String) -> Money? {
-        Money(typedAmount: text).map { Money(cents: abs($0.cents)) }
-    }
-
-    nonisolated private static func text(for amount: Money) -> String {
-        amount.decimalValue.formatted(.number.grouping(.never))
+        return entry
     }
 }

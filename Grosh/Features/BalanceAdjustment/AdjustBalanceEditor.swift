@@ -76,7 +76,6 @@ private struct AdjustBalanceForm: View {
             fields.amountRow(
                 Strings.BalanceAdjustment.realBalance, currencyCode: draft.currencyCode, tint: Money(cents: draft.realBalance?.cents ?? 0).tint
             )
-            ChangeSignButton(entry: $draft.realBalanceEntry)
         } footer: {
             if draft.wallet == nil {
                 Text(Strings.Common.addWalletFirst)

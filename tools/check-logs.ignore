@@ -110,5 +110,13 @@
   {
     "pattern": "^\\[API\\] Failed to create \\d+x0 image slot \\(alpha=\\d wide=\\d\\) \\(client=0x[0-9a-fA-F]+\\) \\[0x5 \\(os/kern\\) failure\\]$",
     "reason": "Core Animation logs this on the iOS 27 simulator when a screen with a large title goes back to it while the title has slid away: it tries to draw the title's zero-height row for the transition. Settings logs the same line when it goes back from a row with its own large title slid away, so it is the system's."
+  },
+  {
+    "pattern": "^\\[AXAppAccessibility\\] Got a keyboard will (change frame|hide) notification, but keyboard was not even present\\.$",
+    "reason": "On iPhone the Keypad is the amount field's input view (ADR-0011). UIKit posts the keyboard's frame notifications for it as for any keyboard, and the accessibility runtime, which only counts the system's own keyboard as present, logs this for each one. VoiceOver still reads every key."
+  },
+  {
+    "pattern": "^\\[ProcessScene\\] \\[UISceneHosting-[^\\]]+:UIHostedScene-com\\.apple\\.InputUI-[0-9A-F-]+\\] No scene exists for this identity \\(didUpdateClientSettingsWithDiff\\)$",
+    "reason": "The system's keyboard host (InputUI) logs this when the app's own input view, the Keypad on iPhone, takes the keyboard's place while the host's scene for the system keyboard is gone. The Keypad still comes up and types."
   }
 ]
