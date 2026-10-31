@@ -139,12 +139,12 @@ nonisolated enum SplitRuleError: Error, Equatable {
 extension SplitRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .notSplittable: String(localized: "Only an ordinary expense or income can be split.")
-        case .noParts: String(localized: "Add at least one part.")
-        case .missingAmount: String(localized: "Give every part an amount above zero, and leave some on the original.")
-        case .missingCategory: String(localized: "Choose a category for every part.")
-        case .unassignedReimbursement: String(localized: "Choose a part for every reimbursement.")
-        case .notSplit: String(localized: "This transaction has no other parts to merge.")
+        case .notSplittable: String(localized: Strings.Transactions.notSplittable)
+        case .noParts: String(localized: Strings.Transactions.noParts)
+        case .missingAmount: String(localized: Strings.Transactions.splitMissingAmount)
+        case .missingCategory: String(localized: Strings.Transactions.splitMissingCategory)
+        case .unassignedReimbursement: String(localized: Strings.Transactions.unassignedReimbursement)
+        case .notSplit: String(localized: Strings.Transactions.notSplit)
         }
     }
 }

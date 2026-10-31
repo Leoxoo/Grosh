@@ -176,13 +176,13 @@ nonisolated enum TransactionRuleError: Error, Equatable {
 extension TransactionRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .missingWallet: String(localized: "Choose a wallet.")
-        case .missingAmount: String(localized: "Enter an amount above zero.")
-        case .missingCategory: String(localized: "Choose a category.")
-        case .missingCard: String(localized: "Choose the Card this expense was paid with.")
-        case .missingWith: String(localized: "Choose who you lent to or borrowed from in With.")
-        case .tooManyWith: String(localized: "A Loan or Debt is with one person. Choose one in With.")
-        case .notAStartingBalance: String(localized: "Only a wallet's Starting balance can be edited here.")
+        case .missingWallet: String(localized: Strings.Common.chooseAWallet)
+        case .missingAmount: String(localized: Strings.Common.enterAmountAboveZero)
+        case .missingCategory: String(localized: Strings.Common.chooseACategory)
+        case .missingCard: String(localized: Strings.Transactions.missingCard)
+        case .missingWith: String(localized: Strings.Transactions.missingWith)
+        case .tooManyWith: String(localized: Strings.Transactions.tooManyWith)
+        case .notAStartingBalance: String(localized: Strings.Transactions.notAStartingBalance)
         }
     }
 }

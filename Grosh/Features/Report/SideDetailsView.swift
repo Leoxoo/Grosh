@@ -43,7 +43,7 @@ struct SideDetailsView: View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Total")
+                    Text(Strings.Common.total)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Text(total.formatted())
@@ -52,7 +52,7 @@ struct SideDetailsView: View {
                         .foregroundStyle(side.color)
                         .contentTransition(.numericText())
                     if timeRange != .day, let average = DailyAverage.of(total, over: days) {
-                        LabeledContent("Daily average") {
+                        LabeledContent(Strings.Report.dailyAverage) {
                             Text(average.formatted()).monospacedDigit()
                         }
                     }
@@ -75,9 +75,9 @@ struct SideDetailsView: View {
             }
 
             Section {
-                Picker("Shows", selection: $shows) {
-                    Text("Breakdown").tag(Shows.breakdown)
-                    Text("Trend").tag(Shows.trend)
+                Picker(Strings.Report.shows, selection: $shows) {
+                    Text(Strings.Report.breakdown).tag(Shows.breakdown)
+                    Text(Strings.Report.trend).tag(Shows.trend)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -182,10 +182,10 @@ private struct SideTrendChart: View {
     var body: some View {
         Chart {
             ForEach(rows) { row in
-                BarMark(x: .value("Step", row.title), y: .value("Total", row.total(of: side).cents))
+                BarMark(x: .value(Strings.Common.step, row.title), y: .value(Strings.Common.total, row.total(of: side).cents))
                     .foregroundStyle(side.color)
             }
-            RuleMark(y: .value("Zero", 0))
+            RuleMark(y: .value(Strings.Common.zero, 0))
                 .foregroundStyle(.secondary.opacity(0.4))
         }
         .chartXAxis {

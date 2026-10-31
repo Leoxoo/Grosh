@@ -12,9 +12,9 @@ struct ReminderField: View {
     @Environment(\.today) private var today
 
     var body: some View {
-        Toggle("Reminder", systemImage: "bell", isOn: isOn)
+        Toggle(Strings.DebtsLoans.reminder, systemImage: "bell", isOn: isOn)
         if let day = Binding($day) {
-            DayPicker(title: "Remind Me On", day: day)
+            DayPicker(title: Strings.DebtsLoans.remindMeOn, day: day)
         }
     }
 

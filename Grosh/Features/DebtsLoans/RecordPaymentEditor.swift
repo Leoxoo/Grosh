@@ -11,8 +11,8 @@ struct RecordPaymentEditor: View {
 
     var body: some View {
         LoanOrDebtSheet(
-            unavailableTitle: "Can't Record Payment",
-            unavailableMessage: "Only a Loan or a Debt can be paid back."
+            unavailableTitle: Strings.DebtsLoans.cantRecordPayment,
+            unavailableMessage: Strings.DebtsLoans.onlyLoanOrDebtPaidBack
         ) { context in
             try DebtPaymentDraft(settling: original, on: today, in: context)
         } form: { draft in
@@ -47,7 +47,7 @@ private struct RecordPaymentForm: View {
 
     var body: some View {
         KeypadSheet(
-            title: Text("Record Payment"),
+            title: Text(Strings.DebtsLoans.recordPayment),
             entry: $entry,
             canSave: draftToSave.canSave,
             save: save
@@ -57,18 +57,18 @@ private struct RecordPaymentForm: View {
                 overpaymentSection
             }
         }
-        .errorAlert("Couldn't Record Payment", message: $errorMessage)
+        .errorAlert(Strings.DebtsLoans.couldntRecordPayment, message: $errorMessage)
     }
 
     private func paymentSection(_ fields: KeypadSheetFields) -> some View {
         Section {
             LoanOrDebtWithRow(loanOrDebt: loanOrDebt)
-            LabeledContent("Outstanding") {
+            LabeledContent(Strings.DebtsLoans.outstanding) {
                 Text(loanOrDebt.outstanding.formatted())
                     .monospacedDigit()
             }
-            fields.amountRow("Amount", currencyCode: currencyCode, tint: Money(cents: loanOrDebt.kind.paymentSign).tint)
-            DayStepper(title: "Date", day: $draft.day)
+            fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: Money(cents: loanOrDebt.kind.paymentSign).tint)
+            DayStepper(title: Strings.Common.date, day: $draft.day)
             fields.noteField($draft.note)
         } footer: {
             Text(loanOrDebt.kind.recordPaymentFooter)
@@ -77,7 +77,7 @@ private struct RecordPaymentForm: View {
 
     private var overpaymentSection: some View {
         Section {
-            LabeledContent("Above Outstanding") {
+            LabeledContent(Strings.DebtsLoans.aboveOutstanding) {
                 AmountText(
                     amount: Money(
                         cents: draftToSave.overpaid.cents * loanOrDebt.kind.paymentSign, currencyCode: currencyCode
@@ -85,7 +85,7 @@ private struct RecordPaymentForm: View {
                     showsPlusSign: true
                 )
             }
-            CategoryPicker(title: "Category", type: draft.overpaymentType, selection: $draft.overpaymentCategory)
+            CategoryPicker(title: Strings.Common.category, type: draft.overpaymentType, selection: $draft.overpaymentCategory)
         } footer: {
             Text(loanOrDebt.kind.overpaymentFooter)
         }

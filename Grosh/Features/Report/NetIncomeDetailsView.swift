@@ -27,7 +27,7 @@ struct NetIncomeDetailsView: View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Net income")
+                    Text(Strings.Screens.netIncome)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     AmountText(amount: PeriodTotals(of: counted).netIncome, showsPlusSign: true)
@@ -55,7 +55,7 @@ struct NetIncomeDetailsView: View {
             walletSelection: $walletSelection, timeRange: $timeRange, period: $period, transactions: transactions,
             showsWalletSelector: false
         )
-        .navigationTitle("Net income")
+        .navigationTitle(Strings.Screens.netIncome)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -78,10 +78,10 @@ private struct StepTotalsRow: View {
             Text(title)
                 .font(.headline)
             HStack(alignment: .top, spacing: 8) {
-                SummaryFigure(title: Text("Income"), value: Text(totals.income.formatted()).monospacedDigit())
-                SummaryFigure(title: Text("Spent"), value: Text(totals.spent.formatted()).monospacedDigit())
+                SummaryFigure(title: Text(Strings.Common.income), value: Text(totals.income.formatted()).monospacedDigit())
+                SummaryFigure(title: Text(Strings.Common.spent), value: Text(totals.spent.formatted()).monospacedDigit())
                 SummaryFigure(
-                    title: Text("Net income"),
+                    title: Text(Strings.Screens.netIncome),
                     value: AmountText(amount: totals.netIncome, showsPlusSign: true, showsColor: false)
                 )
             }
@@ -98,12 +98,12 @@ private struct StepColumns: View {
     var body: some View {
         Chart {
             ForEach(steps) { row in
-                BarMark(x: .value("Step", row.title), y: .value("Income", row.totals.income.cents))
+                BarMark(x: .value(Strings.Common.step, row.title), y: .value(Strings.Common.income, row.totals.income.cents))
                     .foregroundStyle(SpentOrIncome.income.color)
-                BarMark(x: .value("Step", row.title), y: .value("Spent", -row.totals.spent.cents))
+                BarMark(x: .value(Strings.Common.step, row.title), y: .value(Strings.Common.spent, -row.totals.spent.cents))
                     .foregroundStyle(SpentOrIncome.spent.color)
             }
-            RuleMark(y: .value("Zero", 0))
+            RuleMark(y: .value(Strings.Common.zero, 0))
                 .foregroundStyle(.secondary.opacity(0.4))
         }
         .chartXAxis {

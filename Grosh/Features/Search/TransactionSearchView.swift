@@ -30,16 +30,16 @@ struct TransactionSearchView: View {
         .overlay {
             if !filter.isOn {
                 ContentUnavailableView(
-                    "Search Transactions",
+                    Strings.Search.searchTransactions,
                     systemImage: "magnifyingglass",
-                    description: Text("Find a note, a category or an amount in every wallet, across all time.")
+                    description: Text(Strings.Search.searchDescription)
                 )
             } else if results.isEmpty {
                 NoMatchingTransactionsView(filter: filter)
             }
         }
-        .searchable(text: $filter.searchText, isPresented: $isSearchPresented, prompt: "Note, category or amount")
-        .navigationTitle("Search")
+        .searchable(text: $filter.searchText, isPresented: $isSearchPresented, prompt: Strings.Common.searchPrompt)
+        .navigationTitle(Strings.Screens.search)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif

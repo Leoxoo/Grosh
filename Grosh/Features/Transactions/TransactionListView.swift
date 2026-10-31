@@ -37,6 +37,9 @@ private struct TransactionListContent: View {
     @State private var filter = TransactionFilter()
     /// Whether the search field is open, which the toolbar's Search button turns on.
     @State private var isSearchPresented = false
+    /// How far the list has scrolled from its top, which the title fades with and the header rises with.
+    /// Rises far enough that the Total reaches the middle of the bar's row, where the bar shows it in its place.
+    @State private var scroll = TabRootScroll(rise: 63, shortensHeader: true)
     /// Whether the list is choosing transactions to delete, and the ones chosen so far.
     @State private var isSelecting = false
     @State private var chosen = Set<Transaction>()
@@ -90,11 +93,11 @@ private struct TransactionListContent: View {
             } else if shown.isEmpty && scheduled.isEmpty {
                 Section {
                     ContentUnavailableView(
-                        "No Transactions",
+                        Strings.Common.noTransactions,
                         systemImage: "tray",
                         description: Text(period == .future
-                            ? "Transactions dated after today show up here."
-                            : "Nothing was recorded in this period.")
+                            ? Strings.Transactions.futureEmpty
+                            : Strings.Common.nothingRecordedInPeriod)
                     )
                 }
             }
@@ -120,10 +123,13 @@ private struct TransactionListContent: View {
         // over: the header with the period strip, below, keeps its place.
         .id(filter.isSearching)
         .roundedSectionsListStyle()
-        .safeAreaInset(edge: .top, spacing: 0) {
+        .tracksTabRootScroll(scroll)
+        // A bar rather than an inset, so the content scrolling under it fades as it does under the system bar.
+        .safeAreaBar(edge: .top, spacing: 0) {
             VStack(spacing: 4) {
                 VStack(spacing: 4) {
                     WalletSelector(selection: $walletSelection, today: today)
+                        .hiddenOnceRisen(scroll)
                     PeriodStrip(periods: periods, selection: $period, current: currentPeriod, today: today)
                 }
                 .hiddenWhileSearching(filter)
@@ -134,7 +140,8 @@ private struct TransactionListContent: View {
                 }
             }
             .padding(.vertical, 8)
-            .background(.bar)
+            // Rises into the title's place as the list scrolls up, and moves down with the title on a pull.
+            .risingWithTabRootTitle(scroll)
         }
         .modifier(TransactionSearchField(text: $filter.searchText, isOpen: $isSearchPresented))
         .onChange(of: walletSelection) {
@@ -149,27 +156,31 @@ private struct TransactionListContent: View {
             period = currentPeriod
         }
         .transactionSelectionMode(
-            isSelecting: $isSelecting, chosen: $chosen, title: String(localized: "Transactions")
+            isSelecting: $isSelecting, chosen: $chosen, title: String(localized: Strings.Common.transactions)
         )
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .tabRootTitle(Strings.Common.transactions, scroll: scroll, showsSmallTitle: isSelecting) {
+            WalletSelector(selection: $walletSelection, today: today, fillsWidth: false)
+        }
         .toolbar {
             if !isSelecting {
                 ToolbarItem(placement: .primaryAction) {
                     TransactionsMenu(
                         walletSelection: walletSelection, timeRange: $timeRange, grouping: $grouping,
-                        startSelecting: startSelecting
+                        startSelecting: startSelecting, filter: $filter
                     )
                 }
                 #if os(iOS)
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Search", systemImage: "magnifyingglass") { isSearchPresented = true }
+                    Button(Strings.Screens.search, systemImage: "magnifyingglass") { isSearchPresented = true }
                 }
                 #endif
+                #if !os(iOS)
+                // On iPhone and iPad, Filters is in the "…" menu: beside the tab's title the bar has room for two
+                // buttons (ADR-0009).
                 ToolbarItem(placement: .primaryAction) {
                     TransactionFilterButton(filter: $filter)
                 }
+                #endif
             }
         }
         .addTransactionButton()
@@ -218,7 +229,7 @@ private struct TransactionCategoryHeader: View {
     var body: some View {
         HStack(spacing: 8) {
             CategoryIcon(category: group.category, size: 20)
-            Text(group.category?.name ?? String(localized: "Uncategorized"))
+            Text(group.category?.name ?? String(localized: Strings.Common.uncategorized))
             Spacer()
             AmountText(amount: group.total, showsPlusSign: true, showsColor: false)
         }
@@ -236,12 +247,12 @@ private struct TransactionSearchField: ViewModifier {
 
     func body(content: Content) -> some View {
         #if os(macOS)
-        content.searchable(text: $text, prompt: "Note, category or amount")
+        content.searchable(text: $text, prompt: Strings.Common.searchPrompt)
         #else
         content.background {
             if isOpen || !text.isEmpty {
                 Color.clear
-                    .searchable(text: $text, isPresented: $isOpen, prompt: "Note, category or amount")
+                    .searchable(text: $text, isPresented: $isOpen, prompt: Strings.Common.searchPrompt)
             }
         }
         #endif

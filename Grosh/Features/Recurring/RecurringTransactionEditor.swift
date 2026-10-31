@@ -103,7 +103,7 @@ private struct RecurringForm: View {
 
     var body: some View {
         KeypadSheet(
-            title: isNew ? Text("New Recurring Transaction") : Text("Edit Recurring Transaction"),
+            title: isNew ? Text(Strings.Recurring.newRecurring) : Text(Strings.Recurring.editRecurring),
             entry: $entry,
             secondEntry: $totalEntry,
             canSave: draftToSave.canSave && totalEntry.cents != nil,
@@ -111,7 +111,7 @@ private struct RecurringForm: View {
             macHeight: (640, 720)
         ) { fields in
             Section {
-                Picker("Type", selection: $draft.type) {
+                Picker(Strings.Common.type, selection: $draft.type) {
                     Text(CategoryType.expense.title).tag(CategoryType.expense)
                     Text(CategoryType.income.title).tag(CategoryType.income)
                 }
@@ -139,7 +139,7 @@ private struct RecurringForm: View {
                 draft.kind = newCategory.defaultKind
             }
         }
-        .errorAlert("Couldn't Save Recurring Transaction", message: $errorMessage)
+        .errorAlert(Strings.Recurring.couldntSave, message: $errorMessage)
         .sheet(item: $pastPrompt, onDismiss: { dismiss() }) { prompt in
             PastOccurrencesView(recurring: prompt.recurring, days: prompt.days)
         }
@@ -147,11 +147,11 @@ private struct RecurringForm: View {
 
     private func detailsSection(_ fields: KeypadSheetFields) -> some View {
         Section {
-            TextField("Name", text: $draft.name)
-            fields.amountRow("Amount", currencyCode: currencyCode, tint: amountTint)
-            WalletPicker(title: "Wallet", selection: $draft.wallet)
-            CategoryPicker(title: "Category", type: draft.type, selection: $draft.category)
-            Picker("Kind", selection: $draft.kind) {
+            TextField(Strings.Common.name, text: $draft.name)
+            fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: amountTint)
+            WalletPicker(title: Strings.Common.wallet, selection: $draft.wallet)
+            CategoryPicker(title: Strings.Common.category, type: draft.type, selection: $draft.category)
+            Picker(Strings.Common.kind, selection: $draft.kind) {
                 ForEach(RecurringKind.allCases, id: \.self) { kind in
                     Text(kind.title).tag(kind)
                 }
@@ -159,11 +159,11 @@ private struct RecurringForm: View {
             if draft.kind == .subscription {
                 PhotoField(shape: .appIcon, data: $draft.iconData)
             }
-            CardPicker(title: "Card", wallet: draft.wallet, selection: $draft.card)
+            CardPicker(title: Strings.Common.card, wallet: draft.wallet, selection: $draft.card)
             fields.noteField($draft.note)
-            DayStepper(title: "Starts", day: $draft.startDay)
+            DayStepper(title: Strings.Recurring.starts, day: $draft.startDay)
         } footer: {
-            Text("Each time it falls due, a transaction is made with this name, amount, wallet, category and Card.")
+            Text(Strings.Recurring.madeEachTimeFooter)
         }
     }
 
@@ -171,50 +171,48 @@ private struct RecurringForm: View {
     /// real one. The amount above can be left empty when there is an estimate to start from.
     private var estimateSection: some View {
         Section {
-            Toggle("Amount varies", isOn: $draft.amountVaries)
+            Toggle(Strings.Recurring.amountVaries, isOn: $draft.amountVaries)
             if draft.amountVaries {
-                LabeledContent("Estimate", value: estimateText)
+                LabeledContent(Strings.Recurring.estimate, value: estimateText)
                 Stepper(value: $draft.remindAfterDays, in: 1...30) {
                     Text(remindAfterText)
                 }
             }
         } footer: {
-            Text("Each transaction starts as an estimate, the average of recent transactions in its category, until you enter the real amount. The amount above is used only when the category has no history yet.")
+            Text(Strings.Recurring.estimateFooter)
         }
     }
 
     private var estimateText: String {
-        guard let cents = estimateCents else { return String(localized: "None yet") }
+        guard let cents = estimateCents else { return String(localized: Strings.Recurring.noneYet) }
         return Money(cents: cents, currencyCode: currencyCode).formatted()
     }
 
     private var remindAfterText: String {
-        draft.remindAfterDays == 1
-            ? String(localized: "Remind me 1 day later")
-            : String(localized: "Remind me \(draft.remindAfterDays) days later")
+        String(localized: Strings.Recurring.remindDaysLater(draft.remindAfterDays))
     }
 
     /// A Purchase's optional total price. Payments attached to it count as paid toward it; the schedule doesn't change.
     private func purchaseSection(_ fields: KeypadSheetFields) -> some View {
         Section {
-            fields.secondAmountRow("Total price", currencyCode: currencyCode)
+            fields.secondAmountRow(Strings.Recurring.totalPrice, currencyCode: currencyCode)
         } footer: {
-            Text("Payments attached to it count as paid toward this total. Leave it at zero when there isn't one.")
+            Text(Strings.Recurring.totalPriceFooter)
         }
     }
 
     private var repeatSection: some View {
         Section {
-            Picker("Repeat", selection: $draft.preset) {
+            Picker(Strings.Recurring.repeatTitle, selection: $draft.preset) {
                 ForEach(RepeatPreset.allCases, id: \.self) { preset in
                     Text(preset.title).tag(preset)
                 }
             }
             if draft.preset == .custom {
                 Stepper(value: $draft.customRule.every, in: 1...365) {
-                    Text("Every \(draft.customRule.every)")
+                    Text(Strings.Recurring.every(draft.customRule.every))
                 }
-                Picker("Unit", selection: $draft.customRule.unit) {
+                Picker(Strings.Recurring.unit, selection: $draft.customRule.unit) {
                     ForEach(RepeatUnit.allCases, id: \.self) { unit in
                         Text(unit.pluralTitle).tag(unit)
                     }
@@ -222,7 +220,7 @@ private struct RecurringForm: View {
             }
             if draft.rule.unit == .month {
                 // Each choice is written out in full, as the detail screen reads it.
-                Picker("On", selection: $draft.monthlyDay) {
+                Picker(Strings.Common.on, selection: $draft.monthlyDay) {
                     ForEach(MonthlyDay.offered(startingOn: draft.startDay), id: \.self) { option in
                         Text(draft.rule.phrase + " " + option.phrase(startingOn: draft.startDay)).tag(option)
                     }
@@ -235,13 +233,13 @@ private struct RecurringForm: View {
 
     private var endSection: some View {
         Section {
-            Picker("Ends", selection: $draft.endKind) {
+            Picker(Strings.Recurring.ends, selection: $draft.endKind) {
                 ForEach(RepeatEndKind.allCases, id: \.self) { kind in
                     Text(kind.title).tag(kind)
                 }
             }
             if draft.endKind == .until {
-                DayPicker(title: "Last day", day: $draft.untilDay, earliest: draft.startDay)
+                DayPicker(title: Strings.Recurring.lastDay, day: $draft.untilDay, earliest: draft.startDay)
             }
             if draft.endKind == .afterCount {
                 Stepper(value: $draft.occurrenceCount, in: 1...999) {
@@ -253,8 +251,8 @@ private struct RecurringForm: View {
 
     private var occurrenceCountText: String {
         draft.occurrenceCount == 1
-            ? String(localized: "Once")
-            : String(localized: "\(draft.occurrenceCount) times")
+            ? String(localized: Strings.Recurring.once)
+            : String(localized: Strings.Recurring.times(draft.occurrenceCount))
     }
 
     private func save() {

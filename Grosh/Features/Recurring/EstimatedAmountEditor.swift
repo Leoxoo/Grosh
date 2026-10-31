@@ -16,18 +16,18 @@ struct EstimatedAmountEditor: View {
 
     var body: some View {
         KeypadSheet(
-            title: Text("Enter Amount"),
+            title: Text(Strings.Transactions.enterAmount),
             entry: $entry,
             canSave: (entry.cents ?? 0) > 0,
             save: save
         ) { fields in
             Section {
-                fields.amountRow("Amount", currencyCode: transaction.amount.currencyCode)
+                fields.amountRow(Strings.Common.amount, currencyCode: transaction.amount.currencyCode)
             } footer: {
-                Text("\(transaction.categoryName) was estimated from recent transactions in its category. Enter the real amount to confirm it.")
+                Text(Strings.Recurring.estimatedFromRecent(transaction.categoryName))
             }
         }
-        .errorAlert("Couldn't Save Amount", message: $errorMessage)
+        .errorAlert(Strings.Recurring.couldntSaveAmount, message: $errorMessage)
     }
 
     private func save() {

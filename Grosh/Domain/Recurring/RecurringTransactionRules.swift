@@ -19,13 +19,13 @@ nonisolated enum RecurringRuleError: Error, Equatable {
 extension RecurringRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .missingName: String(localized: "Give the recurring transaction a name.")
-        case .missingWallet: String(localized: "Choose a wallet.")
-        case .missingAmount: String(localized: "Enter an amount above zero.")
-        case .missingCategory: String(localized: "Choose a category.")
-        case .cardNotInWallet: String(localized: "Choose a Card paid from this wallet.")
-        case .untilBeforeStart: String(localized: "The last day can't be before the start date.")
-        case .noOccurrences: String(localized: "Repeat at least once.")
+        case .missingName: String(localized: Strings.Recurring.missingName)
+        case .missingWallet: String(localized: Strings.Common.chooseAWallet)
+        case .missingAmount: String(localized: Strings.Common.enterAmountAboveZero)
+        case .missingCategory: String(localized: Strings.Common.chooseACategory)
+        case .cardNotInWallet: String(localized: Strings.Recurring.cardNotInWallet)
+        case .untilBeforeStart: String(localized: Strings.Recurring.untilBeforeStart)
+        case .noOccurrences: String(localized: Strings.Recurring.noOccurrences)
         }
     }
 }
@@ -41,8 +41,8 @@ nonisolated enum AddTransactionNowError: Error, Equatable {
 extension AddTransactionNowError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .inactive: String(localized: "A paused or deleted recurring transaction can't add a transaction.")
-        case .incomplete: String(localized: "Choose a wallet and a category in Edit first.")
+        case .inactive: String(localized: Strings.Recurring.inactive)
+        case .incomplete: String(localized: Strings.Recurring.incomplete)
         }
     }
 }

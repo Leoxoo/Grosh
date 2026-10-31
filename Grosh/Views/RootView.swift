@@ -5,16 +5,16 @@ import SwiftUI
 struct RootView: View {
     var body: some View {
         TabView {
-            Tab("Home", systemImage: "house") {
+            Tab(Strings.Screens.home, systemImage: "house") {
                 HomeView()
             }
-            Tab("Transactions", systemImage: "wallet.bifold") {
+            Tab(Strings.Common.transactions, systemImage: "wallet.bifold") {
                 TransactionsView()
             }
-            Tab("Budgets", systemImage: "chart.pie") {
+            Tab(Strings.Screens.budgets, systemImage: "chart.pie") {
                 BudgetsView()
             }
-            Tab("Account", systemImage: "person.crop.circle") {
+            Tab(Strings.Screens.account, systemImage: "person.crop.circle") {
                 AccountView()
             }
         }

@@ -15,24 +15,24 @@ struct ExportCSVView: View {
             Section {
                 if let file {
                     ShareLink(item: file) {
-                        Label("Share CSV File…", systemImage: "square.and.arrow.up")
+                        Label(Strings.ImportExport.shareCSV, systemImage: "square.and.arrow.up")
                     }
                 } else {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                 }
             } footer: {
-                Text("Every transaction in MoneyLover's CSV format, with its Card and the transactions it is linked to. Import from MoneyLover restores it with “Replace all data”.")
+                Text(Strings.ImportExport.exportFooter)
             }
         }
-        .navigationTitle("Export CSV")
+        .navigationTitle(Strings.Screens.exportCSV)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .task {
             write()
         }
-        .errorAlert("Couldn't Export", message: $errorMessage)
+        .errorAlert(Strings.ImportExport.couldntExport, message: $errorMessage)
     }
 
     /// Writes the export to a temporary file named for today.

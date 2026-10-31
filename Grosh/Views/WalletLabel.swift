@@ -3,7 +3,7 @@ import SwiftUI
 /// A read-only wallet row: the wallet's icon and name, or a dash when there is none (such as the deleted half of a
 /// transfer).
 struct WalletLabel: View {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     let wallet: Wallet?
 
     var body: some View {

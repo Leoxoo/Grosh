@@ -106,5 +106,9 @@
   {
     "pattern": "^\\[UIKBFeedbackGenerator\\] <_UIKBFeedbackGenerator: 0x[0-9a-fA-F]+>: (Error: Cannot start engine because it does not exist\\.|Engine is not running\\. Can't play feedback\\.)$",
     "reason": "The system keyboard plays a haptic on each key a test taps, and the simulator has no haptics: the keyboard logs \"Haptics: unsupported\" when it comes up, then these two errors on every key. Tapping a letter on the Category picker's ordinary search keyboard logs them as well as tapping the number pad's digits. Tests that type with typeText press no keys, so they never log it."
+  },
+  {
+    "pattern": "^\\[API\\] Failed to create \\d+x0 image slot \\(alpha=\\d wide=\\d\\) \\(client=0x[0-9a-fA-F]+\\) \\[0x5 \\(os/kern\\) failure\\]$",
+    "reason": "Core Animation logs this on the iOS 27 simulator when a screen with a large title goes back to it while the title has slid away: it tries to draw the title's zero-height row for the transition. Settings logs the same line when it goes back from a row with its own large title slid away, so it is the system's."
   }
 ]

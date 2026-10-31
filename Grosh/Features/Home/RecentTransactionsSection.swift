@@ -14,9 +14,9 @@ struct RecentTransactionsSection: View {
     }
 
     var body: some View {
-        Section("Recent transactions") {
+        Section(Strings.Home.recentTransactions) {
             if transactions.isEmpty {
-                Text("Transactions you add show up here.")
+                Text(Strings.Home.recentTransactionsEmpty)
                     .foregroundStyle(.secondary)
             }
             ForEach(transactions.inListOrder()) { transaction in

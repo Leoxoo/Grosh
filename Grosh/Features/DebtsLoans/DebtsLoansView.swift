@@ -24,9 +24,9 @@ struct DebtsLoansView: View {
             ?? (list.open.isEmpty && list.settled.isEmpty && owesMe.open.isEmpty && owesMe.settled.isEmpty)
         List {
             Section {
-                Picker("Show", selection: $grouping) {
-                    Text("Show by people").tag(DebtsLoansGrouping.people)
-                    Text("Show by Loan/Debt").tag(DebtsLoansGrouping.loanOrDebt)
+                Picker(Strings.DebtsLoans.show, selection: $grouping) {
+                    Text(Strings.DebtsLoans.showByPeople).tag(DebtsLoansGrouping.people)
+                    Text(Strings.DebtsLoans.showByLoanOrDebt).tag(DebtsLoansGrouping.loanOrDebt)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -40,14 +40,14 @@ struct DebtsLoansView: View {
         .overlay {
             if isEmpty {
                 ContentUnavailableView(
-                    "No Debts or Loans",
+                    Strings.DebtsLoans.noDebtsOrLoans,
                     systemImage: "person.2",
-                    description: Text("Add a Loan or a Debt on the Debt/Loan tab of Add Transaction, or + Owes me on an expense's With.")
+                    description: Text(Strings.DebtsLoans.noDebtsOrLoansDescription)
                 )
             }
         }
         .textThemSheet($texting)
-        .navigationTitle("Debts & Loans")
+        .navigationTitle(Strings.Screens.debtsAndLoans)
     }
 
     /// Show by people: the people with something outstanding, then Settled.
@@ -156,9 +156,9 @@ struct LoanOrDebtRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if !loanOrDebt.isSettled, let due = original.reminderDay {
-                    Text("\(Image(systemName: "bell")) Due \(due.date().formatted(date: .abbreviated, time: .omitted))")
+                    Text("\(Image(systemName: "bell")) \(Text(Strings.DebtsLoans.due(due.date().formatted(date: .abbreviated, time: .omitted))))")
                         .font(.caption)
-                        .foregroundStyle(due <= today ? .red : .secondary)
+                        .foregroundStyle(due <= today ? .urgent : .secondary)
                 }
             }
             Spacer(minLength: 8)
@@ -172,14 +172,14 @@ struct LoanOrDebtRow: View {
                     Text(loanOrDebt.owed.formatted())
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
-                    Text("Settled")
+                    Text(Strings.Common.settled)
                         .font(.caption)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(.settled)
                 } else {
                     Text(loanOrDebt.outstanding.formatted())
                         .monospacedDigit()
                         .foregroundStyle(loanOrDebt.kind.outstandingColor)
-                    Text("of \(loanOrDebt.owed.formatted())")
+                    Text(Strings.DebtsLoans.ofOwed(loanOrDebt.owed.formatted()))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

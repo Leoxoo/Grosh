@@ -64,29 +64,29 @@ private struct ReimbursementForm: View {
     var body: some View {
         let problem = self.problem
         KeypadSheet(
-            title: editing == nil ? Text("Someone Paid Me Back") : Text("Edit Reimbursement"),
+            title: editing == nil ? Text(Strings.Reimbursements.someonePaidMeBackTitle) : Text(Strings.Reimbursements.editReimbursement),
             entry: $entry,
             canSave: problem == nil,
             save: save
         ) { fields in
             Section {
-                fields.amountRow("Amount", currencyCode: currencyCode, tint: Money(cents: 1).tint)
+                fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: Money(cents: 1).tint)
                 if editing == nil {
-                    WalletPicker(title: "Received In", selection: $wallet)
+                    WalletPicker(title: Strings.Reimbursements.receivedIn, selection: $wallet)
                 }
-                DayStepper(title: "Date", day: $draft.day)
+                DayStepper(title: Strings.Common.date, day: $draft.day)
                 fields.noteField($draft.note)
             } footer: {
                 if let problem = problem as? ExpectedReimbursementRuleError {
                     Text(problem.localizedDescription)
                 } else if expense.isElsewhere(wallet) {
-                    Text("Recorded as money in that wallet, on the day you received it, linked to the expense. The expense shows its net in the Total.")
+                    Text(Strings.Reimbursements.elsewhereFooter)
                 } else {
-                    Text("Kept on the expense, which then counts what is left of it. No transaction is made.")
+                    Text(Strings.Reimbursements.editorFooter)
                 }
             }
         }
-        .errorAlert("Couldn't Save Reimbursement", message: $errorMessage)
+        .errorAlert(Strings.Reimbursements.couldntSave, message: $errorMessage)
     }
 
     private func save() {

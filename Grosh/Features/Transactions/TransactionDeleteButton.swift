@@ -13,7 +13,7 @@ struct TransactionDeleteButton: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        Button("Delete Transaction", systemImage: "trash", role: .destructive) {
+        Button(Strings.Transactions.deleteTransaction, systemImage: "trash", role: .destructive) {
             do {
                 prompt = try TransactionDeletePrompt(for: [transaction], in: context)
             } catch {
@@ -21,9 +21,9 @@ struct TransactionDeleteButton: View {
                 errorMessage = error.localizedDescription
             }
         }
-        .foregroundStyle(.red)
+        .foregroundStyle(.destructive)
         .transactionDeleteDialog($prompt, didDelete: didDelete)
-        .errorAlert("Couldn't Delete Transaction", message: $errorMessage)
+        .errorAlert(Strings.Transactions.couldntDelete, message: $errorMessage)
     }
 }
 
@@ -43,17 +43,17 @@ struct TransactionDeletePrompt {
     }
 
     var title: String {
-        if relatedCount > 0 { return String(localized: "Delete the related transactions too?") }
+        if relatedCount > 0 { return String(localized: Strings.Transactions.deleteRelatedToo) }
         return transactions.count == 1
-            ? String(localized: "Delete this transaction?")
-            : String(localized: "Delete \(transactions.count) transactions?")
+            ? String(localized: Strings.Transactions.deleteThisTransaction)
+            : String(localized: Strings.Transactions.deleteCountQuestion(transactions.count))
     }
 
     var message: String? {
         guard relatedCount > 0 else { return nil }
         return transactions.count == 1
-            ? String(localized: "This transaction has \(relatedCount) related transactions.")
-            : String(localized: "The selected transactions have \(relatedCount) related transactions that aren't selected.")
+            ? String(localized: Strings.Transactions.hasRelated(relatedCount))
+            : String(localized: Strings.Transactions.selectedHaveRelated(relatedCount))
     }
 
     func buttonTitle(for scope: TransactionDeleteScope) -> String {
@@ -92,13 +92,13 @@ private struct TransactionDeleteDialog: ViewModifier {
                         delete(prompt.transactions, scope)
                     }
                 }
-                Button("Cancel", role: .cancel) {}
+                Button(Strings.Common.cancel, role: .cancel) {}
             } message: { prompt in
                 if let message = prompt.message {
                     Text(message)
                 }
             }
-            .errorAlert("Couldn't Delete Transaction", message: $errorMessage)
+            .errorAlert(Strings.Transactions.couldntDelete, message: $errorMessage)
     }
 
     private func delete(_ transactions: [Transaction], _ scope: TransactionDeleteScope) {
@@ -118,15 +118,15 @@ extension TransactionDeleteScope {
     func buttonTitle(selectedCount: Int = 1, relatedCount: Int) -> String {
         switch self {
         case .onlySelected where selectedCount == 1:
-            relatedCount > 0 ? String(localized: "Only This One") : String(localized: "Delete Transaction")
+            relatedCount > 0 ? String(localized: Strings.Common.onlyThisOne) : String(localized: Strings.Transactions.deleteTransaction)
         case .onlySelected:
             relatedCount > 0
-                ? String(localized: "Only These \(selectedCount)")
-                : String(localized: "Delete \(selectedCount) Transactions")
+                ? String(localized: Strings.Transactions.onlyThese(selectedCount))
+                : String(localized: Strings.Transactions.deleteCount(selectedCount))
         case .withRelated:
             selectedCount + relatedCount == 2
-                ? String(localized: "Delete Both")
-                : String(localized: "Delete All \(selectedCount + relatedCount)")
+                ? String(localized: Strings.Transactions.deleteBoth)
+                : String(localized: Strings.Transactions.deleteAll(selectedCount + relatedCount))
         }
     }
 }

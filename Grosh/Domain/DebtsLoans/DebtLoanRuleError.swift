@@ -25,21 +25,21 @@ extension DebtLoanRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notALoanOrDebt:
-            String(localized: "Only a Loan or a Debt can be paid back or forgiven.")
+            String(localized: Strings.DebtsLoans.notALoanOrDebt)
         case .alreadySettled:
-            String(localized: "Nothing is outstanding any more.")
+            String(localized: Strings.DebtsLoans.nothingOutstanding)
         case .categoryDoesNotMatch:
-            String(localized: "Choose an Income category for money that comes in, or an Expense category for money that goes out.")
+            String(localized: Strings.DebtsLoans.overpaymentCategoryType)
         case .paymentDoesNotMatch:
-            String(localized: "A Loan is paid back with Debt Collections, and a Debt with Repayments.")
+            String(localized: Strings.DebtsLoans.wrongPaymentCategory)
         case .lockedByPayments:
-            String(localized: "Its payments keep this Loan or Debt in its wallet and category.")
+            String(localized: Strings.DebtsLoans.paymentsLock)
         case .amountBelowPaid:
-            String(localized: "The amount can't be less than what has already been paid back.")
+            String(localized: Strings.DebtsLoans.amountBelowPaid)
         case .notForgiven:
-            String(localized: "This Loan or Debt isn't forgiven.")
+            String(localized: Strings.DebtsLoans.notForgiven)
         case .lockedByForgiveness:
-            String(localized: "Un-forgive this Loan or Debt before changing its amount, wallet or category.")
+            String(localized: Strings.DebtsLoans.unforgiveFirst)
         }
     }
 }

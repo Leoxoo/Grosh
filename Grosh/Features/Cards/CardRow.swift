@@ -4,8 +4,8 @@ import SwiftUI
 extension CardKind {
     var title: String {
         switch self {
-        case .debit: String(localized: "Debit")
-        case .credit: String(localized: "Credit")
+        case .debit: String(localized: Strings.Cards.debit)
+        case .credit: String(localized: Strings.Cards.credit)
         }
     }
 }
@@ -56,7 +56,7 @@ struct CardRow: View {
             parts.append(wallet.name)
         }
         if let statementDay = card.statementDay {
-            parts.append(String(localized: "Statement on the \(Card.ordinalDay(statementDay))"))
+            parts.append(String(localized: Strings.Cards.statementOnThe(Card.ordinalDay(statementDay))))
         }
         return parts.joined(separator: " · ")
     }

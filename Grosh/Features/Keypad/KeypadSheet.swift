@@ -61,10 +61,10 @@ struct KeypadSheet<Content: View>: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
+                    Button(Strings.Common.save, action: save)
                         .disabled(!canSave)
                 }
             }
@@ -102,7 +102,7 @@ struct KeypadSheetFields {
 
     /// The row showing the amount typed on the keypad. Tapping it focuses it, sends the keypad to it, and shows or
     /// hides the keypad. Tapping it while the keypad types into the second amount sends the keypad back here instead.
-    func amountRow(_ title: LocalizedStringKey, currencyCode: String, tint: Color = .primary) -> some View {
+    func amountRow(_ title: LocalizedStringResource, currencyCode: String, tint: Color = .primary) -> some View {
         AmountRow(title: title, entry: $entry, currencyCode: currencyCode, tint: tint) {
             focus.wrappedValue = .amount
             if isKeypadShown && typingInto == .amount {
@@ -118,7 +118,7 @@ struct KeypadSheetFields {
     /// The row showing the form's second amount, such as a Purchase's total, typed on the keypad. Tapping it focuses
     /// it, sends the keypad to it, and shows the keypad. Nothing is shown when the form takes no second amount.
     @ViewBuilder
-    func secondAmountRow(_ title: LocalizedStringKey, currencyCode: String, tint: Color = .primary) -> some View {
+    func secondAmountRow(_ title: LocalizedStringResource, currencyCode: String, tint: Color = .primary) -> some View {
         if let secondEntry {
             AmountRow(title: title, entry: secondEntry, currencyCode: currencyCode, tint: tint) {
                 focus.wrappedValue = .secondAmount
@@ -131,7 +131,7 @@ struct KeypadSheetFields {
 
     /// The Note field. Focusing it hides the keypad.
     func noteField(_ text: Binding<String>) -> some View {
-        TextField("Note", text: text, axis: .vertical)
+        TextField(Strings.Common.note, text: text, axis: .vertical)
             .focused(focus, equals: .note)
     }
 }

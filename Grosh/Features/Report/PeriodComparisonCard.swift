@@ -45,7 +45,7 @@ struct PeriodComparisonCard: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.borderless)
-            .accessibilityLabel("What the Average is")
+            .accessibilityLabel(Strings.Report.whatTheAverageIs)
             .popover(isPresented: $isExplaining) {
                 Text(Self.explanation)
                     .font(.subheadline)
@@ -54,7 +54,7 @@ struct PeriodComparisonCard: View {
                     .presentationCompactAdaptation(.popover)
             }
             Spacer()
-            Button(isShown ? "Hide" : "Show") {
+            Button(isShown ? Strings.Common.hide : Strings.Common.show) {
                 withAnimation { isShown.toggle() }
             }
             .font(.subheadline)
@@ -82,20 +82,20 @@ struct PeriodComparisonCard: View {
     private var title: String {
         switch graph.comparison {
         case .lastYear:
-            return String(localized: "Compared to last year")
+            return String(localized: Strings.Report.comparedToLastYear)
         case .average:
             switch graph.period {
-            case .week: return String(localized: "Compared to 3-Week Avg")
-            case .month: return String(localized: "Compared to 3-Month Avg")
-            case .quarter: return String(localized: "Compared to 3-Quarter Avg")
-            case .year: return String(localized: "Compared to 3-Year Avg")
-            case .day, .all, .custom, .future: return String(localized: "Compared to Average")
+            case .week: return String(localized: Strings.Report.comparedTo3WeekAverage)
+            case .month: return String(localized: Strings.Report.comparedTo3MonthAverage)
+            case .quarter: return String(localized: Strings.Report.comparedTo3QuarterAverage)
+            case .year: return String(localized: Strings.Report.comparedTo3YearAverage)
+            case .day, .all, .custom, .future: return String(localized: Strings.Report.comparedToAverage)
             }
         }
     }
 
     /// What the Average is, in one sentence.
     static let explanation = String(
-        localized: "The Average is the mean of the running totals of up to three complete earlier periods of this length, counting from the first period with anything in it."
+        localized: Strings.Report.averageExplanation
     )
 }

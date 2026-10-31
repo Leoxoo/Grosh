@@ -17,7 +17,7 @@ struct NewTransactionCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("New Transaction") { isAddingTransaction = true }
+            Button(Strings.Transactions.newTransaction) { isAddingTransaction = true }
                 .keyboardShortcut("n")
                 .disabled(isAddingTransaction == nil)
         }

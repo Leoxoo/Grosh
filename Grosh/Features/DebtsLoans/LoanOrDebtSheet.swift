@@ -5,8 +5,8 @@ import SwiftUI
 /// draft made from the Loan or Debt as it is when the sheet opens or, when no draft can be made, why not.
 struct LoanOrDebtSheet<Draft, Form: View>: View {
     /// Shown instead of the form, such as "Can't Record Payment".
-    let unavailableTitle: LocalizedStringKey
-    let unavailableMessage: LocalizedStringKey
+    let unavailableTitle: LocalizedStringResource
+    let unavailableMessage: LocalizedStringResource
     /// Throws when the transaction isn't a Loan or Debt.
     let makeDraft: (ModelContext) throws -> Draft
     @ViewBuilder let form: (Draft) -> Form
@@ -27,7 +27,7 @@ struct LoanOrDebtSheet<Draft, Form: View>: View {
                 )
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }
+                        Button(Strings.Common.cancel) { dismiss() }
                     }
                 }
             }

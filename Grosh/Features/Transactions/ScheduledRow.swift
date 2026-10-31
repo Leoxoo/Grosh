@@ -48,7 +48,7 @@ struct ScheduledRow: View {
 /// A small capsule saying a row is a Scheduled occurrence, not a transaction yet. It never truncates its label.
 struct ScheduledBadge: View {
     var body: some View {
-        Label("Scheduled", systemImage: "calendar.badge.clock")
+        Label(Strings.Transactions.scheduled, systemImage: "calendar.badge.clock")
             .labelStyle(.titleAndIcon)
             .font(.caption2.weight(.medium))
             .lineLimit(1)

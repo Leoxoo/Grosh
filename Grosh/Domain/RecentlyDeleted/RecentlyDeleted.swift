@@ -143,10 +143,10 @@ nonisolated enum RecentlyDeletedError: Error, Equatable {
 extension RecentlyDeletedError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .notDeleted: String(localized: "It isn't in Recently Deleted.")
-        case .walletIsDeleted: String(localized: "Its wallet is in Recently Deleted. Restore the wallet first.")
-        case .deletedWithWallet: String(localized: "It was deleted with its wallet. Restore or delete the wallet instead.")
-        case .loanOrDebtIsForgiven: String(localized: "Its Loan or Debt was forgiven since. Un-forgive it first.")
+        case .notDeleted: String(localized: Strings.RecentlyDeleted.notDeleted)
+        case .walletIsDeleted: String(localized: Strings.RecentlyDeleted.walletIsDeleted)
+        case .deletedWithWallet: String(localized: Strings.RecentlyDeleted.deletedWithWallet)
+        case .loanOrDebtIsForgiven: String(localized: Strings.RecentlyDeleted.loanOrDebtIsForgiven)
         }
     }
 }

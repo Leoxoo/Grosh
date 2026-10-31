@@ -29,22 +29,22 @@ struct LoanOrDebtSection: View {
                     ))
                     .monospacedDigit()
                 }
-                LabeledContent("Outstanding") {
+                LabeledContent(Strings.DebtsLoans.outstanding) {
                     Text(loanOrDebt.outstanding.formatted())
                         .monospacedDigit()
                         .foregroundStyle(loanOrDebt.isSettled ? .secondary : .primary)
                 }
                 if let forgiveness = loanOrDebt.forgiveness {
                     ForgivenRows(forgiveness: forgiveness)
-                    Button("Un-forgive", systemImage: "arrow.uturn.backward") { unforgive() }
+                    Button(Strings.DebtsLoans.unforgive, systemImage: "arrow.uturn.backward") { unforgive() }
                 }
                 if !loanOrDebt.isSettled {
-                    Button("Record Payment", systemImage: "plus.circle") { action = .recordPayment }
-                    Button("Forgive the Rest", systemImage: "hand.raised") { action = .forgive }
+                    Button(Strings.DebtsLoans.recordPayment, systemImage: "plus.circle") { action = .recordPayment }
+                    Button(Strings.DebtsLoans.forgiveTheRest, systemImage: "hand.raised") { action = .forgive }
                     ReminderField(day: reminderDay)
                 } else if loanOrDebt.forgiveness == nil {
-                    Label("Settled", systemImage: "checkmark.seal.fill")
-                        .foregroundStyle(.green)
+                    Label(Strings.Common.settled, systemImage: "checkmark.seal.fill")
+                        .foregroundStyle(.settled)
                 }
             } header: {
                 Text(loanOrDebt.kind.name)
@@ -55,7 +55,7 @@ struct LoanOrDebtSection: View {
                     Text(loanOrDebt.kind.paymentsFooter)
                 }
             }
-            .errorAlert("Couldn't Change Loan or Debt", message: $errorMessage)
+            .errorAlert(Strings.DebtsLoans.couldntChange, message: $errorMessage)
         }
     }
 
@@ -91,17 +91,17 @@ private struct ForgivenRows: View {
         LabeledContent {
             Text(forgiveness.day.date().formatted(date: .abbreviated, time: .omitted))
         } label: {
-            Label("Forgiven", systemImage: "hand.raised.fill")
-                .foregroundStyle(.green)
+            Label(Strings.Common.forgiven, systemImage: "hand.raised.fill")
+                .foregroundStyle(.settled)
         }
-        LabeledContent("Counts As") {
+        LabeledContent(Strings.DebtsLoans.countsAs) {
             HStack(spacing: 6) {
                 CategoryIcon(category: forgiveness.category, size: 20)
-                Text(forgiveness.category?.name ?? String(localized: "Uncategorized"))
+                Text(forgiveness.category?.name ?? String(localized: Strings.Common.uncategorized))
             }
         }
         if !forgiveness.note.isEmpty {
-            LabeledContent("Note", value: forgiveness.note)
+            LabeledContent(Strings.Common.note, value: forgiveness.note)
         }
     }
 }

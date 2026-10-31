@@ -6,8 +6,6 @@ import SwiftUI
 /// still scheduled, and a marker with a popup on the selected day. Scrubbing across the chart moves the marker from day
 /// to day. A few days are named along the bottom, and a few amounts up the right side, shortened as in "5K".
 struct MonthGraphChart: View {
-    /// The gray of the line the month is compared with, the Average or Last year, which the legend matches.
-    static let comparisonColor = Color.gray
     /// The dots of the line of what is still scheduled, which the legend matches.
     static let scheduledStroke = StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round, dash: [0, 5])
 
@@ -23,7 +21,7 @@ struct MonthGraphChart: View {
     var body: some View {
         let popup = graph.popup(on: selection)
         Chart {
-            RuleMark(x: .value("Day", graph.position(of: selection)))
+            RuleMark(x: .value(Strings.Common.day, graph.position(of: selection)))
                 .foregroundStyle(Color.secondary.opacity(0.5))
                 .lineStyle(StrokeStyle(lineWidth: 1))
                 .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
@@ -32,7 +30,7 @@ struct MonthGraphChart: View {
 
             if let comparisonLine = graph.comparisonLine {
                 line(comparisonLine, series: "Comparison")
-                    .foregroundStyle(Self.comparisonColor)
+                    .foregroundStyle(.comparison)
                     .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
             }
 
@@ -50,7 +48,7 @@ struct MonthGraphChart: View {
 
             if let comparison = popup.comparison {
                 marker(at: comparison)
-                    .foregroundStyle(Self.comparisonColor)
+                    .foregroundStyle(.comparison)
             }
             // On the line through today, or on the dotted line after it.
             if let total = popup.total ?? popup.expected {
@@ -96,16 +94,16 @@ struct MonthGraphChart: View {
     private func line(_ points: [MonthGraph.Point], series: String) -> some ChartContent {
         ForEach(points, id: \.position) { point in
             LineMark(
-                x: .value("Day", point.position),
-                y: .value("Total", Double(point.total.cents)),
-                series: .value("Line", series)
+                x: .value(Strings.Common.day, point.position),
+                y: .value(Strings.Common.total, Double(point.total.cents)),
+                series: .value(Strings.Common.line, series)
             )
         }
     }
 
     /// A dot on the selected day at `total`.
     private func marker(at total: Money) -> some ChartContent {
-        PointMark(x: .value("Day", graph.position(of: selection)), y: .value("Total", Double(total.cents)))
+        PointMark(x: .value(Strings.Common.day, graph.position(of: selection)), y: .value(Strings.Common.total, Double(total.cents)))
     }
 
     /// The days named along the bottom: every seventh day from the 1st.
@@ -156,7 +154,7 @@ private struct MonthGraphPopup: View {
                     .monospacedDigit()
             }
             if let expected = popup.expected {
-                Text("Expected \(expected.formatted())")
+                Text(Strings.Home.expected(expected.formatted()))
                     .font(.subheadline.weight(.semibold))
                     .monospacedDigit()
             }

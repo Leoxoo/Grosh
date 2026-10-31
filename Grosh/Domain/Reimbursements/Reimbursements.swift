@@ -41,10 +41,10 @@ nonisolated enum ReimbursementRuleError: Error, Equatable {
 extension ReimbursementRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .missingAmount: String(localized: "Enter an amount above zero.")
-        case .notAnExpense: String(localized: "Only an Expense can be reimbursed.")
-        case .notADeposit: String(localized: "Only money that came in can be moved into an Expense.")
-        case .otherWallet: String(localized: "Only money that came into the Expense's own wallet can be moved into it.")
+        case .missingAmount: String(localized: Strings.Common.enterAmountAboveZero)
+        case .notAnExpense: String(localized: Strings.Reimbursements.notAnExpense)
+        case .notADeposit: String(localized: Strings.Reimbursements.notADeposit)
+        case .otherWallet: String(localized: Strings.Reimbursements.otherWallet)
         }
     }
 }

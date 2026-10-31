@@ -40,16 +40,16 @@ nonisolated enum CardRuleError: Error, Equatable {
 extension CardRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .missingName: String(localized: "Give the Card a name.")
-        case .missingPayingWallet: String(localized: "Choose the wallet this Card is paid from.")
-        case .statementDateRequiresCredit: String(localized: "Only Credit cards have a statement date.")
-        case .statementDayOutOfRange: String(localized: "A statement date is a day from 1 to 31.")
-        case .invalidLastFourDigits: String(localized: "Enter all 4 last digits, or leave them blank.")
-        case .mergeIntoItself: String(localized: "Choose another Card to merge into.")
-        case .mergeIntoAnotherWallet: String(localized: "Choose a Card paid from the same wallet.")
-        case .mergeIntoArchived: String(localized: "Unarchive that Card before merging into it.")
-        case .hasTransactions: String(localized: "This Card paid for transactions. Merge it into another Card to remove it.")
-        case .payingWalletHasTransactions: String(localized: "This Card paid for transactions, so its paying wallet can't change.")
+        case .missingName: String(localized: Strings.Cards.missingName)
+        case .missingPayingWallet: String(localized: Strings.Cards.missingPayingWallet)
+        case .statementDateRequiresCredit: String(localized: Strings.Cards.statementDateRequiresCredit)
+        case .statementDayOutOfRange: String(localized: Strings.Cards.statementDayOutOfRange)
+        case .invalidLastFourDigits: String(localized: Strings.Cards.invalidLastFourDigits)
+        case .mergeIntoItself: String(localized: Strings.Cards.mergeIntoItself)
+        case .mergeIntoAnotherWallet: String(localized: Strings.Cards.mergeIntoAnotherWallet)
+        case .mergeIntoArchived: String(localized: Strings.Cards.mergeIntoArchived)
+        case .hasTransactions: String(localized: Strings.Cards.hasTransactions)
+        case .payingWalletHasTransactions: String(localized: Strings.Cards.payingWalletHasTransactions)
         }
     }
 }

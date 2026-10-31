@@ -11,15 +11,15 @@ struct PeriodSummaryView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             SummaryFigure(
-                title: Text("Opening balance"),
+                title: Text(Strings.Common.openingBalance),
                 value: Text(summary.openingBalance.formatted()).monospacedDigit()
             )
             SummaryFigure(
-                title: Text(period.isProjected(today: today) ? "Projected balance" : "Ending balance"),
+                title: Text(period.isProjected(today: today) ? Strings.Transactions.projectedBalance : Strings.Common.endingBalance),
                 value: Text(summary.endingBalance.formatted()).monospacedDigit()
             )
             SummaryFigure(
-                title: Text("Difference"),
+                title: Text(Strings.Common.difference),
                 value: AmountText(amount: summary.difference, showsPlusSign: true, showsColor: false)
             )
         }

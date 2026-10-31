@@ -123,12 +123,12 @@ struct MonthGraph {
     /// How the period's end is named in the legend and the popup: "month end", "week end" and so on.
     var endName: String {
         switch period {
-        case .day: String(localized: "day end")
-        case .week: String(localized: "week end")
-        case .month: String(localized: "month end")
-        case .quarter: String(localized: "quarter end")
-        case .year: String(localized: "year end")
-        case .all, .custom, .future: String(localized: "end")
+        case .day: String(localized: Strings.Home.dayEnd)
+        case .week: String(localized: Strings.Home.weekEnd)
+        case .month: String(localized: Strings.Home.monthEnd)
+        case .quarter: String(localized: Strings.Home.quarterEnd)
+        case .year: String(localized: Strings.Home.yearEnd)
+        case .all, .custom, .future: String(localized: Strings.Home.end)
         }
     }
 

@@ -5,7 +5,7 @@ import SwiftUI
 /// (show the keypad there). When the row has keyboard focus, typing on a Mac or hardware keyboard goes straight into
 /// it, cents-first.
 struct AmountRow: View {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     @Binding var entry: AmountEntry
     var currencyCode = Money.defaultCurrencyCode
     var tint: Color = .primary
@@ -21,7 +21,7 @@ struct AmountRow: View {
                 }
                 Text(result)
                     .font(.title2.weight(.semibold))
-                    .foregroundStyle(entry.cents == nil ? .red : tint)
+                    .foregroundStyle(entry.cents == nil ? .invalid : tint)
                     .contentTransition(.numericText())
             }
             .monospacedDigit()
@@ -38,7 +38,7 @@ struct AmountRow: View {
 
     /// What the amount comes to, as money.
     private var result: String {
-        guard let cents = entry.cents else { return String(localized: "Error") }
+        guard let cents = entry.cents else { return String(localized: Strings.Common.error) }
         return Money(cents: cents, currencyCode: currencyCode).formatted()
     }
 }

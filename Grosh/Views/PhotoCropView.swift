@@ -50,8 +50,8 @@ struct PhotoCropView: View {
                 cropWindow
                 Slider(value: zoomBinding, in: PhotoCrop.zoomRange)
                     .frame(width: windowWidth)
-                    .accessibilityLabel("Zoom")
-                Text("Drag to move the photo. Pinch, or use the slider, to zoom.")
+                    .accessibilityLabel(Strings.Photos.zoom)
+                Text(Strings.Photos.cropHint)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -60,13 +60,13 @@ struct PhotoCropView: View {
             .navigationTitle(shape.cropTitle)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", role: .cancel) { dismiss() }
+                    Button(Strings.Common.cancel, role: .cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
+                    Button(Strings.Common.save, action: save)
                 }
             }
-            .errorAlert("Couldn't Save Photo", message: $errorMessage)
+            .errorAlert(Strings.Photos.couldntSave, message: $errorMessage)
         }
     }
 
@@ -129,7 +129,7 @@ struct PhotoCropView: View {
 
     private func save() {
         guard let data = CroppedPhoto.jpegData(cropping: photo, to: crop) else {
-            errorMessage = String(localized: "The photo couldn't be cropped.")
+            errorMessage = String(localized: Strings.Photos.couldntCrop)
             return
         }
         onSave(data)

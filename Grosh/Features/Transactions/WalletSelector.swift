@@ -6,18 +6,22 @@ import SwiftUI
 struct WalletSelector: View {
     @Binding var selection: WalletSelection
     let today: CalendarDay
+    /// Takes the width of the screen, lined up with the tab's title; off in the bar, where it takes only its own.
+    var fillsWidth = true
 
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     @NotDeletedTransactions private var transactions: [Transaction]
     @State private var isChoosing = false
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(alignment: .leading, spacing: 2) {
             Button {
                 isChoosing = true
             } label: {
                 HStack(spacing: 4) {
+                    // Both, also in a toolbar, which would show only the icon.
                     Label(selection.name, systemImage: selection.symbolName)
+                        .labelStyle(.titleAndIcon)
                     Image(systemName: "chevron.down")
                         .font(.caption.weight(.semibold))
                 }
@@ -25,8 +29,13 @@ struct WalletSelector: View {
                 .foregroundStyle(.secondary)
             }
             .buttonStyle(.borderless)
+            // The app's green and the header's size, also in a toolbar, which tints its items its own way and makes them
+            // larger.
+            .tint(.accentColor)
+            .controlSize(.regular)
+            .imageScale(.medium)
             .fixedSize()
-            .accessibilityLabel("Wallet")
+            .accessibilityLabel(Strings.Common.wallet)
             .accessibilityValue(selection.name)
             .sheet(isPresented: $isChoosing) {
                 SelectWalletSheet(selection: $selection, today: today)
@@ -37,7 +46,9 @@ struct WalletSelector: View {
                 .monospacedDigit()
                 .contentTransition(.numericText())
         }
-        .frame(maxWidth: .infinity)
+        // Under the tab's title, lined up with it.
+        .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .leading)
+        .padding(.horizontal, fillsWidth ? nil : 0)
     }
 }
 
@@ -45,7 +56,7 @@ extension WalletSelection {
     /// "Total", or the wallet's name.
     var name: String {
         switch self {
-        case .total: String(localized: "Total")
+        case .total: String(localized: Strings.Common.total)
         case .wallet(let wallet): wallet.name
         }
     }
