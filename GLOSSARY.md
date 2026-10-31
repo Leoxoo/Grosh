@@ -254,7 +254,7 @@ Today's total on a Month graph tab plus what the Recurring transactions still ha
 ### Feedback
 
 **Keypad**:
-The on-screen calculator-style pad for typing an amount, shared by every sheet that takes one. It is not the system keyboard that types text such as a Note or a With.
+The app's own calculator-style pad for typing an amount, the same on every device and in every place an amount is typed. Amounts are typed as written, with the decimal point typed by hand. Whether an amount adds to or subtracts from a wallet comes from its category, never from the Keypad; only a balance, which has no category, can be typed below zero, with a leading minus. It is not the system keyboard that types text such as a Note or a With, or a Card's last four digits.
 _Avoid_: Keyboard, numpad
 
 **Success cue**:
