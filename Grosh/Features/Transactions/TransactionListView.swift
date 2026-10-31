@@ -119,7 +119,8 @@ private struct TransactionListContent: View {
         .safeAreaBar(edge: .top, spacing: 0) {
             VStack(spacing: 4) {
                 VStack(spacing: 4) {
-                    WalletSelector(selection: $walletSelection, today: today)
+                    WalletSelector(selection: $walletSelection, today: today, fillsWidth: false)
+                        .linedUpWithTabRootTitle(scroll)
                         .hiddenOnceRisen(scroll)
                     PeriodStrip(periods: periods, selection: $period, current: currentPeriod, today: today)
                 }

@@ -6,7 +6,8 @@ import SwiftUI
 struct WalletSelector: View {
     @Binding var selection: WalletSelection
     let today: CalendarDay
-    /// Takes the width of the screen, lined up with the tab's title; off in the bar, where it takes only its own.
+    /// Takes the width of the screen at the standard margin; off where it is placed from outside: in the bar, where it
+    /// takes only its own, and in Transactions' header, which lines it up with the bar's (`linedUpWithTabRootTitle`).
     var fillsWidth = true
 
     @Query(Wallet.unarchived) private var wallets: [Wallet]
