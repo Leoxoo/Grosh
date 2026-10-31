@@ -21,10 +21,45 @@ env:
 # Benchmarks and snapshot tests are not run on CI: their budgets and reference images belong to
 # the developer's Mac.
 jobs:
+  # Which of the jobs below a pull request needs, from the files it changes. A push to main runs them all.
+  # The tests run unless every file is one the app does not build from: docs, Markdown, agent settings, the
+  # tools' own tests. The Tools job runs when tools/, the hooks or the workflow change.
+  changes:
+    name: Changed files
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      app: ${{ steps.paths.outputs.app }}
+      tools: ${{ steps.paths.outputs.tools }}
+    steps:
+      # A pull request checks out its merge commit, whose first parent is the base branch.
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Sort the changed files
+        id: paths
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            printf 'app=true\ntools=true\n' >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only HEAD^1 HEAD)
+          printf '%s\n' "$changed"
+          app=false
+          tools=false
+          grep -qvE '^(docs/|\.claude/|tools/tests/|tools/test_[^/]*\.py$|LICENSE$|skills-lock\.json$)|\.md$' <<<"$changed" && app=true
+          grep -qE '^(tools/|\.claude/hooks/|\.github/)' <<<"$changed" && tools=true
+          printf 'app=%s\ntools=%s\n' "$app" "$tools" | tee -a "$GITHUB_OUTPUT"
+
   checks:
     # One check per entry, so the unit tests and the UI tests each show on the pull request.
     # A failure in one does not stop the other.
     name: ${{ matrix.name }}
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -32,9 +67,10 @@ jobs:
           - name: Unit tests
             id: unit
             command: tools/check
+          # Only the UI tests: the unit tests have their own job.
           - name: UI tests
             id: ui
-            command: tools/check --ui
+            command: tools/check --ui --only GroshUITests
     runs-on: macos-26
     timeout-minutes: 45
     steps:
@@ -91,6 +127,8 @@ jobs:
   # need no Xcode or simulator, so they report in a minute. On macOS, where the tools run.
   tools:
     name: Tools
+    needs: changes
+    if: needs.changes.outputs.tools == 'true'
     runs-on: macos-26
     timeout-minutes: 10
     steps:
