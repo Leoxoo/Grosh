@@ -273,4 +273,37 @@ struct GroshCSVExportTests {
         #expect(!imported[4].isBalanceAdjustment)
         #expect(imported[4].category?.lockedRole == .outgoingTransfer)
     }
+
+    // MARK: People in With
+
+    @Test func theWithColumnJoinsTheNamesOfEveryPersonWithASemicolon() throws {
+        try importing(moneyLoverExport(
+            "1,10/05/2026,Restaurants,-30.00,USD,Checking,Dinner,Sam,,,",
+            "2,10/05/2026,Café,-3.00,USD,Checking,Coffee,Kim,,,",
+            "3,10/05/2026,Taxi,-9.00,USD,Checking,Ride,,,,"
+        ))
+        let dinner = try transaction(noted: "Dinner")
+        dinner.setPeople([try Person.add(named: "Sam", in: context), try Person.add(named: "Anna", in: context)])
+        try context.save()
+
+        let rows = try exportedRows()
+
+        #expect(rows.first { $0["Note"] == "Dinner" }?["With"] == "Anna; Sam")
+        #expect(rows.first { $0["Note"] == "Coffee" }?["With"] == "Kim")
+        #expect(rows.first { $0["Note"] == "Ride" }?["With"] == "")
+    }
+
+    @Test func severalPeopleInAnExportComeBackAsSeveralPeople() throws {
+        try importing(moneyLoverExport("1,10/05/2026,Restaurants,-30.00,USD,Checking,Dinner,Sam,,,"))
+        try transaction(noted: "Dinner").setPeople([
+            try Person.add(named: "Sam", in: context), try Person.add(named: "Anna", in: context),
+        ])
+        let file = try exported()
+
+        try importing(file)
+
+        #expect(try transaction(noted: "Dinner").orderedPeople.map(\.name) == ["Anna", "Sam"])
+        #expect(try context.fetch(FetchDescriptor<Person>()).count == 2)
+        #expect(try exported() == file)
+    }
 }

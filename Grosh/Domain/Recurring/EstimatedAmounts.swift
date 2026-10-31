@@ -26,6 +26,8 @@ struct EstimatedAmounts: ReminderSource {
         FetchDescriptor(predicate: #Predicate { $0.isEstimated && $0.deletedAt == nil })
     }
 
+    static var records: FetchDescriptor<Transaction> { transactions }
+
     init(_ transactions: some Sequence<Transaction>) {
         open = transactions.filter { $0.isEstimated && $0.deletedAt == nil }
     }

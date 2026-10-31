@@ -125,6 +125,7 @@ struct ReimbursementRecentlyDeletedTests {
     @Test func deletingAReimbursementDoesNotDeleteItsExpense() throws {
         let dinner = try reimbursedDinner()
 
+        // The $20, so the $60 dinner keeps the $15 paid back.
         try #require(dinner.orderedReimbursements.first { $0.amountCents == 20_00 }).delete()
 
         #expect(!dinner.isInRecentlyDeleted)

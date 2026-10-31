@@ -104,9 +104,11 @@ final class GroshUITests: XCTestCase {
             let sheet = app.navigationBars["Add Transaction"]
             walk.expect(sheet, "the Add Transaction sheet")
             app.segmentedControls.buttons["Expense"].tap()
-            // Typed cents first on the keypad, which has focus when the sheet opens: 4, 2 makes 0.42.
-            app.buttons["4"].tap()
-            app.buttons["2"].tap()
+            // Typed as written on the Keypad, which is up when the sheet opens: 4, 2 makes 42.
+            let four = app.buttons["Keypad.4"]
+            walk.expect(four, "the Keypad")
+            four.tap()
+            app.buttons["Keypad.2"].tap()
 
             let category = app.buttons.matching(identifier: "TransactionEditor.category").firstMatch
             walk.expect(category, "the Category row")

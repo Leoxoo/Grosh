@@ -89,7 +89,7 @@ struct RecentlyDeletedTests {
         try CategorySeeder.seedIfNeeded(in: context)
         let lent = record("lent to Pasha", -100_00, in: checking)
         lent.category = try context.lockedCategory(.loan)
-        lent.withName = "Pasha"
+        lent.setPeople([try Person.add(named: "Pasha", in: context)])
         #expect(try context.fetch(DebtsAndLoans.transactions) == [lent])
 
         try lent.delete(.onlySelected, in: context, at: deletedAt)
@@ -104,7 +104,7 @@ struct RecentlyDeletedTests {
         lend.wallet = checking
         lend.amount = Money(cents: 100_00)
         lend.category = try context.lockedCategory(.loan)
-        lend.withName = "Pasha"
+        lend.people = [try Person.add(named: "Pasha", in: context)]
         let loan = try Transaction.create(lend, in: context)
         var payment = try DebtPaymentDraft(settling: loan, on: today, in: context)
         payment.amount = Money(cents: 60_00)
@@ -128,7 +128,7 @@ struct RecentlyDeletedTests {
         lend.wallet = checking
         lend.amount = Money(cents: 100_00)
         lend.category = try context.lockedCategory(.loan)
-        lend.withName = "Pasha"
+        lend.people = [try Person.add(named: "Pasha", in: context)]
         let loan = try Transaction.create(lend, in: context)
         var payment = try DebtPaymentDraft(settling: loan, on: today, in: context)
         payment.amount = Money(cents: 60_00)

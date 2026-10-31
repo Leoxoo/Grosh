@@ -26,7 +26,7 @@ struct DebtReminderTests {
         draft.wallet = store.wallet
         draft.amount = Money(cents: cents)
         draft.category = try context.lockedCategory(role)
-        draft.withName = name
+        draft.people = [try Person.add(named: name, in: context)]
         draft.reminderDay = reminderDay
         return try Transaction.create(draft, in: context)
     }
@@ -194,5 +194,17 @@ struct DebtReminderTests {
 
         #expect(try DebtsAndLoans(in: context).open.map(\.original) == [soon, late, older, newer])
     }
-}
 
+    // MARK: People
+
+    @Test func theReminderNamesThePersonTheLoanIsWith() throws {
+        let loan = try record(.loan, 100_00, with: "Pasha", remindOn: today.adding(days: 5))
+        let pasha = try #require(loan.orderedPeople.first)
+        pasha.name = "Pavel"
+
+        let reminders = try DebtsAndLoans(in: context).reminders(from: today)
+
+        #expect(reminders.map(\.withName) == ["Pavel"])
+        #expect(reminders.first?.body.contains("Pavel") == true)
+    }
+}

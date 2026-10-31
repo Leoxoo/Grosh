@@ -1,8 +1,10 @@
 import SwiftData
 import SwiftUI
 
-/// Someone paid me back: an amount typed on the keypad, the day it was paid back (today to begin with) and an optional
-/// note, kept as a Reimbursement of the Expense. With `editing`, the same sheet changes an existing entry.
+/// Someone paid me back: an amount typed on the keypad, the wallet it came into, the day it was paid back (today to
+/// begin with) and an optional note. Into the Expense's own wallet it is kept as a Reimbursement of the Expense
+/// (ADR-0008); into another wallet it is a transaction there, linked to the Expense (ADR-0010). With `editing`, the same
+/// sheet changes an existing Reimbursement, which stays on the Expense.
 struct ReimbursementEditor: View {
     /// The Expense that was paid back.
     let expense: Transaction
@@ -26,6 +28,8 @@ private struct ReimbursementForm: View {
 
     @State private var draft: ReimbursementDraft
     @State private var entry: AmountEntry
+    /// The wallet the money came into. Starts at the Expense's own.
+    @State private var wallet: Wallet?
     @State private var errorMessage: String?
 
     init(expense: Transaction, editing: Reimbursement?, startingDay: CalendarDay) {
@@ -34,6 +38,7 @@ private struct ReimbursementForm: View {
         let startingDraft = editing.map(ReimbursementDraft.init(editing:)) ?? ReimbursementDraft(day: startingDay)
         _draft = State(initialValue: startingDraft)
         _entry = State(initialValue: editing == nil ? AmountEntry() : AmountEntry(cents: startingDraft.amount.cents))
+        _wallet = State(initialValue: expense.wallet)
     }
 
     private var currencyCode: String { expense.amount.currencyCode }
@@ -45,19 +50,40 @@ private struct ReimbursementForm: View {
         return result
     }
 
+    /// Why it can't be saved as it is, or `nil` when it can.
+    private var problem: Error? {
+        do {
+            try draftToSave.validate()
+            try expense.checkPayback(into: wallet)
+            return nil
+        } catch {
+            return error
+        }
+    }
+
     var body: some View {
+        let problem = self.problem
         KeypadSheet(
             title: editing == nil ? Text(Strings.Reimbursements.someonePaidMeBackTitle) : Text(Strings.Reimbursements.editReimbursement),
             entry: $entry,
-            canSave: (try? draftToSave.validate()) != nil,
+            canSave: problem == nil,
             save: save
         ) { fields in
             Section {
                 fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: Money(cents: 1).tint)
+                if editing == nil {
+                    WalletPicker(title: Strings.Reimbursements.receivedIn, selection: $wallet)
+                }
                 DayStepper(title: Strings.Common.date, day: $draft.day)
                 fields.noteField($draft.note)
             } footer: {
-                Text(Strings.Reimbursements.editorFooter)
+                if let problem = problem as? ExpectedReimbursementRuleError {
+                    Text(problem.localizedDescription)
+                } else if expense.isElsewhere(wallet) {
+                    Text(Strings.Reimbursements.elsewhereFooter)
+                } else {
+                    Text(Strings.Reimbursements.editorFooter)
+                }
             }
         }
         .errorAlert(Strings.Reimbursements.couldntSave, message: $errorMessage)
@@ -67,6 +93,8 @@ private struct ReimbursementForm: View {
         do {
             if let editing {
                 try editing.update(with: draftToSave)
+            } else if expense.isElsewhere(wallet), let wallet {
+                try expense.recordPaybackElsewhere(draftToSave, into: wallet, in: context)
             } else {
                 try Reimbursement.add(draftToSave, to: expense, in: context)
             }

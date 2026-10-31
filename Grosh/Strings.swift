@@ -167,7 +167,8 @@ nonisolated enum Strings {
         static let transactionDeleted: LocalizedStringResource = "Transaction Deleted"
         static let couldntSave: LocalizedStringResource = "Couldn't Save Transaction"
         static let missingCard: LocalizedStringResource = "Choose the Card this expense was paid with."
-        static let missingWith: LocalizedStringResource = "Enter who you lent to or borrowed from in With."
+        static let missingWith: LocalizedStringResource = "Choose who you lent to or borrowed from in With."
+        static let tooManyWith: LocalizedStringResource = "A Loan or Debt is with one person. Choose one in With."
         static let notAStartingBalance: LocalizedStringResource = "Only a wallet's Starting balance can be edited here."
         static let forgivenLockFooter: LocalizedStringResource = "It's forgiven, so it keeps its amount, wallet and category until it's un-forgiven."
         static let cardRequiredFooter: LocalizedStringResource = "Choose the Card this expense was paid with. Expenses need a Card when their wallet has one."
@@ -291,8 +292,7 @@ nonisolated enum Strings {
         static let couldntSave: LocalizedStringResource = "Couldn't Save Wallet"
         static let currentBalance: LocalizedStringResource = "Current balance"
         static let startingBalance: LocalizedStringResource = "Starting balance"
-        static let amountExample: LocalizedStringResource = "Enter an amount such as 1,250.00."
-        static let startingBalanceFooter: LocalizedStringResource = "The money this wallet holds now. It becomes the wallet's first transaction and is excluded from report."
+        static let startingBalanceFooter: LocalizedStringResource = "The money this wallet holds now, below zero if it is in debt. It becomes the wallet's first transaction and is excluded from report."
         static let reorderFooter: LocalizedStringResource = "Drag to reorder. Home and every wallet picker use this order."
         static let archivedSectionFooter: LocalizedStringResource = "Archived wallets are left out of the Total and the pickers. Their transactions are kept."
         static let noWallets: LocalizedStringResource = "No Wallets"
@@ -424,10 +424,13 @@ nonisolated enum Strings {
         static let notForgiven: LocalizedStringResource = "This Loan or Debt isn't forgiven."
         static let unforgiveFirst: LocalizedStringResource = "Un-forgive this Loan or Debt before changing its amount, wallet or category."
         static let open: LocalizedStringResource = "Open"
+        static let show: LocalizedStringResource = "Show"
+        static let showByPeople: LocalizedStringResource = "Show by people"
+        static let showByLoanOrDebt: LocalizedStringResource = "Show by Loan/Debt"
         static let noDebtsOrLoans: LocalizedStringResource = "No Debts or Loans"
-        static let noDebtsOrLoansDescription: LocalizedStringResource = "Add a Loan or a Debt on the Debt/Loan tab of Add Transaction."
+        static let noDebtsOrLoansDescription: LocalizedStringResource = "Add a Loan or a Debt on the Debt/Loan tab of Add Transaction, or + Owes me on an expense's With."
         static let noDueReminders: LocalizedStringResource = "No Due Reminders"
-        static let noDueRemindersDescription: LocalizedStringResource = "A Loan, Debt or estimated amount shows here once its reminder date comes."
+        static let noDueRemindersDescription: LocalizedStringResource = "A Loan, Debt, Owes me or estimated amount shows here once its reminder date comes."
         static let cantForgive: LocalizedStringResource = "Can't Forgive"
         static let onlyLoanOrDebtForgiven: LocalizedStringResource = "Only a Loan or a Debt can be forgiven."
         static let forgiveTheRest: LocalizedStringResource = "Forgive the Rest"
@@ -586,7 +589,9 @@ nonisolated enum Strings {
         static let otherWallet: LocalizedStringResource = "Only money that came into the Expense's own wallet can be moved into it."
         static let someonePaidMeBackTitle: LocalizedStringResource = "Someone Paid Me Back"
         static let editReimbursement: LocalizedStringResource = "Edit Reimbursement"
-        static let editorFooter: LocalizedStringResource = "It is kept on the expense, which then counts what is left of it. No transaction is made."
+        static let receivedIn: LocalizedStringResource = "Received In"
+        static let elsewhereFooter: LocalizedStringResource = "Recorded as money in that wallet, on the day you received it, linked to the expense. The expense shows its net in the Total."
+        static let editorFooter: LocalizedStringResource = "Kept on the expense, which then counts what is left of it. No transaction is made."
         static let couldntSave: LocalizedStringResource = "Couldn't Save Reimbursement"
         static let noTransactionsToMoveIn: LocalizedStringResource = "No Transactions to Move In"
         static let noTransactionsToMoveInDescription: LocalizedStringResource = "Money that came into this wallet, such as a deposit, appears here."
@@ -594,7 +599,7 @@ nonisolated enum Strings {
         static let couldntMoveIn: LocalizedStringResource = "Couldn't Move Transaction In"
         static let someonePaidMeBack: LocalizedStringResource = "Someone paid me back"
         static let moveExistingIn: LocalizedStringResource = "Move an existing transaction in"
-        static let sectionFooter: LocalizedStringResource = "Money paid back is kept on this expense. Its net, what is left of it, is what counts in your balance and reports."
+        static let sectionFooter: LocalizedStringResource = "Money paid back into this wallet is kept on this expense, and its net, what is left of it, counts in your balance and reports. Money paid back into another wallet is a transaction there."
         static let couldntDelete: LocalizedStringResource = "Couldn't Delete Reimbursement"
     }
 
@@ -688,17 +693,17 @@ nonisolated enum Strings {
         static func unmatchedRow(_ line: Int, _ day: String, _ wallet: String) -> LocalizedStringResource { "Line \(line) · \(day) · \(wallet)" }
     }
 
-    /// The amount keypad's keys, as shown and as VoiceOver reads them.
+    /// The Keypad's keys, as shown and as VoiceOver reads them.
     enum Keypad {
-        static let allClearKey: LocalizedStringResource = "AC"
-        static let doubleZero: LocalizedStringResource = "Double zero"
-        static let allClear: LocalizedStringResource = "All clear"
+        static let clearKey: LocalizedStringResource = "C"
+        static let clear: LocalizedStringResource = "Clear"
+        static let decimalPoint: LocalizedStringResource = "Decimal point"
         static let plus: LocalizedStringResource = "Plus"
         static let minus: LocalizedStringResource = "Minus"
         static let times: LocalizedStringResource = "Times"
         static let dividedBy: LocalizedStringResource = "Divided by"
         static let equals: LocalizedStringResource = "Equals"
-        static let changeSign: LocalizedStringResource = "Change Sign"
+        static let hideKeyboard: LocalizedStringResource = "Hide Keyboard"
     }
 
     /// Settings and the screens not built yet.
