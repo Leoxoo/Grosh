@@ -63,13 +63,17 @@ extension ShapeStyle where Self == Color {
 // MARK: - Actions
 
 extension ShapeStyle where Self == Color {
-    /// The app's own green, its accent color: the + that adds a transaction, the keypad's operation keys, the
+    /// The app's own green, its accent color: the + that adds a transaction, the Keypad's action key, the
     /// selected period.
     static var brand: Color { .accentColor }
 
     /// Text and symbols drawn on the brand green: white on the deep green of light mode, near-black on the soft green
     /// of dark mode, as Fidelity's buttons are.
     static var onBrand: Color { Color("OnAccent") }
+
+    /// The tint of the Keypad's operator keys: a light wash of the brand green over their glass, so the action key, in
+    /// the brand green itself, stands out from them.
+    static var keypadOperator: Color { .brand.opacity(0.35) }
 
     /// The swipe action that archives a wallet or Card.
     static var archiveAction: Color { .orange }
