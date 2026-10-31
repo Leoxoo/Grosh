@@ -90,7 +90,7 @@ tools/check --only SnapshotTests
 
 ## Testing the tools
 
-These need no Xcode, and CI runs all three on every pull request (the Tools check):
+These need no Xcode, and CI runs all three on every pull request that changes `tools/`, `.claude/hooks/` or `.github/` (the Tools check). A pull request that changes only docs, Markdown, agent settings or the tools' own tests skips the unit and UI tests; a push to main runs everything (`.github/workflows/tests.yml`):
 
 ```
 tools/tests/check/run.sh                     # tools/check, against stand-ins for xcodebuild, xcrun and tools/check-logs
