@@ -30,7 +30,10 @@ private struct WalletForm: View {
     @Environment(\.today) private var today
 
     @State private var draft: WalletDraft
-    @State private var startingAmountText = ""
+    /// The Starting balance, typed on the Keypad; nothing typed is $0.
+    @State private var startingEntry = AmountEntry(kind: .balance)
+    @State private var keypad = KeypadTarget()
+    @FocusState private var isNameFocused: Bool
     @State private var startingDay: CalendarDay
     @State private var errorMessage: String?
     @State private var isAdjustingBalance = false
@@ -43,11 +46,9 @@ private struct WalletForm: View {
         _startingDay = State(initialValue: startingDay)
     }
 
-    /// The Starting balance typed so far; an empty field means $0.
+    /// The Starting balance typed so far, or `nil` while the Keypad can't work it out.
     private var startingBalance: Money? {
-        startingAmountText.trimmingCharacters(in: .whitespaces).isEmpty
-            ? Money(cents: 0)
-            : Money(typedAmount: startingAmountText)
+        startingEntry.cents.map { Money(cents: $0) }
     }
 
     private var canSave: Bool { (try? draft.validate()) != nil && (!mode.isAdding || startingBalance != nil) }
@@ -59,6 +60,7 @@ private struct WalletForm: View {
                     HStack(spacing: 12) {
                         SymbolCircle(symbolName: draft.symbolName, color: draft.color, size: 40)
                         TextField(Strings.Common.name, text: $draft.name)
+                            .focused($isNameFocused)
                     }
                     Toggle(Strings.Wallets.includeInTotal, isOn: $draft.includeInTotal)
                 } footer: {
@@ -109,6 +111,12 @@ private struct WalletForm: View {
                 }
             }
             .formStyle(.grouped)
+            .keypad(keypad)
+            .onChange(of: isNameFocused) {
+                if isNameFocused {
+                    keypad.hide()
+                }
+            }
             .navigationTitle(mode.isAdding ? Strings.Wallets.addWallet : Strings.Wallets.editWallet)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -129,20 +137,15 @@ private struct WalletForm: View {
 
     private var startingBalanceSection: some View {
         Section {
-            TextField(Strings.Wallets.currentBalance, text: $startingAmountText, prompt: Text(Money(cents: 0).formatted()))
-                #if os(iOS)
-                .keyboardType(.numbersAndPunctuation)
-                #endif
+            AmountRow(
+                Strings.Wallets.currentBalance, field: "currentBalance", entry: $startingEntry,
+                tint: Money(cents: startingEntry.cents ?? 0).tint, font: .body
+            )
             DayStepper(title: Strings.Common.date, day: $startingDay)
         } header: {
             Text(Strings.Wallets.startingBalance)
         } footer: {
-            if startingBalance == nil {
-                Text(Strings.Wallets.amountExample)
-                    .foregroundStyle(.invalid)
-            } else {
-                Text(Strings.Wallets.startingBalanceFooter)
-            }
+            Text(Strings.Wallets.startingBalanceFooter)
         }
     }
 

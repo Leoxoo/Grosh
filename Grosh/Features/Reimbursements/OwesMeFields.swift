@@ -40,7 +40,8 @@ struct OwesMeSections: View {
     }
 }
 
-/// One Person who owes: their amount and reminder, and Remove unless money has been paid back already.
+/// One Person who owes: their amount, typed on the form's Keypad, and reminder, and Remove unless money has been paid
+/// back already.
 private struct OwesMeRow: View {
     @Binding var entry: OwesMeDraft
     let currencyCode: String
@@ -48,21 +49,24 @@ private struct OwesMeRow: View {
     /// Takes the row away, or `nil` for one with payments.
     let remove: (() -> Void)?
 
-    @State private var text = ""
+    @State private var amountEntry: AmountEntry
+
+    init(entry: Binding<OwesMeDraft>, currencyCode: String, expenseDay: CalendarDay, remove: (() -> Void)?) {
+        _entry = entry
+        self.currencyCode = currencyCode
+        self.expenseDay = expenseDay
+        self.remove = remove
+        _amountEntry = State(initialValue: AmountEntry(cents: entry.wrappedValue.amount?.cents ?? 0))
+    }
 
     var body: some View {
-        LabeledContent {
-            TextField("?", text: $text)
-                .multilineTextAlignment(.trailing)
-                #if os(iOS)
-                .keyboardType(.decimalPad)
-                #endif
-                .frame(maxWidth: 120)
-        } label: {
+        AmountRow(
+            field: OwesMeAmountField(person: entry.person.persistentModelID), entry: $amountEntry,
+            currencyCode: currencyCode, placeholder: "?", font: .body
+        ) {
             Label("Amount", systemImage: "arrow.uturn.backward.circle")
         }
-        .onAppear { text = Self.text(of: entry.amount) }
-        .onChange(of: text) { entry.amount = Self.amount(typed: text, currencyCode: currencyCode) }
+        .onChange(of: amountEntry) { entry.amount = Self.amount(typed: amountEntry, currencyCode: currencyCode) }
         ReminderField(
             day: $entry.reminderDay, turnsOnAt: ExpectedReimbursement.defaultReminderDay(expenseOn: expenseDay)
         )
@@ -71,16 +75,16 @@ private struct OwesMeRow: View {
         }
     }
 
-    /// The amount as the field shows it: no cents when whole, and blank for an open amount.
-    private static func text(of amount: Money?) -> String {
-        amount?.plainNumber() ?? ""
+    /// What was typed as an amount: nothing is an open amount, and anything that isn't an amount above zero comes to
+    /// zero, which saving refuses (``ExpectedReimbursementRuleError/invalidAmount``).
+    private static func amount(typed entry: AmountEntry, currencyCode: String) -> Money? {
+        guard !entry.isEmpty else { return nil }
+        guard let cents = entry.cents, cents > 0 else { return Money(cents: 0, currencyCode: currencyCode) }
+        return Money(cents: cents, currencyCode: currencyCode)
     }
+}
 
-    /// What was typed as an amount: blank is an open amount, and anything that isn't an amount above zero comes to zero,
-    /// which saving refuses (``ExpectedReimbursementRuleError/invalidAmount``).
-    private static func amount(typed text: String, currencyCode: String) -> Money? {
-        guard text.nilIfBlank != nil else { return nil }
-        let amount = Money(typedAmount: text, currencyCode: currencyCode)
-        return amount.flatMap { $0.cents > 0 ? $0 : nil } ?? Money(cents: 0, currencyCode: currencyCode)
-    }
+/// Which Owes me amount the Keypad types into: the one of this Person.
+private struct OwesMeAmountField: Hashable {
+    let person: PersistentIdentifier
 }
