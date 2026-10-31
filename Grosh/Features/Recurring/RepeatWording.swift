@@ -3,37 +3,37 @@ import SwiftUI
 
 extension RepeatPreset {
     /// The preset's name in the Repeat picker.
-    var title: LocalizedStringKey {
+    var title: LocalizedStringResource {
         switch self {
-        case .daily: "Daily"
-        case .weekly: "Weekly"
-        case .biWeekly: "Bi-weekly"
-        case .monthly: "Monthly"
-        case .yearly: "Yearly"
-        case .custom: "Custom"
+        case .daily: Strings.Recurring.daily
+        case .weekly: Strings.Recurring.weekly
+        case .biWeekly: Strings.Recurring.biWeekly
+        case .monthly: Strings.Recurring.monthly
+        case .yearly: Strings.Recurring.yearly
+        case .custom: Strings.Common.custom
         }
     }
 }
 
 extension RepeatUnit {
     /// The unit's name in the Custom repeat's picker.
-    var pluralTitle: LocalizedStringKey {
+    var pluralTitle: LocalizedStringResource {
         switch self {
-        case .day: "Days"
-        case .week: "Weeks"
-        case .month: "Months"
-        case .year: "Years"
+        case .day: Strings.Recurring.days
+        case .week: Strings.Recurring.weeks
+        case .month: Strings.Recurring.months
+        case .year: Strings.Recurring.years
         }
     }
 }
 
 extension RepeatEndKind {
     /// The kind's name in the Ends picker.
-    var title: LocalizedStringKey {
+    var title: LocalizedStringResource {
         switch self {
-        case .forever: "Never"
-        case .until: "On a date"
-        case .afterCount: "After a number of times"
+        case .forever: Strings.Recurring.never
+        case .until: Strings.Recurring.onADate
+        case .afterCount: Strings.Recurring.afterCount
         }
     }
 }
@@ -42,10 +42,10 @@ extension RepeatRule {
     /// How often the rule repeats, before any day is named: "Every month", "Every 2 weeks".
     var phrase: String {
         switch unit {
-        case .day: every == 1 ? String(localized: "Every day") : String(localized: "Every \(every) days")
-        case .week: every == 1 ? String(localized: "Every week") : String(localized: "Every \(every) weeks")
-        case .month: every == 1 ? String(localized: "Every month") : String(localized: "Every \(every) months")
-        case .year: every == 1 ? String(localized: "Every year") : String(localized: "Every \(every) years")
+        case .day: every == 1 ? String(localized: Strings.Recurring.everyDay) : String(localized: Strings.Recurring.everyDays(every))
+        case .week: every == 1 ? String(localized: Strings.Recurring.everyWeek) : String(localized: Strings.Recurring.everyWeeks(every))
+        case .month: every == 1 ? String(localized: Strings.Recurring.everyMonth) : String(localized: Strings.Recurring.everyMonths(every))
+        case .year: every == 1 ? String(localized: Strings.Recurring.everyYear) : String(localized: Strings.Recurring.everyYears(every))
         }
     }
 }
@@ -58,7 +58,7 @@ extension RepeatSchedule {
         case .month:
             text += " " + monthlyDay.phrase(startingOn: start)
         case .year:
-            text += " " + String(localized: "on \(start.date().formatted(.dateTime.month(.abbreviated).day()))")
+            text += " " + String(localized: Strings.Recurring.onDate(start.date().formatted(.dateTime.month(.abbreviated).day())))
         case .day, .week:
             break
         }
@@ -66,9 +66,9 @@ extension RepeatSchedule {
         case .forever:
             break
         case .until(let last):
-            text += ", " + String(localized: "until \(last.date().formatted(.dateTime.month(.abbreviated).year()))")
+            text += ", " + String(localized: Strings.Recurring.until(last.date().formatted(.dateTime.month(.abbreviated).year())))
         case .afterCount(let count):
-            text += ", " + (count == 1 ? String(localized: "once") : String(localized: "\(count) times"))
+            text += ", " + (count == 1 ? String(localized: Strings.Recurring.onceLowercase) : String(localized: Strings.Recurring.times(count)))
         }
         return text
     }
@@ -79,18 +79,18 @@ extension MonthlyDay {
     func phrase(startingOn start: CalendarDay) -> String {
         switch self {
         case .sameDay:
-            return String(localized: "on the \(Self.ordinal(start.day))")
+            return String(localized: Strings.Recurring.onThe(Self.ordinal(start.day)))
         case .nthWeekday:
             let weekday = start.date().formatted(.dateTime.weekday(.wide))
             switch (start.day - 1) / 7 {
-            case 0: return String(localized: "on the first \(weekday)")
-            case 1: return String(localized: "on the second \(weekday)")
-            case 2: return String(localized: "on the third \(weekday)")
-            case 3: return String(localized: "on the fourth \(weekday)")
-            default: return String(localized: "on the last \(weekday)")
+            case 0: return String(localized: Strings.Recurring.onTheFirst(weekday))
+            case 1: return String(localized: Strings.Recurring.onTheSecond(weekday))
+            case 2: return String(localized: Strings.Recurring.onTheThird(weekday))
+            case 3: return String(localized: Strings.Recurring.onTheFourth(weekday))
+            default: return String(localized: Strings.Recurring.onTheLast(weekday))
             }
         case .lastDay:
-            return String(localized: "on the last day")
+            return String(localized: Strings.Recurring.onTheLastDay)
         }
     }
 

@@ -229,7 +229,7 @@ nonisolated struct AmountEntry: Hashable, Sendable {
 
     /// What the display shows: the expression, every amount with exactly two decimals (`12.00 + 3.50`).
     func text(locale: Locale = .current) -> String {
-        guard !isError else { return String(localized: "Error") }
+        guard !isError else { return String(localized: Strings.Common.error) }
         var parts = steps.flatMap { [Self.format($0.operand, locale), $0.operation.symbol] }
         if current != nil || steps.isEmpty {
             parts.append(Self.format(current ?? 0, locale))

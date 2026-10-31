@@ -8,12 +8,12 @@ struct TransactionFilterButton: View {
 
     var body: some View {
         Button(
-            "Filters",
+            Strings.Screens.filters,
             systemImage: filter.hasFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
         ) {
             isPresented = true
         }
-        .accessibilityValue(filter.hasFilters ? Text("On") : Text("Off"))
+        .accessibilityValue(filter.hasFilters ? Text(Strings.Common.on) : Text(Strings.Common.off))
         .sheet(isPresented: $isPresented) {
             TransactionFilterSheet(filter: $filter)
         }
@@ -40,7 +40,7 @@ struct FilterSummaryView: View {
         GroupedForEach(rows) { row in
             switch row {
             case .count:
-                LabeledContent("Transactions") {
+                LabeledContent(Strings.Common.transactions) {
                     Text(transactions.count.formatted())
                         .monospacedDigit()
                 }
@@ -50,7 +50,7 @@ struct FilterSummaryView: View {
                         .fontWeight(.semibold)
                 }
             case .clearFilters:
-                Button("Clear Filters", systemImage: "xmark.circle") { filter.clearFilters() }
+                Button(Strings.Search.clearFilters, systemImage: "xmark.circle") { filter.clearFilters() }
             }
         }
     }
@@ -67,7 +67,7 @@ struct FilterSummaryFigures: View {
         VStack(spacing: 6) {
             HStack(alignment: .top, spacing: 8) {
                 SummaryFigure(
-                    title: Text("Transactions"),
+                    title: Text(Strings.Common.transactions),
                     value: Text(transactions.count.formatted()).monospacedDigit()
                 )
                 SummaryFigure(
@@ -76,7 +76,7 @@ struct FilterSummaryFigures: View {
                 )
             }
             if filter.hasFilters {
-                Button("Clear Filters", systemImage: "xmark.circle") { filter.clearFilters() }
+                Button(Strings.Search.clearFilters, systemImage: "xmark.circle") { filter.clearFilters() }
                     .font(.subheadline)
                     .buttonStyle(.borderless)
             }
@@ -88,7 +88,7 @@ struct FilterSummaryFigures: View {
 private extension TransactionFilter {
     /// The title of the total: the Card's when a Card filter is on, otherwise the net total.
     var totalTitle: String {
-        card.map { "\($0.name) total" } ?? String(localized: "Net total")
+        card.map { String(localized: Strings.Search.cardTotal($0.name)) } ?? String(localized: Strings.Search.netTotal)
     }
 }
 
@@ -101,9 +101,9 @@ struct NoMatchingTransactionsView: View {
             ContentUnavailableView.search(text: filter.searchText.trimmingCharacters(in: .whitespacesAndNewlines))
         } else {
             ContentUnavailableView(
-                "No Matching Transactions",
+                Strings.Search.noMatching,
                 systemImage: "line.3.horizontal.decrease.circle",
-                description: Text("Try changing the filters.")
+                description: Text(Strings.Search.tryChangingFilters)
             )
         }
     }
@@ -125,7 +125,7 @@ extension View {
                 NavigationLink {
                     TransactionSearchView()
                 } label: {
-                    Label("Search", systemImage: "magnifyingglass")
+                    Label(Strings.Screens.search, systemImage: "magnifyingglass")
                 }
             }
         }

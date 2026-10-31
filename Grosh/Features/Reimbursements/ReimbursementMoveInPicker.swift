@@ -34,9 +34,9 @@ struct ReimbursementMoveInPicker: View {
                         NoMatchingTransactionsView(filter: filter)
                     } else {
                         ContentUnavailableView(
-                            "No Transactions to Move In",
+                            Strings.Reimbursements.noTransactionsToMoveIn,
                             systemImage: "tray",
-                            description: Text("Money that came into this wallet, such as a deposit, appears here.")
+                            description: Text(Strings.Reimbursements.noTransactionsToMoveInDescription)
                         )
                     }
                 } else {
@@ -50,20 +50,20 @@ struct ReimbursementMoveInPicker: View {
                     }
                 }
             }
-            .navigationTitle("Move Transaction In")
+            .navigationTitle(Strings.Reimbursements.moveTransactionIn)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .searchable(text: $filter.searchText, prompt: "Note, category or amount")
+            .searchable(text: $filter.searchText, prompt: Strings.Common.searchPrompt)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .primaryAction) {
                     TransactionFilterButton(filter: $filter)
                 }
             }
-            .errorAlert("Couldn't Move Transaction In", message: $errorMessage)
+            .errorAlert(Strings.Reimbursements.couldntMoveIn, message: $errorMessage)
         }
     }
 

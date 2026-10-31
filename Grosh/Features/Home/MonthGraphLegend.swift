@@ -13,13 +13,13 @@ struct MonthGraphLegend: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 16) {
                 // Already localized: shown as they are.
-                entry("\(graph.lineName)", color: graph.side.color)
+                entry(Text(verbatim: graph.lineName), color: graph.side.color)
                 if graph.comparisonLine != nil {
-                    entry("\(graph.comparison.name)", color: MonthGraphChart.comparisonColor)
+                    entry(Text(verbatim: graph.comparison.name), color: .comparison)
                 }
                 Spacer(minLength: 0)
                 if graph.offersLastYear {
-                    Toggle("vs last year", isOn: $comparesWithLastYear)
+                    Toggle(Strings.Home.vsLastYear, isOn: $comparesWithLastYear)
                         .toggleStyle(.switch)
                         .controlSize(.mini)
                         .fixedSize()
@@ -28,14 +28,14 @@ struct MonthGraphLegend: View {
                 }
             }
             if let expected = graph.expectedByMonthEnd {
-                entry("Scheduled · Expected by \(graph.endName) \(expected.formatted())", color: graph.side.color, dotted: true)
+                entry(Text(Strings.Home.scheduledExpectedBy(graph.endName, expected.formatted())), color: graph.side.color, dotted: true)
             }
         }
         .font(.caption)
         .foregroundStyle(.secondary)
     }
 
-    private func entry(_ name: LocalizedStringKey, color: Color, dotted: Bool = false) -> some View {
+    private func entry(_ name: Text, color: Color, dotted: Bool = false) -> some View {
         HStack(spacing: 6) {
             if dotted {
                 Path { path in
@@ -49,7 +49,7 @@ struct MonthGraphLegend: View {
                     .fill(color)
                     .frame(width: 12, height: 3)
             }
-            Text(name)
+            name
         }
     }
 }

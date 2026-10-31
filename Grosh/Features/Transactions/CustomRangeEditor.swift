@@ -23,19 +23,19 @@ struct CustomRangeEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                DayPicker(title: "From", day: $first, latest: latest)
-                DayPicker(title: "To", day: $last, earliest: first, latest: latest)
+                DayPicker(title: Strings.Common.from, day: $first, latest: latest)
+                DayPicker(title: Strings.Common.to, day: $last, earliest: first, latest: latest)
             }
-            .navigationTitle("Custom Range")
+            .navigationTitle(Strings.Transactions.customRange)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button(Strings.Common.done) {
                         choose(days)
                         dismiss()
                     }

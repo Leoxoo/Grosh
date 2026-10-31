@@ -93,7 +93,7 @@ struct CategoryDonut: View {
         case .everythingElse(let amount):
             SymbolCircle(symbolName: "ellipsis", color: .gray, size: iconRadius * 2)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Self.label(String(localized: "Everything else"), share: breakdown.share(of: amount)))
+                .accessibilityLabel(Self.label(String(localized: Strings.Report.everythingElse), share: breakdown.share(of: amount)))
         }
     }
 

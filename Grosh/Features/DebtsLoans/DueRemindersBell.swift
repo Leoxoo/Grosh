@@ -66,22 +66,22 @@ private struct DueRemindersList: View {
             .overlay {
                 if due.isEmpty && estimatesDue.isEmpty {
                     ContentUnavailableView(
-                        "No Due Reminders",
+                        Strings.DebtsLoans.noDueReminders,
                         systemImage: "bell",
-                        description: Text("A Loan, Debt or estimated amount shows here once its reminder date comes.")
+                        description: Text(Strings.DebtsLoans.noDueRemindersDescription)
                     )
                 }
             }
             .sheet(item: $estimateBeingEntered) { estimate in
                 EstimatedAmountEditor(transaction: estimate)
             }
-            .navigationTitle("Reminders")
+            .navigationTitle(Strings.Screens.reminders)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button(Strings.Common.done) { dismiss() }
                 }
             }
         }

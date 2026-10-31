@@ -39,25 +39,25 @@ private struct TransferForm: View {
     }
 
     var body: some View {
-        KeypadSheet(title: Text("Transfer"), entry: $entry, canSave: draftToSave.canSave, save: save) { fields in
+        KeypadSheet(title: Text(Strings.Transfers.transfer), entry: $entry, canSave: draftToSave.canSave, save: save) { fields in
             Section {
                 // Always today's balances, whatever the Date: a transfer dated later doesn't move them today.
-                WalletPicker(title: "From", selection: $draft.from, balancesAsOf: today)
-                WalletPicker(title: "To", selection: $draft.to, balancesAsOf: today)
-                fields.amountRow("Amount", currencyCode: currencyCode)
-                DayStepper(title: "Date", day: $draft.day)
+                WalletPicker(title: Strings.Common.from, selection: $draft.from, balancesAsOf: today)
+                WalletPicker(title: Strings.Common.to, selection: $draft.to, balancesAsOf: today)
+                fields.amountRow(Strings.Common.amount, currencyCode: currencyCode)
+                DayStepper(title: Strings.Common.date, day: $draft.day)
                 fields.noteField($draft.note)
             } footer: {
                 if draft.from == nil || draft.to == nil {
-                    Text("A transfer needs two wallets. Add another in Account → Wallets.")
+                    Text(Strings.Transfers.twoWalletsNeeded)
                 } else if draft.from == draft.to {
-                    Text("Choose two different wallets.")
+                    Text(Strings.Common.chooseTwoDifferentWallets)
                 } else {
-                    Text("Recorded as an Outgoing transfer and an Incoming transfer, linked to each other. A transfer is never income or spending, and the Total doesn't change.")
+                    Text(Strings.Transfers.footer)
                 }
             }
         }
-        .errorAlert("Couldn't Save Transfer", message: $errorMessage)
+        .errorAlert(Strings.Transfers.couldntSave, message: $errorMessage)
     }
 
     private func save() {

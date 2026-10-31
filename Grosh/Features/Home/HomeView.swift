@@ -41,16 +41,16 @@ private struct HomeContent: View {
 
                 Section {
                     if wallets.isEmpty {
-                        NavigationLink("Add a wallet") { WalletListView() }
+                        NavigationLink(Strings.Home.addAWallet) { WalletListView() }
                     }
                     ForEach(wallets) { wallet in
                         WalletRow(wallet: wallet, today: today, balances: balances)
                     }
                 } header: {
                     HStack {
-                        Text("My Wallets")
+                        Text(Strings.Home.myWallets)
                         Spacer()
-                        NavigationLink("See all") { WalletListView() }
+                        NavigationLink(Strings.Home.seeAll) { WalletListView() }
                             .font(.subheadline)
                             .textCase(nil)
                     }
@@ -62,8 +62,8 @@ private struct HomeContent: View {
 
                 RecentTransactionsSection(today: today)
             }
-            .navigationTitle("Home")
-            .tabRootTitle("Home")
+            .navigationTitle(Strings.Screens.home)
+            .tabRootTitle(Strings.Screens.home)
             // Presented from the list itself, not from a row of it, so the Report opens on the month the strip shows.
             .reportPresentation(isPresented: $isShowingReport) {
                 ReportView(startingOn: monthPeriod)
@@ -89,7 +89,7 @@ private struct TotalBalanceView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                     .contentTransition(.numericText())
-                    .accessibilityLabel(isHidden ? Text("Hidden") : Text(total.formatted()))
+                    .accessibilityLabel(isHidden ? Text(Strings.Common.hidden) : Text(total.formatted()))
                 Button {
                     withAnimation { isHidden.toggle() }
                 } label: {
@@ -97,9 +97,9 @@ private struct TotalBalanceView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
-                .accessibilityLabel(isHidden ? "Show Total" : "Hide Total")
+                .accessibilityLabel(isHidden ? Strings.Home.showTotal : Strings.Home.hideTotal)
             }
-            Text("Total balance")
+            Text(Strings.Home.totalBalance)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

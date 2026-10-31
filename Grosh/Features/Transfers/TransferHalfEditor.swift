@@ -38,34 +38,34 @@ struct TransferHalfEditor: View {
             Section {
                 wallets
                 fields.amountRow(
-                    "Amount", currencyCode: currencyCode, tint: Money(cents: transaction.category?.sign ?? 0).tint
+                    Strings.Common.amount, currencyCode: currencyCode, tint: Money(cents: transaction.category?.sign ?? 0).tint
                 )
-                DayStepper(title: "Date", day: $draft.day)
+                DayStepper(title: Strings.Common.date, day: $draft.day)
                 fields.noteField($draft.note)
             } footer: {
-                Text("Changing the amount or date asks whether to change the other half of the transfer too.")
+                Text(Strings.Transfers.halfFooter)
             }
         }
         .confirmationDialog(
-            "Update the other half of the transfer too?",
+            Strings.Transfers.updateOtherHalfQuestion,
             isPresented: $isAskingScope,
             titleVisibility: .visible
         ) {
-            Button("Update Both") { save(.bothHalves) }
-            Button("Only This One") { save(.onlyThisOne) }
-            Button("Cancel", role: .cancel) {}
+            Button(Strings.Transfers.updateBoth) { save(.bothHalves) }
+            Button(Strings.Common.onlyThisOne) { save(.onlyThisOne) }
+            Button(Strings.Common.cancel, role: .cancel) {}
         } message: {
-            Text("Only This One leaves the two halves different, as when a fee was taken.")
+            Text(Strings.Transfers.onlyThisOneFooter)
         }
-        .errorAlert("Couldn't Save Transfer", message: $errorMessage)
+        .errorAlert(Strings.Transfers.couldntSave, message: $errorMessage)
     }
 
     /// Where the money left and where it went: this half's wallet and, while it is there, the other half's.
     @ViewBuilder
     private var wallets: some View {
         let wallets = Log.store.attempt("Reading the wallets of a transfer") { try transaction.transferWallets(in: context) }
-        WalletLabel(title: "From", wallet: wallets?.from)
-        WalletLabel(title: "To", wallet: wallets?.to)
+        WalletLabel(title: Strings.Common.from, wallet: wallets?.from)
+        WalletLabel(title: Strings.Common.to, wallet: wallets?.to)
     }
 
     /// Saves straight away, or first asks whether to update both halves when the amount or date changed.

@@ -18,13 +18,13 @@ nonisolated enum TimeRange: Hashable, Sendable {
     /// The range's name in the "…" menu.
     var title: String {
         switch self {
-        case .day: String(localized: "Day")
-        case .week: String(localized: "Week")
-        case .month: String(localized: "Month")
-        case .quarter: String(localized: "Quarter")
-        case .year: String(localized: "Year")
-        case .all: String(localized: "All")
-        case .custom: String(localized: "Custom")
+        case .day: String(localized: Strings.Common.day)
+        case .week: String(localized: Strings.Periods.week)
+        case .month: String(localized: Strings.Periods.month)
+        case .quarter: String(localized: Strings.Periods.quarter)
+        case .year: String(localized: Strings.Periods.year)
+        case .all: String(localized: Strings.Periods.all)
+        case .custom: String(localized: Strings.Common.custom)
         }
     }
 

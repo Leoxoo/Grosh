@@ -7,13 +7,13 @@ struct MoneyLoverImportSummarySections: View {
 
     var body: some View {
         Section {
-            LabeledContent("Transactions", value: summary.transactionCount.formatted())
-            LabeledContent("Cards created", value: summary.cardsCreated.formatted())
+            LabeledContent(Strings.Common.transactions, value: summary.transactionCount.formatted())
+            LabeledContent(Strings.ImportExport.cardsCreated, value: summary.cardsCreated.formatted())
         } header: {
-            Text("Imported")
+            Text(Strings.ImportExport.imported)
         }
 
-        Section("Wallets") {
+        Section(Strings.Screens.wallets) {
             ForEach(summary.wallets, id: \.name) { wallet in
                 LabeledContent(wallet.name, value: wallet.transactionCount.formatted())
             }
@@ -21,7 +21,7 @@ struct MoneyLoverImportSummarySections: View {
 
         Section {
             if summary.unmatchedRows.isEmpty {
-                Text("Every transfer and payment was matched.")
+                Text(Strings.ImportExport.everythingMatched)
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(summary.unmatchedRows, id: \.row.line) { unmatched in
@@ -29,7 +29,7 @@ struct MoneyLoverImportSummarySections: View {
                 }
             }
         } header: {
-            Text("Unmatched rows")
+            Text(Strings.ImportExport.unmatchedRows)
         }
     }
 }
@@ -43,7 +43,7 @@ private struct UnmatchedRowView: View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.categoryName)
-                Text("Line \(row.line) · \(row.day.date().formatted(date: .numeric, time: .omitted)) · \(row.walletName)")
+                Text(Strings.ImportExport.unmatchedRow(row.line, row.day.date().formatted(date: .numeric, time: .omitted), row.walletName))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text(unmatched.outcome.wording)
@@ -59,9 +59,9 @@ private struct UnmatchedRowView: View {
 private extension MoneyLoverImportSummary.UnmatchedRow.Outcome {
     var wording: String {
         switch self {
-        case .balanceAdjustment: String(localized: "No partner: recorded as a balance adjustment")
-        case .notImported: String(localized: "No partner and no amount: not imported")
-        case .unlinkedPayment: String(localized: "No open Loan or Debt of this amount: not linked")
+        case .balanceAdjustment: String(localized: Strings.ImportExport.balanceAdjustmentFallback)
+        case .notImported: String(localized: Strings.ImportExport.notImported)
+        case .unlinkedPayment: String(localized: Strings.ImportExport.unlinkedPayment)
         }
     }
 }

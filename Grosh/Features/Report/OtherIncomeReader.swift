@@ -15,7 +15,7 @@ struct OtherIncomeReader<Content: View>: View {
             content(otherIncome)
         case .failure(let error):
             ContentUnavailableView(
-                "Can't Count Income",
+                Strings.Report.cantCountIncome,
                 systemImage: "exclamationmark.triangle",
                 description: Text(error.localizedDescription)
             )

@@ -12,8 +12,8 @@ struct ForgiveEditor: View {
 
     var body: some View {
         LoanOrDebtSheet(
-            unavailableTitle: "Can't Forgive",
-            unavailableMessage: "Only a Loan or a Debt can be forgiven."
+            unavailableTitle: Strings.DebtsLoans.cantForgive,
+            unavailableMessage: Strings.DebtsLoans.onlyLoanOrDebtForgiven
         ) { context in
             try ForgiveDraft(forgiving: original, on: today, in: context)
         } form: { draft in
@@ -41,28 +41,28 @@ private struct ForgiveForm: View {
             Form {
                 Section {
                     LoanOrDebtWithRow(loanOrDebt: loanOrDebt)
-                    LabeledContent("Forgiven") {
+                    LabeledContent(Strings.Common.forgiven) {
                         Text(draft.forgiven.formatted())
                             .monospacedDigit()
                     }
-                    DayStepper(title: "Date", day: $draft.day)
-                    CategoryPicker(title: "Category", type: draft.forgivenType, selection: $draft.category)
-                    TextField("Note", text: $draft.note, axis: .vertical)
+                    DayStepper(title: Strings.Common.date, day: $draft.day)
+                    CategoryPicker(title: Strings.Common.category, type: draft.forgivenType, selection: $draft.category)
+                    TextField(Strings.Common.note, text: $draft.note, axis: .vertical)
                 } footer: {
                     Text(loanOrDebt.kind.forgiveFooter)
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("Forgive the Rest")
+            .navigationTitle(Strings.DebtsLoans.forgiveTheRest)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Forgive", action: forgive)
+                    Button(Strings.DebtsLoans.forgive, action: forgive)
                         .disabled(!draft.canSave)
                 }
             }
@@ -70,7 +70,7 @@ private struct ForgiveForm: View {
         #if os(macOS)
         .frame(minWidth: 420, idealWidth: 460, minHeight: 360, idealHeight: 420)
         #endif
-        .errorAlert("Couldn't Forgive", message: $errorMessage)
+        .errorAlert(Strings.DebtsLoans.couldntForgive, message: $errorMessage)
     }
 
     private func forgive() {

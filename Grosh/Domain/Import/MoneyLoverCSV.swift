@@ -52,11 +52,11 @@ extension MoneyLoverImportError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notAMoneyLoverExport:
-            String(localized: "This isn't a MoneyLover CSV export. It needs Date, Category, Amount and Wallet columns.")
+            String(localized: Strings.ImportExport.notAMoneyLoverExport)
         case .noTransactions:
-            String(localized: "This file has no transactions.")
+            String(localized: Strings.ImportExport.noTransactionsInFile)
         case .unreadableRow(let line):
-            String(localized: "Line \(line) of the file has no valid date, amount, category or wallet.")
+            String(localized: Strings.ImportExport.invalidLine(line))
         }
     }
 }

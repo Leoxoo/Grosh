@@ -13,51 +13,51 @@ struct TransactionFilterSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    WalletPicker(title: "Wallet", everyWalletOr: "Any", selection: $filter.wallet)
-                    CategoryPicker(title: "Category", everyCategoryOr: "Any", selection: $filter.category)
-                    CardPicker(title: "Card", everyCardOr: "Any", selection: $filter.card)
-                    Picker("Type", selection: $filter.type) {
-                        Text("Any").tag(CategoryType?.none)
+                    WalletPicker(title: Strings.Common.wallet, everyWalletOr: Strings.Common.any, selection: $filter.wallet)
+                    CategoryPicker(title: Strings.Common.category, everyCategoryOr: Strings.Common.any, selection: $filter.category)
+                    CardPicker(title: Strings.Common.card, everyCardOr: Strings.Common.any, selection: $filter.card)
+                    Picker(Strings.Common.type, selection: $filter.type) {
+                        Text(Strings.Common.any).tag(CategoryType?.none)
                         ForEach(CategoryType.segments, id: \.self) { type in
                             Text(type.title).tag(Optional(type))
                         }
                     }
                 } footer: {
                     if filter.card != nil {
-                        Text("The list's header shows the Card's total for the period.")
+                        Text(Strings.Search.cardTotalFooter)
                     }
                 }
 
-                Section("Date Range") {
-                    OptionalDayRow(title: "From", day: $filter.dateRange.first)
-                    OptionalDayRow(title: "To", day: $filter.dateRange.last)
+                Section(Strings.Search.dateRange) {
+                    OptionalDayRow(title: Strings.Common.from, day: $filter.dateRange.first)
+                    OptionalDayRow(title: Strings.Common.to, day: $filter.dateRange.last)
                 }
 
                 Section {
-                    AmountBoundField(title: "At least", amount: $filter.minimumAmount)
-                    AmountBoundField(title: "At most", amount: $filter.maximumAmount)
+                    AmountBoundField(title: Strings.Search.atLeast, amount: $filter.minimumAmount)
+                    AmountBoundField(title: Strings.Search.atMost, amount: $filter.maximumAmount)
                 } header: {
-                    Text("Amount Range")
+                    Text(Strings.Search.amountRange)
                 } footer: {
-                    Text("Amounts as entered, whether money went in or out.")
+                    Text(Strings.Search.amountRangeFooter)
                 }
 
                 Section {
-                    Toggle("Excluded from report only", isOn: $filter.excludedOnly)
+                    Toggle(Strings.Search.excludedOnly, isOn: $filter.excludedOnly)
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("Filters")
+            .navigationTitle(Strings.Screens.filters)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Clear") { filter.clearFilters() }
+                    Button(Strings.Common.clear) { filter.clearFilters() }
                         .disabled(!filter.hasFilters)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button(Strings.Common.done) { dismiss() }
                 }
             }
         }
@@ -66,7 +66,7 @@ struct TransactionFilterSheet: View {
 
 /// One end of the date range: off leaves that side open.
 private struct OptionalDayRow: View {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     @Binding var day: CalendarDay?
 
     @Environment(\.today) private var today
@@ -82,12 +82,12 @@ private struct OptionalDayRow: View {
 
 /// One end of the amount range, typed as a plain amount such as `50` or `12.50`. Empty means any.
 private struct AmountBoundField: View {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     @Binding var amount: Money?
 
     @State private var text: String
 
-    init(title: LocalizedStringKey, amount: Binding<Money?>) {
+    init(title: LocalizedStringResource, amount: Binding<Money?>) {
         self.title = title
         _amount = amount
         _text = State(initialValue: amount.wrappedValue.map(Self.text(for:)) ?? "")
@@ -95,7 +95,7 @@ private struct AmountBoundField: View {
 
     var body: some View {
         LabeledContent(title) {
-            TextField(title, text: $text, prompt: Text("Any"))
+            TextField(title, text: $text, prompt: Text(Strings.Common.any))
                 .labelsHidden()
                 .multilineTextAlignment(.trailing)
                 .monospacedDigit()

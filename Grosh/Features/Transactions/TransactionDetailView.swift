@@ -22,12 +22,12 @@ struct TransactionDetailView: View {
     var body: some View {
         Group {
             if transaction.isDeleted || transaction.modelContext == nil || transaction.isInRecentlyDeleted {
-                ContentUnavailableView("Transaction Deleted", systemImage: "trash")
+                ContentUnavailableView(Strings.Transactions.transactionDeleted, systemImage: "trash")
             } else {
                 details
             }
         }
-        .navigationTitle("Transaction")
+        .navigationTitle(Strings.Transactions.transaction)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -70,11 +70,11 @@ struct TransactionDetailView: View {
 
             if transaction.isEstimated {
                 Section {
-                    Button("Enter Amount", systemImage: "checkmark.circle") {
+                    Button(Strings.Transactions.enterAmount, systemImage: "checkmark.circle") {
                         isEnteringAmount = true
                     }
                 } footer: {
-                    Text("This amount is the average of recent transactions in its category. Enter the real amount to confirm it.")
+                    Text(Strings.Transactions.estimatedFooter)
                 }
             }
 
@@ -92,13 +92,13 @@ struct TransactionDetailView: View {
 
             Section {
                 if canBeDuplicated {
-                    Button("Duplicate", systemImage: "plus.square.on.square") {
+                    Button(Strings.Common.duplicate, systemImage: "plus.square.on.square") {
                         isDuplicating = true
                     }
                     .fullWidthRowButton()
                 }
                 if transaction.canBeSplit(editFlow: editFlow) {
-                    Button("Split", systemImage: "square.split.2x1") {
+                    Button(Strings.Transactions.split, systemImage: "square.split.2x1") {
                         isSplitting = true
                     }
                     .fullWidthRowButton()
@@ -109,7 +109,7 @@ struct TransactionDetailView: View {
                 .fullWidthRowButton()
             } footer: {
                 if canBeDuplicated {
-                    Text("Duplicate opens a new transaction with the same details, dated today.")
+                    Text(Strings.Transactions.duplicateFooter)
                 }
             }
         }
@@ -121,7 +121,7 @@ struct TransactionDetailView: View {
         .toolbar {
             if let editFlow {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Edit") { editing = editFlow }
+                    Button(Strings.Common.edit) { editing = editFlow }
                 }
             }
         }
@@ -131,10 +131,10 @@ struct TransactionDetailView: View {
     @ViewBuilder
     private var fields: some View {
         if let wallet = transaction.wallet {
-            WalletLabel(title: "Wallet", wallet: wallet)
+            WalletLabel(title: Strings.Common.wallet, wallet: wallet)
         }
         if let card = transaction.card {
-            LabeledContent("Card") {
+            LabeledContent(Strings.Common.card) {
                 HStack(spacing: 6) {
                     CardMark(image: card.image, height: 18) {
                         Image(systemName: Card.symbolName)
@@ -145,13 +145,13 @@ struct TransactionDetailView: View {
             }
         }
         if !transaction.note.isEmpty {
-            LabeledContent("Note", value: transaction.note)
+            LabeledContent(Strings.Common.note, value: transaction.note)
         }
         if !transaction.withName.isEmpty {
-            LabeledContent("With", value: transaction.withName)
+            LabeledContent(Strings.Common.with, value: transaction.withName)
         }
         if !transaction.eventName.isEmpty {
-            LabeledContent("Event", value: transaction.eventName)
+            LabeledContent(Strings.Common.event, value: transaction.eventName)
         }
     }
 }
@@ -187,15 +187,15 @@ private struct ExcludedFromReportBanner: View {
     var body: some View {
         Label {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Excluded from report")
+                Text(Strings.Common.excludedFromReport)
                     .font(.headline)
-                Text("Left out of income and spending. It still counts in the wallet's balance.")
+                Text(Strings.Common.excludedFromReportFooter)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
         } icon: {
             Image(systemName: "eye.slash")
-                .foregroundStyle(.orange)
+                .foregroundStyle(.attention)
         }
     }
 }

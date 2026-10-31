@@ -33,24 +33,24 @@ struct PastOccurrencesView: View {
                         """)
                 }
             }
-            .navigationTitle("Past Occurrences")
+            .navigationTitle(Strings.Recurring.pastOccurrences)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Add All") { selected = Set(days) }
+                    Button(Strings.Recurring.addAll) { selected = Set(days) }
                         .disabled(selected.count == days.count)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
+                    Button(Strings.Common.save, action: save)
                 }
             }
         }
-        .errorAlert("Couldn't Add Transactions", message: $errorMessage)
+        .errorAlert(Strings.Recurring.couldntAddTransactions, message: $errorMessage)
     }
 
     private func row(_ day: CalendarDay) -> some View {

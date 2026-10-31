@@ -25,9 +25,9 @@ struct CardTransactionsView: View {
         Group {
             if isRemoved {
                 ContentUnavailableView(
-                    "Card Removed",
+                    Strings.Cards.cardRemoved,
                     systemImage: Card.symbolName,
-                    description: Text("It was merged into another Card or deleted.")
+                    description: Text(Strings.Cards.cardRemovedDescription)
                 )
             } else {
                 periodList
@@ -57,7 +57,7 @@ struct CardTransactionsView: View {
                 CardPeriodStepper(
                     period: period, periods: card.periods(today: today), today: today, periodsBack: $periodsBack
                 )
-                LabeledContent("Transactions") {
+                LabeledContent(Strings.Common.transactions) {
                     Text(shown.count.formatted())
                         .monospacedDigit()
                 }
@@ -65,25 +65,25 @@ struct CardTransactionsView: View {
                     AmountText(amount: (shown + added).charged, showsPlusSign: true, showsColor: false)
                         .fontWeight(.semibold)
                 } label: {
-                    Text(period.isStatement ? "Statement total" : "Total")
+                    Text(period.isStatement ? Strings.Cards.statementTotal : Strings.Common.total)
                     if !added.isEmpty {
-                        Text("Includes \(added.count) from the previous statement")
+                        Text(Strings.Cards.includesFromPreviousStatement(added.count))
                     }
                 }
             } footer: {
                 if period.isStatement {
-                    Text("A statement period runs from the day after one statement date through the next.")
+                    Text(Strings.Cards.statementPeriodFooter)
                 } else if card.kind == .credit {
-                    Text("Add the day this card's statement closes to see its transactions by statement period.")
+                    Text(Strings.Cards.addStatementDayFooter)
                 }
             }
 
             if shown.isEmpty {
                 Section {
                     ContentUnavailableView(
-                        "No Transactions",
+                        Strings.Common.noTransactions,
                         systemImage: Card.symbolName,
-                        description: Text("Nothing was paid with this Card in this period.")
+                        description: Text(Strings.Cards.nothingPaidInPeriod)
                     )
                 }
             }
@@ -109,15 +109,15 @@ struct CardTransactionsView: View {
                         }
                     }
                 } header: {
-                    Text("Previous statement")
+                    Text(Strings.Cards.previousStatementSection)
                 } footer: {
-                    Text("From the \(CardPeriod.leadInDayCount) days before this statement, as entries aren't always dated as on the statement. They're not in its total; tap + to add one for now.")
+                    Text(Strings.Cards.previousStatementFooter(CardPeriod.leadInDayCount))
                 }
             }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Edit") { isEditing = true }
+                Button(Strings.Common.edit) { isEditing = true }
             }
         }
     }
@@ -138,7 +138,7 @@ private struct LeadInTransactionRow: View {
                     .frame(minWidth: 28, minHeight: 28)
             }
             .buttonStyle(.borderless)
-            .accessibilityLabel(isAdded ? "Remove from Statement Total" : "Add to Statement Total")
+            .accessibilityLabel(isAdded ? Strings.Cards.removeFromStatementTotal : Strings.Cards.addToStatementTotal)
 
             NavigationLink {
                 TransactionDetailView(transaction: transaction)
@@ -168,7 +168,7 @@ private struct CardPeriodStepper: View {
                 Image(systemName: "chevron.left")
                     .frame(minWidth: 28, minHeight: 28)
             }
-            .accessibilityLabel(period.isStatement ? "Previous Statement" : "Previous Month")
+            .accessibilityLabel(period.isStatement ? Strings.Cards.previousStatement : Strings.Cards.previousMonth)
             .disabled(period <= periods.lowerBound)
 
             Spacer()
@@ -177,7 +177,7 @@ private struct CardPeriodStepper: View {
                     .font(.headline)
                     .monospacedDigit()
                 if period.isStatement {
-                    Text(period.contains(today) ? "Current statement" : "Statement period")
+                    Text(period.contains(today) ? Strings.Cards.currentStatement : Strings.Cards.statementPeriod)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -191,7 +191,7 @@ private struct CardPeriodStepper: View {
                 Image(systemName: "chevron.right")
                     .frame(minWidth: 28, minHeight: 28)
             }
-            .accessibilityLabel(period.isStatement ? "Next Statement" : "Next Month")
+            .accessibilityLabel(period.isStatement ? Strings.Cards.nextStatement : Strings.Cards.nextMonth)
             .disabled(period >= periods.upperBound)
         }
         .buttonStyle(.borderless)

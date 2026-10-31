@@ -37,8 +37,8 @@ struct CategoryEditor: View {
     static func deleteMessage(for category: Category) -> String {
         let subcategories = category.children?.count ?? 0
         return subcategories == 0
-            ? "This can't be undone."
-            : "Its \(subcategories) subcategories are deleted too. This can't be undone."
+            ? String(localized: Strings.Common.cantBeUndone)
+            : String(localized: Strings.Categories.subcategoriesDeletedToo(subcategories))
     }
 
     let mode: Mode
@@ -97,13 +97,13 @@ struct CategoryEditor: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle(editing == nil ? "Add Category" : "Edit Category")
+            .navigationTitle(editing == nil ? Strings.Categories.addCategory : Strings.Categories.editCategory)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(editing == nil ? "Add" : "Save", action: save)
+                    Button(editing == nil ? Strings.Common.add : Strings.Common.save, action: save)
                         .disabled(!canSave)
                 }
             }
@@ -113,11 +113,11 @@ struct CategoryEditor: View {
                 }
             }
             .confirmationDialog(
-                "Delete “\(editing?.name ?? "")”?",
+                Strings.Common.deleteNamed(editing?.name ?? ""),
                 isPresented: $isConfirmingDelete,
                 titleVisibility: .visible
             ) {
-                Button("Delete", role: .destructive) {
+                Button(Strings.Common.delete, role: .destructive) {
                     perform {
                         if let editing { try catalog.delete(editing) }
                     }
@@ -125,7 +125,7 @@ struct CategoryEditor: View {
             } message: {
                 if let editing { Text(Self.deleteMessage(for: editing)) }
             }
-            .errorAlert("Couldn't Save Category", message: $errorMessage)
+            .errorAlert(Strings.Categories.couldntSave, message: $errorMessage)
         }
     }
 
@@ -133,11 +133,11 @@ struct CategoryEditor: View {
         Section {
             HStack(spacing: 12) {
                 SymbolCircle(symbolName: draft.symbolName, color: draft.color, size: 40)
-                TextField("Name", text: $draft.name)
+                TextField(Strings.Common.name, text: $draft.name)
                     .disabled(isLocked)
             }
             if !isLocked {
-                Picker("Type", selection: $draft.type) {
+                Picker(Strings.Common.type, selection: $draft.type) {
                     Text(CategoryType.expense.title).tag(CategoryType.expense)
                     Text(CategoryType.income.title).tag(CategoryType.income)
                 }
@@ -147,8 +147,8 @@ struct CategoryEditor: View {
                     draft.parent = nil
                 }
 
-                Picker("Parent", selection: $draft.parent) {
-                    Text("None").tag(Category?.none)
+                Picker(Strings.Categories.parent, selection: $draft.parent) {
+                    Text(Strings.Common.none).tag(Category?.none)
                     ForEach(parentOptions) { parent in
                         Text(parent.name).tag(Category?.some(parent))
                     }
@@ -159,25 +159,25 @@ struct CategoryEditor: View {
             if isLocked {
                 Text(CategoryRuleError.locked.localizedDescription)
             } else if !canChangeType {
-                Text("This category has transactions, so its type can't change.")
+                Text(Strings.Categories.typeLockedFooter)
             } else if !(editing?.children ?? []).isEmpty {
-                Text("A category with subcategories stays at the top level.")
+                Text(Strings.Categories.topLevelFooter)
             }
         }
     }
 
     private var kindSection: some View {
         Section {
-            Picker("Kind", selection: kindChoice) {
+            Picker(Strings.Common.kind, selection: kindChoice) {
                 if let parent = draft.parent {
-                    Text("Same as \(parent.name) (\(parent.defaultKind.title))").tag(RecurringKind?.none)
+                    Text(Strings.Categories.sameAsParent(parent.name, parent.defaultKind.title)).tag(RecurringKind?.none)
                 }
                 ForEach(RecurringKind.allCases, id: \.self) { kind in
                     Text(kind.title).tag(Optional(kind))
                 }
             }
         } footer: {
-            Text("New Recurring transactions in this category start as this Kind. Existing ones keep theirs.")
+            Text(Strings.Categories.kindFooter)
         }
     }
 
@@ -191,13 +191,13 @@ struct CategoryEditor: View {
     }
 
     private var iconSection: some View {
-        Section("Icon") {
+        Section(Strings.Common.icon) {
             SymbolGrid(symbols: Self.symbolChoices, selection: $draft.symbolName, color: draft.color)
         }
     }
 
     private var colorSection: some View {
-        Section("Color") {
+        Section(Strings.Common.color) {
             PaletteColorGrid(selection: $draft.color)
         }
     }
@@ -206,23 +206,23 @@ struct CategoryEditor: View {
         let canDelete = catalog.canDelete(category)
         return Section {
             Button(
-                category.isHidden ? "Unhide Category" : "Hide Category",
+                category.isHidden ? Strings.Categories.unhideCategory : Strings.Categories.hideCategory,
                 systemImage: category.isHidden ? "eye" : "eye.slash"
             ) {
                 perform { try catalog.setHidden(category, !category.isHidden) }
             }
-            Button("Merge into Another Category…", systemImage: "arrow.triangle.merge") {
+            Button(Strings.Categories.mergeIntoAnother, systemImage: "arrow.triangle.merge") {
                 isMerging = true
             }
             if canDelete {
-                Button("Delete Category", systemImage: "trash", role: .destructive) {
+                Button(Strings.Categories.deleteCategory, systemImage: "trash", role: .destructive) {
                     isConfirmingDelete = true
                 }
             }
         } footer: {
             Text(canDelete
-                ? "Hidden categories leave the picker but stay on their transactions."
-                : "This category has transactions, so it can't be deleted. Merge it into another category instead.")
+                ? Strings.Categories.hiddenFooter
+                : Strings.Categories.cantDeleteFooter)
         }
     }
 

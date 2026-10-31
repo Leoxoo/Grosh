@@ -40,9 +40,9 @@ struct CategoryTransactionsView: View {
             if listed.transactions.isEmpty {
                 Section {
                     ContentUnavailableView(
-                        "No Transactions",
+                        Strings.Common.noTransactions,
                         systemImage: "tray",
-                        description: Text("Nothing in this category in the period.")
+                        description: Text(Strings.Report.nothingInCategory)
                     )
                 }
             }

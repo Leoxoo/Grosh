@@ -8,7 +8,7 @@ nonisolated struct MissingLockedCategory: Error, Equatable {
 
 extension MissingLockedCategory: LocalizedError {
     var errorDescription: String? {
-        String(localized: "Grosh can't do this without its “\(role.seededName)” category, which is missing.")
+        String(localized: Strings.Categories.missingLockedCategory(role.seededName))
     }
 }
 

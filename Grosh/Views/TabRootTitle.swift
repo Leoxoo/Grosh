@@ -56,7 +56,7 @@ extension View {
     /// tab's `NavigationStack`; a screen that moves something else with the scroll passes its own `scroll`, kept up to
     /// date with ``tracksTabRootScroll(_:)``.
     func tabRootTitle(
-        _ title: LocalizedStringKey, scroll: TabRootScroll? = nil, showsSmallTitle: Bool = false
+        _ title: LocalizedStringResource, scroll: TabRootScroll? = nil, showsSmallTitle: Bool = false
     ) -> some View {
         tabRootTitle(title, scroll: scroll, showsSmallTitle: showsSmallTitle) { EmptyView() }
     }
@@ -65,7 +65,7 @@ extension View {
     /// `scroll`'s ``TabRootScroll/rise``: the part of a rising header that has reached the bar, shown there so that taps
     /// reach it, as the bar's row takes the taps on what lies under it.
     func tabRootTitle<Risen: View>(
-        _ title: LocalizedStringKey, scroll: TabRootScroll?, showsSmallTitle: Bool = false,
+        _ title: LocalizedStringResource, scroll: TabRootScroll?, showsSmallTitle: Bool = false,
         @ViewBuilder risen: @escaping () -> Risen
     ) -> some View {
         modifier(TabRootTitleModifier(title: title, given: scroll, showsSmallTitle: showsSmallTitle, risen: risen))
@@ -73,7 +73,7 @@ extension View {
 }
 
 private struct TabRootTitleModifier<Risen: View>: ViewModifier {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     let given: TabRootScroll?
     let showsSmallTitle: Bool
     let risen: () -> Risen
@@ -122,7 +122,7 @@ private struct TrackingUnlessGiven: ViewModifier {
 /// The bar's leading item: the title in the large title's font, fading out as the list leaves its top and moving down
 /// with a pull, and in its place, once the header has risen to the bar, the header's part that has reached it.
 private struct TabRootLeadingItem<Risen: View>: View {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     let scroll: TabRootScroll
     let risen: () -> Risen
 

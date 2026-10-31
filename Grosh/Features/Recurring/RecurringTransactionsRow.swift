@@ -8,7 +8,7 @@ struct RecurringTransactionsRow: View {
         NavigationLink {
             RecurringTransactionsView()
         } label: {
-            Label("Recurring transactions", systemImage: "repeat")
+            Label(Strings.Screens.recurringTransactions, systemImage: "repeat")
         }
     }
 }

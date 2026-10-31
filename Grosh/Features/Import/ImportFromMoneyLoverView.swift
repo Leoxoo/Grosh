@@ -19,15 +19,15 @@ struct ImportFromMoneyLoverView: View {
                 MoneyLoverImportSummarySections(summary: summary)
             } else {
                 Section {
-                    Button("Choose CSV File…", systemImage: "doc.badge.plus") {
+                    Button(Strings.ImportExport.chooseCSVFile, systemImage: "doc.badge.plus") {
                         isPickingFile = true
                     }
                 } footer: {
-                    Text("Replaces every wallet, Card and transaction with those in a MoneyLover CSV export, or restores a Grosh CSV export. Your categories are kept.")
+                    Text(Strings.ImportExport.importFooter)
                 }
             }
         }
-        .navigationTitle("Import from MoneyLover")
+        .navigationTitle(Strings.Screens.importFromMoneyLover)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -35,28 +35,28 @@ struct ImportFromMoneyLoverView: View {
             read(result)
         }
         .confirmationDialog(
-            "Replace all data?",
+            Strings.ImportExport.replaceAllDataQuestion,
             isPresented: Binding(get: { picked != nil }, set: { if !$0 { picked = nil } }),
             titleVisibility: .visible,
             presenting: picked
         ) { export in
-            Button("Replace All Data", role: .destructive) {
+            Button(Strings.ImportExport.replaceAllData, role: .destructive) {
                 replaceAllData(with: export)
             }
-            Button("Cancel", role: .cancel) {}
+            Button(Strings.Common.cancel, role: .cancel) {}
         } message: { export in
-            Text("Every wallet, Card and transaction will be deleted and replaced with the \(export.rows.count) transactions in \(export.fileName). Categories are kept. This can't be undone.")
+            Text(Strings.ImportExport.replaceConfirmation(export.rows.count, export.fileName))
         }
         .disabled(isImporting)
         .overlay {
             if isImporting {
-                ProgressView("Importing…")
+                ProgressView(Strings.ImportExport.importing)
                     .padding()
                     .background(.regularMaterial, in: .rect(cornerRadius: 12))
                     .transition(.opacity)
             }
         }
-        .errorAlert("Couldn't Import", message: $errorMessage)
+        .errorAlert(Strings.ImportExport.couldntImport, message: $errorMessage)
     }
 
     /// Reads the picked file and checks it is a MoneyLover export before asking to replace anything.

@@ -81,7 +81,7 @@ struct PeriodStrip: View {
                 .overlay(alignment: .bottom) {
                     if isSelected {
                         Capsule()
-                            .fill(.green)
+                            .fill(.brand)
                             .frame(height: 2)
                     }
                 }
@@ -113,7 +113,7 @@ struct PeriodStrip: View {
         .buttonStyle(.glass)
         .buttonBorderShape(.capsule)
         .controlSize(.small)
-        .accessibilityLabel("Back to \(title)")
+        .accessibilityLabel(Strings.Transactions.backTo(title))
         .padding(.trailing)
         .transition(.opacity)
     }

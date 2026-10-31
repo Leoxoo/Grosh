@@ -21,19 +21,19 @@ struct TransactionsMenu: View {
     @State private var isFiltering = false
 
     var body: some View {
-        Menu("More", systemImage: "ellipsis.circle") {
+        Menu(Strings.Transactions.more, systemImage: "ellipsis.circle") {
             #if os(iOS)
             Section {
                 Button {
                     isFiltering = true
                 } label: {
                     Label(
-                        "Filters",
+                        Strings.Screens.filters,
                         systemImage: filter.hasFilters
                             ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
                     )
                     if filter.hasFilters {
-                        Text("On")
+                        Text(Strings.Common.on)
                     }
                 }
             }
@@ -43,23 +43,23 @@ struct TransactionsMenu: View {
                 Menu {
                     TimeRangeChoices(timeRange: $timeRange) { isPickingCustomRange = true }
                 } label: {
-                    Label("Time Range", systemImage: "calendar")
+                    Label(Strings.Common.timeRange, systemImage: "calendar")
                     Text(timeRange.title)
                 }
 
-                Toggle("View by Category", systemImage: "square.grid.2x2", isOn: viewsByCategory)
+                Toggle(Strings.Transactions.viewByCategory, systemImage: "square.grid.2x2", isOn: viewsByCategory)
             }
 
             Section {
-                Button("Select", systemImage: "checkmark.circle", action: startSelecting)
+                Button(Strings.Transactions.select, systemImage: "checkmark.circle", action: startSelecting)
             }
 
             Section {
-                Button("Transfer", systemImage: "arrow.left.arrow.right") { isTransferring = true }
+                Button(Strings.Transfers.transfer, systemImage: "arrow.left.arrow.right") { isTransferring = true }
             }
 
             Section {
-                Button("Adjust Balance", systemImage: "plusminus") { isAdjustingBalance = true }
+                Button(Strings.BalanceAdjustment.adjustBalance, systemImage: "plusminus") { isAdjustingBalance = true }
             }
         }
         .customRangeEditor($timeRange, isPresented: $isPickingCustomRange)

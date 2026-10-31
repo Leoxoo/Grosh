@@ -18,17 +18,17 @@ private struct WalletDeleteDialog: ViewModifier {
     func body(content: Content) -> some View {
         content
             .confirmationDialog(
-                "Delete this wallet?",
+                Strings.Wallets.deleteThisWallet,
                 isPresented: Binding(get: { wallet != nil }, set: { if !$0 { wallet = nil } }),
                 titleVisibility: .visible,
                 presenting: wallet
             ) { wallet in
-                Button("Delete Wallet", role: .destructive) { delete(wallet) }
-                Button("Cancel", role: .cancel) {}
+                Button(Strings.Wallets.deleteWallet, role: .destructive) { delete(wallet) }
+                Button(Strings.Common.cancel, role: .cancel) {}
             } message: { wallet in
-                Text("“\(wallet.name)” and all its transactions and Recurring transactions will be deleted and moved to Recently Deleted, where they can be restored for \(RecentlyDeleted.keptDays) days.")
+                Text(Strings.Wallets.deleteMessage(wallet.name, RecentlyDeleted.keptDays))
             }
-            .errorAlert("Couldn't Delete Wallet", message: $errorMessage)
+            .errorAlert(Strings.Wallets.couldntDelete, message: $errorMessage)
     }
 
     private func delete(_ wallet: Wallet) {

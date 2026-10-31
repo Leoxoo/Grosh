@@ -58,38 +58,38 @@ nonisolated enum Period: Hashable, Sendable {
     func title(today: CalendarDay, locale: Locale = .current) -> String {
         switch self {
         case .day(let day):
-            if day == today { return String(localized: "Today") }
-            if day == today.adding(days: -1) { return String(localized: "Yesterday") }
+            if day == today { return String(localized: Strings.Periods.today) }
+            if day == today.adding(days: -1) { return String(localized: Strings.Periods.yesterday) }
             return day.numericTitle(locale)
         case .week(let first):
             let last = first.adding(days: 6)
-            if (first...last).contains(today) { return String(localized: "This week") }
-            if (first...last).contains(today.adding(days: -7)) { return String(localized: "Last week") }
+            if (first...last).contains(today) { return String(localized: Strings.Periods.thisWeek) }
+            if (first...last).contains(today.adding(days: -7)) { return String(localized: Strings.Periods.lastWeek) }
             return first.numericTitle(through: last, locale: locale)
         case .month(let month):
             let thisMonth = CalendarMonth(today)
-            if month == thisMonth { return String(localized: "This month") }
-            if month == thisMonth.adding(months: -1) { return String(localized: "Last month") }
+            if month == thisMonth { return String(localized: Strings.Periods.thisMonth) }
+            if month == thisMonth.adding(months: -1) { return String(localized: Strings.Periods.lastMonth) }
             return String(format: "%02d/%d", month.month, month.year)
         case .quarter(let year, let quarter):
             let thisQuarter = TimeRange.quarter.period(containing: today)
-            if self == thisQuarter { return String(localized: "This quarter") }
+            if self == thisQuarter { return String(localized: Strings.Periods.thisQuarter) }
             let lastQuarter = TimeRange.quarter.period(containing: CalendarMonth(today).adding(months: -3).firstDay)
-            if self == lastQuarter { return String(localized: "Last quarter") }
+            if self == lastQuarter { return String(localized: Strings.Periods.lastQuarter) }
             return "Q\(quarter) \(year)"
         case .year(let year):
-            if year == today.year { return String(localized: "This year") }
-            if year == today.year - 1 { return String(localized: "Last year") }
+            if year == today.year { return String(localized: Strings.Periods.thisYear) }
+            if year == today.year - 1 { return String(localized: Strings.Periods.lastYear) }
             return String(year)
         case .all:
-            return String(localized: "All time")
+            return String(localized: Strings.Periods.allTime)
         case .custom(let days):
             // A custom range is picked with both ends; an open one would show "…" for the missing end.
             let first = days.first.map { $0.numericTitle(locale) } ?? "…"
             let last = days.last.map { $0.numericTitle(locale) } ?? "…"
             return "\(first) – \(last)"
         case .future:
-            return String(localized: "Future")
+            return String(localized: Strings.Periods.future)
         }
     }
 }

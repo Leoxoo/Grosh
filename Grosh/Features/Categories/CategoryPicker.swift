@@ -7,16 +7,16 @@ import SwiftUI
 /// every category of every type, hidden and locked ones included, or none. The list it opens puts the categories used
 /// most in the last month first, each with its subcategories in their usual order, and can be searched by name.
 struct CategoryPicker: View {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     @Binding var selection: Category?
     private let offered: CategoryChoiceList.Offered
     /// The first choice, which picks no category, such as "Any". `nil` offers categories only.
-    private let noneTitle: LocalizedStringKey?
+    private let noneTitle: LocalizedStringResource?
 
     @Environment(\.today) private var today
 
     /// A transaction's category: those of `type` the user may pick by hand.
-    init(title: LocalizedStringKey, type: CategoryType, selection: Binding<Category?>) {
+    init(title: LocalizedStringResource, type: CategoryType, selection: Binding<Category?>) {
         self.title = title
         _selection = selection
         offered = .pickable(type)
@@ -24,7 +24,7 @@ struct CategoryPicker: View {
     }
 
     /// Any category of any type, hidden and locked ones included, or none (`noneTitle`, such as "Any"): for filters.
-    init(title: LocalizedStringKey, everyCategoryOr noneTitle: LocalizedStringKey, selection: Binding<Category?>) {
+    init(title: LocalizedStringResource, everyCategoryOr noneTitle: LocalizedStringResource, selection: Binding<Category?>) {
         self.title = title
         _selection = selection
         offered = .every
@@ -42,7 +42,7 @@ struct CategoryPicker: View {
                     CategoryLabel(category: selection, indentsSubcategories: false)
                         .foregroundStyle(.primary)
                 } else {
-                    Text(noneTitle ?? "Choose")
+                    Text(noneTitle ?? Strings.Common.choose)
                 }
             }
         }
@@ -60,9 +60,9 @@ private struct CategoryChoiceList: View {
         case every
     }
 
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     let offered: Offered
-    let noneTitle: LocalizedStringKey?
+    let noneTitle: LocalizedStringResource?
     /// The day the categories used most lately are counted back from.
     let today: CalendarDay
     @Binding var selection: Category?
@@ -76,7 +76,7 @@ private struct CategoryChoiceList: View {
     @State private var query = ""
 
     init(
-        title: LocalizedStringKey, offered: Offered, noneTitle: LocalizedStringKey?, today: CalendarDay,
+        title: LocalizedStringResource, offered: Offered, noneTitle: LocalizedStringResource?, today: CalendarDay,
         selection: Binding<Category?>
     ) {
         self.title = title
@@ -112,7 +112,7 @@ private struct CategoryChoiceList: View {
                 ContentUnavailableView.search(text: query.trimmingCharacters(in: .whitespacesAndNewlines))
             }
         }
-        .searchable(text: $query, prompt: "Search categories")
+        .searchable(text: $query, prompt: Strings.Categories.searchCategories)
         .navigationTitle(title)
     }
 

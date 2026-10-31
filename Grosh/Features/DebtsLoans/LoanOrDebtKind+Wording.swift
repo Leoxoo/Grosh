@@ -1,80 +1,72 @@
 import SwiftUI
 
-/// The words and colors that differ between a Loan and a Debt on screen and in notifications.
+/// The words that differ between a Loan and a Debt on screen and in notifications.
 extension LoanOrDebtKind {
     /// "Loan" or "Debt".
-    var name: LocalizedStringKey {
+    var name: LocalizedStringResource {
         switch self {
-        case .loan: "Loan"
-        case .debt: "Debt"
+        case .loan: Strings.DebtsLoans.loan
+        case .debt: Strings.DebtsLoans.debt
         }
     }
 
     /// The With row's label: who the money was lent to or borrowed from.
-    var withTitle: LocalizedStringKey {
+    var withTitle: LocalizedStringResource {
         switch self {
-        case .loan: "Lent To"
-        case .debt: "Borrowed From"
-        }
-    }
-
-    /// What is outstanding: green for money coming back, red for money owed.
-    var outstandingColor: Color {
-        switch self {
-        case .loan: .green
-        case .debt: .red
+        case .loan: Strings.DebtsLoans.lentTo
+        case .debt: Strings.DebtsLoans.borrowedFrom
         }
     }
 
     /// "Loan · May 27, 2026" or "Debt · May 27, 2026", for the day it was lent or borrowed.
     func summary(lentOrBorrowedOn day: String) -> String {
         switch self {
-        case .loan: String(localized: "Loan · \(day)")
-        case .debt: String(localized: "Debt · \(day)")
+        case .loan: String(localized: Strings.DebtsLoans.loanOn(day))
+        case .debt: String(localized: Strings.DebtsLoans.debtOn(day))
         }
     }
 
     /// The detail's Loan or Debt section, while something is outstanding.
-    var paymentsFooter: LocalizedStringKey {
+    var paymentsFooter: LocalizedStringResource {
         switch self {
-        case .loan: "Payments are recorded as Debt Collections. The Loan itself never changes."
-        case .debt: "Payments are recorded as Repayments. The Debt itself never changes."
+        case .loan: Strings.DebtsLoans.loanPaymentsFooter
+        case .debt: Strings.DebtsLoans.debtPaymentsFooter
         }
     }
 
     /// Record Payment's payment section.
-    var recordPaymentFooter: LocalizedStringKey {
+    var recordPaymentFooter: LocalizedStringResource {
         switch self {
         case .loan:
-            "Recorded as a Debt Collection in the Loan's wallet, excluded from report. The Loan itself doesn't change."
+            Strings.DebtsLoans.loanRecordPaymentFooter
         case .debt:
-            "Recorded as a Repayment from the Debt's wallet, excluded from report. The Debt itself doesn't change."
+            Strings.DebtsLoans.debtRecordPaymentFooter
         }
     }
 
     /// Record Payment's section for what is paid above the outstanding amount.
-    var overpaymentFooter: LocalizedStringKey {
+    var overpaymentFooter: LocalizedStringResource {
         switch self {
-        case .loan: "What's paid above the outstanding amount is recorded as income and counts in reports."
-        case .debt: "What's paid above the outstanding amount is recorded as an expense and counts in reports."
+        case .loan: Strings.DebtsLoans.loanOverpaymentFooter
+        case .debt: Strings.DebtsLoans.debtOverpaymentFooter
         }
     }
 
     /// Forgive the Rest's form.
-    var forgiveFooter: LocalizedStringKey {
+    var forgiveFooter: LocalizedStringResource {
         switch self {
         case .loan:
-            "Marks the Loan forgiven without adding any transaction, so no balance changes. The forgiven amount counts in reports as an expense on this date."
+            Strings.DebtsLoans.loanForgiveFooter
         case .debt:
-            "Marks the Debt forgiven without adding any transaction, so no balance changes. The forgiven amount counts in reports as income on this date."
+            Strings.DebtsLoans.debtForgiveFooter
         }
     }
 
     /// The detail's Loan or Debt section, once forgiven.
-    var forgivenFooter: LocalizedStringKey {
+    var forgivenFooter: LocalizedStringResource {
         switch self {
-        case .loan: "The forgiven amount counts in reports as an expense. Un-forgive makes it outstanding again."
-        case .debt: "The forgiven amount counts in reports as income. Un-forgive makes it outstanding again."
+        case .loan: Strings.DebtsLoans.loanForgivenFooter
+        case .debt: Strings.DebtsLoans.debtForgivenFooter
         }
     }
 
@@ -84,15 +76,15 @@ extension LoanOrDebtKind {
         var parts: [String] = []
         switch self {
         case .loan:
-            parts.append(String(localized: "Lent \(owed.formatted())"))
-            if paid.cents > 0 { parts.append(String(localized: "Collected \(paid.formatted())")) }
-            if let forgiven { parts.append(String(localized: "Forgiven \(forgiven.formatted())")) }
+            parts.append(String(localized: Strings.DebtsLoans.lent(owed.formatted())))
+            if paid.cents > 0 { parts.append(String(localized: Strings.DebtsLoans.collected(paid.formatted()))) }
+            if let forgiven { parts.append(String(localized: Strings.DebtsLoans.forgivenAmount(forgiven.formatted()))) }
         case .debt:
-            parts.append(String(localized: "Borrowed \(owed.formatted())"))
-            if paid.cents > 0 { parts.append(String(localized: "Repaid \(paid.formatted())")) }
+            parts.append(String(localized: Strings.DebtsLoans.borrowed(owed.formatted())))
+            if paid.cents > 0 { parts.append(String(localized: Strings.DebtsLoans.repaid(paid.formatted()))) }
             if let forgiven {
-                parts.append(String(localized: "Forgiven \(forgiven.formatted())"))
-                parts.append(String(localized: "Kept \(forgiven.formatted())"))
+                parts.append(String(localized: Strings.DebtsLoans.forgivenAmount(forgiven.formatted())))
+                parts.append(String(localized: Strings.DebtsLoans.kept(forgiven.formatted())))
             }
         }
         return parts.joined(separator: " · ")
@@ -103,8 +95,8 @@ extension DebtReminder {
     /// "Loan reminder" or "Debt reminder".
     var title: String {
         switch kind {
-        case .loan: String(localized: "Loan reminder")
-        case .debt: String(localized: "Debt reminder")
+        case .loan: String(localized: Strings.DebtsLoans.loanReminder)
+        case .debt: String(localized: Strings.DebtsLoans.debtReminder)
         }
     }
 
@@ -112,8 +104,8 @@ extension DebtReminder {
     var body: String {
         let amount = outstanding.formatted()
         return switch kind {
-        case .loan: String(localized: "\(withName) owes you \(amount).")
-        case .debt: String(localized: "You owe \(withName) \(amount).")
+        case .loan: String(localized: Strings.DebtsLoans.owesYou(withName, amount))
+        case .debt: String(localized: Strings.DebtsLoans.youOwe(withName, amount))
         }
     }
 }

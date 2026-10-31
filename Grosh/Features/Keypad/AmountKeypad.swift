@@ -64,7 +64,7 @@ private extension KeypadKey {
         case .digit(let digit): Text(verbatim: "\(digit)")
         case .doubleZero: Text(verbatim: "00")
         case .backspace: Image(systemName: "delete.left")
-        case .allClear: Text("AC")
+        case .allClear: Text(Strings.Keypad.allClearKey)
         case .operation(let operation): Text(verbatim: operation.symbol)
         case .equals: Text(verbatim: "=")
         }
@@ -73,14 +73,14 @@ private extension KeypadKey {
     var accessibilityLabel: Text {
         switch self {
         case .digit(let digit): Text(verbatim: "\(digit)")
-        case .doubleZero: Text("Double zero")
-        case .backspace: Text("Delete")
-        case .allClear: Text("All clear")
-        case .operation(.add): Text("Plus")
-        case .operation(.subtract): Text("Minus")
-        case .operation(.multiply): Text("Times")
-        case .operation(.divide): Text("Divided by")
-        case .equals: Text("Equals")
+        case .doubleZero: Text(Strings.Keypad.doubleZero)
+        case .backspace: Text(Strings.Common.delete)
+        case .allClear: Text(Strings.Keypad.allClear)
+        case .operation(.add): Text(Strings.Keypad.plus)
+        case .operation(.subtract): Text(Strings.Keypad.minus)
+        case .operation(.multiply): Text(Strings.Keypad.times)
+        case .operation(.divide): Text(Strings.Keypad.dividedBy)
+        case .equals: Text(Strings.Keypad.equals)
         }
     }
 }
@@ -121,7 +121,7 @@ private struct KeypadButtonStyle: ButtonStyle {
         switch role {
         case .digit: AnyShapeStyle(.fill.tertiary)
         case .function: AnyShapeStyle(.fill.secondary)
-        case .operation: AnyShapeStyle(Color.green.gradient)
+        case .operation: AnyShapeStyle(Color.brand.gradient)
         }
     }
 }

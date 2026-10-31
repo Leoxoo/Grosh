@@ -11,27 +11,27 @@ struct AccountView: View {
                     NavigationLink {
                         WalletListView()
                     } label: {
-                        Label("Wallets", systemImage: "wallet.bifold")
+                        Label(Strings.Screens.wallets, systemImage: "wallet.bifold")
                     }
                     NavigationLink {
                         CategoryListView()
                     } label: {
-                        Label("Categories", systemImage: "square.grid.2x2")
+                        Label(Strings.Screens.categories, systemImage: "square.grid.2x2")
                     }
                     NavigationLink {
                         CardListView()
                     } label: {
-                        Label("Cards", systemImage: "creditcard")
+                        Label(Strings.Screens.cards, systemImage: "creditcard")
                     }
                     NavigationLink {
                         DebtsLoansView()
                     } label: {
-                        Label("Debts & Loans", systemImage: "person.2")
+                        Label(Strings.Screens.debtsAndLoans, systemImage: "person.2")
                     }
                     NavigationLink {
                         RecentlyDeletedView()
                     } label: {
-                        Label("Recently Deleted", systemImage: "trash")
+                        Label(Strings.Screens.recentlyDeleted, systemImage: "trash")
                     }
                 }
 
@@ -39,12 +39,12 @@ struct AccountView: View {
                     NavigationLink {
                         ImportFromMoneyLoverView()
                     } label: {
-                        Label("Import from MoneyLover", systemImage: "square.and.arrow.down")
+                        Label(Strings.Screens.importFromMoneyLover, systemImage: "square.and.arrow.down")
                     }
                     NavigationLink {
                         ExportCSVView()
                     } label: {
-                        Label("Export CSV", systemImage: "square.and.arrow.up")
+                        Label(Strings.Screens.exportCSV, systemImage: "square.and.arrow.up")
                     }
                 }
 
@@ -52,7 +52,7 @@ struct AccountView: View {
                     NavigationLink {
                         SettingsView()
                     } label: {
-                        Label("Settings", systemImage: "gearshape")
+                        Label(Strings.Screens.settings, systemImage: "gearshape")
                     }
                 }
 
@@ -60,8 +60,8 @@ struct AccountView: View {
                     RecurringTransactionsRow()
                 }
             }
-            .navigationTitle("Account")
-            .tabRootTitle("Account")
+            .navigationTitle(Strings.Screens.account)
+            .tabRootTitle(Strings.Screens.account)
         }
     }
 }

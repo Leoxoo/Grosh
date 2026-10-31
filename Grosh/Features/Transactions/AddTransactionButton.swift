@@ -14,8 +14,8 @@ struct AddTransactionButton: View {
         }
         .buttonStyle(.glassProminent)
         .buttonBorderShape(.circle)
-        .tint(.green)
-        .accessibilityLabel("Add Transaction")
+        .tint(.brand)
+        .accessibilityLabel(Strings.Transactions.addTransaction)
         .disabled(isAdding == nil)
     }
 }
@@ -47,10 +47,10 @@ private struct AddTransactionButtonPlacement: ViewModifier {
             .toolbar {
                 if inToolbar {
                     ToolbarItem(placement: .primaryAction) {
-                        Button("Add Transaction", systemImage: "plus") {
+                        Button(Strings.Transactions.addTransaction, systemImage: "plus") {
                             isAdding?.wrappedValue = true
                         }
-                        .tint(.green)
+                        .tint(.brand)
                         .disabled(isAdding == nil)
                     }
                 }

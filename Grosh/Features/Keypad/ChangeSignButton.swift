@@ -6,7 +6,7 @@ struct ChangeSignButton: View {
     @Binding var entry: AmountEntry
 
     var body: some View {
-        Button("Change Sign", systemImage: "plusminus") { entry.changeSign() }
+        Button(Strings.Keypad.changeSign, systemImage: "plusminus") { entry.changeSign() }
             .disabled(entry.cents == nil)
     }
 }

@@ -28,7 +28,7 @@ struct RecurringTransactionsView: View {
                             RecurringTransactionRow(recurring: item)
                         }
                         .swipeActions(edge: .trailing) {
-                            Button("Duplicate", systemImage: "doc.on.doc") {
+                            Button(Strings.Common.duplicate, systemImage: "doc.on.doc") {
                                 editorMode = .duplicate(item)
                             }
                         }
@@ -40,25 +40,25 @@ struct RecurringTransactionsView: View {
         .overlay {
             if recurring.isEmpty {
                 ContentUnavailableView {
-                    Label("No Recurring Transactions", systemImage: "repeat")
+                    Label(Strings.Recurring.noRecurring, systemImage: "repeat")
                 } description: {
-                    Text("Bills, subscriptions and income that repeat are added for you on their dates.")
+                    Text(Strings.Recurring.noRecurringDescription)
                 } actions: {
-                    Button("Add Recurring Transaction") { editorMode = .add }
+                    Button(Strings.Recurring.addRecurring) { editorMode = .add }
                 }
             } else if groups.isEmpty, let walletFilter {
                 ContentUnavailableView {
-                    Label("No Recurring Transactions", systemImage: "repeat")
+                    Label(Strings.Recurring.noRecurring, systemImage: "repeat")
                 } description: {
-                    Text("None are paid from \(walletFilter.name).")
+                    Text(Strings.Recurring.noneFromWallet(walletFilter.name))
                 }
             }
         }
-        .navigationTitle("Recurring transactions")
+        .navigationTitle(Strings.Screens.recurringTransactions)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 walletMenu
-                Button("Add Recurring Transaction", systemImage: "plus") { editorMode = .add }
+                Button(Strings.Recurring.addRecurring, systemImage: "plus") { editorMode = .add }
             }
         }
         .sheet(item: $editorMode) { mode in
@@ -69,17 +69,17 @@ struct RecurringTransactionsView: View {
     /// Narrows the list to every wallet, or to one unarchived wallet.
     private var walletMenu: some View {
         Menu {
-            Picker("Wallet", selection: $walletFilter) {
-                Text("All wallets").tag(Wallet?.none)
+            Picker(Strings.Common.wallet, selection: $walletFilter) {
+                Text(Strings.Recurring.allWallets).tag(Wallet?.none)
                 ForEach(wallets) { wallet in
                     Label(wallet.name, systemImage: wallet.symbolName).tag(Optional(wallet))
                 }
             }
             .pickerStyle(.inline)
         } label: {
-            Label("Wallet", systemImage: walletFilter == nil ? "wallet.bifold" : "wallet.bifold.fill")
+            Label(Strings.Common.wallet, systemImage: walletFilter == nil ? "wallet.bifold" : "wallet.bifold.fill")
         }
-        .accessibilityValue(walletFilter?.name ?? String(localized: "All wallets"))
+        .accessibilityValue(walletFilter?.name ?? String(localized: Strings.Recurring.allWallets))
     }
 }
 
@@ -121,14 +121,14 @@ struct RecurringTransactionRow: View {
     /// The wallet and the next day it falls due, such as "Checking · Next Nov 4, 2026", or "Paused" while its wallet
     /// is archived.
     private var detail: String {
-        let wallet = recurring.wallet?.name ?? String(localized: "No wallet")
+        let wallet = recurring.wallet?.name ?? String(localized: Strings.Recurring.noWallet)
         if recurring.isPaused {
-            return String(localized: "\(wallet) · Paused")
+            return String(localized: Strings.Recurring.walletPaused(wallet))
         }
         guard let next = recurring.nextDueDay else {
-            return String(localized: "\(wallet) · Ended")
+            return String(localized: Strings.Recurring.walletEnded(wallet))
         }
         let day = next.date().formatted(.dateTime.day().month(.abbreviated).year())
-        return String(localized: "\(wallet) · Next \(day)")
+        return String(localized: Strings.Recurring.walletNext(wallet, day))
     }
 }

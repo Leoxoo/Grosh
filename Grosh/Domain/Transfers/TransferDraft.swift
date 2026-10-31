@@ -31,11 +31,11 @@ nonisolated enum TransferRuleError: Error, Equatable {
 extension TransferRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .missingSourceWallet: String(localized: "Choose the wallet the money leaves.")
-        case .missingDestinationWallet: String(localized: "Choose the wallet the money goes to.")
-        case .sameWallet: String(localized: "Choose two different wallets.")
-        case .missingAmount: String(localized: "Enter an amount above zero.")
-        case .notATransferHalf: String(localized: "Only half of a transfer can be edited here.")
+        case .missingSourceWallet: String(localized: Strings.Transfers.missingSourceWallet)
+        case .missingDestinationWallet: String(localized: Strings.Transfers.missingDestinationWallet)
+        case .sameWallet: String(localized: Strings.Common.chooseTwoDifferentWallets)
+        case .missingAmount: String(localized: Strings.Common.enterAmountAboveZero)
+        case .notATransferHalf: String(localized: Strings.Transfers.notATransferHalf)
         }
     }
 }

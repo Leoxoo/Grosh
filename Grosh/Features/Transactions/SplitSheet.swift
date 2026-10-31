@@ -28,14 +28,14 @@ struct SplitSheet: View {
             List {
                 totalSection
 
-                Section("This transaction") {
+                Section(Strings.Transactions.thisTransaction) {
                     Button { editing = .original } label: {
                         SplitPartRow(part: draft.original)
                     }
                     .buttonStyle(.plain)
                 }
 
-                Section("New parts") {
+                Section(Strings.Transactions.newParts) {
                     ForEach(draft.parts.indices, id: \.self) { index in
                         Button { editing = .part(index) } label: {
                             SplitPartRow(part: draft.parts[index])
@@ -47,23 +47,23 @@ struct SplitSheet: View {
                             draft.removePart(at: index)
                         }
                     }
-                    Button("Add Part", systemImage: "plus") { isAddingPart = true }
+                    Button(Strings.Transactions.addPart, systemImage: "plus") { isAddingPart = true }
                 }
 
                 if !draft.reimbursements.isEmpty {
                     reimbursementsSection
                 }
             }
-            .navigationTitle("Split")
+            .navigationTitle(Strings.Transactions.split)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Split", action: split)
+                    Button(Strings.Transactions.split, action: split)
                         .disabled(!draft.canSplit)
                 }
             }
@@ -76,37 +76,37 @@ struct SplitSheet: View {
         }
         .sheet(isPresented: $isAddingPart) {
             SplitPartEditor(
-                title: "New Part", part: draft.newPart(), type: partType, capacity: draft.original.amount.cents
+                title: Strings.Transactions.newPart, part: draft.newPart(), type: partType, capacity: draft.original.amount.cents
             ) {
                 draft.addPart($0)
             }
         }
-        .errorAlert("Couldn't Split Transaction", message: $errorMessage)
+        .errorAlert(Strings.Transactions.couldntSplit, message: $errorMessage)
     }
 
     /// The total the parts come to, and how the wallet's balance moves when it differs from the original amount.
     private var totalSection: some View {
         Section {
-            LabeledContent("Total") {
+            LabeledContent(Strings.Common.total) {
                 if draft.total == draft.was {
                     Text(draft.total.formatted())
                 } else {
-                    Text("\(draft.total.formatted()) (was \(draft.was.formatted()))")
+                    Text(Strings.Transactions.totalWas(draft.total.formatted(), draft.was.formatted()))
                 }
             }
             .monospacedDigit()
             if draft.walletChange.cents != 0 {
-                LabeledContent("Balance change") {
+                LabeledContent(Strings.Transactions.balanceChange) {
                     AmountText(amount: draft.walletChange, showsPlusSign: true)
                 }
             }
         } footer: {
             if draft.original.amount.cents <= 0 {
-                Text("Leave some on this transaction, or type over its amount to raise the total.")
+                Text(Strings.Transactions.leaveSomeFooter)
             } else if draft.walletChange.cents != 0, let wallet = transaction.wallet {
-                Text("\(wallet.name)'s balance changes by the difference.")
+                Text(Strings.Transactions.walletBalanceChanges(wallet.name))
             } else {
-                Text("This transaction shows what the other parts leave of the total.")
+                Text(Strings.Transactions.originalShowsRestFooter)
             }
         }
     }
@@ -117,8 +117,8 @@ struct SplitSheet: View {
             ForEach(draft.reimbursements.indices, id: \.self) { index in
                 let reimbursement = draft.reimbursements[index].reimbursement
                 Picker(selection: $draft.reimbursements[index].part) {
-                    Text("Choose a part").tag(SplitPartRef?.none)
-                    Text("This transaction").tag(SplitPartRef?.some(.original))
+                    Text(Strings.Transactions.chooseAPart).tag(SplitPartRef?.none)
+                    Text(Strings.Transactions.thisTransaction).tag(SplitPartRef?.some(.original))
                     ForEach(draft.parts.indices, id: \.self) { part in
                         Text("\(draft.parts[part].categoryName), \(draft.parts[part].amount.formatted())")
                             .tag(SplitPartRef?.some(.part(part)))
@@ -134,9 +134,9 @@ struct SplitSheet: View {
                 }
             }
         } header: {
-            Text("Reimbursements")
+            Text(Strings.Common.reimbursements)
         } footer: {
-            Text("Choose the part each Reimbursement was paid back against.")
+            Text(Strings.Transactions.chooseReimbursementPartFooter)
         }
     }
 
@@ -147,12 +147,12 @@ struct SplitSheet: View {
     private func editor(for part: SplitPartRef) -> some View {
         switch part {
         case .original:
-            SplitPartEditor(title: "This Transaction", part: draft.original, type: partType, capacity: nil) {
+            SplitPartEditor(title: Strings.Transactions.thisTransactionTitle, part: draft.original, type: partType, capacity: nil) {
                 draft.original = $0
             }
         case .part(let index):
             SplitPartEditor(
-                title: "Edit Part", part: draft.parts[index], type: partType,
+                title: Strings.Transactions.editPart, part: draft.parts[index], type: partType,
                 capacity: draft.original.amount.cents + draft.parts[index].amount.cents
             ) {
                 draft.replacePart(at: index, with: $0)
@@ -203,7 +203,7 @@ private struct SplitPartRow: View {
             Spacer(minLength: 8)
             Text(part.amount.formatted())
                 .monospacedDigit()
-                .foregroundStyle(part.amount.cents > 0 ? Money(cents: part.category?.sign ?? 0).tint : .red)
+                .foregroundStyle(part.amount.cents > 0 ? Money(cents: part.category?.sign ?? 0).tint : .invalid)
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
@@ -214,7 +214,7 @@ private struct SplitPartRow: View {
 /// part back to the split. `capacity` is how much the part could take before nothing is left on the transaction being
 /// split, or `nil` for that transaction itself, whose amount changes the total instead.
 private struct SplitPartEditor: View {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     let type: CategoryType
     let capacity: Int?
     let save: (SplitPart) -> Void
@@ -225,7 +225,7 @@ private struct SplitPartEditor: View {
     @State private var entry: AmountEntry
 
     init(
-        title: LocalizedStringKey, part: SplitPart, type: CategoryType, capacity: Int?,
+        title: LocalizedStringResource, part: SplitPart, type: CategoryType, capacity: Int?,
         save: @escaping (SplitPart) -> Void
     ) {
         self.title = title
@@ -246,20 +246,20 @@ private struct SplitPartEditor: View {
             title: Text(title), entry: $entry, canSave: cents > 0 && part.category != nil, save: commit
         ) { fields in
             Section {
-                fields.amountRow("Amount", currencyCode: currencyCode, tint: Money(cents: part.category?.sign ?? 0).tint)
-                CategoryPicker(title: "Category", type: type, selection: $part.category)
-                DayStepper(title: "Date", day: $part.day)
+                fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: Money(cents: part.category?.sign ?? 0).tint)
+                CategoryPicker(title: Strings.Common.category, type: type, selection: $part.category)
+                DayStepper(title: Strings.Common.date, day: $part.day)
                 fields.noteField($part.note)
             } footer: {
                 if let capacity {
-                    Text("Leaves \(Money(cents: capacity - cents, currencyCode: currencyCode).formatted()) on the transaction being split.")
+                    Text(Strings.Transactions.leavesOnOriginal(Money(cents: capacity - cents, currencyCode: currencyCode).formatted()))
                 } else {
-                    Text("Typing a different amount changes the total.")
+                    Text(Strings.Transactions.differentAmountChangesTotal)
                 }
             }
 
             Section {
-                TextField("With", text: $part.withName)
+                TextField(Strings.Common.with, text: $part.withName)
                     .focused(fields.focus, equals: .withName)
                 if fields.focus.wrappedValue == .withName {
                     WithNameSuggestions(typed: part.withName) { name in
@@ -267,7 +267,7 @@ private struct SplitPartEditor: View {
                         fields.focus.wrappedValue = nil
                     }
                 }
-                TextField("Event", text: $part.eventName)
+                TextField(Strings.Common.event, text: $part.eventName)
                     .focused(fields.focus, equals: .event)
             }
         }

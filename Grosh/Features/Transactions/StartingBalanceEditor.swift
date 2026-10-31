@@ -32,21 +32,21 @@ struct StartingBalanceEditor: View {
 
     var body: some View {
         KeypadSheet(
-            title: Text("Edit Starting Balance"), entry: $entry, canSave: draftToSave != nil, save: save
+            title: Text(Strings.Transactions.editStartingBalance), entry: $entry, canSave: draftToSave != nil, save: save
         ) { fields in
             Section {
                 if let wallet = transaction.wallet {
-                    WalletLabel(title: "Wallet", wallet: wallet)
+                    WalletLabel(title: Strings.Common.wallet, wallet: wallet)
                 }
-                fields.amountRow("Amount", currencyCode: currencyCode, tint: Money(cents: entry.cents ?? 0).tint)
+                fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: Money(cents: entry.cents ?? 0).tint)
                 ChangeSignButton(entry: $entry)
-                DayStepper(title: "Date", day: $draft.day)
+                DayStepper(title: Strings.Common.date, day: $draft.day)
                 fields.noteField($draft.note)
             } footer: {
-                Text("The money this wallet held when it was added, below zero if it started in debt. It is always excluded from report.")
+                Text(Strings.Transactions.startingBalanceFooter)
             }
         }
-        .errorAlert("Couldn't Save Starting Balance", message: $errorMessage)
+        .errorAlert(Strings.Transactions.couldntSaveStartingBalance, message: $errorMessage)
     }
 
     private func save() {

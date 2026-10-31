@@ -20,24 +20,24 @@ struct SelectWalletSheet: View {
                         .groupedRow(.only)
                 }
                 if !choices.includedInTotal.isEmpty {
-                    Section("Included in total") {
+                    Section(Strings.Common.includedInTotal) {
                         GroupedForEach(choices.includedInTotal) { row($0) }
                     }
                 }
                 if !choices.notInTotal.isEmpty {
-                    Section("Not in total") {
+                    Section(Strings.Common.notInTotal) {
                         GroupedForEach(choices.notInTotal) { row($0) }
                     }
                 }
             }
             .roundedSectionsListStyle()
-            .navigationTitle("Select Wallet")
+            .navigationTitle(Strings.Transactions.selectWallet)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    Button(Strings.Common.close) { dismiss() }
                 }
             }
         }
