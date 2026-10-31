@@ -52,8 +52,12 @@ final class KeypadInputField: UITextField, UITextFieldDelegate {
             pad.view.heightAnchor.constraint(equalToConstant: Keypad.keyboardHeight - 2 * margin),
         ])
         inputView = container
+        // A number pad, as far as the text system knows, so it asks for no predictions: with the Keypad in the
+        // keyboard's place there is no bar to show them in, and the keyboard logs an error for each one.
+        keyboardType = .numberPad
         autocorrectionType = .no
         spellCheckingType = .no
+        inlinePredictionType = .no
         tintColor = .clear
         delegate = self
     }
