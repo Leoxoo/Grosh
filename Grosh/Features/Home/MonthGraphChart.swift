@@ -61,7 +61,7 @@ struct MonthGraphChart: View {
         .chartXAxis {
             AxisMarks(values: labeledDays.map { graph.position(of: $0) }) { value in
                 AxisGridLine()
-                AxisValueLabel {
+                AxisValueLabel(anchor: .top) {
                     Text(labeledDays[value.index].day, format: .number)
                 }
             }
@@ -69,7 +69,7 @@ struct MonthGraphChart: View {
         .chartYAxis {
             AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
                 AxisGridLine()
-                AxisValueLabel {
+                AxisValueLabel(anchor: .leading) {
                     if let cents = value.as(Double.self) {
                         Text(Money(cents: Int(cents.rounded())).decimalValue, format: .number.notation(.compactName))
                     }

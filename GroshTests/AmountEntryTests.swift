@@ -2,77 +2,167 @@ import Foundation
 import Testing
 @testable import Grosh
 
-/// The cents-first keypad: digits fill the amount from the cents up, like a card terminal.
+/// The Keypad: amounts are typed the way they're written, with the decimal separator typed by hand.
 @Suite(.namedInTheLog)
 struct AmountEntryTests {
     private let usEnglish = Locale(identifier: "en_US")
+    private let german = Locale(identifier: "de_DE")
 
-    /// Presses each key in turn on a fresh entry.
-    private func entry(_ keys: KeypadKey...) -> AmountEntry {
-        entry(keys)
-    }
-
-    private func entry(_ keys: [KeypadKey]) -> AmountEntry {
-        var entry = AmountEntry()
-        for key in keys {
-            entry.press(key)
-        }
+    /// Types `text` on a fresh entry, one key per character: digits, `.`, `+ - * /`, `=`, `<` for backspace and `C`.
+    private func entry(_ text: String, kind: AmountEntry.Kind = .signedByCategory) -> AmountEntry {
+        var entry = AmountEntry(kind: kind)
+        entry.type(text)
         return entry
-    }
-
-    /// The digit keys that type `digits`, e.g. `"1200"` for 12.00.
-    private func typing(_ digits: String) -> [KeypadKey] {
-        digits.compactMap(\.wholeNumberValue).map(KeypadKey.digit)
     }
 
     /// Types `lhs`, the operation, `rhs`, then `=`.
     private func calculate(_ lhs: String, _ operation: CalculatorOperation, _ rhs: String) -> AmountEntry {
-        entry(typing(lhs) + [.operation(operation)] + typing(rhs) + [.equals])
+        var result = entry(lhs)
+        result.press(.operation(operation))
+        result.type(rhs + "=")
+        return result
     }
 
-    @Test func digitsAreEnteredCentsFirst() {
-        let typed = entry(.digit(1), .digit(2), .digit(7), .digit(6))
+    // MARK: Typing as written
 
-        #expect(typed.cents == 1276)
-        #expect(typed.text(locale: usEnglish) == "12.76")
+    @Test(arguments: [
+        ("6", 600, "6"), ("6.", 600, "6."), ("6.3", 630, "6.3"), ("6.35", 635, "6.35"), ("1234.5", 1234_50, "1,234.5"),
+        (".5", 50, "0.5"), ("0", 0, "0"), ("007", 700, "7"),
+    ])
+    func amountsAreTypedAsWritten(typed: String, cents: Int, shown: String) {
+        let typed = entry(typed)
+
+        #expect(typed.cents == cents)
+        #expect(typed.text(locale: usEnglish) == shown)
     }
 
-    @Test func doubleZeroAddsTwoZeros() {
-        let typed = entry(.digit(1), .digit(2), .doubleZero)
-
-        #expect(typed.cents == 1200)
-        #expect(typed.text(locale: usEnglish) == "12.00")
-    }
-
-    @Test func aFreshEntryShowsZeroWithTwoDecimals() {
+    @Test func aFreshEntryShowsZeroAndIsEmpty() {
         #expect(AmountEntry().cents == 0)
-        #expect(AmountEntry().text(locale: usEnglish) == "0.00")
+        #expect(AmountEntry().text(locale: usEnglish) == "0")
+        #expect(AmountEntry().isEmpty)
+        #expect(!entry("0").isEmpty)
     }
 
-    @Test func backspaceRemovesTheLastDigit() {
-        let typed = entry(.digit(1), .digit(2), .digit(7), .digit(6), .backspace)
-
-        #expect(typed.cents == 127)
-        #expect(typed.text(locale: usEnglish) == "1.27")
+    @Test func aSeparatorTypedFirstGivesZeroPoint() {
+        #expect(entry(".").text(locale: usEnglish) == "0.")
     }
 
-    @Test func allClearStartsOver() {
-        let typed = entry(.digit(1), .digit(2), .allClear)
+    @Test func aSecondSeparatorIsIgnored() {
+        var typed = entry("6.3")
 
+        let taken = typed.press(.decimalSeparator)
+        #expect(taken)
+        #expect(typed.text(locale: usEnglish) == "6.3")
+        #expect(typed.cents == 630)
+    }
+
+    @Test func aThirdDigitAfterTheSeparatorIsRefused() {
+        var typed = entry("6.35")
+
+        let taken = typed.press(.digit(7))
+        #expect(!taken)
+        #expect(typed.cents == 635)
+        #expect(typed.text(locale: usEnglish) == "6.35")
+    }
+
+    @Test func digitsPastTheLargestAmountAreRefused() {
+        var typed = entry("999999999")
+
+        let taken = typed.press(.digit(9))
+        #expect(!taken)
+        typed.type(".99")
+        #expect(typed.cents == 99_999_999_999)
+        #expect(typed.text(locale: usEnglish) == "999,999,999.99")
+    }
+
+    @Test func theRegionsSeparatorAndGroupingAreShown() {
+        #expect(entry("1234.5").text(locale: german) == "1.234,5")
+        #expect(entry("6.").text(locale: german) == "6,")
+    }
+
+    @Test func theFieldShowsTheAmountAsTypedAsMoney() {
+        #expect(entry("1234.5").amountText(currencyCode: "USD", locale: usEnglish) == "$1,234.5")
+        #expect(entry("6.").amountText(currencyCode: "USD", locale: usEnglish) == "$6.")
+        #expect(AmountEntry().amountText(currencyCode: "USD", locale: usEnglish) == "$0")
+        #expect(entry("6.3").amountText(currencyCode: "EUR", locale: german) == "6,3\u{00A0}€")
+    }
+
+    @Test func whileCalculatingTheFieldShowsWhatItComesToUnpadded() {
+        let typed = entry("12+3.5")
+
+        #expect(typed.amountText(currencyCode: "USD", locale: usEnglish) == "$15.5")
+    }
+
+    // MARK: Deleting and clearing
+
+    @Test func backspaceDeletesOneCharacter() {
+        var typed = entry("12.5")
+
+        typed.press(.backspace)
+        #expect(typed.text(locale: usEnglish) == "12.")
+        typed.press(.backspace)
+        #expect(typed.text(locale: usEnglish) == "12")
+        typed.press(.backspace)
+        #expect(typed.text(locale: usEnglish) == "1")
+        typed.press(.backspace)
+        #expect(typed.isEmpty)
+        #expect(typed.text(locale: usEnglish) == "0")
+    }
+
+    @Test func clearEmptiesTheWholeEntry() {
+        let typed = entry("12+3.5C")
+
+        #expect(typed.isEmpty)
+        #expect(!typed.isCalculation)
         #expect(typed.cents == 0)
-        #expect(typed.text(locale: usEnglish) == "0.00")
+    }
+
+    // MARK: An existing amount
+
+    @Test(arguments: [(1200, "12"), (1250, "12.5"), (1205, "12.05"), (5, "0.05")])
+    func anExistingAmountOpensUnpadded(cents: Int, shown: String) {
+        let existing = AmountEntry(cents: cents)
+
+        #expect(existing.cents == cents)
+        #expect(existing.text(locale: usEnglish) == shown)
+    }
+
+    @Test func anExistingZeroIsEmpty() {
+        #expect(AmountEntry(cents: 0).isEmpty)
+    }
+
+    @Test func theFirstDigitReplacesAnExistingAmount() {
+        var existing = AmountEntry(cents: 1250)
+        existing.press(.digit(5))
+
+        #expect(existing.cents == 500)
+    }
+
+    @Test func backspaceTrimsAnExistingAmount() {
+        var existing = AmountEntry(cents: 1250)
+        existing.press(.backspace)
+
+        #expect(existing.text(locale: usEnglish) == "12.")
+        existing.press(.digit(7))
+        #expect(existing.cents == 1270)
+    }
+
+    @Test func anOperationCarriesOnFromAnExistingAmount() {
+        var existing = AmountEntry(cents: 1250)
+        existing.type("+1=")
+
+        #expect(existing.cents == 1350)
     }
 
     // MARK: Calculator
 
-    @Test func theDisplayShowsTheExpressionWhileItIsTyped() {
-        let typed = entry(.digit(1), .doubleZero, .operation(.add), .digit(3), .digit(5), .digit(0))
-
-        #expect(typed.text(locale: usEnglish) == "1.00 + 3.50")
+    @Test func theDisplayShowsTheExpressionAsTyped() {
+        #expect(entry("1+3.5").text(locale: usEnglish) == "1 + 3.5")
+        #expect(entry("1000*3.").text(locale: usEnglish) == "1,000 × 3.")
     }
 
     @Test func anEntryIsACalculationOnlyWhileItHasAnOperation() {
-        var typed = entry(typing("1200"))
+        var typed = entry("12")
         #expect(!typed.isCalculation)
 
         typed.press(.operation(.add))
@@ -82,210 +172,207 @@ struct AmountEntryTests {
         #expect(!typed.isCalculation)
     }
 
-    @Test func equalsAddsInCents() {
-        let added = entry(.digit(1), .digit(2), .doubleZero, .operation(.add), .digit(3), .digit(5), .digit(0), .equals)
+    @Test func equalsShowsTheResultUnpadded() {
+        let added = entry("12+3.5=")
 
-        #expect(added.cents == 1550)
-        #expect(added.text(locale: usEnglish) == "15.50")
+        #expect(added.cents == 15_50)
+        #expect(added.text(locale: usEnglish) == "15.5")
     }
 
     @Test func multiplyingTreatsBothNumbersAsAmounts() {
-        #expect(calculate("1200", .multiply, "300").cents == 3600)
+        #expect(calculate("12", .multiply, "3").cents == 36_00)
     }
 
     @Test func multiplyingRoundsToTheNearestCent() {
-        #expect(calculate("125", .multiply, "50").cents == 63)
+        #expect(calculate("1.25", .multiply, ".5").cents == 63)
     }
 
-    @Test(arguments: [("1000", "300", 333), ("2000", "300", 667)])
+    @Test(arguments: [("10", "3", 333), ("20", "3", 667)])
     func dividingRoundsToTheNearestCent(lhs: String, rhs: String, expected: Int) {
         #expect(calculate(lhs, .divide, rhs).cents == expected)
     }
 
-    @Test func subtractingCanGoBelowZero() {
-        let result = calculate("500", .subtract, "1200")
-
-        #expect(result.cents == -700)
-        #expect(result.text(locale: usEnglish) == "-7.00")
-    }
-
     @Test func multiplyingAndDividingComeBeforeAddingAndSubtracting() {
-        var keys = typing("1000")
-        keys.append(.operation(.add))
-        keys += typing("200")
-        keys.append(.operation(.multiply))
-        keys += typing("300")
-        keys.append(.equals)
-
-        #expect(entry(keys).cents == 1600)
+        #expect(entry("10+2*3=").cents == 16_00)
     }
 
     @Test func dividingByZeroIsAnErrorWithNoAmount() {
-        let result = calculate("1000", .divide, "0")
+        let result = calculate("10", .divide, "0")
 
         #expect(result.cents == nil)
         #expect(result.text(locale: usEnglish) == "Error")
+        #expect(result.amountText(currencyCode: "USD", locale: usEnglish) == "Error")
     }
 
     @Test func aDigitAfterAnErrorStartsOver() {
-        var result = calculate("1000", .divide, "0")
+        var result = calculate("10", .divide, "0")
         result.press(.digit(5))
 
-        #expect(result.cents == 5)
-        #expect(result.text(locale: usEnglish) == "0.05")
-    }
-
-    @Test func digitsPastTheLargestAmountAreIgnored() {
-        let typed = entry(typing("99999999999") + typing("9"))
-
-        #expect(typed.cents == 99_999_999_999)
-        #expect(typed.text(locale: usEnglish) == "999,999,999.99")
+        #expect(result.cents == 500)
+        #expect(result.text(locale: usEnglish) == "5")
     }
 
     @Test func aResultTooLargeToHoldIsAnError() {
-        #expect(calculate("99999999999", .multiply, "99999999999").cents == nil)
+        #expect(calculate("999999999", .multiply, "999999999").cents == nil)
     }
 
-    // MARK: Correcting and continuing
-
     @Test func anOperationWithNothingAfterItIsLeftOutOfTheAmount() {
-        let typed = entry(typing("1200") + [.operation(.add)])
+        let typed = entry("12+")
 
-        #expect(typed.cents == 1200)
-        #expect(typed.text(locale: usEnglish) == "12.00 +")
+        #expect(typed.cents == 12_00)
+        #expect(typed.text(locale: usEnglish) == "12 +")
     }
 
     @Test func aSecondOperationKeyReplacesTheFirst() {
-        var keys = typing("1200")
-        keys += [.operation(.add), .operation(.multiply)]
-        keys += typing("200")
-        keys.append(.equals)
-
-        #expect(entry(keys).cents == 2400)
+        #expect(entry("12+*2=").cents == 24_00)
     }
 
     @Test func backspaceRemovesTheNumberAfterAnOperationThenTheOperation() {
-        var typed = entry(typing("1200") + [.operation(.add)] + typing("5"))
+        var typed = entry("12+5")
 
         typed.press(.backspace)
-        #expect(typed.text(locale: usEnglish) == "12.00 +")
+        #expect(typed.text(locale: usEnglish) == "12 +")
 
         typed.press(.backspace)
-        #expect(typed.text(locale: usEnglish) == "12.00")
-        #expect(typed.cents == 1200)
-    }
-
-    @Test func anOperationFirstStartsFromZero() {
-        let result = entry([.operation(.subtract)] + typing("500") + [.equals])
-
-        #expect(result.cents == -500)
+        #expect(typed.text(locale: usEnglish) == "12")
+        #expect(typed.cents == 12_00)
     }
 
     @Test func aDigitAfterEqualsStartsANewAmount() {
-        var result = calculate("1200", .add, "300")
+        var result = calculate("12", .add, "3")
         result.press(.digit(5))
 
-        #expect(result.cents == 5)
+        #expect(result.cents == 500)
     }
 
     @Test func anOperationAfterEqualsContinuesFromTheResult() {
-        var result = calculate("1200", .add, "300")
-        result.press(.operation(.add))
-        for key in typing("100") { result.press(key) }
-        result.press(.equals)
+        var result = calculate("12", .add, "3")
+        result.type("+1=")
 
-        #expect(result.cents == 1600)
+        #expect(result.cents == 16_00)
     }
 
-    @Test func backspaceAfterEqualsTrimsTheResult() {
-        var result = calculate("1200", .add, "350")
-        result.press(.backspace)
+    @Test func workingOutLeavesOneNumber() {
+        var typed = entry("12+3")
 
-        #expect(result.cents == 155)
-    }
-
-    @Test func digitsTypedAfterTrimmingANegativeResultExtendIt() {
-        var result = calculate("500", .subtract, "1200")
-        result.press(.backspace)
-        result.press(.digit(5))
-
-        #expect(result.cents == -705)
-    }
-
-    @Test func anEntryCanStartFromAnExistingAmount() {
-        let existing = AmountEntry(cents: 1276)
-
-        #expect(existing.cents == 1276)
-        #expect(existing.text(locale: usEnglish) == "12.76")
-    }
-
-    @Test func typingOverAnExistingAmountReplacesIt() {
-        var existing = AmountEntry(cents: 1276)
-        existing.press(.digit(5))
-
-        #expect(existing.cents == 5)
-    }
-
-    @Test func backspaceTrimsAnExistingAmount() {
-        var existing = AmountEntry(cents: 1276)
-        existing.press(.backspace)
-
-        #expect(existing.cents == 127)
-    }
-
-    // MARK: Changing the sign
-
-    @Test func changingTheSignTurnsAnAmountIntoItsNegativeAndBack() {
-        var typed = entry(.digit(1), .digit(2), .digit(7), .digit(6))
-
-        typed.changeSign()
-        #expect(typed.cents == -1276)
-
-        typed.changeSign()
-        #expect(typed.cents == 1276)
-    }
-
-    @Test func changingTheSignWorksOutACalculationFirst() {
-        var typed = calculate("1000", .subtract, "250")
-        typed.press(.operation(.add))
-        typed.press(.digit(5))
-
-        typed.changeSign()
-
-        #expect(typed.cents == -755)
+        let taken = typed.workOut()
+        #expect(taken)
         #expect(!typed.isCalculation)
+        #expect(typed.cents == 15_00)
     }
 
-    @Test func aDigitAfterChangingTheSignStartsANewAmount() {
-        var typed = entry(.digit(1), .digit(2))
-        typed.changeSign()
+    // MARK: The sign, set by the category
 
-        typed.press(.digit(3))
+    @Test func aLeadingMinusIsRefusedWhereTheCategorySetsTheSign() {
+        var typed = AmountEntry()
 
-        #expect(typed.cents == 3)
+        let taken = typed.press(.operation(.subtract))
+        #expect(!taken)
+        #expect(typed.isEmpty)
     }
 
-    @Test func changingTheSignOfAnErrorLeavesTheError() {
-        var typed = calculate("100", .divide, "0")
-
-        typed.changeSign()
+    @Test func aCalculationBelowZeroIsAnErrorWhereTheCategorySetsTheSign() {
+        let typed = entry("5-12")
 
         #expect(typed.cents == nil)
+        #expect(typed.amountText(currencyCode: "USD", locale: usEnglish) == "Error")
     }
 
-    // MARK: Typing on a Mac keyboard
+    @Test func equalsRefusesACalculationBelowZeroWhereTheCategorySetsTheSign() {
+        var typed = entry("5-12")
 
-    @Test func typingOnAKeyboardIsCentsFirstToo() {
+        let taken = typed.press(.equals)
+        #expect(!taken)
+        #expect(typed.isCalculation)
+        #expect(typed.text(locale: usEnglish) == "5 − 12")
+
+        typed.press(.backspace)
+        typed.press(.backspace)
+        typed.press(.digit(2))
+        let taken2 = typed.press(.equals)
+        #expect(taken2)
+        #expect(typed.cents == 3_00)
+    }
+
+    // MARK: The sign of a balance
+
+    @Test func aLeadingMinusMakesABalanceNegative() {
+        let typed = entry("-12.5", kind: .balance)
+
+        #expect(typed.cents == -12_50)
+        #expect(typed.text(locale: usEnglish) == "-12.5")
+        #expect(typed.amountText(currencyCode: "USD", locale: usEnglish) == "-$12.5")
+    }
+
+    @Test func aMinusAloneIsShownAndComesToZero() {
+        let typed = entry("-", kind: .balance)
+
+        #expect(typed.cents == 0)
+        #expect(typed.text(locale: usEnglish) == "-")
+        #expect(!typed.isEmpty)
+    }
+
+    @Test func backspaceDeletesTheSignLast() {
+        var typed = entry("-5", kind: .balance)
+
+        typed.press(.backspace)
+        #expect(typed.text(locale: usEnglish) == "-")
+        typed.press(.backspace)
+        #expect(typed.isEmpty)
+    }
+
+    @Test func anOperationAfterAMinusAloneIsRefused() {
+        var typed = entry("-", kind: .balance)
+
+        let taken = typed.press(.operation(.add))
+        #expect(!taken)
+        let taken2 = typed.press(.operation(.subtract))
+        #expect(!taken2)
+    }
+
+    @Test func aBalanceCalculationMayComeOutBelowZero() {
+        let result = entry("5-12=", kind: .balance)
+
+        #expect(result.cents == -7_00)
+        #expect(result.text(locale: usEnglish) == "-7")
+    }
+
+    @Test func aMinusAfterAnExistingBalanceSubtracts() {
+        var existing = AmountEntry(cents: 100_00, kind: .balance)
+        existing.type("-30=")
+
+        #expect(existing.cents == 70_00)
+    }
+
+    @Test func anExistingNegativeBalanceOpensWithItsSign() {
+        let existing = AmountEntry(cents: -12_50, kind: .balance)
+
+        #expect(existing.cents == -12_50)
+        #expect(existing.text(locale: usEnglish) == "-12.5")
+    }
+
+    @Test func clearKeepsTheKind() {
+        var typed = entry("12C", kind: .balance)
+
+        let taken = typed.press(.operation(.subtract))
+        #expect(taken)
+        #expect(typed.kind == .balance)
+    }
+
+    // MARK: Typing on a hardware keyboard
+
+    @Test func typingOnAKeyboardIsAsWrittenToo() {
         var typed = AmountEntry()
-        for character in "1276" {
+        for character in "12.76" {
             if let key = KeypadKey(typing: character) { typed.press(key) }
         }
 
-        #expect(typed.cents == 1276)
+        #expect(typed.cents == 12_76)
     }
 
     @Test(arguments: [
-        ("+", KeypadKey.operation(.add)), ("-", .operation(.subtract)), ("−", .operation(.subtract)),
+        (".", KeypadKey.decimalSeparator), (",", .decimalSeparator),
+        ("+", .operation(.add)), ("-", .operation(.subtract)), ("−", .operation(.subtract)),
         ("*", .operation(.multiply)), ("x", .operation(.multiply)), ("×", .operation(.multiply)),
         ("/", .operation(.divide)), ("÷", .operation(.divide)), ("=", .equals),
         ("\u{7F}", .backspace), ("\u{8}", .backspace), ("c", .allClear), ("C", .allClear),
@@ -294,8 +381,18 @@ struct AmountEntryTests {
         #expect(KeypadKey(typing: character) == key)
     }
 
-    @Test(arguments: [".", ",", "a", " "] as [Character])
+    @Test(arguments: ["a", " ", "%"] as [Character])
     func otherKeyboardKeysAreIgnored(character: Character) {
         #expect(KeypadKey(typing: character) == nil)
+    }
+}
+
+private extension AmountEntry {
+    /// Types each character as its key: digits, `.`, `+ - * /`, `=`, `<` for backspace and `C` for clear.
+    mutating func type(_ text: String) {
+        for character in text {
+            let key = character == "<" ? .backspace : KeypadKey(typing: character)
+            if let key { press(key) }
+        }
     }
 }

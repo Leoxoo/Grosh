@@ -24,9 +24,9 @@ struct CategorySeedingTests {
         try CategorySeeder.seedIfNeeded(in: context)
 
         let categories = try allCategories()
-        #expect(categories.count == 83)
+        #expect(categories.count == 84)
         #expect(categories.filter { $0.type == .expense }.count == 64)
-        #expect(categories.filter { $0.type == .income }.count == 14)
+        #expect(categories.filter { $0.type == .income }.count == 15)
         #expect(categories.filter { $0.type == .debtLoan }.count == 4)
     }
 
@@ -50,7 +50,7 @@ struct CategorySeedingTests {
         let locked = try allCategories().filter(\.isLocked).map(\.name)
         #expect(Set(locked) == [
             "Outgoing transfer", "Incoming transfer", "Other Income", "Other Expense",
-            "Starting balance", "Loan", "Debt", "Debt Collection", "Repayment",
+            "Starting balance", "Loan", "Debt", "Debt Collection", "Repayment", "Reimbursement",
         ])
     }
 
@@ -66,7 +66,7 @@ struct CategorySeedingTests {
         try CategorySeeder.seedIfNeeded(in: context)
         try CategorySeeder.seedIfNeeded(in: context)
 
-        #expect(try allCategories().count == 83)
+        #expect(try allCategories().count == 84)
     }
 
     /// A store upgraded from an older build keeps its categories, but their icons and locked roles came back empty.
@@ -80,7 +80,7 @@ struct CategorySeedingTests {
 
         try CategorySeeder.restoreMissingDefaults(in: context)
 
-        #expect(try allCategories().count == 83)
+        #expect(try allCategories().count == 84)
         #expect(try category(named: "Food & Beverage")?.symbolName == "fork.knife")
         #expect(try allCategories().allSatisfy { $0.symbolName != "questionmark" })
         for role in LockedRole.allCases {
@@ -111,7 +111,7 @@ struct CategorySeedingTests {
         let restored = try context.lockedCategory(.otherIncome)
         #expect(restored.name == "Other Income")
         #expect(restored.type == .income)
-        #expect(try allCategories().count == 83)
+        #expect(try allCategories().count == 84)
     }
 
     /// Running the repair on a complete store changes nothing.
@@ -120,8 +120,8 @@ struct CategorySeedingTests {
 
         try CategorySeeder.restoreMissingDefaults(in: context)
 
-        #expect(try allCategories().count == 83)
-        #expect(try allCategories().filter(\.isLocked).count == 9)
+        #expect(try allCategories().count == 84)
+        #expect(try allCategories().filter(\.isLocked).count == 10)
         #expect(try category(named: "Food & Beverage")?.symbolName == "fork.knife")
     }
 
@@ -138,7 +138,7 @@ struct CategorySeedingTests {
         try CategorySeeder.restoreMissingDefaults(in: context)
 
         #expect(try allCategories().filter { $0.type == .expense }.count == 64)
-        #expect(try allCategories().filter { $0.type == .income }.count == 14)
+        #expect(try allCategories().filter { $0.type == .income }.count == 15)
         #expect(try allCategories().filter { $0.type == .debtLoan }.count == 4)
         #expect(try context.lockedCategory(.otherIncome).type == .income)
     }

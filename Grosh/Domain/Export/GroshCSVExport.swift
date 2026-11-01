@@ -5,7 +5,8 @@ import SwiftData
 /// its Card, a `Linked` column that related rows share, and on a forgiven Loan or Debt its Forgiven mark: the amount,
 /// date, category and note; on a part of a Split a `Split from` column, the `Id` of the row it was split from; and on an
 /// Expense with Reimbursements a `Reimbursement` column listing them as `amount day`, earliest day first and separated
-/// by `; `, such as `20.00 10/06/2026; 10.00 10/08/2026` (an entry's note is not written). Import from MoneyLover
+/// by `; `, such as `20.00 10/06/2026; 10.00 10/08/2026` (an entry's note is not written). The `With` column names the
+/// people in With, by name and separated by `; ` (``Transaction/withName``). Import from MoneyLover
 /// recognises the file by the `Card` and `Linked` columns and restores it with "Replace all data"
 /// (``MoneyLoverImport``): exporting what it restored gives the same file again. The `Split from` and `Reimbursement`
 /// columns are written for the record; import ignores them.

@@ -1,10 +1,11 @@
 import Foundation
+import SwiftData
 
 /// What a transaction list is narrowed to: search text and filters. Everything left empty matches every
 /// transaction.
 nonisolated struct TransactionFilter: Equatable {
-    /// Finds the text in a transaction's note or its category's name, ignoring case and accents. A number also
-    /// finds amounts: `973` finds $973.17.
+    /// Finds the text in a transaction's note, its category's name or the name of any of the people in its With,
+    /// ignoring case and accents. A number also finds amounts: `973` finds $973.17.
     var searchText = ""
     /// Only this wallet's transactions, in place of the wallet or Total the list is showing. Any wallet, archived
     /// ones and those left out of the Total included.
@@ -13,6 +14,9 @@ nonisolated struct TransactionFilter: Equatable {
     var category: Category?
     /// Only transactions paid with this Card.
     var card: Card?
+    /// Only transactions with this Person among the people in With, whoever else is there (ADR-0009). Hidden people
+    /// can be chosen: Hide keeps their history.
+    var person: Person?
     /// Only transactions whose category is of this type.
     var type: CategoryType?
     /// Only transactions dated within these days. Open on both sides by default.
@@ -24,12 +28,14 @@ nonisolated struct TransactionFilter: Equatable {
     /// Only transactions excluded from report.
     var excludedOnly = false
 
-    /// Wallets, categories and Cards are compared by identity, so this doesn't rely on their Equatable conformance.
+    /// Wallets, categories, Cards and people are compared by identity, so this doesn't rely on their Equatable
+    /// conformance.
     static func == (lhs: TransactionFilter, rhs: TransactionFilter) -> Bool {
         lhs.searchText == rhs.searchText
             && lhs.wallet === rhs.wallet
             && lhs.category === rhs.category
             && lhs.card === rhs.card
+            && lhs.person === rhs.person
             && lhs.type == rhs.type
             && lhs.dateRange == rhs.dateRange
             && lhs.minimumAmount == rhs.minimumAmount
@@ -47,17 +53,23 @@ nonisolated struct TransactionFilter: Equatable {
         let filter: TransactionFilter
         let query: String
         let amount: AmountQuery?
+        /// The transactions the filter's Person is in With on, read once from the Person rather than from each
+        /// transaction's people, or `nil` with no Person filter.
+        let withPerson: Set<PersistentIdentifier>?
 
         init(_ filter: TransactionFilter) {
             self.filter = filter
+            withPerson = filter.person.map { Set(($0.transactions ?? []).map(\.persistentModelID)) }
             query = filter.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
             amount = query.isEmpty ? nil : AmountQuery(query)
         }
 
         func matches(_ transaction: Transaction) -> Bool {
             filter.passesFilters(transaction)
+                && withPerson?.contains(transaction.persistentModelID) != false
                 && (query.isEmpty
                     || transaction.note.localizedStandardContains(query)
+                    || transaction.withName.localizedStandardContains(query)
                     || transaction.category?.name.localizedStandardContains(query) == true
                     || amount?.matches(Money(cents: transaction.amountCents)) == true)
         }
@@ -107,21 +119,36 @@ nonisolated struct TransactionFilter: Equatable {
     /// archived ones included; otherwise the list holds the matching ones among ``transactions(in:from:)`` on `days`
     /// (the selected period).
     func listed(from all: [Transaction], selection: WalletSelection, on days: DayRange) -> [Transaction] {
-        listed(from: all, selected: transactions(in: selection, from: all.map(LedgerEntry.init)), on: days)
+        listed(
+            from: all, selected: transactions(in: selection, from: all.map(LedgerEntry.init)), on: days,
+            hidingPaybacksIn: self.selection(replacing: selection)
+        )
     }
 
     /// ``listed(from:selection:on:)`` with the selection's transactions at hand already: `selected`, as
-    /// ``transactions(in:from:)`` picks them from the ledger entries of `all`.
-    func listed(from all: [Transaction], selected: [LedgerEntry], on days: DayRange) -> [Transaction] {
+    /// ``transactions(in:from:)`` picks them from the ledger entries of `all`. In the Total (`hidingPaybacksIn`) the
+    /// money paid back into another wallet is left out, as its Expense shows it in its net (ADR-0010); searching still
+    /// finds it.
+    func listed(
+        from all: [Transaction], selected: [LedgerEntry], on days: DayRange,
+        hidingPaybacksIn selection: WalletSelection? = nil
+    ) -> [Transaction] {
         if isSearching { return Signpost.interval("Search") { all.matching(self) } }
-        return selected.filter { days.contains(CalendarDay(rawValue: $0.dayRaw)) }.map(\.transaction).matching(self)
+        let inDays = selected.filter { days.contains(CalendarDay(rawValue: $0.dayRaw)) }.map(\.transaction)
+        let shown = selection == WalletSelection.total ? inDays.filter { !$0.isHiddenInTotal } : inDays
+        return shown.matching(self)
+    }
+
+    /// What the list shows: the wallet filter's wallet when one is set, otherwise `selection`.
+    func selection(replacing selection: WalletSelection) -> WalletSelection {
+        wallet.map(WalletSelection.wallet) ?? selection
     }
 
     /// The transactions the Transactions tab steps through period by period, before the period and the other filters
     /// narrow them: the wallet filter's wallet when one is set (any wallet, archived or left out of the Total, in
     /// place of `selection`), otherwise `selection`'s. The period strip reaches back to the first of them.
     func transactions<Entry: DatedAmount>(in selection: WalletSelection, from all: [Entry]) -> [Entry] {
-        let selection = wallet.map(WalletSelection.wallet) ?? selection
+        let selection = self.selection(replacing: selection)
         // A wallet is asked once whether it belongs, rather than once for each of its transactions.
         var includesWallet: [ObjectIdentifier?: Bool] = [:]
         return all.filter { transaction in

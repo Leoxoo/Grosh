@@ -40,6 +40,7 @@ struct CategoryVisibilityTests {
         #expect(!expense.contains("Outgoing transfer"))
         #expect(expense.last == "Other Expense")
         #expect(!income.contains("Incoming transfer"))
+        #expect(!income.contains("Reimbursement"))
         #expect(income.last == "Other Income")
         #expect(try catalog.pickerCategories(of: .debtLoan).map(\.name) == ["Loan", "Debt"])
         #expect(try catalog.pickerCategories(of: .system).isEmpty)

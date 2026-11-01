@@ -45,7 +45,7 @@ Each step is an activity in the test report. Every screen gets 10 seconds to app
 | `Recurring → open` | Account → Recurring transactions. |
 | `Debts & Loans → open` | Account → Debts & Loans. |
 | `Recently Deleted → open` | Account → Recently Deleted. |
-| `Home → add an Expense` | The + on Home: Expense, 0.42 on the keypad, the category Products (found with the category search), the Card Debit when the suggested wallet needs a Card, a note holding the time, then Save. |
+| `Home → add an Expense` | The + on Home: Expense, 42 on the Keypad, the category Products (found with the category search), the Card Debit when the suggested wallet needs a Card, a note holding the time, then Save. |
 | `Home → see the new Expense` | Scrolls Home to Recent transactions and waits for the row with that note. |
 | `Search → find a payee` | Opens the Transactions tab's search, searches for "Sam" and waits for a "Dinner with Sam". It comes last, so its keyboard stays up and nothing after it taps a tab. |
 

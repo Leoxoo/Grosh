@@ -106,9 +106,17 @@ private struct StepColumns: View {
             RuleMark(y: .value(Strings.Common.zero, 0))
                 .foregroundStyle(.secondary.opacity(0.4))
         }
+        .chartXAxis {
+            // Anchored, as the default label of a bar's category isn't one Charts accepts.
+            AxisMarks { _ in
+                AxisGridLine()
+                AxisTick()
+                AxisValueLabel(anchor: .top)
+            }
+        }
         .chartYAxis {
             AxisMarks(position: .leading) { value in
-                AxisValueLabel {
+                AxisValueLabel(anchor: .trailing) {
                     if let cents = value.as(Int.self) {
                         Text(Money(cents: cents).formatted())
                             .font(.caption2)

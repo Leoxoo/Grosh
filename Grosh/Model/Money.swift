@@ -13,6 +13,28 @@ nonisolated struct Money: Hashable, Sendable {
     func formatted(locale: Locale = .current) -> String {
         decimalValue.formatted(.currency(code: currencyCode).locale(locale))
     }
+
+    /// The amount as a plain number, without cents when it is whole: "20", "3.50". How an amount paid back and an Owes me
+    /// amount are written.
+    func plainNumber(locale: Locale = .current) -> String {
+        let fractionLength = cents % 100 == 0 ? 0 : 2
+        return decimalValue.formatted(.number.precision(.fractionLength(fractionLength)).locale(locale))
+    }
+}
+
+nonisolated extension Sequence where Element == Money {
+    /// The amounts added up per currency, one total for each, by currency code. A currency is never added to another,
+    /// and one that adds up to nothing is left out.
+    var totalsPerCurrency: [Money] {
+        var cents: [String: Int] = [:]
+        for amount in self {
+            cents[amount.currencyCode, default: 0] += amount.cents
+        }
+        return cents.keys.sorted().compactMap { code in
+            let total = cents[code] ?? 0
+            return total == 0 ? nil : Money(cents: total, currencyCode: code)
+        }
+    }
 }
 
 nonisolated extension Money {

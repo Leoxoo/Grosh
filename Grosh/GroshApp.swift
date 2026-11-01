@@ -4,20 +4,27 @@ import SwiftUI
 @main
 struct GroshApp: App {
     private let container: ModelContainer
+    private let textThemInbox = TextThemInbox()
+    /// The notification center holds its delegate weakly, so the app keeps it.
+    private let reminderActions: ReminderActionHandler
     @Environment(\.scenePhase) private var scenePhase
     /// The day the screens treat as today: the real one, moved on when it changes while the app is open.
     @State private var today = CalendarDay.today
 
     init() {
+        container = Self.openStore()
+        reminderActions = ReminderActionHandler.install(inbox: textThemInbox, context: container.mainContext)
+    }
+
+    /// The user's store or, when a UI test asks for it, the 16k store in its place (UITestStore).
+    private static func openStore() -> ModelContainer {
         do {
             #if DEBUG
-            // A UI test can ask for the 16k store in place of the user's (UITestStore).
             if let uiTestStore = try UITestStore.containerIfAsked() {
-                container = uiTestStore
-                return
+                return uiTestStore
             }
             #endif
-            container = try GroshStore.makeSeededContainer()
+            return try GroshStore.makeSeededContainer()
         } catch {
             fatalError("Couldn't open the Grosh store: \(error)")
         }
@@ -26,6 +33,7 @@ struct GroshApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .presentsTextThem(textThemInbox)
                 .onChange(of: scenePhase, initial: true) { _, phase in
                     // Items in Recently Deleted that have waited 30 days are removed for good, and Recurring transactions
                     // make the days that came due while the app was closed, whenever the app opens or comes back to the

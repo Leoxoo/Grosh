@@ -277,7 +277,7 @@ extension LockedRole {
     var isOfferedInPicker: Bool {
         switch self {
         case .otherIncome, .otherExpense, .loan, .debt: true
-        case .outgoingTransfer, .incomingTransfer, .debtCollection, .repayment, .startingBalance: false
+        case .outgoingTransfer, .incomingTransfer, .debtCollection, .repayment, .startingBalance, .reimbursement: false
         }
     }
 }

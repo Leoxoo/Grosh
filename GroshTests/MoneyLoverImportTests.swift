@@ -513,4 +513,46 @@ struct MoneyLoverImportTests {
         #expect(checking.balance(asOf: today) == Money(cents: -15_41))
         #expect(try wallet("Savings").balance(asOf: today) == Money(cents: 1_000_00))
     }
+
+    // MARK: People in With
+
+    @Test func aRowsWithBecomesOnePersonCreatedOrReusedByNameIgnoringCase() throws {
+        try importing(export(
+            "1,10/05/2026,Café,-3.00,USD,Checking,First,Sam,,,",
+            "2,10/04/2026,Café,-4.00,USD,Checking,Second,sam,,,",
+            "3,10/03/2026,Café,-5.00,USD,Checking,Third,Kim,,,",
+            "4,10/02/2026,Café,-6.00,USD,Checking,Fourth,,,,"
+        ))
+
+        let people = try context.fetch(FetchDescriptor<Person>(sortBy: [SortDescriptor(\.name)]))
+        #expect(people.map(\.name) == ["Kim", "Sam"])
+        let byNote = Dictionary(uniqueKeysWithValues: try rows(in: "Checking").map { ($0.note, $0) })
+        #expect(byNote["First"]?.orderedPeople.first === byNote["Second"]?.orderedPeople.first)
+        #expect(byNote["First"]?.orderedPeople.count == 1)
+        #expect(byNote["Third"]?.withName == "Kim")
+        #expect(byNote["Fourth"]?.orderedPeople.isEmpty == true)
+    }
+
+    @Test func aPersonIsLastUsedWhenTheirNewestImportedTransactionWasEntered() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        try MoneyLoverImport.replaceAllData(
+            with: MoneyLoverCSV.rows(in: export(
+                "1,10/05/2026,Café,-3.00,USD,Checking,First,Sam,,,",
+                "2,10/04/2026,Café,-4.00,USD,Checking,Second,Kim,,,"
+            )),
+            in: context, now: now
+        )
+
+        let people = try context.fetch(Person.previous)
+        #expect(people.map(\.name) == ["Sam", "Kim"])
+        #expect(people[0].lastUsedAt == now)
+        #expect(people[1].lastUsedAt == now.addingTimeInterval(-1))
+    }
+
+    @Test func replacingAllDataReplacesThePeopleToo() throws {
+        try Person.add(named: "Old friend", in: context)
+        try importing(export("1,10/05/2026,Café,-3.00,USD,Checking,First,Sam,,,"))
+
+        #expect(try context.fetch(FetchDescriptor<Person>()).map(\.name) == ["Sam"])
+    }
 }

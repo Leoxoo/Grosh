@@ -32,6 +32,9 @@ struct LoanOrDebt {
         self.init(original, among: try original.related(in: context))
     }
 
+    /// The Person it is with: a Loan or Debt is with exactly one (ADR-0009, ``TransactionRuleError/tooManyWith``).
+    var person: Person? { original.people?.first }
+
     /// What the original lent or borrowed, above zero.
     var owed: Money { Money(cents: abs(original.amountCents), currencyCode: original.amount.currencyCode) }
 
@@ -82,7 +85,7 @@ struct LoanOrDebt {
         transaction.wallet = original.wallet
         transaction.category = category
         transaction.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        transaction.withName = original.withName
+        transaction.setPeople(original.orderedPeople)
         transaction.isExcludedFromReport = isExcludedFromReport
         transaction.linkID = link
         return transaction

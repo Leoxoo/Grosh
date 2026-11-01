@@ -108,7 +108,7 @@ private struct TransactionForm: View {
             }
 
             mainSection(fields)
-            detailsSection(fields)
+            detailsSection
         }
         .onChange(of: draft.type) {
             if draft.type == .debtLoan {
@@ -146,40 +146,46 @@ private struct TransactionForm: View {
         }
     }
 
-    private func detailsSection(_ fields: KeypadSheetFields) -> some View {
+    /// Add more details: With and its + Owes me first, then a section for each Person who owes, then the rest, so one
+    /// Person's Owes me is set apart from the next one's and from the other details.
+    @ViewBuilder
+    private var detailsSection: some View {
         Section {
             DisclosureGroup(Strings.Transactions.addMoreDetails, isExpanded: $isShowingDetails) {
-                TextField(Strings.Common.with, text: $draft.withName)
-                    .focused(fields.focus, equals: .withName)
-                if fields.focus.wrappedValue == .withName {
-                    WithNameSuggestions(typed: draft.withName) { name in
-                        draft.withName = name
-                        fields.focus.wrappedValue = nil
-                    }
-                }
-                Toggle(Strings.Common.excludeFromReport, isOn: $draft.isExcludedFromReport)
-                if draft.offersReminder {
-                    ReminderField(day: $draft.reminderDay)
-                }
-                LabeledContent {
-                    Text(Strings.Transactions.comingSoon)
-                } label: {
-                    Label(Strings.Transactions.location, systemImage: "mappin.and.ellipse")
-                }
-                .foregroundStyle(.tertiary)
-                LabeledContent {
-                    Text(draft.eventName.isEmpty ? String(localized: Strings.Common.none) : draft.eventName)
-                } label: {
-                    Label(Strings.Common.event, systemImage: "calendar")
-                }
-                .foregroundStyle(.tertiary)
+                WithField(people: $draft.people, picksOne: draft.requiresWith)
+                OwesMeAddButtons(draft: $draft)
             }
         } footer: {
             if draft.isMissingWith {
                 Text(Strings.Transactions.withRequiredFooter)
-            } else if isShowingDetails {
-                Text(Strings.Common.excludedFromReportFooter)
             }
+        }
+        if isShowingDetails {
+            OwesMeSections(draft: $draft)
+            otherDetailsSection
+        }
+    }
+
+    private var otherDetailsSection: some View {
+        Section {
+            Toggle("Exclude from report", isOn: $draft.isExcludedFromReport)
+            if draft.offersReminder {
+                ReminderField(day: $draft.reminderDay)
+            }
+            LabeledContent {
+                Text("Coming soon")
+            } label: {
+                Label("Location", systemImage: "mappin.and.ellipse")
+            }
+            .foregroundStyle(.tertiary)
+            LabeledContent {
+                Text(draft.eventName.isEmpty ? String(localized: "None") : draft.eventName)
+            } label: {
+                Label("Event", systemImage: "calendar")
+            }
+            .foregroundStyle(.tertiary)
+        } footer: {
+            Text("A transaction excluded from report still counts in balances, just not in income and spending.")
         }
     }
 
@@ -217,31 +223,10 @@ private struct TransactionForm: View {
     }
 }
 
-/// Names used before that match what's typed in the With field, to pick with one tap.
-struct WithNameSuggestions: View {
-    let typed: String
-    let onPick: (String) -> Void
-
-    @Environment(\.modelContext) private var context
-
-    var body: some View {
-        let names = Log.store.attempt("Reading the With names") {
-            try Transaction.withNames(matching: typed, limit: 3, in: context)
-        } ?? []
-        ForEach(names, id: \.self) { name in
-            Button {
-                onPick(name)
-            } label: {
-                Label(name, systemImage: "person.crop.circle")
-            }
-        }
-    }
-}
-
 private extension TransactionDraft {
     /// Whether any of the "more details" are filled in, so they open already showing.
     var hasDetails: Bool {
-        type == .debtLoan || !withName.isEmpty || isExcludedFromReport || !eventName.isEmpty
+        type == .debtLoan || !people.isEmpty || isExcludedFromReport || !eventName.isEmpty
     }
 }
 

@@ -12,6 +12,10 @@ final class TabRootScroll {
 
     var offset: CGFloat = 0
 
+    /// Where the bar's leading item, the title and what takes its place once risen, starts on the screen; nil until
+    /// the bar has been laid out, and on Mac, where the title isn't in the bar.
+    var titleMinX: CGFloat?
+
     init(rise: CGFloat = 44, shortensHeader: Bool = false) {
         self.rise = rise
         self.shortensHeader = shortensHeader
@@ -142,6 +146,7 @@ private struct TabRootLeadingItem<Risen: View>: View {
                 risen()
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minX } action: { scroll.titleMinX = $0 }
     }
 }
 
@@ -150,6 +155,33 @@ extension View {
     /// it has reached it, so the two are never both there.
     func hiddenOnceRisen(_ scroll: TabRootScroll) -> some View {
         modifier(HiddenOnceRisen(scroll: scroll))
+    }
+
+    /// Starts the part of a rising header that the bar shows once risen where the bar starts its leading item, rather
+    /// than at the standard margin, which is a few points short of it: so that part is lined up with the title at rest,
+    /// and doesn't jump sideways when the bar's copy takes its place. It takes the width of the header.
+    func linedUpWithTabRootTitle(_ scroll: TabRootScroll) -> some View {
+        modifier(LinedUpWithTitle(scroll: scroll))
+    }
+}
+
+private struct LinedUpWithTitle: ViewModifier {
+    let scroll: TabRootScroll
+    /// Where the header's row starts on the screen.
+    @State private var rowMinX: CGFloat?
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.leading, leading)
+            .padding(.trailing)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minX } action: { rowMinX = $0 }
+    }
+
+    /// The title's distance from the row's start, or the standard margin until both have been laid out.
+    private var leading: CGFloat? {
+        guard let titleMinX = scroll.titleMinX, let rowMinX else { return nil }
+        return max(0, titleMinX - rowMinX)
     }
 }
 

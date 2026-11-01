@@ -13,6 +13,8 @@ nonisolated enum LockedRole: String, CaseIterable, Sendable {
     case otherIncome, otherExpense
     case startingBalance
     case loan, debt, debtCollection, repayment
+    /// Money paid back into another wallet than its Expense's (ADR-0010).
+    case reimbursement
 }
 
 /// What a transaction was for. Categories nest at most two levels deep.

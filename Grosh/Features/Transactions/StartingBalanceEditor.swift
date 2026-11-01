@@ -1,8 +1,9 @@
 import SwiftData
 import SwiftUI
 
-/// Edits a wallet's Starting balance: the money it held when it was added (below zero for a wallet that started
-/// in debt), its date and note. It stays under the Starting balance category and excluded from report.
+/// Edits a wallet's Starting balance: the money it held when it was added (below zero, typed with a leading minus, for
+/// a wallet that started in debt), its date and note. It stays under the Starting balance category and excluded from
+/// report.
 struct StartingBalanceEditor: View {
     let transaction: Transaction
 
@@ -17,7 +18,7 @@ struct StartingBalanceEditor: View {
         self.transaction = transaction
         let draft = StartingBalanceDraft(editing: transaction)
         _draft = State(initialValue: draft)
-        _entry = State(initialValue: AmountEntry(cents: draft.amount.cents))
+        _entry = State(initialValue: AmountEntry(cents: draft.amount.cents, kind: .balance))
     }
 
     private var currencyCode: String { transaction.amount.currencyCode }
@@ -39,7 +40,6 @@ struct StartingBalanceEditor: View {
                     WalletLabel(title: Strings.Common.wallet, wallet: wallet)
                 }
                 fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: Money(cents: entry.cents ?? 0).tint)
-                ChangeSignButton(entry: $entry)
                 DayStepper(title: Strings.Common.date, day: $draft.day)
                 fields.noteField($draft.note)
             } footer: {

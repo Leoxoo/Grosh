@@ -18,6 +18,9 @@ final class Reimbursement {
     /// The deposit it was moved in from, waiting in Recently Deleted: restoring the deposit undoes the move and removes
     /// this entry. `nil` for an entry typed in, and once the deposit is removed for good.
     var movedFrom: Transaction?
+    /// The Expected reimbursement it was recorded against by Record payment (ADR-0010), or `nil` for an entry nobody
+    /// expected.
+    var expectation: ExpectedReimbursement?
 
     init(amount: Money, day: CalendarDay, note: String = "") {
         self.amountCents = amount.cents

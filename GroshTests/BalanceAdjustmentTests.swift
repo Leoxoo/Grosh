@@ -115,8 +115,8 @@ struct BalanceAdjustmentTests {
 
         draft.day = today.adding(days: -1)
 
-        #expect(draft.realBalance == Money(cents: 7))
-        #expect(draft.difference == Money(cents: 7))
+        #expect(draft.realBalance == Money(cents: 7_00))
+        #expect(draft.difference == Money(cents: 7_00))
     }
 
     @Test func changingTheWalletStartsAgainFromThatWalletsRecordedBalance() throws {
@@ -139,8 +139,8 @@ struct BalanceAdjustmentTests {
         draft.realBalanceEntry.press(.digit(4))
         draft.realBalanceEntry.press(.digit(2))
 
-        #expect(draft.realBalance == Money(cents: 42))
-        #expect(draft.difference == Money(cents: -499_58))
+        #expect(draft.realBalance == Money(cents: 42_00))
+        #expect(draft.difference == Money(cents: -458_00))
     }
 
     @Test func aRealBalanceTheKeypadCantWorkOutCantBeSaved() throws {
@@ -153,6 +153,18 @@ struct BalanceAdjustmentTests {
 
         #expect(draft.realBalance == nil)
         #expect(!draft.canSave)
+    }
+
+    @Test func aRealBalanceCanBeTypedBelowZeroWithALeadingMinus() throws {
+        try record(500_00, "Salary", .income, on: today)
+        var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
+
+        for key: KeypadKey in [.allClear, .operation(.subtract), .digit(4), .digit(2)] {
+            draft.realBalanceEntry.press(key)
+        }
+
+        #expect(draft.realBalance == Money(cents: -42_00))
+        #expect(draft.difference == Money(cents: -542_00))
     }
 
     // MARK: The reason

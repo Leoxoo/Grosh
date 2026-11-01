@@ -1,17 +1,22 @@
 import Foundation
 import SwiftData
 
-/// A notification on a reminder day: what the Loan and Debt reminders and the Estimated-amount reminders have in common.
+/// A notification on a reminder day: what the Loan and Debt reminders, the Estimated-amount reminders and the Owes me
+/// reminders have in common.
 nonisolated protocol PendingReminder: Hashable, Sendable {
     /// Marks the pending notifications of this sort, so replacing them leaves any other alone.
     static var identifierPrefix: String { get }
-    /// The transaction it reminds of.
+    /// The category the notification is posted in, which is what a notification action hangs off, or `nil` for none.
+    static var categoryIdentifier: String? { get }
+    /// The record it reminds of: a transaction, or an Expected reimbursement.
     var original: PersistentIdentifier { get }
     var day: CalendarDay { get }
     /// When the notification arrives.
     var arrival: ReminderArrival { get set }
     var title: String { get }
     var body: String { get }
+    /// What an action on the notification needs to know, kept in the notification itself.
+    var userInfo: [String: String] { get }
 }
 
 extension PendingReminder {
@@ -19,20 +24,43 @@ extension PendingReminder {
     func isSameReminder(as other: Self) -> Bool {
         original == other.original && day == other.day
     }
+
+    nonisolated static var categoryIdentifier: String? { nil }
+
+    nonisolated var userInfo: [String: String] { [:] }
 }
 
 /// A notification on the reminder day of an open Loan or Debt, saying who it is with and what is outstanding.
+///
+/// Like the Owes me reminder it is posted in a ``categoryIdentifier`` and carries a ``userInfo``, which is what its
+/// "Text them" action needs (``TextReminder``).
 nonisolated struct DebtReminder: PendingReminder {
     static let identifierPrefix = "grosh.debt-reminder."
+    /// What a notification action registers against.
+    static let categoryIdentifier: String? = "grosh.debt"
 
     /// The Loan or Debt it reminds of.
     let original: PersistentIdentifier
     let day: CalendarDay
+    /// The name of the Person the Loan or Debt is with.
     let withName: String
     let outstanding: Money
     /// A Loan (they owe the user) or a Debt (the user owes them).
     let kind: LoanOrDebtKind
+    /// The phone number of the Person it is with, when they have one.
+    var phone: String?
     var arrival = ReminderArrival.onItsDay
+
+    var userInfo: [String: String] {
+        typealias Key = TextReminder.InfoKey
+        var info = [
+            Key.person: withName, Key.amountCents: String(outstanding.cents),
+            Key.currencyCode: outstanding.currencyCode,
+        ]
+        if let phone { info[Key.phone] = phone }
+        if kind == .debt { info[Key.youOwe] = "true" }
+        return info
+    }
 }
 
 /// When a reminder's notification arrives.
@@ -55,15 +83,17 @@ protocol ReminderScheduler {
     func replacePending<Reminder: PendingReminder>(_ reminders: [Reminder]) async
 }
 
-/// What the Home bell and the notifications remind of, made from the transactions it is fetched from.
+/// What the Home bell and the notifications remind of, made from the records it is fetched from.
 protocol ReminderSource {
     associatedtype Reminder: PendingReminder
+    /// What it is made from: transactions, or Expected reimbursements.
+    associatedtype Record: PersistentModel
 
-    /// Every transaction it is made from. A source made from them stays current, since a change to one changes what
-    /// this fetches.
-    static var transactions: FetchDescriptor<Transaction> { get }
+    /// Every record it is made from. A source made from them stays current, since a change to one changes what this
+    /// fetches.
+    static var records: FetchDescriptor<Record> { get }
 
-    init(_ transactions: [Transaction])
+    init(_ records: [Record])
 
     /// The notifications that should be pending: one for each reminder day `today` or later, the soonest first.
     func reminders(from today: CalendarDay) -> [Reminder]
@@ -101,6 +131,8 @@ extension ReminderSource {
 }
 
 extension DebtsAndLoans: ReminderSource {
+    static var records: FetchDescriptor<Transaction> { transactions }
+
     /// The open Loans and Debts whose reminder day is `today` or earlier, the earliest first: what the Home bell
     /// lists. A settled one is never due.
     func due(on today: CalendarDay) -> [LoanOrDebt] {
@@ -113,9 +145,10 @@ extension DebtsAndLoans: ReminderSource {
     func reminders(from today: CalendarDay) -> [DebtReminder] {
         open.compactMap { loanOrDebt in
             guard let day = loanOrDebt.original.reminderDay, day >= today else { return nil }
+            let person = loanOrDebt.person
             return DebtReminder(
-                original: loanOrDebt.original.persistentModelID, day: day, withName: loanOrDebt.original.withName,
-                outstanding: loanOrDebt.outstanding, kind: loanOrDebt.kind
+                original: loanOrDebt.original.persistentModelID, day: day, withName: person?.name ?? "",
+                outstanding: loanOrDebt.outstanding, kind: loanOrDebt.kind, phone: person?.phone
             )
         }
         .sorted { $0.day < $1.day }

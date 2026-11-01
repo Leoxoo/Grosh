@@ -9,7 +9,8 @@ nonisolated struct SplitPart {
     var category: Category?
     var day: CalendarDay
     var note: String
-    var withName: String
+    /// The people in With. A part is never a Loan or Debt, so it takes any number.
+    var people: [Person]
     var eventName: String
 
     /// The part as `transaction` is now.
@@ -18,7 +19,7 @@ nonisolated struct SplitPart {
         category = transaction.category
         day = transaction.day
         note = transaction.note
-        withName = transaction.withName
+        people = transaction.orderedPeople
         eventName = transaction.eventName
     }
 
@@ -29,7 +30,7 @@ nonisolated struct SplitPart {
         transaction.category = category
         transaction.day = day
         transaction.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        transaction.withName = withName.trimmingCharacters(in: .whitespacesAndNewlines)
+        transaction.setPeople(people)
         transaction.eventName = eventName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
@@ -150,19 +151,23 @@ extension SplitRuleError: LocalizedError {
 
 extension Transaction {
     /// Whether the transaction can be split: an ordinary Expense or Income, which is not a transfer half, a Loan or
-    /// Debt or one of their payments (or what they write off), a Starting balance, a Balance adjustment, or in Recently
-    /// Deleted. A part of a split can be split again.
+    /// Debt or one of their payments (or what they write off), a Starting balance, a Balance adjustment, an Expense
+    /// paid back into another wallet (ADR-0010), or in Recently Deleted. A part of a split can be split again.
     var canBeSplit: Bool { canBeSplit(editFlow: editFlow) }
 
     /// ``canBeSplit``, for a screen that has already worked out ``editFlow``.
     func canBeSplit(editFlow: TransactionEditFlow?) -> Bool {
         editFlow == .addSheet && category?.type.isUserManaged == true && !isBalanceAdjustment && !isInRecentlyDeleted
+            && !hasPaybacksElsewhere
     }
 
     /// Whether this is an Expense or Income, not a transfer half, that shares a link: a part of a Split, or what a Loan
-    /// or Debt writes off beside a payment.
+    /// or Debt writes off beside a payment. A payback into another wallet and the Expense it was paid against share a
+    /// link too, but they are neither (ADR-0010).
     var isLinkedExpenseOrIncome: Bool {
-        guard linkID != nil, let category, !category.isTransferHalf else { return false }
+        guard linkID != nil, !hasPaybacksElsewhere, let category, !category.isTransferHalf,
+              category.lockedRole != .reimbursement
+        else { return false }
         return category.type.isUserManaged
     }
 

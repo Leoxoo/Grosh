@@ -19,7 +19,7 @@ struct MonthGraphLegend: View {
                 }
                 Spacer(minLength: 0)
                 if graph.offersLastYear {
-                    Toggle(Strings.Home.vsLastYear, isOn: $comparesWithLastYear)
+                    Toggle(Strings.Home.vsLastYear, isOn: comparesWithoutAnimation)
                         .toggleStyle(.switch)
                         .controlSize(.mini)
                         .fixedSize()
@@ -33,6 +33,19 @@ struct MonthGraphLegend: View {
         }
         .font(.caption)
         .foregroundStyle(.secondary)
+    }
+
+    /// The switch's setting, changed with every animation off. Home, the Report's comparison card and the Spent and
+    /// Income details all redraw from it, some on screens not showing; an animation carried into those while the user
+    /// leaves for another tab drew "Transformers don't support animations across multiple screens".
+    private var comparesWithoutAnimation: Binding<Bool> {
+        Binding {
+            comparesWithLastYear
+        } set: { isOn in
+            var transaction = SwiftUI.Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { comparesWithLastYear = isOn }
+        }
     }
 
     private func entry(_ name: Text, color: Color, dotted: Bool = false) -> some View {

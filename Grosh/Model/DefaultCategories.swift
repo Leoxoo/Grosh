@@ -121,6 +121,7 @@ nonisolated enum DefaultCategories {
         income("Gifts", "gift.fill", .pink),
         income("Other Income", "ellipsis.circle.fill", .gray, role: .otherIncome),
         income("Incoming transfer", "arrow.down.left.circle.fill", .blue, role: .incomingTransfer),
+        income("Reimbursement", "arrow.uturn.left.circle.fill", .teal, role: .reimbursement),
     ]
 
     private static let debtLoanTree: [CategorySeed] = [
