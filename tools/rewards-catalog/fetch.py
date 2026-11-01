@@ -618,6 +618,11 @@ def report(summary: RunSummary, total_cards: int) -> str:
 RETRYABLE = ("failed", "gone", "needs-browser")
 
 
+def text_saved(card_id: str, entry: dict, cache: Path) -> bool:
+    """Whether a card's fetched text is in the cache. A card that never got a page has nothing to save."""
+    return not entry.get("hash") or (cache / card_id / "latest.txt").exists()
+
+
 def select(
     cards: list[dict],
     only: list[str],
@@ -626,9 +631,12 @@ def select(
     state: dict | None = None,
     missing: bool = False,
     retry: bool = False,
+    cache: Path | None = None,
 ) -> list[dict]:
     """The cards to fetch. `missing` keeps those never fetched and `retry` those whose last fetch
-    failed, found the page gone or came back too thin; with both, a card qualifies under either."""
+    failed, found the page gone or came back too thin; with both, a card qualifies under either.
+    Given the cache, `missing` also keeps cards fetched before whose saved text isn't there (a new
+    checkout has fetch-state.json but not the ignored cache/)."""
     state = state or {}
     chosen = []
     for card in cards:
@@ -638,7 +646,9 @@ def select(
             continue
         if missing or retry:
             entry = state.get(card["id"])
-            wanted = (missing and entry is None) or (retry and entry is not None and entry["lastStatus"] in RETRYABLE)
+            wanted = (missing and (entry is None or (cache is not None and not text_saved(card["id"], entry, cache)))) or (
+                retry and entry is not None and entry["lastStatus"] in RETRYABLE
+            )
             # A card whose page moved in the seed since it was fetched needs a fresh look too.
             wanted = wanted or (entry is not None and entry.get("url") != card["sourceUrl"])
             if not wanted:
@@ -652,7 +662,7 @@ def main() -> int:
     parser.add_argument("--only", nargs="+", default=[], metavar="ID", help="fetch just these card ids")
     parser.add_argument("--issuer", default="", help="fetch just cards whose issuer contains this text")
     parser.add_argument("--limit", type=int, help="fetch at most this many cards")
-    parser.add_argument("--missing", action="store_true", help="only cards never fetched (resumes an interrupted run)")
+    parser.add_argument("--missing", action="store_true", help="only cards never fetched, or whose saved text is missing (resumes an interrupted run)")
     parser.add_argument("--retry", action="store_true", help="only cards whose last fetch failed, found the page gone, or came back too thin")
     parser.add_argument("--delay", type=float, default=DELAY_SECONDS, help="seconds between requests to one host")
     parser.add_argument("--no-browser", action="store_true", help="don't load shell pages in headless Chromium (faster; needs Playwright otherwise)")
@@ -660,7 +670,7 @@ def main() -> int:
 
     cards = read_json(SEED, {"cards": []})["cards"]
     state = read_json(STATE, {})
-    chosen = select(cards, args.only, args.issuer, args.limit, state, args.missing, args.retry)
+    chosen = select(cards, args.only, args.issuer, args.limit, state, args.missing, args.retry, CACHE)
     if not chosen:
         sys.exit("No cards match.")
 

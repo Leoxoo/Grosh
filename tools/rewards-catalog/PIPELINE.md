@@ -61,7 +61,7 @@ Pages are fetched one at a time, never in parallel. Each card's result prints as
 ```
 fetch.py --only ID [ID ...]   # specific cards
 fetch.py --issuer chase       # one issuer
-fetch.py --missing            # never fetched: resumes an interrupted run
+fetch.py --missing            # never fetched, or saved text missing: resumes an interrupted run
 fetch.py --retry              # last fetch failed or found the page gone
 ```
 

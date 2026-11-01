@@ -341,7 +341,9 @@ class App:
                 "id": card["id"], "name": card["name"], "issuer": card["issuer"], "kind": card["rewardKind"],
                 "sourceUrl": card["sourceUrl"], "handEntered": hand_entered,
                 "fetch": {
-                    "status": entry.get("lastStatus", "never"), "chars": entry.get("textChars"),
+                    # fetch-state.json is committed but cache/ isn't, so a new checkout knows a page it doesn't have.
+                    "status": "not-saved" if not fetch.text_saved(card["id"], entry, self.paths.cache) else entry.get("lastStatus", "never"),
+                    "chars": entry.get("textChars"),
                     "embedded": bool(entry.get("embedded")), "changedAt": entry.get("changedAt"), "hasPage": page,
                 },
                 "extract": None if candidate is None else {
@@ -480,14 +482,17 @@ class App:
             chosen = [card for card in cards if card["id"] in set(ids)]
             if kind == "extract":
                 manual_ids = set(fetch.read_json(self.paths.manual, {}))
+                ticked = len(chosen)
                 chosen = [c for c in chosen if extract.has_page(c, state, self.paths.cache) or c["id"] in manual_ids]
                 if ids and not chosen:
-                    raise Problem("None of the ticked cards has a fetched page yet. Fetch them first.")
+                    raise Problem("None of the ticked cards has a fetched page here. Fetch them first.")
+                if len(chosen) < ticked:
+                    return chosen, f"{len(chosen)} ticked card(s); {ticked - len(chosen)} skipped, no saved page (fetch them first)"
             if not chosen:
                 raise Problem("Tick at least one card first.")
             return chosen, f"{len(chosen)} ticked card(s)"
         if kind == "fetch":
-            chosen = fetch.select(cards, [], "", None, state, missing=which == "missing", retry=which == "retry")
+            chosen = fetch.select(cards, [], "", None, state, missing=which == "missing", retry=which == "retry", cache=self.paths.cache)
             if which == "all":
                 chosen = cards
             return chosen, {"missing": "cards never fetched", "retry": "cards that failed or came back thin", "all": "every card"}.get(which, "")

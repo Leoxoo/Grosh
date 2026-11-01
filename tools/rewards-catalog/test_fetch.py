@@ -368,6 +368,16 @@ class SelectTests(unittest.TestCase):
     def test_missing_picks_up_cards_never_fetched(self):
         self.assertEqual(self.ids(state=self.STATE, missing=True), ["citi-a", "citi-b"])
 
+    def test_missing_picks_up_fetched_cards_whose_text_is_not_saved(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp)
+            state = {**self.STATE, "chase-a": {**self.STATE["chase-a"], "hash": "h"}, "citi-b": {**self.STATE["citi-b"], "hash": "h"}}
+            (cache / "citi-b").mkdir()
+            (cache / "citi-b" / "latest.txt").write_text("saved")
+            # chase-a was fetched but its text is gone; chase-b failed, so it never had text to lose.
+            self.assertEqual(self.ids(state=state, missing=True, cache=cache), ["chase-a", "citi-a", "citi-b"])
+            self.assertEqual(self.ids(state=state, missing=True), ["citi-a", "citi-b"])  # no cache given: state alone
+
     def test_retry_picks_up_failures(self):
         self.assertEqual(self.ids(state=self.STATE, retry=True), ["chase-b", "citi-b"])
 

@@ -164,7 +164,7 @@
     <h2 id="run-h">Run</h2>
     <div class="groups">
       <div class="group"><span class="name">Fetch pages</span>
-        <button data-job="fetch:missing">Never fetched</button>
+        <button data-job="fetch:missing">Never fetched or not saved</button>
         <button data-job="fetch:retry">Retry failed</button>
         <button data-job="fetch:ids">Ticked</button>
         <button data-job="fetch:all">All</button>
@@ -248,7 +248,7 @@ async function api(method, path, body) {
   return data;
 }
 
-const fetchKind = { ok: "ok", new: "ok", unchanged: "ok", changed: "ok", never: "", "needs-browser": "warn", refused: "warn", robots: "warn", gone: "bad", failed: "bad" };
+const fetchKind = { "not-saved": "warn", ok: "ok", new: "ok", unchanged: "ok", changed: "ok", never: "", "needs-browser": "warn", refused: "warn", robots: "warn", gone: "bad", failed: "bad" };
 const extractKind = { ok: "ok", manual: "info", "no-rules": "", "wrong-page": "warn", failed: "bad" };
 const NEEDS = { "choice-categories": "picks a category", "account-opened": "date opened", "pays-with-apple-pay": "uses Apple Pay" };
 
@@ -395,7 +395,7 @@ function renderRows() {
         h("span", { class: "small muted" }, c.issuer + " · " + c.kind, c.handEntered ? " · " : "", c.handEntered ? chip("hand-entered", "info") : null))),
       h("td", {}, h("div", { class: "stack" },
         chip(f.status, fetchKind[f.status] ?? "warn"),
-        h("span", { class: "small muted", text: f.chars ? `${f.chars.toLocaleString()} characters${f.embedded ? " · from page data" : ""}` : "" }))),
+        h("span", { class: "small muted", text: f.status === "not-saved" ? "fetched before, but the text isn't in this checkout: fetch it again" : f.chars ? `${f.chars.toLocaleString()} characters${f.embedded ? " · from page data" : ""}` : "" }))),
       h("td", {}, ex ? h("div", { class: "stack" },
         h("span", {}, chip(ex.status, extractKind[ex.status] ?? ""), " ", ex.rules ? `${ex.rules} rule${ex.rules === 1 ? "" : "s"}` : "", ex.rejected ? ` · ${ex.rejected} rejected` : ""),
         h("span", { class: "small muted", text: ex.model ? `${ex.model} · prompt ${ex.promptVersion ?? "-"}` : "" }),

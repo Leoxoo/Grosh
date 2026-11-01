@@ -212,6 +212,22 @@ class OverviewTests(AppCase):
         self.assertEqual((overview["summary"]["cards"], overview["summary"]["fetched"], overview["summary"]["pending"]), (3, 1, 0))
 
 
+    def test_a_page_in_the_state_but_not_the_cache_says_so_and_is_fetched_as_missing(self):
+        self.give_page("bank-a")
+        (self.paths.cache / "bank-a" / "latest.txt").unlink()
+        row = next(r for r in self.app.overview()["cards"] if r["id"] == "bank-a")
+        self.assertEqual((row["fetch"]["status"], row["fetch"]["hasPage"], row["pending"]), ("not-saved", False, False))
+        chosen, _ = self.app.choose_cards({"kind": "fetch", "which": "missing"})
+        self.assertIn("bank-a", [c["id"] for c in chosen])
+
+    def test_extracting_ticked_cards_says_which_were_skipped_for_want_of_a_page(self):
+        self.give_page("bank-a")
+        chosen, what = self.app.choose_cards({"kind": "extract", "which": "ids", "ids": ["bank-a", "bank-b"]})
+        self.assertEqual(([c["id"] for c in chosen], what), (["bank-a"], "1 ticked card(s); 1 skipped, no saved page (fetch them first)"))
+        with self.assertRaises(ui.Problem):
+            self.app.choose_cards({"kind": "extract", "which": "ids", "ids": ["bank-b"]})
+
+
 class DetailAndModelTests(AppCase):
     def test_card_detail_shows_the_page_candidate_and_rate_lines(self):
         self.give_page("bank-a")
