@@ -69,6 +69,10 @@
   .rule .what { font-weight: 600; } .rule blockquote { margin: 8px 0 0; padding-left: 10px; border-left: 3px solid var(--line); color: var(--muted); font-size: 13px; }
   .rule ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
   .rule.rejected { border-color: var(--bad); }
+  .rule.accepted { border-color: var(--ok); }
+  .rule .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  .reviewcard { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+  .reviewcard:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
   pre { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; overflow: auto; font: 12px/1.5 var(--mono); white-space: pre-wrap; word-break: break-word; margin: 6px 0; }
   details > summary { cursor: pointer; color: var(--muted); }
   a { color: var(--info); }
@@ -77,7 +81,7 @@
 </head>
 <body>
 <header>
-  <h1>Rewards catalog<small>Fetch issuer pages, then extract reward rules with a model</small></h1>
+  <h1>Rewards catalog<small>Fetch issuer pages, extract reward rules with a model, then review them</small></h1>
   <span id="server" class="pill">checking the model server…</span>
 </header>
 
@@ -214,6 +218,24 @@
         <tbody id="rows"></tbody>
       </table>
     </div>
+  </section>
+
+  <section class="panel" aria-labelledby="review-h">
+    <h2 id="review-h">Review</h2>
+    <p class="small muted" style="margin-top: 0">Passing the checks means a rule's quote is on the page, not that the rule is right. Read each quote and accept or reject the rule; only accepted rules go into the catalog. Decisions are saved in <span class="mono">review-decisions.json</span> (committed), one per exact rule: if a new extraction changes a rule, it waits here again.</p>
+    <div class="row" style="margin-bottom: 10px">
+      <label>Show
+        <select id="reviewShow">
+          <option value="waiting">Waiting for review</option>
+          <option value="">All rules</option>
+          <option value="accept">Accepted</option>
+          <option value="reject">Rejected</option>
+        </select>
+      </label>
+      <button id="reviewReload" type="button">Reload</button>
+      <span class="small muted" id="reviewSummary"></span>
+    </div>
+    <div id="reviewList"></div>
   </section>
 </main>
 
@@ -438,7 +460,7 @@ async function pollJob() {
     const { job } = await api("GET", "/api/job?since=" + state.logNext);
     if (!job) return;
     applyJob(job);
-    if (job.state !== "running") { clearInterval(state.poll); state.poll = null; await loadOverview(); await loadModels(); if (state.open) openCard(state.open, true); }
+    if (job.state !== "running") { clearInterval(state.poll); state.poll = null; await loadOverview(); await loadModels(); await loadReview(); if (state.open) openCard(state.open, true); }
     else if (job.done !== state.lastDone) { state.lastDone = job.done; loadOverview().catch(() => {}); }
   } catch (e) { /* the server may be busy; the next tick tries again */ }
 }
@@ -545,11 +567,65 @@ async function jobFor(kind, id, force) {
   catch (e) { alert(e.message); }
 }
 
+// ---------- review ----------
+const DECISION = { accept: ["accepted", "ok"], reject: ["rejected", "bad"] };
+async function loadReview() {
+  try { state.review = await api("GET", "/api/review"); } catch (e) { fill($("reviewList"), h("div", { class: "result bad", text: e.message })); return; }
+  renderReview();
+}
+function renderReview() {
+  const data = state.review; if (!data) return;
+  const show = $("reviewShow").value, s = data.summary;
+  $("reviewSummary").textContent = `${s.cards} card${s.cards === 1 ? "" : "s"} with rules · ${s.waiting} waiting · ${s.accept} accepted · ${s.reject} rejected`;
+  const wanted = (r) => show === "" || (show === "waiting" ? r.decision == null : r.decision === show);
+  const cards = data.cards.filter((c) => c.rules.some(wanted));
+  if (!cards.length) { fill($("reviewList"), h("p", { class: "muted small", text: show === "waiting" ? "Nothing is waiting for review." : "No rules to show." })); return; }
+  fill($("reviewList"), cards.map((c) => h("div", { class: "reviewcard" },
+    h("div", { class: "row", style: "justify-content: space-between" },
+      h("div", {}, h("strong", { text: c.name }), h("span", { class: "small muted", text: ` ${c.issuer} · ${c.status}` })),
+      h("span", { class: "small muted", text: `${c.counts.waiting} waiting · ${c.counts.accept} accepted · ${c.counts.reject} rejected` })),
+    c.warnings.length ? h("div", { class: "result", style: "background: var(--warn-bg); color: var(--warn)", text: "Check across this card's rules:\n" + c.warnings.join("\n") }) : null,
+    c.cardConditions.length ? h("details", {}, h("summary", { class: "small", text: `Applies to the whole card (${c.cardConditions.length})` }),
+                                h("ul", { class: "small" }, c.cardConditions.map((t) => h("li", { text: t })))) : null,
+    c.rules.filter(wanted).map((r) => reviewBox(c, r)))));
+}
+function reviewBox(c, r) {
+  const decided = DECISION[r.decision], rule = r.rule;
+  const send = (decision) => async (e) => {
+    e.target.disabled = true;
+    try {
+      const updated = await api("POST", "/api/review", { cardId: c.cardId, key: r.key, decision });
+      state.review.cards = state.review.cards.map((x) => x.cardId === c.cardId ? updated : x);
+      const s = { cards: state.review.cards.length, waiting: 0, accept: 0, reject: 0 };
+      for (const x of state.review.cards) for (const k of Object.keys(x.counts)) s[k] += x.counts[k];
+      state.review.summary = s; renderReview();
+    } catch (err) { alert(err.message); await loadReview(); }
+  };
+  return h("div", { class: "rule" + (r.decision === "accept" ? " accepted" : r.decision === "reject" ? " rejected" : "") },
+    h("div", { class: "what", text: describe(rule) }),
+    h("div", { class: "small", style: "margin-top: 4px" },
+      decided ? chip(decided[0], decided[1]) : chip("waiting for review", "info"), " ",
+      r.warnings.map((w) => [chip(w, "warn"), " "]),
+      rule.requires.map((q) => [chip("needs " + q, "info"), " "]), rule.tier ? [chip(rule.tier + " tier", "info"), " "] : null,
+      rule.validFrom || rule.validTo ? chip(`${rule.validFrom || "…"} to ${rule.validTo || "…"}`) : null,
+      rule.firstMonths ? chip(`first ${rule.firstMonths} months`) : null),
+    rule.conditions.length ? h("ul", {}, rule.conditions.map((t) => h("li", { text: t }))) : null,
+    h("blockquote", { text: r.quote }),
+    h("p", { class: "small", style: "margin: 6px 0 0" }, "Source: ",
+      /^https?:\/\//.test(r.url) ? h("a", { href: r.url, target: "_blank", rel: "noopener noreferrer", text: r.url }) : r.url),
+    h("div", { class: "actions" },
+      h("button", { type: "button", class: r.decision === "accept" ? "primary" : "", disabled: r.decision === "accept", text: "Accept", onclick: send("accept") }),
+      h("button", { type: "button", class: "danger", disabled: r.decision === "reject", text: "Reject", onclick: send("reject") }),
+      r.decision ? h("button", { type: "button", text: "Undo", onclick: send("undo") }) : null));
+}
+$("reviewShow").addEventListener("input", renderReview);
+$("reviewReload").onclick = loadReview;
+
 // ---------- start ----------
 (async function start() {
   try {
     fillSettings(await api("GET", "/api/settings"));
-    await loadProfiles(); await loadModels(); await loadOverview();
+    await loadProfiles(); await loadModels(); await loadOverview(); await loadReview();
     const { job } = await api("GET", "/api/job?since=0");
     if (job) { applyJob(job); if (job.state === "running") startPolling(); }
   } catch (e) { $("server").className = "pill bad"; $("server").textContent = "Can't reach the page's server: " + e.message; }

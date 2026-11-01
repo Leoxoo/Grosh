@@ -7,13 +7,13 @@ How Grosh gets credit card reward rules without a server, and keeps them current
 The app ships a **rewards catalog**: for each known card, its fee, its flat earn rate and its category rules (3% dining, 5% on rotating categories up to a cap...). Adding a Card in Grosh can start from a catalog entry.
 
 - The catalog is built **offline**, in this repo, and shipped as one static JSON file. The app never scrapes (ADR 0001: no backend).
-- Nothing reaches the app unreviewed. A script *proposes*; a person *accepts* by merging a pull request.
+- Nothing reaches the app unreviewed. A script *proposes*; a person *accepts* each rule on the review page, and the decisions are committed and merged in a pull request.
 - We ship facts we re-verified ourselves. We never ship card art or another site's compiled data.
 
 ## The shape of a run
 
 ```
-seed ──► fetch ──► extract ──► validate ──► diff ──► review (PR) ──► publish
+seed ──► fetch ──► extract ──► validate ──► diff ──► review ──► publish
 ```
 
 Each stage reads files and writes files, so any stage can be rerun alone and a failed run resumes where it stopped.
@@ -25,7 +25,7 @@ Each stage reads files and writes files, so any stage can be rerun alone and a f
 | **Extract** | cached text | `cache/candidates/<id>.json` (not committed) | `extract.py`, built, not yet run against a real model. Details below. |
 | **Validate** | candidates | pass/fail per candidate | Deterministic checks, below. A failing candidate is dropped, never "fixed". |
 | **Diff** | candidates vs. `catalog.json` | `report.md` | Classifies each card: unchanged, changed, new, page gone, extraction failed. |
-| **Review** | `report.md` | a PR | Only changes need eyes. Merging is the acceptance. |
+| **Review** | candidates | `review-decisions.json` (committed) | `review.py` and the page's Review panel, built. Accept or reject each rule; only accepted rules move on. Details below. |
 | **Publish** | accepted `catalog.json` | `rewards-catalog.json` | Versioned, sorted, byte-stable so the PR diff shows only real changes. |
 
 ## The fetch stage (`fetch.py`)
@@ -221,6 +221,18 @@ Some things about a rule depend on the person, not the card. The catalog doesn't
 - **Chunks with no rate in them aren't sent**, so a footnote-only chunk holding a card-wide condition can be skipped on big pages.
 - **Category words** are a guess at what a quote about a category says. Valid rules the list misses show up in `rejected` as "quote doesn't mention ...", and the fix is to add the word to `CATEGORIES`.
 
+## The review stage (`review.py`)
+
+Passing the checks means a rule is supported by its page, not that it is right, so every rule waits for a person. The page's **Review** panel lists each card that has rules (model-read and hand-entered alike), and for each rule: what it says in plain words, its quote, its source URL, its conditions, and its warnings. **Accept**, **Reject** and **Undo** are saved per rule as soon as they're clicked.
+
+- **Warnings.** A rule's own: hand-entered and not confirmed by the saved page (`verified: "manual"`), or a cap the page mentions without an amount (`capUnknown`). The card's warnings from the extract stage (two rates for one thing, no base rate, rate sentences the result missed) are about its rules taken together, so they are shown above the card's rules.
+- **Hand-entered rules are reviewed too.** `manual-rules.json` is a person's reading of a page, which is not the same as a second person checking it.
+- **Where decisions live.** `review-decisions.json`, next to this file and committed (`cache/` isn't): `{card id: {rule key: {decision, decidedAt, rule, quote}}}`. `rule` and `quote` are there so a pull request's diff reads as "accepted 3% on dining", not a hash.
+- **The key is the exact rule.** It is a hash of the card id and everything the rule says: rate, unit, categories, selection, cap, dates, `firstMonths`, tier, requirements, conditions, the quote, the source URL, and whether the page confirmed it. A re-extraction that changes any of that makes a new rule, which waits for review; it never inherits the old accept. Left out: the page's hash (a page whose menus churned but whose rule is the same keeps its decision), the derived `needs`, the order of lists, and 3 vs 3.0. The same rule on two cards that share a page is reviewed once per card.
+- **Old decisions stay.** A decision whose rule is gone from the candidate is kept and does nothing; if a later extraction brings back that exact rule, its decision applies again.
+- **What moves on.** `review.accepted_rules(candidate)` returns only the candidate's rules a person accepted, in the candidate's order. Rejected rules and rules still waiting are left out. The publish step (#162) builds the catalog from this and nothing else.
+- Not reviewed: card-wide conditions (`cardConditions`). They are the issuer's sentences, checked word for word against the page, and are shown on the panel for reading only.
+
 ## The web page (`ui.py`)
 
 ```
@@ -232,6 +244,7 @@ A small local page, standard library only, that drives the same code as `fetch.p
 - **Model panel:** the server's address, its API key (a password field), and a model box that lists what the server has (or take any id); **Test model** asks it a trivial question using the real output schema and reports the time, tokens, and how many were spent reasoning; **More settings** holds the page size sent per request, the reply limit, the time limit, extra request fields (JSON, such as `{"reasoning_effort": "none"}`), and text added to every prompt. Settings are saved in `cache/ui-settings.json`, and `extract.py` on the command line uses them as its defaults (flags override).
 - **Run:** fetch (never fetched, retry failed, ticked, all) or extract (what needs it, ticked, redo all), one job at a time, with a progress bar, the card and the part of its page being sent, a live log, and **Stop** (it stops between cards, or between parts of a card). A card is "needs extracting" when it has no result for the chosen model and the current prompt version, so switching models marks every card again.
 - **Cards:** every card with its fetch status, extraction status, rule count, model, and the questions it asks the user; search, issuer and status filters; click a card for a drawer with the page's rate-looking lines, every rule in plain words with the quote it came from, what was rejected and why, and any error. **Try the model on this page** shows the model's raw reply and what the checks make of each rule, without saving anything.
+- **Review:** every rule waiting for a decision (or all, accepted or rejected), with Accept, Reject and Undo; see the review stage above.
 - **Safe to leave running:** it listens on `127.0.0.1` only, refuses requests whose Host isn't local, and refuses POSTs without an `X-Requested-With` header, so a web page you visit can't drive it. It never puts page text into markup (text is set with `textContent`).
 
 ### Speed, and what was learned about `flint` (`rec serve`)
