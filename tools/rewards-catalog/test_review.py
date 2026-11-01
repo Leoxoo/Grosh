@@ -18,7 +18,7 @@ URL = "https://x.test/savor"
 
 
 def rule(**changes) -> dict:
-    return extract.accepted_rule(dict(PROPOSAL, **changes), URL, "hash-1", "page")
+    return extract.candidate_rule(dict(PROPOSAL, **changes), URL, "hash-1", "page")
 
 
 def candidate(*rules, card_id: str = "bank-savor", warnings=()) -> dict:
@@ -58,8 +58,8 @@ class AcceptedRulesTests(ReviewCase):
         for changed in (rule(rate=4, quote="Earn unlimited 4% cash back on dining."), rule(capAmount=6000, capPeriod="year"),
                         rule(conditions=["Excluding superstores."]), rule(quote="Earn unlimited 3% cash back on dining!"),
                         rule(requires=["activation"]), rule(validTo="2026-12-31"),
-                        extract.accepted_rule(PROPOSAL, "https://x.test/other-page", "hash-1", "page"),
-                        extract.accepted_rule(PROPOSAL, URL, "hash-1", "manual")):
+                        extract.candidate_rule(PROPOSAL, "https://x.test/other-page", "hash-1", "page"),
+                        extract.candidate_rule(PROPOSAL, URL, "hash-1", "manual")):
             self.assertEqual(self.accepted(candidate(changed)), [], changed)
 
     def test_the_same_rule_from_a_page_that_churned_keeps_its_decision(self):
@@ -116,6 +116,17 @@ class CardReviewTests(ReviewCase):
         self.assertEqual(first["rule"], self.dining)
         self.assertEqual(view["warnings"], ["dining earns 3 and 4 with nothing to tell them apart"])  # the card's, shown with its rules
         self.assertEqual(view["counts"], {"waiting": 1, "accept": 0, "reject": 1})
+
+    def test_a_rule_in_words_says_who_picks_how_many_and_its_cap(self):
+        choice = rule(categories=["gas", "online-shopping"], selection="choose", picks=1, hasOtherChoices=True,
+                      capAmount=2500, capPeriod="quarter")
+        self.assertEqual(review.describe(choice),
+                         "3% in the category the cardholder chooses: gas, online shopping (and others), up to $2,500 per quarter")
+        self.assertEqual(review.describe(rule(unit="per-dollar", rate=1.5, categories=["everything-else"])), "1.5x on everything else")
+
+    def test_the_review_totals_every_cards_counts(self):
+        one, two = (review.card_review(candidate(self.dining, card_id=i), {}) for i in ("a", "b"))
+        self.assertEqual(review.summarize([one, two]), {"cards": 2, "waiting": 2, "accept": 0, "reject": 0})
 
     def test_hand_entered_rules_wait_for_review_too_and_say_when_the_page_did_not_confirm_them(self):
         card = {"id": "bank-savor", "name": "Savor", "sourceUrl": URL}

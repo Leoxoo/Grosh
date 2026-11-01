@@ -331,8 +331,8 @@ class TierBoostTests(unittest.TestCase):
         self.assertEqual(result["warnings"], [])
 
     def test_a_boost_alone_is_not_the_base_rate(self):
-        boost = extract.accepted_rule(rule(**self.BOOST, requires=["preferred-rewards-tier"]), "u", "h", "page")
-        self.assertIn("no rate for all other purchases was found", extract.review_warnings([boost])[0])
+        boost = extract.candidate_rule(rule(**self.BOOST, requires=["preferred-rewards-tier"]), "u", "h", "page")
+        self.assertIn("no rate for all other purchases was found", extract.card_warnings([boost])[0])
 
 
 class WhatCountsAsWhatTests(unittest.TestCase):
@@ -567,11 +567,11 @@ class WhatCountsAsWhatTests(unittest.TestCase):
 
 class ReviewWarningTests(unittest.TestCase):
     def rules(self, *specs):
-        return [extract.accepted_rule(rule(**spec), "u", "h", "page") for spec in specs]
+        return [extract.candidate_rule(rule(**spec), "u", "h", "page") for spec in specs]
 
     def test_two_rates_for_the_same_thing_are_flagged(self):
         base = dict(categories=["everything-else"], quote="Earn 1% on all other purchases.")
-        warnings = extract.review_warnings(self.rules({**base, "rate": 1}, {**base, "rate": 5}))
+        warnings = extract.card_warnings(self.rules({**base, "rate": 1}, {**base, "rate": 5}))
         self.assertEqual(warnings, ["everything-else earns 1 and 5 with nothing to tell them apart"])
 
     def test_rates_with_something_to_tell_them_apart_are_not(self):
@@ -581,14 +581,14 @@ class ReviewWarningTests(unittest.TestCase):
                            {**base, "rate": 4, "capAmount": 500, "capPeriod": "month"},
                            {"categories": [], "selection": "rotating", "rate": 5}, {"categories": [], "selection": "rotating", "rate": 2},
                            {"categories": ["everything-else"], "rate": 1, "quote": "Earn 1% on all other purchases."})
-        self.assertEqual(extract.review_warnings(rules), [])
+        self.assertEqual(extract.card_warnings(rules), [])
 
     def test_a_card_with_rates_but_no_base_rate_is_flagged(self):
         dining = self.rules({"categories": ["dining"], "rate": 3})
-        self.assertEqual(extract.review_warnings(dining), ["no rate for all other purchases was found: check the page for what everything else earns"])
+        self.assertEqual(extract.card_warnings(dining), ["no rate for all other purchases was found: check the page for what everything else earns"])
         both = self.rules({"categories": ["dining"], "rate": 3}, {"categories": ["everything-else"], "rate": 1, "quote": "Earn 1% on all other purchases."})
-        self.assertEqual(extract.review_warnings(both), [])
-        self.assertEqual(extract.review_warnings([]), [])  # nothing found is already no-rules
+        self.assertEqual(extract.card_warnings(both), [])
+        self.assertEqual(extract.card_warnings([]), [])  # nothing found is already no-rules
 
     def test_a_candidate_carries_its_warnings(self):
         reply = [rule(categories=["everything-else"], rate=1, quote="Earn 1% cash back on all other purchases."),

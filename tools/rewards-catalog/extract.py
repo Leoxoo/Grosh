@@ -110,13 +110,15 @@ SELECTION_WORDS = {
     "choose": ("choice", "choose", "choosing", "chosen", "select", "pick"),
     "top-spend": ("top", "highest", "most", "greatest"),
 }
+# A relationship boost's tag, both what the rate requires and what the app must ask (Bank of America Preferred Rewards).
+TIER_BOOST = "preferred-rewards-tier"
 # What a rate can require beyond the purchase itself, and the words that must back the tag up.
 REQUIRES = {
     "apple-pay": ("apple pay",),
     "activation": ("activate", "activation", "enroll"),
     "issuer-booking": ("booked through", "booked with", "book through", "book with", "booking through",
                        "purchased through", "portal"),
-    "preferred-rewards-tier": ("preferred rewards", "rewards bonus", "reward bonus"),  # the bonus: a tier table's row
+    TIER_BOOST: ("preferred rewards", "rewards bonus", "reward bonus"),  # the bonus: a tier table's row
 }
 # Bank of America's Preferred Rewards tiers, and how a quote names each ("Platinum" alone is not Platinum Honors).
 TIERS = {
@@ -133,7 +135,7 @@ NEEDS = {
     "choice-categories": "Which category did you choose on this card?",
     "account-opened": "When did you open this card?",
     "pays-with-apple-pay": "Do you usually pay with Apple Pay?",
-    "preferred-rewards-tier": "Which Bank of America Preferred Rewards tier are you in?",
+    TIER_BOOST: "Which Bank of America Preferred Rewards tier are you in?",
 }
 MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
           "november", "december")
@@ -428,8 +430,8 @@ def validate_rule(rule, page_norm: str | None = None, rows: dict[str, str] | Non
     tier = rule.get("tier")
     if tier is not None and tier not in TIERS:
         return f"tier {tier!r} is not one of {', '.join(TIERS)}"
-    if tier is not None and "preferred-rewards-tier" not in requires:
-        return "a tier is only for a rule that requires preferred-rewards-tier"
+    if tier is not None and TIER_BOOST not in requires:
+        return f"a tier is only for a rule that requires {TIER_BOOST}"
     if not isinstance(conditions, list) or len(conditions) > MAX_CONDITIONS:
         return f"conditions must be a list of at most {MAX_CONDITIONS} quotes"
     for condition in conditions:
@@ -450,9 +452,9 @@ def validate_rule(rule, page_norm: str | None = None, rows: dict[str, str] | Non
     context = " ".join([quote_norm, *map(normalize, conditions)])
     rate_norm = normalize(_rate_sentence(quote, rate))
     row = next((head for cell, head in (rows or {}).items() if quote_norm in cell), None)
-    boost = "preferred-rewards-tier" in requires
+    boost = TIER_BOOST in requires
     if not boost and (row or mentions(rate_norm, BOOST_WORDS) and not mentions(rate_norm, NOT_A_BOOST)):
-        return "the rate is a relationship boost, not one every cardholder earns: it needs requires preferred-rewards-tier"
+        return f"the rate is a relationship boost, not one every cardholder earns: it needs requires {TIER_BOOST}"
     if row:
         context += " " + row  # a table cell's tier and bonus are in its row
     if selection == "rotating":
@@ -677,8 +679,8 @@ Rules:
 - unit: "percent" for cash back percent, "per-dollar" for points or miles per dollar.
 - quote: copy the exact words of one sentence or phrase from the text that states the rate. Do not change, shorten or join them.
 - capAmount and capPeriod: only if that same sentence limits how much spending earns the rate (for "up to $6,000 per year": 6000 and "year"; the period is month, quarter, year, or cycle for a billing cycle). Otherwise null for both.
-- requires: only what the text says the rate needs. "apple-pay" (must pay with Apple Pay), "activation" (must activate or enroll), "issuer-booking" (must book through the issuer's travel site or portal), "preferred-rewards-tier" (a higher rate only for members of a banking relationship program, such as Bank of America Preferred Rewards: "earn up to 75% more", "as a Platinum Honors member"). Otherwise [].
-- tier: for a "preferred-rewards-tier" rate, the tier the text gives it: "gold", "platinum", "platinum-honors" or "diamond-honors". Otherwise null. A boosted rate is its own entry; the rate every cardholder earns is a separate entry without it.
+- requires: only what the text says the rate needs. "apple-pay" (must pay with Apple Pay), "activation" (must activate or enroll), "issuer-booking" (must book through the issuer's travel site or portal), "{TIER_BOOST}" (a higher rate only for members of a banking relationship program, such as Bank of America Preferred Rewards: "earn up to 75% more", "as a Platinum Honors member"). Otherwise [].
+- tier: for a "{TIER_BOOST}" rate, the tier the text gives it: "gold", "platinum", "platinum-honors" or "diamond-honors". Otherwise null. A boosted rate is its own entry; the rate every cardholder earns is a separate entry without it.
 - validFrom and validTo: for a rate that applies only in a stated period, its first and last day as YYYY-MM-DD, and only when the text names the months and the year (October through December 2026 is 2026-10-01 and 2026-12-31). Otherwise null.
 - firstMonths: only if the text says the rate applies just during an introductory period after the account is opened ("first year", "first 6 months"): the length in months (12 for "first year"). Otherwise null.
 - conditions: copy, word for word, each sentence in the text that excludes or restricts this one rate: excluded stores, a minimum, who qualifies. These are often in footnotes, which repeat the rate with its exclusions. Never paraphrase. Use [] if there are none.
@@ -881,12 +883,12 @@ def needs_of(rule: dict) -> list[str]:
         needs.append("account-opened")
     if "apple-pay" in rule["requires"]:
         needs.append("pays-with-apple-pay")
-    if "preferred-rewards-tier" in rule["requires"]:
-        needs.append("preferred-rewards-tier")
+    if TIER_BOOST in rule["requires"]:
+        needs.append(TIER_BOOST)
     return needs
 
 
-def accepted_rule(proposal: dict, url: str, page_hash: str | None, verified: str) -> dict:
+def candidate_rule(proposal: dict, url: str, page_hash: str | None, verified: str) -> dict:
     """A rule as the candidate stores it. `verified` is "page" when its quote was found on the page and
     "manual" when a person entered it and the page could not confirm the quote."""
     return {
@@ -911,7 +913,7 @@ def accepted_rule(proposal: dict, url: str, page_hash: str | None, verified: str
     }
 
 
-def _rule_key(rule: dict) -> tuple:
+def _merge_key(rule: dict) -> tuple:
     """What makes two rules the same rule. The quote and the requirements are left out on purpose: the model
     words the same sentence differently in different parts of a page, and the requirements it finds in one
     part are merged into the rule (see extract_card)."""
@@ -921,7 +923,7 @@ def _rule_key(rule: dict) -> tuple:
     )
 
 
-def review_warnings(rules: list[dict]) -> list[str]:
+def card_warnings(rules: list[dict]) -> list[str]:
     """Things that pass every check but that a person should look at before trusting the card: the same
     thing earning two different rates with nothing to tell them apart (two base rates, say). Each of the
     rates is on the page; at most one is probably the right reading."""
@@ -940,7 +942,7 @@ def review_warnings(rules: list[dict]) -> list[str]:
         for key, rates in sorted(groups.items(), key=lambda item: repr(item[0])) if len(rates) > 1
     ]
     if rules and not any(
-        r["selection"] == "fixed" and r["categories"] == ["everything-else"] and "preferred-rewards-tier" not in r["requires"]
+        r["selection"] == "fixed" and r["categories"] == ["everything-else"] and TIER_BOOST not in r["requires"]
         for r in rules
     ):  # a boost is not the base rate: most cardholders don't earn it
         warnings.append("no rate for all other purchases was found: check the page for what everything else earns")
@@ -1154,8 +1156,8 @@ def extract_card(
             if reason:
                 candidate["rejected"].append({"rule": proposal, "reason": reason})
                 continue
-            rule = accepted_rule(proposal, card["sourceUrl"], page_hash, "page")
-            entry = accepted.setdefault(_rule_key(rule), rule)
+            rule = candidate_rule(proposal, card["sourceUrl"], page_hash, "page")
+            entry = accepted.setdefault(_merge_key(rule), rule)
             # The same rule seen again (the model words a quote a little differently in each part of a page) may carry a
             # condition or requirement the first time lacked.
             entry["conditions"] += [c for c in rule["conditions"] if c not in entry["conditions"]]
@@ -1193,7 +1195,7 @@ def extract_card(
 
     candidate["rules"] = sorted(accepted.values(), key=lambda r: (r["categories"][0] if r["categories"] else "~", -r["rate"]))  # "~" sorts rotating rules last
     candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
-    candidate["warnings"] = review_warnings(candidate["rules"])
+    candidate["warnings"] = card_warnings(candidate["rules"])
     if still_missing:
         # The page states these rates and the result doesn't have them: an "ok" that isn't complete must say so.
         candidate["warnings"].append(
@@ -1219,7 +1221,7 @@ def manual_candidate(card: dict, entry: dict, text: str | None, page_hash: str |
         if problem:
             candidate["rejected"].append({"rule": proposal, "reason": problem})
             continue
-        candidate["rules"].append(accepted_rule(proposal, card["sourceUrl"], page_hash, "page" if grounded else "manual"))
+        candidate["rules"].append(candidate_rule(proposal, card["sourceUrl"], page_hash, "page" if grounded else "manual"))
     for condition in entry.get("cardConditions", []):
         problem = check_condition(condition, None)
         if problem:
@@ -1230,7 +1232,7 @@ def manual_candidate(card: dict, entry: dict, text: str | None, page_hash: str |
         normalize(c) in page_norm for c in candidate["cardConditions"]
     )
     candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
-    candidate["warnings"] = review_warnings(candidate["rules"])
+    candidate["warnings"] = card_warnings(candidate["rules"])
     if not candidate["rules"]:
         candidate["status"] = "no-rules"
     return candidate

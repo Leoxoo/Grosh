@@ -11,6 +11,7 @@ import json
 import sys
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).parent))
 import extract  # noqa: E402
@@ -29,7 +30,6 @@ CARD_FIELDS = ("id", "name", "issuer", "network", "isBusiness", "annualFee", "re
                "discontinued", "sourceUrl")
 RULE_FIELDS = ("categories", "selection", "picks", "hasOtherChoices", "rate", "unit", "capAmount", "capPeriod",
                "capUnknown", "requires", "validFrom", "validTo", "firstMonths", "tier", "needs", "conditions")
-LIST_FIELDS = ("categories", "requires", "needs", "conditions")  # sets, in whatever order the model listed them
 
 
 def number(value):
@@ -39,16 +39,11 @@ def number(value):
 
 def published_rule(rule: dict) -> dict:
     published = {field: rule.get(field) for field in RULE_FIELDS}
-    for field in LIST_FIELDS:
+    for field in review.SET_FIELDS:
         published[field] = sorted(published[field] or [])
     published["rate"], published["capAmount"] = number(published["rate"]), number(published["capAmount"])
     published["evidence"] = {"quote": rule["evidence"]["quote"], "url": rule["evidence"]["url"]}
     return published
-
-
-def dumps(document: dict) -> str:
-    """The file's text: keys sorted, two-space indents, one trailing newline, so equal catalogs are equal bytes."""
-    return json.dumps(document, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
 
 
 def catalog(cards: list[dict], candidates: dict[str, dict], decisions: dict, previous: dict | None, today: str) -> dict:
@@ -65,10 +60,10 @@ def catalog(cards: list[dict], candidates: dict[str, dict], decisions: dict, pre
         rules = review.accepted_rules(candidate, decisions) if candidate else []
         if not rules:  # nobody has checked this card, so its seed facts aren't ours to ship
             continue
-        mine = decisions[card["id"]]
+        card_decisions = decisions[card["id"]]
         published.append({
             **{field: card[field] for field in CARD_FIELDS},
-            "verifiedAt": max(mine[review.rule_key(card["id"], r)]["decidedAt"] for r in rules),
+            "verifiedAt": max(card_decisions[review.rule_key(card["id"], r)]["decidedAt"] for r in rules),
             "cardConditions": sorted(candidate.get("cardConditions", [])),
             "rules": sorted((published_rule(r) for r in rules), key=lambda r: json.dumps(r, sort_keys=True)),
         })
@@ -77,14 +72,19 @@ def catalog(cards: list[dict], candidates: dict[str, dict], decisions: dict, pre
     return {"formatVersion": FORMAT_VERSION, "publishedAt": previous["publishedAt"] if unchanged else today, "cards": published}
 
 
-def publish(seed: Path = SEED, candidates: Path = extract.CANDIDATES, decisions: Path = review.DECISIONS,
-            out: Path = OUT, today: str = "") -> dict:
-    """Build the catalog from the files and write it to `out`. Returns what was written."""
-    cards = fetch.read_json(seed, {"cards": []})["cards"]
-    found = {path.stem: fetch.read_json(path, None) for path in sorted(candidates.glob("*.json"))}
-    document = catalog(cards, found, review.load_decisions(decisions), fetch.read_json(out, None),
+# Where publish reads and writes: the seed, the candidates, the decisions and the catalog. ui.Paths has the same
+# fields, for the web page's own (test) folders.
+PATHS = SimpleNamespace(seed=SEED, candidates=extract.CANDIDATES, decisions=review.DECISIONS, catalog=OUT)
+
+
+def publish(paths=PATHS, today: str = "") -> dict:
+    """Build the catalog from the files in `paths` and write it to `paths.catalog` (fetch.write_json: keys sorted,
+    so equal catalogs are equal bytes). Returns what was written."""
+    cards = fetch.read_json(paths.seed, {"cards": []})["cards"]
+    found = {path.stem: fetch.read_json(path, None) for path in sorted(paths.candidates.glob("*.json"))}
+    document = catalog(cards, found, review.load_decisions(paths.decisions), fetch.read_json(paths.catalog, None),
                        today or date.today().isoformat())
-    out.write_text(dumps(document), encoding="utf-8")
+    fetch.write_json(paths.catalog, document)
     return document
 
 
