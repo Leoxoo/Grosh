@@ -686,6 +686,86 @@ class ExtractCardTests(unittest.TestCase):
         self.assertEqual(len(self.run_card(FakeModel(json.dumps({"rules": [rule()]})))["rules"]), 1)
 
 
+DISCOVER_IT = {"id": "discover-discover-it", "name": "Discover It", "issuer": "Discover", "rewardKind": "cashback",
+               "sourceUrl": "https://x.test/discover"}
+BASE = "Plus, earn 1% cash back on all other purchases."
+MILES = "Earn 1.5x miles on every dollar of every purchase — from hotels to groceries and online shopping."
+CHROME = "Earn 2% cash back at gas stations and restaurants on up to $1,000 in combined purchases each quarter, automatically."
+# Discover's card list: one page, a section per card, and the same sentences under several of them.
+DISCOVER_PAGE = "\n".join([
+    "Compare Discover credit cards to find the perfect fit",
+    "Discover it Cash Back Credit Card", "Check My Eligibility Apply Now", DISCOVER, BASE, "No annual fee", "Read More",
+    "Discover it Miles Credit Card", "Check My Eligibility Apply Now", MILES, "No annual fee", "Read More",
+    "Discover it Chrome Gas & Restaurants Credit Card", "Check My Eligibility Apply Now", CHROME, BASE, "No annual fee",
+    "NHL® Discover it Credit Card", DISCOVER, BASE,
+    *["Unlimited Discover Match"] * 12,
+    "Discover it Miles for Good Credit", MILES,  # not a heading, so in no card's section
+])
+
+
+class OtherCardsTests(unittest.TestCase):
+    """A page can describe several cards. A rate is kept only if the page states it for this card."""
+
+    def test_a_rate_only_in_another_cards_section_is_rejected(self):
+        reply = [
+            rule(categories=[], selection="rotating", rate=5, quote=DISCOVER, requires=["activation"]),
+            rule(categories=["everything-else"], rate=1, quote=BASE),
+            rule(categories=["everything-else"], rate=1.5, unit="per-dollar", quote=MILES),
+            rule(categories=["gas"], rate=2, quote=CHROME, capAmount=1000, capPeriod="quarter"),
+        ]
+        result = extract_card(DISCOVER_IT, DISCOVER_PAGE, "h", FakeModel(reply), "m", follow_up=False)
+        self.assertEqual([(r["selection"], r["rate"]) for r in result["rules"]], [("fixed", 1), ("rotating", 5)])
+        reasons = {r["rule"]["quote"]: r["reason"] for r in result["rejected"]}
+        self.assertEqual(set(reasons), {MILES, CHROME})
+        self.assertIn("another card's section (Discover it Miles", reasons[MILES])
+        self.assertIn("another card's section (Discover it Chrome Gas & Restaurants", reasons[CHROME])
+
+    def test_a_quote_that_names_another_card_is_rejected_wherever_it_sits(self):
+        named = "Ask about the Discover it Miles Card: earn 1.5x miles on every purchase."
+        page = DISCOVER_PAGE.replace(BASE, BASE + "\n" + named, 1)  # in this card's own section
+        reply = [rule(categories=["everything-else"], rate=1.5, unit="per-dollar", quote=named)]
+        result = extract_card(DISCOVER_IT, page, "h", FakeModel(reply), "m", follow_up=False)
+        self.assertEqual(result["rules"], [])
+        self.assertEqual([r["reason"] for r in result["rejected"]], ["the quote names another card (Discover it Miles Card)"])
+
+    def test_another_cards_rates_are_not_asked_about_again_or_missed(self):
+        model = FakeModel([rule(categories=[], selection="rotating", rate=5, quote=DISCOVER, requires=["activation"]),
+                           rule(categories=["everything-else"], rate=1, quote=BASE)])
+        result = extract_card(DISCOVER_IT, DISCOVER_PAGE, "h", model, "m")
+        self.assertEqual((len(model.asked), result["followUps"]), (1, 0))  # the chunk only, no follow-up on miles or Chrome
+        self.assertEqual(result["warnings"], [])
+
+    def test_title_case_navigation_is_not_a_card_name(self):
+        # A quote that swept up the menu ("Manage Your Credit Card") names no card.
+        menu = "Discover Deals Manage Your Credit Card Earn 1% cash back on all other purchases."
+        page = DISCOVER_PAGE.replace(BASE, BASE + "\n" + menu, 1)
+        reply = [rule(categories=["everything-else"], rate=1, quote=menu)]
+        result = extract_card(DISCOVER_IT, page, "h", FakeModel(reply), "m", follow_up=False)
+        self.assertEqual((len(result["rules"]), result["rejected"]), (1, []))
+
+    def test_a_shorter_name_for_this_card_is_not_another_card(self):
+        card = {**DISCOVER_IT, "name": "IHG Traveler", "issuer": "Chase"}
+        own, premier = "Earn 2 points per $1 spent on all other purchases.", "Earn 3 points per $1 spent on all other purchases."
+        page = "\n".join([
+            "IHG One Rewards Traveler Credit Card", "Apply now",
+            "Why the IHG One Rewards Credit Card", own,  # the page's short name for this card
+            "IHG One Rewards Premier Credit Card", premier,  # a sibling: Traveler with Premier in its place
+        ])
+        reply = [rule(categories=["everything-else"], rate=r, unit="per-dollar", quote=q) for r, q in ((2, own), (3, premier))]
+        result = extract_card(card, page, "h", FakeModel(reply), "m", follow_up=False)
+        self.assertEqual([r["rate"] for r in result["rules"]], [2])
+        self.assertEqual([r["rule"]["quote"] for r in result["rejected"]], [premier])
+
+    def test_a_page_that_never_names_this_card_exactly_cannot_tell_its_cards_apart(self):
+        # CardPin calls it "Breeze"; Barclays only ever says "Breeze Easy Visa". Nothing is rejected for that.
+        card = {**DISCOVER_IT, "name": "Breeze", "issuer": "Barclays"}
+        quote = "Earn 1 point for every $1 spent on all other purchases with the Breeze Easy Visa Credit Card."
+        page = "Breeze Easy Visa Credit Card\n" + quote
+        reply = [rule(categories=["everything-else"], rate=1, unit="per-dollar", quote=quote)]
+        result = extract_card(card, page, "h", FakeModel(reply), "m", follow_up=False)
+        self.assertEqual((len(result["rules"]), result["rejected"]), (1, []))
+
+
 class StatsTests(unittest.TestCase):
     def test_calls_are_totalled_including_what_a_server_leaves_out(self):
         calls = [

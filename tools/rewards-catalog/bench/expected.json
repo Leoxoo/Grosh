@@ -14,8 +14,6 @@
     {"categories": [], "selection": "rotating", "rate": 5, "capAmount": 1500, "capPeriod": "quarter", "requires": ["activation"]}
   ],
   "discover-discover-it": [
-    {"categories": ["gas"], "selection": "fixed", "rate": 2, "capAmount": 1000, "capPeriod": "quarter"},
-    {"categories": ["dining"], "selection": "fixed", "rate": 2, "capAmount": 1000, "capPeriod": "quarter"},
     {"categories": ["everything-else"], "selection": "fixed", "rate": 1},
     {"categories": [], "selection": "rotating", "rate": 5, "requires": ["activation"]}
   ],
