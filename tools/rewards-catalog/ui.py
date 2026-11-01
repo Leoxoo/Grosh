@@ -19,7 +19,9 @@ What the page does:
   - runs one job at a time, either "fetch pages" or "extract rules", on all cards, the ones that
     need it, or the ones you tick, with a live log, a progress bar and a Stop button;
   - shows every card's fetch and extraction status, and for one card: the rules found, what was
-    rejected and why, any error, the page's rate lines, and a "try" that shows the model's raw reply.
+    rejected and why, any error, the page's rate lines, and a "try" that shows the model's raw reply;
+  - reviews: every rule with its quote, source and warnings, to accept or reject (review.py), and
+    publishes the accepted ones to rewards-catalog.json (publish.py).
 """
 
 import argparse
@@ -40,6 +42,8 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, str(Path(__file__).parent))
 import extract  # noqa: E402
 import fetch  # noqa: E402
+import publish  # noqa: E402
+import review  # noqa: E402
 
 PAGE = Path(__file__).with_name("ui.html")
 DEFAULT_PORT = 8765
@@ -54,6 +58,8 @@ class Paths:
     state: Path = fetch.STATE
     cache: Path = fetch.CACHE
     manual: Path = extract.MANUAL_RULES
+    decisions: Path = review.DECISIONS  # committed: a person's accept or reject on each rule
+    catalog: Path = publish.OUT  # committed: the accepted rules, as the app reads them
 
     @property
     def candidates(self) -> Path:
@@ -382,6 +388,36 @@ class App:
             "manual": fetch.read_json(self.paths.manual, {}).get(card_id), "page": page,
         }
 
+    # --- review ---------------------------------------------------------------------------------
+
+    def review_list(self) -> dict:
+        """Every card that has rules, each rule with its quote, source, warnings and decision (review.card_review)."""
+        decisions = review.load_decisions(self.paths.decisions)
+        entries = []
+        for card in self.cards():
+            candidate = self.candidate(card["id"])
+            if candidate and candidate.get("rules"):
+                entries.append({**review.card_review(candidate, decisions), "name": card["name"], "issuer": card["issuer"]})
+        summary = {"cards": len(entries), "waiting": 0, "accept": 0, "reject": 0}
+        for entry in entries:
+            for name, count in entry["counts"].items():
+                summary[name] += count
+        return {"cards": entries, "summary": summary}
+
+    def decide(self, body: dict) -> dict:
+        card = self.card(str(body.get("cardId")))
+        candidate = self.candidate(card["id"])
+        if not candidate:
+            raise Problem(f"{card['name']} has no candidate to review: extract it first.", 404)
+        decisions = review.decide(candidate, str(body.get("key")), str(body.get("decision")), self.paths.decisions, date.today().isoformat())
+        return {**review.card_review(candidate, decisions), "name": card["name"], "issuer": card["issuer"]}
+
+    def publish_catalog(self) -> dict:
+        """Write the accepted rules to the catalog file (publish.py) and say how much went in."""
+        document = publish.publish(self.paths.seed, self.paths.candidates, self.paths.decisions, self.paths.catalog)
+        return {"cards": len(document["cards"]), "rules": sum(len(c["rules"]) for c in document["cards"]),
+                "publishedAt": document["publishedAt"], "file": self.paths.catalog.name}
+
     # --- the model server ---------------------------------------------------------------------
 
     def lm_models(self) -> dict:
@@ -467,7 +503,8 @@ class App:
         except ValueError as problem:
             return {**result, "error": str(problem)}
         page_norm = extract.normalize(text)
-        result["rules"] = [{"rule": rule, "problem": extract.validate_rule(rule, page_norm)} for rule in proposals]
+        rows = extract.tier_rows(text)
+        result["rules"] = [{"rule": rule, "problem": extract.validate_rule(rule, page_norm, rows)} for rule in proposals]
         result["cardConditions"] = [
             {"text": c, "problem": extract.check_condition(c, page_norm)} for c in card_conditions
         ]
@@ -622,6 +659,8 @@ class App:
                 return self.lm_models()
             if path == "/api/profiles":
                 return self.profile_list()
+            if path == "/api/review":
+                return self.review_list()
             if path == "/api/job":
                 since = int((query.get("since") or ["0"])[0] or 0)
                 return {"job": self.job.snapshot(since) if self.job else None}
@@ -632,6 +671,10 @@ class App:
                 return self.save_settings(body)
             if path == "/api/profiles":
                 return self.change_profile(body)
+            if path == "/api/review":
+                return self.decide(body)
+            if path == "/api/publish":
+                return self.publish_catalog()
             if path == "/api/test-model":
                 return self.test_model()
             if path == "/api/ask":

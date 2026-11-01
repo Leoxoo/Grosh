@@ -11,6 +11,7 @@ from pathlib import Path
 
 import extract
 import fetch
+import review
 import ui
 
 PAGE_TEXT = "Savor Rewards Credit Card\nEarn unlimited 3% cash back on dining, entertainment and popular streaming services.\n" + "Filler line.\n" * 5
@@ -54,7 +55,8 @@ class AppCase(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         root = Path(tmp.name)
-        self.paths = ui.Paths(seed=root / "seed.json", state=root / "state.json", cache=root / "cache", manual=root / "manual.json")
+        self.paths = ui.Paths(seed=root / "seed.json", state=root / "state.json", cache=root / "cache", manual=root / "manual.json",
+                              decisions=root / "review-decisions.json", catalog=root / "rewards-catalog.json")
         self.cards = [card("bank-a", "Savor Rewards"), card("bank-b", "Other Card"), card("zed-c", "Zed Card", "Zed")]
         self.paths.seed.write_text(json.dumps({"cards": self.cards}))
         self.state: dict = {}
@@ -466,6 +468,59 @@ class AskAndStatsTests(AppCase):
         self.assertEqual(ui.format_stats({"calls": 0}), "")
         self.assertEqual(ui.format_stats({"calls": 2, "seconds": 3.5, "promptTokens": 10, "cachedTokens": 0, "replyTokens": 5, "reasoningTokens": 2}),
                          "2 calls, 3.5s, 10 prompt tokens, 5 reply tokens (2 reasoning)")
+
+
+class ReviewTests(AppCase):
+    def extracted(self) -> None:
+        self.give_page("bank-a")
+        self.app.save_settings({"model": "good-model"})
+        self.app.start_job({"kind": "extract", "which": "pending"})
+        self.wait()
+
+    def test_the_review_lists_every_card_with_rules_and_what_waits(self):
+        self.extracted()
+        status, payload = self.app.handle("GET", "/api/review", {}, {})
+        self.assertEqual(status, 200)
+        (entry,) = payload["cards"]  # cards without rules have nothing to review
+        self.assertEqual((entry["cardId"], entry["name"], entry["issuer"]), ("bank-a", "Savor Rewards", "Bank"))
+        (row,) = entry["rules"]
+        self.assertEqual((row["decision"], row["quote"], row["url"]), (None, RULE["quote"], "https://x.test/bank-a"))
+        self.assertEqual(payload["summary"], {"cards": 1, "waiting": 1, "accept": 0, "reject": 0})
+
+    def test_a_decision_is_saved_in_the_committed_file_and_only_accepted_rules_move_on(self):
+        self.extracted()
+        key = self.app.handle("GET", "/api/review", {}, {})[1]["cards"][0]["rules"][0]["key"]
+        status, payload = self.app.handle("POST", "/api/review", {}, {"cardId": "bank-a", "key": key, "decision": "reject"})
+        self.assertEqual((status, payload["rules"][0]["decision"]), (200, "reject"))
+        self.assertIn(key, self.paths.decisions.read_text())
+        self.assertNotIn(fetch.CACHE, ui.Paths().decisions.parents)  # the real file is committed, so decisions travel with the repo
+        self.assertEqual(review.accepted_rules(self.app.candidate("bank-a"), review.load_decisions(self.paths.decisions)), [])
+        self.app.handle("POST", "/api/review", {}, {"cardId": "bank-a", "key": key, "decision": "accept"})
+        self.assertEqual(len(review.accepted_rules(self.app.candidate("bank-a"), review.load_decisions(self.paths.decisions))), 1)
+
+    def test_decisions_that_make_no_sense_are_refused(self):
+        self.extracted()
+        key = self.app.handle("GET", "/api/review", {}, {})[1]["cards"][0]["rules"][0]["key"]
+        for body, status, message in (({"cardId": "bank-a", "key": key, "decision": "maybe"}, 400, "accept, reject or undo"),
+                                      ({"cardId": "bank-a", "key": "0" * 16, "decision": "accept"}, 400, "no longer"),
+                                      ({"cardId": "bank-b", "key": key, "decision": "accept"}, 404, "no candidate"),
+                                      ({"cardId": "nope", "key": key, "decision": "accept"}, 404, "No card")):
+            got, payload = self.app.handle("POST", "/api/review", {}, body)
+            self.assertEqual(got, status, body)
+            self.assertIn(message, payload["error"])
+        self.assertFalse(self.paths.decisions.exists())
+
+    def test_publish_writes_the_accepted_rules_to_the_catalog_file(self):
+        facts = {"isBusiness": False, "rewardProgram": None, "baseEarnRate": 1, "discontinued": False}
+        self.paths.seed.write_text(json.dumps({"cards": [dict(c, **facts) for c in self.cards]}))
+        self.extracted()
+        key = self.app.handle("GET", "/api/review", {}, {})[1]["cards"][0]["rules"][0]["key"]
+        self.app.handle("POST", "/api/review", {}, {"cardId": "bank-a", "key": key, "decision": "accept"})
+        status, payload = self.app.handle("POST", "/api/publish", {}, {})
+        self.assertEqual((status, payload["cards"], payload["rules"]), (200, 1, 1))
+        (published,) = json.loads(self.paths.catalog.read_text())["cards"]
+        self.assertEqual([r["evidence"]["quote"] for r in published["rules"]], [RULE["quote"]])
+        self.assertEqual(ui.Paths().catalog.parent, Path(ui.__file__).parent)  # committed beside the scripts, not in cache/
 
 
 class ServerTests(AppCase):
