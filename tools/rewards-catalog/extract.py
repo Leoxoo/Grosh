@@ -1052,6 +1052,17 @@ def rate_sentences(text: str) -> list[str]:
     return found
 
 
+# "Earn up to 75% more points": the size of a relationship boost, not a rate.
+_UP_TO_MORE = re.compile(r"up to (?:an? )?\d+(?:\.\d+)?% more")
+
+
+def _only_a_boost(sentence: str, rows: dict[str, str]) -> bool:
+    """Whether a rate sentence is a boost the result needn't have and the model can't add by reading it alone: a
+    tier table's cell (tier_rows: the row that makes it a boost isn't in the sentence) or "up to 75% more"."""
+    flat = normalize(sentence)
+    return flat in rows or bool(_UP_TO_MORE.search(flat))
+
+
 def _covered(sentence: str, rules: list[dict]) -> bool:
     """Whether the result has the rate this sentence states: an accepted rule quotes it (or part of it, or all
     of it), or accepted rules give a rate the sentence states to every category it names. Pages state a rate
@@ -1080,7 +1091,8 @@ def extract_card(
     (the model could not be read for at least one chunk, so the result is incomplete).
 
     After the chunks, each sentence that states a rate but that no accepted rule quotes is asked about
-    on its own (up to MAX_FOLLOW_UPS). The model skips sentences in a long chunk; asking alone catches them."""
+    on its own (up to MAX_FOLLOW_UPS). The model skips sentences in a long chunk; asking alone catches them.
+    Another card's sentences and a boost's tier cells or "up to N% more" are neither asked about nor missed."""
     candidate = _empty_candidate(card, model, PROMPT_VERSION, page_hash, "ok")
     if not name_on_page(card["name"], text):
         candidate["status"] = "wrong-page"
@@ -1136,7 +1148,8 @@ def extract_card(
         else:
             take(reply)
 
-    this_cards = [s for s in rate_sentences(text) if not page.other_card_problem(s)]  # another card's rates are no loss
+    # Another card's rates are no loss, and a boost's tier cell or "up to N% more" is no rate the model can add alone.
+    this_cards = [s for s in rate_sentences(text) if not page.other_card_problem(s) and not _only_a_boost(s, rows)]
     uncovered = [s for s in this_cards if not _covered(s, list(accepted.values()))][:MAX_FOLLOW_UPS] if follow_up else []
     candidate["followUps"] = len(uncovered)
     for sentence in uncovered:

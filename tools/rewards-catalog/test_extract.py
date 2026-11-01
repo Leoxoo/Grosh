@@ -311,6 +311,18 @@ class TierBoostTests(unittest.TestCase):
         self.assertIn("needs requires preferred-rewards-tier", validate_rule(boost, normalize(text), extract.tier_rows(text)))
         self.assertIsNone(validate_rule(base, normalize(text), extract.tier_rows(text)))  # the "No rewards bonus" row
 
+    def test_tier_table_cells_and_up_to_more_are_not_asked_about_again_or_missed(self):
+        # A tier cell read alone has lost the row that says it is a boost, and "up to 75% more" is no rate: asking the
+        # model about either again can't add a rule, and the result doesn't lack them.
+        card = {**CARD, "id": "boa-btr", "name": "Business Advantage Travel Rewards", "rewardKind": "points"}
+        page = "\n".join(["Business Advantage Travel Rewards.", "Earn up to 75% more points with every purchase", BOA_PLUS_ANY,
+                          *BOA_TABLE, *BOA_CALCULATOR])
+        model = FakeModel([rule(categories=["everything-else"], rate=1.5, unit="per-dollar", quote=BOA_PLUS_ANY),
+                           rule(categories=["travel"], rate=3, unit="per-dollar", quote=BOA_PLUS_ANY)])
+        result = extract_card(card, page, "h", model, "m")
+        self.assertEqual((len(model.asked), result["followUps"]), (1, 0))
+        self.assertEqual(result["warnings"], [])
+
     def test_a_boost_alone_is_not_the_base_rate(self):
         boost = extract.accepted_rule(rule(**self.BOOST, requires=["preferred-rewards-tier"]), "u", "h", "page")
         self.assertIn("no rate for all other purchases was found", extract.review_warnings([boost])[0])
