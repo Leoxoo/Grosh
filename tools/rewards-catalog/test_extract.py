@@ -51,7 +51,7 @@ def rule(**overrides) -> dict:
     base = {
         "categories": ["dining"], "selection": "fixed", "picks": None, "hasOtherChoices": False,
         "rate": 3, "unit": "percent", "capAmount": None, "capPeriod": None, "requires": [],
-        "validFrom": None, "validTo": None, "firstMonths": None, "conditions": [],
+        "validFrom": None, "validTo": None, "firstMonths": None, "tier": None, "conditions": [],
         "quote": "Earn unlimited 3% cash back on dining, entertainment and popular streaming services.",
     }
     return {**base, **overrides}
@@ -213,6 +213,94 @@ class RequiresAndDatesTests(unittest.TestCase):
 FREEDOM = "Activate each quarter to earn 5% cash back on up to $1,500 in combined purchases in that quarter's bonus categories."
 DISCOVER = "Earn 5% cash back on everyday purchases at different places you shop each quarter, up to the quarterly maximum when you activate."
 LYFT = "Earn 2% total cash back on Lyft rides with your card through September 30, 2027."
+
+
+# Bank of America Business Advantage Travel Rewards: the base rate and its Preferred Rewards boost, one sentence apart.
+BOA_TRAVEL = ("Earn unlimited 1.5 points for every $1 spent on everyday purchases. Or, enroll in Preferred Rewards for Business"
+              " for no fee and earn up to an unlimited 5.25 points per $1 spent on travel purchases made through BofA Travel and"
+              " 2.62 points for every $1 spent on all other purchases if you have a Bank of America® business checking account"
+              " and qualify for Preferred Rewards for Business Platinum Honors4 tier.")
+BOA_PLUS_ANY = ("Earn 1.5 points for every $1 you spend on everyday purchases and 3 points for every $1 spent on travel purchases"
+                " made at BofA Travel, plus any Preferred Rewards for Business tiered bonus (if applicable).")
+ATMOS = "10% rewards bonus on all points earned from card purchases if you have an eligible Bank of America® account"
+# The same card's rewards table: one row per tier, each cell on its own line, no sentence saying what a row is.
+BOA_TABLE = ["For illustrative purposes only.", "Not Enrolled", "No rewards bonus", "$1080", "3 points on BofA Travel",
+             "1.5 points on All other purchases", "Gold", "25% rewards bonus", "$1350", "3.75 points on Travel center",
+             "1.87 points on All other purchases", "Platinum Honors", "75% rewards bonus", "$1890",
+             "5.25 points on Travel center", "2.62 points on All other purchases", "Calculate rewards"]
+
+
+class TierBoostTests(unittest.TestCase):
+    PAGE = normalize("\n".join(["Business Advantage Travel Rewards", BOA_TRAVEL, BOA_PLUS_ANY, ATMOS]))
+    BOOST = dict(categories=["everything-else"], rate=2.62, unit="per-dollar", quote=BOA_TRAVEL)
+
+    def check(self, **overrides):
+        return validate_rule(rule(**overrides), self.PAGE)
+
+    def test_a_boost_is_never_a_base_rate(self):
+        self.assertIn("preferred-rewards-tier", self.check(**self.BOOST))
+        self.assertIn("preferred-rewards-tier", self.check(categories=["everything-else"], rate=10, quote=ATMOS))
+
+    def test_a_boost_labelled_as_one_is_kept_with_its_tier(self):
+        self.assertIsNone(self.check(**self.BOOST, requires=["preferred-rewards-tier"], tier="platinum-honors"))
+        self.assertIsNone(self.check(**self.BOOST, requires=["preferred-rewards-tier"]))  # the tier is optional
+
+    def test_the_tier_must_be_named_in_the_quote(self):
+        labelled = dict(self.BOOST, requires=["preferred-rewards-tier"])
+        self.assertIn("tier gold", self.check(**labelled, tier="gold"))
+        self.assertIn("tier platinum,", self.check(**labelled, tier="platinum"))  # the quote says Platinum Honors
+        self.assertIn("tier 'bronze'", self.check(**labelled, tier="bronze"))
+        self.assertIn("only for a rule that requires", self.check(**self.BOOST, tier="platinum-honors"))
+
+    def test_the_base_rate_beside_a_boost_is_still_the_base_rate(self):
+        base = dict(categories=["everything-else"], rate=1.5, unit="per-dollar")
+        self.assertIsNone(self.check(**base, quote=BOA_TRAVEL))  # its own sentence says nothing of the boost
+        self.assertIsNone(self.check(**base, quote=BOA_PLUS_ANY))  # "plus any ... bonus": the boost comes on top
+
+    def test_a_card_named_preferred_is_not_a_boost(self):
+        chase = "Earn 3X points on dining with your Chase Sapphire Preferred® rewards card."
+        self.assertIsNone(validate_rule(rule(rate=3, unit="per-dollar", quote=chase), normalize(chase)))
+
+    def test_business_travel_rewards_keeps_its_boost_out_of_the_base_rate(self):
+        card = {**CARD, "id": "boa-btr", "name": "Business Advantage Travel Rewards", "rewardKind": "points"}
+        page = "\n".join(["Business Advantage Travel Rewards.", BOA_TRAVEL])
+        base = rule(categories=["everything-else"], rate=1.5, unit="per-dollar", quote=BOA_TRAVEL)
+        unlabelled = rule(**self.BOOST)
+        labelled = rule(**self.BOOST, requires=["preferred-rewards-tier"], tier="platinum-honors")
+
+        result = extract_card(card, page, "h", FakeModel([base, unlabelled]), "m", follow_up=False)
+        self.assertEqual([r["rate"] for r in result["rules"]], [1.5])
+        self.assertIn("preferred-rewards-tier", result["rejected"][0]["reason"])
+
+        result = extract_card(card, page, "h", FakeModel([base, labelled]), "m", follow_up=False)
+        boost = next(r for r in result["rules"] if r["rate"] == 2.62)
+        self.assertEqual((boost["requires"], boost["tier"], boost["needs"]), (["preferred-rewards-tier"], "platinum-honors", ["preferred-rewards-tier"]))
+        self.assertEqual(result["needs"], ["preferred-rewards-tier"])
+        self.assertEqual(result["warnings"], [])  # the boost is not a second base rate
+
+    def test_a_rate_in_a_tier_row_of_the_rewards_table_is_a_boost(self):
+        card = {**CARD, "id": "boa-btr", "name": "Business Advantage Travel Rewards", "rewardKind": "points"}
+        page = "\n".join(["Business Advantage Travel Rewards.", *BOA_TABLE])
+        cell = dict(categories=["everything-else"], unit="per-dollar")
+        tagged = dict(cell, requires=["preferred-rewards-tier"])
+        reply = [
+            rule(**cell, rate=1.5, quote="1.5 points on All other purchases"),  # the "No rewards bonus" row: the base rate
+            rule(**cell, rate=2.62, quote="2.62 points on All other purchases"),  # unlabelled: rejected
+            rule(**tagged, rate=2.62, tier="platinum-honors", quote="2.62 points on All other purchases"),
+            rule(**tagged, rate=1.87, tier="gold", quote="1.87 points on All other purchases"),
+            rule(**tagged, rate=1.87, tier="platinum-honors", quote="1.87 points on All other purchases"),  # the row says Gold
+        ]
+        result = extract_card(card, page, "h", FakeModel(reply), "m", follow_up=False)
+        self.assertEqual([(r["rate"], r["requires"], r["tier"]) for r in result["rules"]],
+                         [(2.62, ["preferred-rewards-tier"], "platinum-honors"), (1.87, ["preferred-rewards-tier"], "gold"), (1.5, [], None)])
+        unlabelled, wrong_tier = result["rejected"]
+        self.assertIn("needs requires preferred-rewards-tier", unlabelled["reason"])
+        self.assertIn("tier platinum-honors", wrong_tier["reason"])
+        self.assertFalse([w for w in result["warnings"] if "nothing to tell them apart" in w or "no rate for all other" in w])
+
+    def test_a_boost_alone_is_not_the_base_rate(self):
+        boost = extract.accepted_rule(rule(**self.BOOST, requires=["preferred-rewards-tier"]), "u", "h", "page")
+        self.assertIn("no rate for all other purchases was found", extract.review_warnings([boost])[0])
 
 
 class WhatCountsAsWhatTests(unittest.TestCase):
@@ -667,7 +755,7 @@ class ExtractCardTests(unittest.TestCase):
         user = model.asked[0][1]["content"]
         self.assertIn('"Savor Rewards"', user)
         self.assertIn("Earn 5% cash back on hotels", user)
-        for word in ("choose", "top-spend", "apple-pay", "validFrom", "cardConditions"):
+        for word in ("choose", "top-spend", "apple-pay", "validFrom", "cardConditions", "preferred-rewards-tier", "tier:"):
             self.assertIn(word, user)
 
     def test_everything_that_is_the_same_for_every_card_comes_first_so_servers_can_cache_it(self):

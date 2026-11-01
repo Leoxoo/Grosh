@@ -467,7 +467,8 @@ class App:
         except ValueError as problem:
             return {**result, "error": str(problem)}
         page_norm = extract.normalize(text)
-        result["rules"] = [{"rule": rule, "problem": extract.validate_rule(rule, page_norm)} for rule in proposals]
+        rows = extract.tier_rows(text)
+        result["rules"] = [{"rule": rule, "problem": extract.validate_rule(rule, page_norm, rows)} for rule in proposals]
         result["cardConditions"] = [
             {"text": c, "problem": extract.check_condition(c, page_norm)} for c in card_conditions
         ]

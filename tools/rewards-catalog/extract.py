@@ -46,7 +46,7 @@ import fetch  # noqa: E402
 CANDIDATES = fetch.CACHE / "candidates"
 SAVED_SETTINGS = fetch.CACHE / "ui-settings.json"
 MANUAL_RULES = Path(__file__).with_name("manual-rules.json")
-PROMPT_VERSION = "8"
+PROMPT_VERSION = "9"
 DEFAULT_URL = "http://localhost:1234/v1"
 DEFAULT_MODEL = "k2-horizon-7b-uno-uncensored"
 # A reasoning model "thinks" before it answers and can spend a small reply limit on that alone (the first
@@ -111,15 +111,24 @@ REQUIRES = {
     "activation": ("activate", "activation", "enroll"),
     "issuer-booking": ("booked through", "booked with", "book through", "book with", "booking through",
                        "purchased through", "portal"),
+    "preferred-rewards-tier": ("preferred rewards", "rewards bonus", "reward bonus"),  # the bonus: a tier table's row
+}
+# Bank of America's Preferred Rewards tiers, and how a quote names each ("Platinum" alone is not Platinum Honors).
+TIERS = {
+    "gold": r"gold",
+    "platinum": r"platinum(?! honors)",
+    "platinum-honors": r"platinum honors",
+    "diamond-honors": r"diamond honors",
 }
 # Questions only the cardholder can answer, with the wording the app can ask. A rule's `needs` is worked out
 # from the rule itself (needs_of), never taken from the model: a choose rule needs the category picked, a
 # rate for the first N months needs the date the card was opened, an Apple Pay rate needs to know whether
-# the cardholder pays that way. Not modeled yet: Bank of America's Preferred Rewards tier.
+# the cardholder pays that way, a Preferred Rewards boost needs the cardholder's tier.
 NEEDS = {
     "choice-categories": "Which category did you choose on this card?",
     "account-opened": "When did you open this card?",
     "pays-with-apple-pay": "Do you usually pay with Apple Pay?",
+    "preferred-rewards-tier": "Which Bank of America Preferred Rewards tier are you in?",
 }
 MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
           "november", "december")
@@ -139,11 +148,12 @@ RULE_SCHEMA = {
         "validFrom": {"type": ["string", "null"]},
         "validTo": {"type": ["string", "null"]},
         "firstMonths": {"type": ["integer", "null"]},
+        "tier": {"type": ["string", "null"], "enum": [*TIERS, None]},
         "quote": {"type": "string"},
         "conditions": {"type": "array", "items": {"type": "string"}},
     },
     "required": ["categories", "selection", "picks", "hasOtherChoices", "rate", "unit", "capAmount", "capPeriod",
-                 "requires", "validFrom", "validTo", "firstMonths", "quote", "conditions"],
+                 "requires", "validFrom", "validTo", "firstMonths", "tier", "quote", "conditions"],
     "additionalProperties": False,
 }
 SCHEMA = {
@@ -248,11 +258,45 @@ NOT_A_BASE_RATE = ("quarter", "activate", "activation", "enroll", "different pla
 # "Each quarter" alone is not enough: a cap ("up to $1,000 each quarter") says it too. A rotating rate says
 # the categories themselves change.
 ROTATING_WORDS = ("rotating", "different places", "bonus categor", "categories change", "categories that change")
+# A relationship boost ("up to 75% more": Bank of America's 1.5 points become 2.62 at Platinum Honors) is a rate
+# only some cardholders earn, so it is never the base rate. Pages state it in its own sentence beside the base,
+# or in a tier table's row (tier_rows).
+BOOST_WORDS = ("preferred rewards", "rewards bonus", "reward bonus", "platinum honors", "diamond honors")
+# "1.5 points on everyday purchases, plus any Preferred Rewards tiered bonus" is the base rate, naming the boost on top;
+# Chase's "Sapphire Preferred rewards" is a card's name.
+NOT_A_BOOST = ("plus any", "sapphire preferred rewards", "business preferred rewards")
+# Bank of America's rewards tables have one row per tier, each cell on its own line: "Gold", "25% rewards bonus",
+# "$1350", "1.87 points on All other purchases". The row's bonus cell, and the tier just above it, start a row.
+_BONUS_CELL = re.compile(r"(?:no|\d+(?:\.\d+)?%) rewards? bonus")
+ROW_LINES = 6  # cells after the bonus cell that still belong to its row
+TABLE_CELL_CHARS = 60  # a longer line is a sentence, not a cell, and ends the table
 
 
-def _category_fits(category: str, quote_norm: str) -> bool:
+def tier_rows(text: str) -> dict[str, str]:
+    """Each rate cell of a tier table on the page (normalized) with the head of its row ("platinum honors 75%
+    rewards bonus"), for the rows that are a boost. A cell's own words never say it is one, so its row must."""
+    rows: dict[str, str] = {}
+    head, previous, since = None, "", 0
+    for line in map(normalize, text.splitlines()):
+        since += 1
+        if _BONUS_CELL.fullmatch(line):
+            head, since = (None if line.startswith("no ") else f"{previous} {line}"), 0
+        elif len(line) > TABLE_CELL_CHARS or since > ROW_LINES:
+            head = None
+        elif head and has_rates(line):
+            rows.setdefault(line, head)
+        previous = line
+    return rows
+
+
+def _rate_sentence(quote: str, rate) -> str:
+    """The sentence of a quote that states the rate: one quote can hold the base rate and, a sentence later, its boost."""
+    return next((s for s in re.split(r"(?<=[.!?])\s+", quote) if float(rate) in numbers_in(s)), quote)
+
+
+def _category_fits(category: str, quote_norm: str, boost: bool = False) -> bool:
     if category == "everything-else":
-        if mentions(quote_norm, NOT_A_BASE_RATE):
+        if not boost and mentions(quote_norm, NOT_A_BASE_RATE):  # a boost's "enroll" is in its program, not a quarter's bonus
             return False
         if mentions(quote_norm, CATEGORIES[category]):
             return True
@@ -301,11 +345,12 @@ def check_condition(condition, page_norm: str | None) -> str | None:
     return None
 
 
-def validate_rule(rule, page_norm: str | None = None) -> str | None:
+def validate_rule(rule, page_norm: str | None = None, rows: dict[str, str] | None = None) -> str | None:
     """Why a proposed rule can't be kept, or None if every check holds. Nothing here trusts the model.
 
     With `page_norm` (the normalized page text) the quote and conditions must be on that page. Without
-    it, only the checks that don't need the page run: used for hand-entered rules."""
+    it, only the checks that don't need the page run: used for hand-entered rules. `rows` (tier_rows of the
+    page) tells a rate in a tier table's boost row from the base rate."""
     if not isinstance(rule, dict):
         return "not an object"
     categories, selection, picks = rule.get("categories"), rule.get("selection"), rule.get("picks")
@@ -357,6 +402,11 @@ def validate_rule(rule, page_norm: str | None = None) -> str | None:
         or len(set(requires)) != len(requires)
     ):
         return f"requires must be some of {', '.join(REQUIRES)}"
+    tier = rule.get("tier")
+    if tier is not None and tier not in TIERS:
+        return f"tier {tier!r} is not one of {', '.join(TIERS)}"
+    if tier is not None and "preferred-rewards-tier" not in requires:
+        return "a tier is only for a rule that requires preferred-rewards-tier"
     if not isinstance(conditions, list) or len(conditions) > MAX_CONDITIONS:
         return f"conditions must be a list of at most {MAX_CONDITIONS} quotes"
     for condition in conditions:
@@ -375,6 +425,13 @@ def validate_rule(rule, page_norm: str | None = None) -> str | None:
         return "unit is per-dollar but the quote has no points, miles or X"
 
     context = " ".join([quote_norm, *map(normalize, conditions)])
+    rate_norm = normalize(_rate_sentence(quote, rate))
+    row = next((head for cell, head in (rows or {}).items() if quote_norm in cell), None)
+    boost = "preferred-rewards-tier" in requires
+    if not boost and (row or mentions(rate_norm, BOOST_WORDS) and not mentions(rate_norm, NOT_A_BOOST)):
+        return "the rate is a relationship boost, not one every cardholder earns: it needs requires preferred-rewards-tier"
+    if row:
+        context += " " + row  # a table cell's tier and bonus are in its row
     if selection == "rotating":
         if not mentions(quote_norm, ROTATING_WORDS):
             return "quote doesn't say the categories change (quarter, rotating, bonus categories...)"
@@ -382,7 +439,9 @@ def validate_rule(rule, page_norm: str | None = None) -> str | None:
             if not mentions(quote_norm, CATEGORIES[category]):
                 return f"quote doesn't mention {category}"
     elif selection == "fixed":
-        if not _category_fits(categories[0], quote_norm):
+        # A base rate is judged on its own sentence, so a boost beside it ("Or, enroll in Preferred Rewards") doesn't count.
+        fit_text = rate_norm if categories[0] == "everything-else" else quote_norm
+        if not _category_fits(categories[0], fit_text, boost):
             return f"quote doesn't mention {categories[0]}"
     else:
         if not mentions(quote_norm, SELECTION_WORDS[selection]):
@@ -398,6 +457,8 @@ def validate_rule(rule, page_norm: str | None = None) -> str | None:
     for tag in requires:
         if not mentions(context, REQUIRES[tag]):
             return f"requires {tag}, but neither the quote nor a condition says so"
+    if tier is not None and not re.search(r"(?<![a-z0-9])" + TIERS[tier], context):
+        return f"tier {tier}, but neither the quote nor a condition names it"
     first = rule.get("firstMonths")
     if first is not None:
         if isinstance(first, bool) or not isinstance(first, int) or not 1 <= first <= 60:
@@ -437,7 +498,8 @@ Rules:
 - unit: "percent" for cash back percent, "per-dollar" for points or miles per dollar.
 - quote: copy the exact words of one sentence or phrase from the text that states the rate. Do not change, shorten or join them.
 - capAmount and capPeriod: only if that same sentence limits how much spending earns the rate (for "up to $6,000 per year": 6000 and "year"; the period is month, quarter, year, or cycle for a billing cycle). Otherwise null for both.
-- requires: only what the text says the rate needs. "apple-pay" (must pay with Apple Pay), "activation" (must activate or enroll), "issuer-booking" (must book through the issuer's travel site or portal). Otherwise [].
+- requires: only what the text says the rate needs. "apple-pay" (must pay with Apple Pay), "activation" (must activate or enroll), "issuer-booking" (must book through the issuer's travel site or portal), "preferred-rewards-tier" (a higher rate only for members of a banking relationship program, such as Bank of America Preferred Rewards: "earn up to 75% more", "as a Platinum Honors member"). Otherwise [].
+- tier: for a "preferred-rewards-tier" rate, the tier the text gives it: "gold", "platinum", "platinum-honors" or "diamond-honors". Otherwise null. A boosted rate is its own entry; the rate every cardholder earns is a separate entry without it.
 - validFrom and validTo: for a rate that applies only in a stated period, its first and last day as YYYY-MM-DD, and only when the text names the months and the year (October through December 2026 is 2026-10-01 and 2026-12-31). Otherwise null.
 - firstMonths: only if the text says the rate applies just during an introductory period after the account is opened ("first year", "first 6 months"): the length in months (12 for "first year"). Otherwise null.
 - conditions: copy, word for word, each sentence in the text that excludes or restricts this one rate: excluded stores, a minimum, who qualifies. These are often in footnotes, which repeat the rate with its exclusions. Never paraphrase. Use [] if there are none.
@@ -640,6 +702,8 @@ def needs_of(rule: dict) -> list[str]:
         needs.append("account-opened")
     if "apple-pay" in rule["requires"]:
         needs.append("pays-with-apple-pay")
+    if "preferred-rewards-tier" in rule["requires"]:
+        needs.append("preferred-rewards-tier")
     return needs
 
 
@@ -659,6 +723,7 @@ def accepted_rule(proposal: dict, url: str, page_hash: str | None, verified: str
         "validFrom": proposal["validFrom"],
         "validTo": proposal["validTo"],
         "firstMonths": proposal.get("firstMonths"),
+        "tier": proposal.get("tier"),
         "capUnknown": bool(proposal.get("capUnknown")),
         "needs": needs_of(proposal),
         "conditions": [c.strip() for c in proposal["conditions"]],
@@ -673,7 +738,7 @@ def _rule_key(rule: dict) -> tuple:
     part are merged into the rule (see extract_card)."""
     return (
         tuple(rule["categories"]), rule["selection"], rule["picks"], float(rule["rate"]), rule["unit"],
-        rule["capAmount"], rule["capPeriod"], rule["validFrom"], rule["validTo"], rule["firstMonths"],
+        rule["capAmount"], rule["capPeriod"], rule["validFrom"], rule["validTo"], rule["firstMonths"], rule["tier"],
     )
 
 
@@ -685,7 +750,7 @@ def review_warnings(rules: list[dict]) -> list[str]:
     for rule in rules:
         if rule["selection"] != "fixed" or rule["capAmount"] is not None:
             continue
-        key = (rule["categories"][0], tuple(rule["requires"]), rule["validFrom"], rule["validTo"], rule["firstMonths"])
+        key = (rule["categories"][0], tuple(rule["requires"]), rule["validFrom"], rule["validTo"], rule["firstMonths"], rule["tier"])
         groups.setdefault(key, set()).add(rule["rate"])
     warnings = [
         f"{rule['categories'] or 'a rotating bonus'} at {rule['rate']:g}%: the page says it has a cap but doesn't state the amount"
@@ -695,7 +760,10 @@ def review_warnings(rules: list[dict]) -> list[str]:
         f"{key[0]} earns {' and '.join(f'{rate:g}' for rate in sorted(rates))} with nothing to tell them apart"
         for key, rates in sorted(groups.items(), key=lambda item: repr(item[0])) if len(rates) > 1
     ]
-    if rules and not any(r["selection"] == "fixed" and r["categories"] == ["everything-else"] for r in rules):
+    if rules and not any(
+        r["selection"] == "fixed" and r["categories"] == ["everything-else"] and "preferred-rewards-tier" not in r["requires"]
+        for r in rules
+    ):  # a boost is not the base rate: most cardholders don't earn it
         warnings.append("no rate for all other purchases was found: check the page for what everything else earns")
     return warnings
 
@@ -882,7 +950,7 @@ def extract_card(
         candidate["status"] = "wrong-page"
         return candidate
 
-    page_norm = normalize(text)
+    page_norm, rows = normalize(text), tier_rows(text)
     accepted: dict[tuple, dict] = {}
     errors: list[str] = []
 
@@ -900,7 +968,7 @@ def extract_card(
     def take(reply) -> None:
         proposals, card_conditions = reply
         for proposal in (split for raw in proposals for split in split_fixed(raw)):
-            reason = validate_rule(proposal, page_norm)
+            reason = validate_rule(proposal, page_norm, rows)
             if reason:
                 candidate["rejected"].append({"rule": proposal, "reason": reason})
                 continue
@@ -960,9 +1028,9 @@ def manual_candidate(card: dict, entry: dict, text: str | None, page_hash: str |
     but without needing the page. A rule is "page" verified when its quote is on the cached page, else
     "manual". Rules that break the shape rules (bad category, rate not in the quote...) are rejected."""
     candidate = _empty_candidate(card, "manual", None, page_hash, "manual")
-    page_norm = normalize(text) if text else None
+    page_norm, rows = (normalize(text), tier_rows(text)) if text else (None, None)
     for proposal in entry.get("rules", []):
-        grounded = page_norm is not None and validate_rule(proposal, page_norm) is None
+        grounded = page_norm is not None and validate_rule(proposal, page_norm, rows) is None
         problem = None if grounded else validate_rule(proposal, None)
         if problem:
             candidate["rejected"].append({"rule": proposal, "reason": problem})
