@@ -6,11 +6,11 @@ import SwiftUI
 /// gets haptics while the Haptics switch is on. Holding ⌫ repeats.
 ///
 /// ```
-/// C   ÷   ×   │ ⌫ (tall)
-/// 7   8   9   │
-/// 4   5   6   │ −
-/// 1   2   3   │ +
-///  0 (wide)  .│ = or hide
+/// C   ÷   ×   │ ⌫
+/// 7   8   9   │ −
+/// 4   5   6   │ +
+/// 1   2   3   │ = or hide (tall)
+///  0 (wide)  .│
 /// ```
 struct Keypad: View {
     let target: KeypadTarget
@@ -57,13 +57,13 @@ struct Keypad: View {
                     }
                     VStack(spacing: spacing) {
                         BackspaceKey(target: target, tick: tick(for: .backspace))
-                            .frame(height: topHeight + spacing + rowHeight)
+                            .frame(height: topHeight)
                         key(.operation(.subtract))
                             .frame(height: rowHeight)
                         key(.operation(.add))
                             .frame(height: rowHeight)
                         actionKey
-                            .frame(height: rowHeight)
+                            .frame(height: 2 * rowHeight + spacing)
                     }
                     .frame(width: keyWidth)
                 }
