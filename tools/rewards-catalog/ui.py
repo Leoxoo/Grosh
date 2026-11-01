@@ -345,7 +345,7 @@ class App:
             )
             rows.append({
                 "id": card["id"], "name": card["name"], "issuer": card["issuer"], "kind": card["rewardKind"],
-                "sourceUrl": card["sourceUrl"], "handEntered": hand_entered,
+                "sourceUrl": card["sourceUrl"], "handEntered": hand_entered, "needsInfo": card.get("needsInfo"),
                 "fetch": {
                     # fetch-state.json is committed but cache/ isn't, so a new checkout knows a page it doesn't have.
                     "status": "not-saved" if not fetch.text_saved(card["id"], entry, self.paths.cache) else entry.get("lastStatus", "never"),
