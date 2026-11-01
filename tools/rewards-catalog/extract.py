@@ -20,8 +20,9 @@ inside that quote. Anything else is listed under "rejected" with the reason, nev
 
 A card whose page doesn't name the card is "wrong-page" and gets no rules: Amex's state
 holds many cards' marketing, and a redirect can land on a different card's page. On a page
-that describes several cards, a rule whose quote names another card, or sits only under
-another card's heading, is rejected too (CardPage).
+that describes several cards, a rule whose quote names another card, sits only under
+another card's heading, or states its rate in the unit the page doesn't use for this card's
+rates, is rejected too (CardPage).
 
 Rules for cards whose pages hide them (or that need a person's judgment) are entered by
 hand in manual-rules.json, in the same shape, and go through the same checks. A hand-entered
@@ -505,6 +506,17 @@ NAME_FILLER = {"the", "a", "an", "your", "my", "our", "this", "credit", "card", 
 NOT_IN_A_NAME = {"the", "a", "an", "your", "my", "our", "for", "with", "of", "to", "and", "on", "in", "about", "using"}
 SECTION_LINES = 12  # a card's heading reaches this many lines down (or to the next heading), so a footer isn't a card's section
 FOOTNOTE_LINES = 3  # "Footnote 2:" and the lines after it, up to the next footnote
+# A rate stated as a percent ("2% on dining"; not a boost's "75% more" or "25% rewards bonus") or in points, miles or X.
+_PERCENT_RATE = re.compile(r"\d\s*%(?!\s*(?:more|rewards? bonus))", re.I)
+_POINTS_RATE = re.compile(r"\b(?:points?|miles?)\b|\d\s*x\b", re.I)
+UNIT_SHARE = 2 / 3  # how many of a page's rate sentences must use this card's unit before the other unit marks another card
+UNIT_OF_KIND = {"cashback": "percent", "points": "per-dollar", "miles": "per-dollar"}
+
+
+def _rate_unit(text: str) -> str | None:
+    """"percent" or "per-dollar" when the text states rates in only one of them, else None."""
+    percent, points = bool(_PERCENT_RATE.search(text)), bool(_POINTS_RATE.search(text))
+    return None if percent == points else "percent" if percent else "per-dollar"
 
 
 def _name_words(name: str) -> list[str]:
@@ -568,6 +580,14 @@ class CardPage:
                 self._markers.setdefault(marker.group(1), []).append(number)
         # The names the page uses for this card. A page that never names it can't say which of its cards it is.
         self._own_names = [set(self._distinct(n)) for line in lines for n in _card_names(line) if self._is_this_card(n)]
+        # The unit this card's rates are in, when its page agrees: most of the page's rate sentences use it. Then a rate in
+        # the other unit is another card's (Bank of America's points cards carry a calculator for its cash-back cards too).
+        # The seed's kind alone can't say it: Chase's points cards say "5% cash back", Citi's cash-back cards "5 points per $1".
+        self._kind = card.get("rewardKind")
+        own_unit = UNIT_OF_KIND.get(self._kind)
+        units = [unit for unit in map(_rate_unit, rate_sentences(text)) if unit]
+        agrees = own_unit is not None and bool(units) and units.count(own_unit) >= UNIT_SHARE * len(units)
+        self._other_unit = ({"percent", "per-dollar"} - {own_unit}).pop() if agrees else None
 
     def _distinct(self, name: str) -> list[str]:
         return [word for word in _name_words(name) if word not in self._filler]
@@ -594,12 +614,22 @@ class CardPage:
         return bool(set(_name_words(name)) & self._family)
 
     def other_card_problem(self, quote: str) -> str | None:
-        """Why a quote is another card's, or None: it names another card, or it sits under another card's
-        heading and never under this card's. A place under no heading (a footer, a list without headings)
-        says nothing either way."""
+        """Why a quote is another card's, or None: it names another card, it sits under another card's heading
+        and never under this card's, or it states its rate in the unit this card's page doesn't use for its own
+        rates. A place under no heading (a footer, a list without headings) says nothing either way."""
         for name in _card_names(quote):
             if self.is_other_card(name):
                 return f"the quote names another card ({name} Card)"
+        section = self._section_problem(quote)
+        if section:
+            return section
+        if self._other_unit and _rate_unit(quote) == self._other_unit:
+            unit = "a percent" if self._other_unit == "percent" else "in points, miles or X"
+            return f"the quote's rate is {unit}, but this card earns {self._kind} as its page's rates say: it is another card's"
+        return None
+
+    def _section_problem(self, quote: str) -> str | None:
+        """The other card whose section the quote sits in, when every place it sits under a heading is another card's."""
         quote = normalize(quote)
         others = []
         at = self._flat.find(quote)

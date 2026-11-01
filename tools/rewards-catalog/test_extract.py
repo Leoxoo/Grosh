@@ -911,6 +911,31 @@ class OtherCardsTests(unittest.TestCase):
         self.assertEqual((len(model.asked), result["followUps"]), (1, 0))  # the chunk only, no follow-up on miles or Chrome
         self.assertEqual(result["warnings"], [])
 
+    def test_a_rate_in_the_unit_this_card_does_not_earn_is_another_cards(self):
+        # Business Advantage Travel Rewards (points) carries a calculator for all three Business Advantage cards, its
+        # sections under no heading: Customized Cash's percents are not this card's rates.
+        card = {**CARD, "id": "boa-btr", "name": "Business Advantage Travel Rewards", "issuer": "Bank of America", "rewardKind": "points"}
+        dining, base = "Earn 2.00% on dining purchases.", "Earn 1.00% on all other purchases."
+        page = "\n".join(["Business Advantage Travel Rewards World Mastercard® Credit Card", BOA_PLUS_ANY, *BOA_TABLE,
+                          "Change card", "Business Advantage Customized Cash Rewards Mastercard® credit card", dining, base])
+        model = FakeModel([rule(categories=["everything-else"], rate=1.5, unit="per-dollar", quote=BOA_PLUS_ANY),
+                           rule(categories=["travel"], rate=3, unit="per-dollar", quote=BOA_PLUS_ANY),
+                           rule(categories=["dining"], rate=2, quote=dining)])
+        result = extract_card(card, page, "h", model, "m")
+        self.assertEqual(sorted(r["rate"] for r in result["rules"]), [1.5, 3])
+        self.assertEqual([r["rule"]["quote"] for r in result["rejected"]], [dining])
+        self.assertIn("another card's", result["rejected"][0]["reason"])
+        self.assertEqual((result["followUps"], result["warnings"]), (0, []))  # nor is 1% on all other purchases missed
+
+    def test_a_card_whose_page_states_its_rates_in_the_other_unit_keeps_them(self):
+        # Chase's Freedom cards earn points but say "cash back"; Citi's cash-back cards say "5 points per $1".
+        card = {**CARD, "id": "chase-freedom", "name": "Freedom Flex", "issuer": "Chase", "rewardKind": "points"}
+        dining, base = "Earn 3% cash back on dining at restaurants.", "Earn 1% cash back on all other purchases."
+        page = "\n".join(["Chase Freedom Flex Credit Card", dining, base])
+        reply = [rule(rate=3, quote=dining), rule(categories=["everything-else"], rate=1, quote=base)]
+        result = extract_card(card, page, "h", FakeModel(reply), "m", follow_up=False)
+        self.assertEqual((len(result["rules"]), result["rejected"]), (2, []))
+
     def test_title_case_navigation_is_not_a_card_name(self):
         # A quote that swept up the menu ("Manage Your Credit Card") names no card.
         menu = "Discover Deals Manage Your Credit Card Earn 1% cash back on all other purchases."
