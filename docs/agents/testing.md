@@ -90,12 +90,13 @@ tools/check --only SnapshotTests
 
 ## Testing the tools
 
-These need no Xcode, and CI runs all three on every pull request that changes `tools/`, `.claude/hooks/` or `.github/` (the Tools check). A pull request that changes only docs, Markdown, agent settings or the tools' own tests skips the unit and UI tests; a push to main runs everything (`.github/workflows/tests.yml`):
+These need no Xcode and take about 30 seconds. `tools/check-tools` runs all three and prints only what failed. The Stop hook runs it when an agent's turn changed `tools/` or `.claude/hooks/`, and CI runs it on every pull request that changes `tools/`, `.claude/hooks/` or `.github/` (the Tools check). A pull request that changes only `tools/`, docs, Markdown or agent settings skips the unit and UI tests; a push to main runs everything (`.github/workflows/tests.yml`):
 
 ```
+bash tools/check-tools                       # all three
 tools/tests/check/run.sh                     # tools/check, against stand-ins for xcodebuild, xcrun and tools/check-logs
 tools/tests/run-checks/run.sh                # the Stop hook, .claude/hooks/run-checks.sh
 python3 -B -m unittest discover -s tools     # tools/check-logs
 ```
 
-`tools/tests/run-checks/run.sh` runs the hook on a throwaway repository whose `tools/check` fails while a Swift file holds `BROKEN`, with stand-ins for xcodebuild, curl (LM Studio) and claude (the local model). It covers when the hook runs the tests and what it hands back, the three-failure limit, and the local fix: that a failed attempt leaves the worktree, the index and the stash list as they were. A change to the hook comes with a case there.
+`tools/tests/run-checks/run.sh` runs the hook on a throwaway repository whose `tools/check` fails while a Swift file holds `BROKEN`, with stand-ins for xcodebuild, curl (LM Studio) and claude (the local model). It covers when the hook runs the unit tests and when the tools' tests (a stand-in `tools/check-tools` that fails while a file under `tools/` or `.claude/hooks/` holds `TOOLBUG`), what it hands back, the three-failure limit, and the local fix: that a failed attempt leaves the worktree, the index and the stash list as they were. A change to the hook comes with a case there.

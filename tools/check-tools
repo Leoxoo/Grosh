@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+#
+# Runs the tools' own tests and prints only what failed: each failing suite's failure lines, then one summary line.
+# They need no Xcode or simulator. The Stop hook runs this when tools/ or .claude/hooks/ change, and so does CI's Tools
+# job. See docs/agents/testing.md.
+#
+#   bash tools/check-tools
+#
+# Exit status: 0 every suite passed; 1 a suite failed.
+
+set -u -o pipefail
+
+cd "$(dirname "$0")/.." || exit 1
+
+suites=0
+failed=0
+
+# suite <name> <command>...: runs one suite, and prints its output, less the lines of passing tests, if it fails.
+suite() {
+    local name=$1 out
+    shift
+    suites=$((suites + 1))
+    if ! out=$("$@" 2>&1 </dev/null); then
+        failed=$((failed + 1))
+        echo "FAIL $name:"
+        printf '%s\n' "$out" | grep -v '^ok ' | sed 's/^/  /'
+    fi
+}
+
+suite "tools/check (tools/tests/check/run.sh)" tools/tests/check/run.sh
+suite "the Stop hook (tools/tests/run-checks/run.sh)" tools/tests/run-checks/run.sh
+suite "tools/check-logs (python3 -m unittest)" python3 -B -m unittest discover -s tools
+
+if [ "$failed" -eq 0 ]; then
+    echo "$suites suites passed"
+else
+    echo "$failed of $suites suites failed"
+    exit 1
+fi
