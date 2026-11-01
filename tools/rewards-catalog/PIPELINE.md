@@ -133,7 +133,7 @@ For each card it splits the cached page text into chunks of about 12,000 charact
 **Checks on every proposed rule** (`validate_rule`, none of which trusts the model):
 
 1. every category is in the catalog list, unit is `percent` or `per-dollar`, the rate is a number above 0 and up to 10;
-2. the quote appears on the page word for word (ignoring case, spacing, curly quotes and ®/™ marks);
+2. the quote appears on the page word for word (ignoring case, spacing, curly quotes and ®/™ marks), and is at most 600 characters: the sentence that states the rate (or two, a base rate and its boost), not the page around it. Hand-entered rules too: Customized Cash's used to quote 2,135 characters, from the page's title through its menu;
 3. the rate appears in the quote as a whole number (13% is not 3%), and the quote has a `%` for percent or points, miles or X for per-dollar;
 4. the quote uses a word for its category (for example "grocer", "restaurant", "all other"), which catches a rate filed under the wrong category. Brand names are not category words (a rate "on Lyft rides" is one company's promotion, not a transit rate). A base rate (`everything-else`) may leave out "all other" if the quote names no other category (Apple Card's "Get 2% Daily Cash back when you use Apple Card with Apple Pay"), but never if the quote talks about a quarter, activating, enrolling, rotating or "different places": that's a rotating bonus, not the base;
 5. a cap needs an amount and a period, and both appear in the quote (`$6,000`, `6K` and `6000` match; "year" or "annual"; `cycle` is a "billing cycle");

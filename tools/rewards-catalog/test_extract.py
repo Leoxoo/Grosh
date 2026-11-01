@@ -137,6 +137,13 @@ class ValidateRuleTests(unittest.TestCase):
             self.assertIn("condition", self.check(conditions=bad), bad)
         self.assertIn("condition", validate_rule({k: v for k, v in rule().items() if k != "conditions"}, PAGE_NORM))
 
+    def test_a_quote_is_one_sentence_not_a_page(self):
+        # A quote that runs from the page's title through its menu is "on the page", and shows a reviewer nothing.
+        menu = "Menu Contact us Privacy " * 30
+        long_quote = menu + "Earn unlimited 3% cash back on dining, entertainment and popular streaming services."
+        problem = validate_rule(rule(quote=long_quote), normalize(long_quote))
+        self.assertIn("quote is over 600 characters", problem)
+
     def test_not_a_rule(self):
         self.assertEqual(validate_rule("3% on dining", PAGE_NORM), "not an object")
         self.assertIn("no quote", self.check(quote=" "))
@@ -1024,6 +1031,12 @@ class ManualRulesTests(unittest.TestCase):
         result = self.candidate({"rules": [bad]})
         self.assertEqual((result["rules"], result["status"]), ([], "no-rules"))
         self.assertIn("not in the quote", result["rejected"][0]["reason"])
+
+    def test_every_hand_entered_rule_passes_the_checks_that_need_no_page(self):
+        manual = json.loads(extract.MANUAL_RULES.read_text(encoding="utf-8"))
+        for card_id, entry in manual.items():
+            for proposal in entry.get("rules", []):
+                self.assertIsNone(validate_rule(proposal), f"{card_id}: {proposal['quote'][:80]}")
 
     def test_card_conditions_say_whether_the_page_has_them(self):
         self.assertTrue(self.candidate({"rules": [self.APPLE_RULE], "cardConditions": [WALLETS]})["cardConditionsOnPage"])

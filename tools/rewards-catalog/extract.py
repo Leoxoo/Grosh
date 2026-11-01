@@ -63,6 +63,7 @@ MAX_RATE = 10
 MAX_CONDITIONS = 5
 MAX_CARD_CONDITIONS = 8
 MAX_CONDITION_CHARS = 400
+MAX_QUOTE_CHARS = 600  # a rate's sentence (or two: a base rate and its boost), not the page around it
 ATTEMPTS_PER_CHUNK = 2
 
 # The catalog's fixed categories (PIPELINE.md), each with words a quote about it would use.
@@ -410,6 +411,8 @@ def validate_rule(rule, page_norm: str | None = None, rows: dict[str, str] | Non
         return f"rate {rate!r} is not a number from 0 to {MAX_RATE}"
     if not isinstance(quote, str) or not quote.strip():
         return "no quote"
+    if len(quote) > MAX_QUOTE_CHARS:
+        return f"quote is over {MAX_QUOTE_CHARS} characters: it should be the sentence that states the rate"
     if cap is not None and (isinstance(cap, bool) or not isinstance(cap, (int, float)) or cap <= 0):
         return f"cap {cap!r} is not a positive number"
     if period not in (None, *PERIOD_WORDS):
