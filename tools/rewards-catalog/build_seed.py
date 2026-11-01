@@ -34,6 +34,9 @@ EXTRA_CARDS = Path(__file__).with_name("extra-cards.json")
 # Cards left out of the seed on purpose, {card id: why}: brokerage co-brands of a card already in
 # it, for one. Kept apart for the same reason as the overrides, so a fresh CSV doesn't bring them back.
 REMOVED_CARDS = Path(__file__).with_name("removed-cards.json")
+# Cards waiting on a person's decision, {card id: what is needed}: a card that no longer exists, or one whose
+# rates no page states. Each gets a "needsInfo" field with that text, which the web page (ui.py) shows.
+NEEDS_INFO = Path(__file__).with_name("needs-info.json")
 
 # CardPin's issuer codes, as people would write them.
 ISSUER_NAMES = {
@@ -131,9 +134,11 @@ def build(
     url_overrides: dict[str, str] | None = None,
     extra_cards: list[dict] | None = None,
     removed_cards: dict[str, str] | None = None,
+    needs_info: dict[str, str] | None = None,
 ) -> list[dict]:
     url_overrides = url_overrides or {}
     removed_cards = removed_cards or {}
+    needs_info = needs_info or {}
     cards: dict[str, dict] = {}
     for row in rows:
         # A card with several sign-up offers has several rows that differ only in
@@ -166,10 +171,15 @@ def build(
     unknown = sorted(set(url_overrides) - set(ids))
     if unknown:
         sys.exit(f"url-overrides.json names cards that aren't in the CSV: {unknown}")
+    unmarked = sorted(set(needs_info) - set(ids))
+    if unmarked:
+        sys.exit(f"needs-info.json names cards that aren't in the CSV: {unmarked}")
     for card in catalog:
         if card["id"] in url_overrides:
             card["sourceUrl"] = url_overrides[card["id"]]
             card["sourceHost"] = urlparse(card["sourceUrl"]).netloc
+        if card["id"] in needs_info:
+            card["needsInfo"] = needs_info[card["id"]]
     duplicates = {i for i in ids if ids.count(i) > 1}
     if duplicates:
         sys.exit(f"Two cards share an id, so one would overwrite the other: {sorted(duplicates)}")
@@ -183,7 +193,8 @@ def main() -> None:
         overrides = json.loads(URL_OVERRIDES.read_text(encoding="utf-8")) if URL_OVERRIDES.exists() else {}
         extras = json.loads(EXTRA_CARDS.read_text(encoding="utf-8")) if EXTRA_CARDS.exists() else []
         removed = json.loads(REMOVED_CARDS.read_text(encoding="utf-8")) if REMOVED_CARDS.exists() else {}
-        catalog = build(list(csv.DictReader(file)), overrides, extras, removed)
+        needs_info = json.loads(NEEDS_INFO.read_text(encoding="utf-8")) if NEEDS_INFO.exists() else {}
+        catalog = build(list(csv.DictReader(file)), overrides, extras, removed, needs_info)
     document = {
         "seededFrom": "CardPin raw_import.csv (MIT)",
         "cards": catalog,

@@ -137,6 +137,13 @@ class ValidateRuleTests(unittest.TestCase):
             self.assertIn("condition", self.check(conditions=bad), bad)
         self.assertIn("condition", validate_rule({k: v for k, v in rule().items() if k != "conditions"}, PAGE_NORM))
 
+    def test_a_quote_is_one_sentence_not_a_page(self):
+        # A quote that runs from the page's title through its menu is "on the page", and shows a reviewer nothing.
+        menu = "Menu Contact us Privacy " * 30
+        long_quote = menu + "Earn unlimited 3% cash back on dining, entertainment and popular streaming services."
+        problem = validate_rule(rule(quote=long_quote), normalize(long_quote))
+        self.assertIn("quote is over 600 characters", problem)
+
     def test_not_a_rule(self):
         self.assertEqual(validate_rule("3% on dining", PAGE_NORM), "not an object")
         self.assertIn("no quote", self.check(quote=" "))
@@ -228,6 +235,11 @@ BOA_TABLE = ["For illustrative purposes only.", "Not Enrolled", "No rewards bonu
              "1.5 points on All other purchases", "Gold", "25% rewards bonus", "$1350", "3.75 points on Travel center",
              "1.87 points on All other purchases", "Platinum Honors", "75% rewards bonus", "$1890",
              "5.25 points on Travel center", "2.62 points on All other purchases", "Calculate rewards"]
+# The same card's calculator table: each cell broken in two, its rate on one line and what it is for on the next.
+BOA_CALCULATOR = ["Not Enrolled", "No rewards bonus", "3.00 points", "per $1 spent on purchases at BofA Travel", "1.50 points",
+                  "per $1 spent on all other purchases", "Platinum Honors", "75% rewards bonus", "5.25 points",
+                  "per $1 spent on purchases at BofA Travel", "2.62 points", "per $1 spent on all other purchases",
+                  "Get the card and start earning today:"]
 
 
 class TierBoostTests(unittest.TestCase):
@@ -298,9 +310,29 @@ class TierBoostTests(unittest.TestCase):
         self.assertIn("tier platinum-honors", wrong_tier["reason"])
         self.assertFalse([w for w in result["warnings"] if "nothing to tell them apart" in w or "no rate for all other" in w])
 
+    def test_a_tier_row_cell_broken_across_two_lines_is_still_a_boost(self):
+        text = "\n".join(["Business Advantage Travel Rewards", *BOA_CALCULATOR])
+        cell = dict(categories=["everything-else"], unit="per-dollar")
+        boost = rule(**cell, rate=2.62, quote="2.62 points per $1 spent on all other purchases")
+        base = rule(**cell, rate=1.5, quote="1.50 points per $1 spent on all other purchases")
+        self.assertIn("needs requires preferred-rewards-tier", validate_rule(boost, normalize(text), extract.tier_rows(text)))
+        self.assertIsNone(validate_rule(base, normalize(text), extract.tier_rows(text)))  # the "No rewards bonus" row
+
+    def test_tier_table_cells_and_up_to_more_are_not_asked_about_again_or_missed(self):
+        # A tier cell read alone has lost the row that says it is a boost, and "up to 75% more" is no rate: asking the
+        # model about either again can't add a rule, and the result doesn't lack them.
+        card = {**CARD, "id": "boa-btr", "name": "Business Advantage Travel Rewards", "rewardKind": "points"}
+        page = "\n".join(["Business Advantage Travel Rewards.", "Earn up to 75% more points with every purchase", BOA_PLUS_ANY,
+                          *BOA_TABLE, *BOA_CALCULATOR])
+        model = FakeModel([rule(categories=["everything-else"], rate=1.5, unit="per-dollar", quote=BOA_PLUS_ANY),
+                           rule(categories=["travel"], rate=3, unit="per-dollar", quote=BOA_PLUS_ANY)])
+        result = extract_card(card, page, "h", model, "m")
+        self.assertEqual((len(model.asked), result["followUps"]), (1, 0))
+        self.assertEqual(result["warnings"], [])
+
     def test_a_boost_alone_is_not_the_base_rate(self):
-        boost = extract.accepted_rule(rule(**self.BOOST, requires=["preferred-rewards-tier"]), "u", "h", "page")
-        self.assertIn("no rate for all other purchases was found", extract.review_warnings([boost])[0])
+        boost = extract.candidate_rule(rule(**self.BOOST, requires=["preferred-rewards-tier"]), "u", "h", "page")
+        self.assertIn("no rate for all other purchases was found", extract.card_warnings([boost])[0])
 
 
 class WhatCountsAsWhatTests(unittest.TestCase):
@@ -535,11 +567,11 @@ class WhatCountsAsWhatTests(unittest.TestCase):
 
 class ReviewWarningTests(unittest.TestCase):
     def rules(self, *specs):
-        return [extract.accepted_rule(rule(**spec), "u", "h", "page") for spec in specs]
+        return [extract.candidate_rule(rule(**spec), "u", "h", "page") for spec in specs]
 
     def test_two_rates_for_the_same_thing_are_flagged(self):
         base = dict(categories=["everything-else"], quote="Earn 1% on all other purchases.")
-        warnings = extract.review_warnings(self.rules({**base, "rate": 1}, {**base, "rate": 5}))
+        warnings = extract.card_warnings(self.rules({**base, "rate": 1}, {**base, "rate": 5}))
         self.assertEqual(warnings, ["everything-else earns 1 and 5 with nothing to tell them apart"])
 
     def test_rates_with_something_to_tell_them_apart_are_not(self):
@@ -549,14 +581,14 @@ class ReviewWarningTests(unittest.TestCase):
                            {**base, "rate": 4, "capAmount": 500, "capPeriod": "month"},
                            {"categories": [], "selection": "rotating", "rate": 5}, {"categories": [], "selection": "rotating", "rate": 2},
                            {"categories": ["everything-else"], "rate": 1, "quote": "Earn 1% on all other purchases."})
-        self.assertEqual(extract.review_warnings(rules), [])
+        self.assertEqual(extract.card_warnings(rules), [])
 
     def test_a_card_with_rates_but_no_base_rate_is_flagged(self):
         dining = self.rules({"categories": ["dining"], "rate": 3})
-        self.assertEqual(extract.review_warnings(dining), ["no rate for all other purchases was found: check the page for what everything else earns"])
+        self.assertEqual(extract.card_warnings(dining), ["no rate for all other purchases was found: check the page for what everything else earns"])
         both = self.rules({"categories": ["dining"], "rate": 3}, {"categories": ["everything-else"], "rate": 1, "quote": "Earn 1% on all other purchases."})
-        self.assertEqual(extract.review_warnings(both), [])
-        self.assertEqual(extract.review_warnings([]), [])  # nothing found is already no-rules
+        self.assertEqual(extract.card_warnings(both), [])
+        self.assertEqual(extract.card_warnings([]), [])  # nothing found is already no-rules
 
     def test_a_candidate_carries_its_warnings(self):
         reply = [rule(categories=["everything-else"], rate=1, quote="Earn 1% cash back on all other purchases."),
@@ -886,6 +918,31 @@ class OtherCardsTests(unittest.TestCase):
         self.assertEqual((len(model.asked), result["followUps"]), (1, 0))  # the chunk only, no follow-up on miles or Chrome
         self.assertEqual(result["warnings"], [])
 
+    def test_a_rate_in_the_unit_this_card_does_not_earn_is_another_cards(self):
+        # Business Advantage Travel Rewards (points) carries a calculator for all three Business Advantage cards, its
+        # sections under no heading: Customized Cash's percents are not this card's rates.
+        card = {**CARD, "id": "boa-btr", "name": "Business Advantage Travel Rewards", "issuer": "Bank of America", "rewardKind": "points"}
+        dining, base = "Earn 2.00% on dining purchases.", "Earn 1.00% on all other purchases."
+        page = "\n".join(["Business Advantage Travel Rewards World Mastercard® Credit Card", BOA_PLUS_ANY, *BOA_TABLE,
+                          "Change card", "Business Advantage Customized Cash Rewards Mastercard® credit card", dining, base])
+        model = FakeModel([rule(categories=["everything-else"], rate=1.5, unit="per-dollar", quote=BOA_PLUS_ANY),
+                           rule(categories=["travel"], rate=3, unit="per-dollar", quote=BOA_PLUS_ANY),
+                           rule(categories=["dining"], rate=2, quote=dining)])
+        result = extract_card(card, page, "h", model, "m")
+        self.assertEqual(sorted(r["rate"] for r in result["rules"]), [1.5, 3])
+        self.assertEqual([r["rule"]["quote"] for r in result["rejected"]], [dining])
+        self.assertIn("another card's", result["rejected"][0]["reason"])
+        self.assertEqual((result["followUps"], result["warnings"]), (0, []))  # nor is 1% on all other purchases missed
+
+    def test_a_card_whose_page_states_its_rates_in_the_other_unit_keeps_them(self):
+        # Chase's Freedom cards earn points but say "cash back"; Citi's cash-back cards say "5 points per $1".
+        card = {**CARD, "id": "chase-freedom", "name": "Freedom Flex", "issuer": "Chase", "rewardKind": "points"}
+        dining, base = "Earn 3% cash back on dining at restaurants.", "Earn 1% cash back on all other purchases."
+        page = "\n".join(["Chase Freedom Flex Credit Card", dining, base])
+        reply = [rule(rate=3, quote=dining), rule(categories=["everything-else"], rate=1, quote=base)]
+        result = extract_card(card, page, "h", FakeModel(reply), "m", follow_up=False)
+        self.assertEqual((len(result["rules"]), result["rejected"]), (2, []))
+
     def test_title_case_navigation_is_not_a_card_name(self):
         # A quote that swept up the menu ("Manage Your Credit Card") names no card.
         menu = "Discover Deals Manage Your Credit Card Earn 1% cash back on all other purchases."
@@ -974,6 +1031,12 @@ class ManualRulesTests(unittest.TestCase):
         result = self.candidate({"rules": [bad]})
         self.assertEqual((result["rules"], result["status"]), ([], "no-rules"))
         self.assertIn("not in the quote", result["rejected"][0]["reason"])
+
+    def test_every_hand_entered_rule_passes_the_checks_that_need_no_page(self):
+        manual = json.loads(extract.MANUAL_RULES.read_text(encoding="utf-8"))
+        for card_id, entry in manual.items():
+            for proposal in entry.get("rules", []):
+                self.assertIsNone(validate_rule(proposal), f"{card_id}: {proposal['quote'][:80]}")
 
     def test_card_conditions_say_whether_the_page_has_them(self):
         self.assertTrue(self.candidate({"rules": [self.APPLE_RULE], "cardConditions": [WALLETS]})["cardConditionsOnPage"])

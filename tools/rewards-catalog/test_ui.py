@@ -214,6 +214,12 @@ class OverviewTests(AppCase):
         self.assertEqual((overview["summary"]["cards"], overview["summary"]["fetched"], overview["summary"]["pending"]), (3, 1, 0))
 
 
+    def test_a_card_waiting_on_a_decision_says_what_is_needed(self):
+        self.cards[1]["needsInfo"] = "The card no longer exists: mark it discontinued or replace it?"
+        self.paths.seed.write_text(json.dumps({"cards": self.cards}))
+        rows = {r["id"]: r for r in self.app.overview()["cards"]}
+        self.assertEqual((rows["bank-a"]["needsInfo"], rows["bank-b"]["needsInfo"]), (None, self.cards[1]["needsInfo"]))
+
     def test_a_page_in_the_state_but_not_the_cache_says_so_and_is_fetched_as_missing(self):
         self.give_page("bank-a")
         (self.paths.cache / "bank-a" / "latest.txt").unlink()

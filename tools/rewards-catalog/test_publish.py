@@ -4,8 +4,10 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 import extract
+import fetch
 import publish
 import review
 
@@ -23,7 +25,7 @@ SAVOR = {
 
 
 def rule(**changes) -> dict:
-    return extract.accepted_rule(dict(PROPOSAL, **changes), URL, "hash-1", "page")
+    return extract.candidate_rule(dict(PROPOSAL, **changes), URL, "hash-1", "page")
 
 
 def candidate(*rules, card_id: str = "bank-savor", card_conditions=()) -> dict:
@@ -96,7 +98,7 @@ class CatalogTests(unittest.TestCase):
             both = {"bank-savor": cand, "bank-quicksilver": dict(cand, cardId="bank-quicksilver")}
             decisions = {**decided(both["bank-savor"], (0, "accept", "2026-11-01"), (1, "accept", "2026-11-01")),
                          **decided(both["bank-quicksilver"], (0, "accept", "2026-11-01"), (1, "accept", "2026-11-01"))}
-            texts.append(publish.dumps(publish.catalog(cards, both, decisions, None, "2026-11-01")))
+            texts.append(fetch.json_text(publish.catalog(cards, both, decisions, None, "2026-11-01")))
         self.assertEqual(texts[0], texts[1])
         self.assertIn('"rate": 3,', texts[0])  # not 3.0
         self.assertLess(texts[0].index('"bank-quicksilver"'), texts[0].index('"bank-savor"'))
@@ -120,12 +122,12 @@ class PublishTests(unittest.TestCase):
         cand = candidate(rule())
         (candidates / "bank-savor.json").write_text(json.dumps(cand))
         decisions.write_text(json.dumps(decided(cand, (0, "accept", "2026-11-01"))))
-        paths = dict(seed=seed, candidates=candidates, decisions=decisions, out=out)
-        written = publish.publish(**paths, today="2026-11-01")
+        paths = SimpleNamespace(seed=seed, candidates=candidates, decisions=decisions, catalog=out)
+        written = publish.publish(paths, today="2026-11-01")
         text = out.read_text(encoding="utf-8")
         self.assertEqual((json.loads(text), [r["evidence"]["quote"] for r in written["cards"][0]["rules"]]),
                          (written, ["Earn unlimited 3% cash back on dining."]))
-        publish.publish(**paths, today="2026-12-01")
+        publish.publish(paths, today="2026-12-01")
         self.assertEqual(out.read_text(encoding="utf-8"), text)
 
 

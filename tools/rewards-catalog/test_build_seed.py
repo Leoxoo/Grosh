@@ -1,5 +1,6 @@
 """Offline tests for build_seed.py: python3 -m unittest discover -s tools/rewards-catalog"""
 
+import json
 import unittest
 
 import build_seed
@@ -49,6 +50,19 @@ class BuildTests(unittest.TestCase):
         with self.assertRaises(SystemExit) as stopped:
             build_seed.build([ROW], removed_cards={"no-such-card": "why"})
         self.assertIn("removed-cards.json", str(stopped.exception))
+
+    def test_a_card_waiting_on_a_decision_is_marked_needs_info_and_unknown_ids_stop_the_build(self):
+        catalog = build_seed.build([ROW], extra_cards=[EXTRA], needs_info={"capital-one-savor": "Is it discontinued?"})
+        self.assertEqual([c.get("needsInfo") for c in catalog], ["Is it discontinued?", None])
+        with self.assertRaises(SystemExit) as stopped:
+            build_seed.build([ROW], needs_info={"no-such-card": "why"})
+        self.assertIn("needs-info.json", str(stopped.exception))
+
+    def test_the_committed_seed_carries_every_needs_info_mark(self):
+        marks = json.loads(build_seed.NEEDS_INFO.read_text(encoding="utf-8"))
+        seed = json.loads(build_seed.OUT.read_text(encoding="utf-8"))["cards"]
+        self.assertEqual({c["id"]: c["needsInfo"] for c in seed if c.get("needsInfo")}, marks)
+        self.assertLessEqual({"barclays-carnival-world-mastercard", "american-express-green"}, set(marks))
 
 
 if __name__ == "__main__":

@@ -499,9 +499,14 @@ def read_json(path: Path, default):
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else default
 
 
+def json_text(value) -> str:
+    """How every JSON file here is written: keys sorted, two-space indents, one trailing newline, so equal values are equal bytes."""
+    return json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+
+
 def write_json(path: Path, value) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
+    path.write_text(json_text(value), encoding="utf-8")
 
 
 def run(

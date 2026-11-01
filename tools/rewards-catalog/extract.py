@@ -20,8 +20,9 @@ inside that quote. Anything else is listed under "rejected" with the reason, nev
 
 A card whose page doesn't name the card is "wrong-page" and gets no rules: Amex's state
 holds many cards' marketing, and a redirect can land on a different card's page. On a page
-that describes several cards, a rule whose quote names another card, or sits only under
-another card's heading, is rejected too (CardPage).
+that describes several cards, a rule whose quote names another card, sits only under
+another card's heading, or states its rate in the unit the page doesn't use for this card's
+rates, is rejected too (CardPage).
 
 Rules for cards whose pages hide them (or that need a person's judgment) are entered by
 hand in manual-rules.json, in the same shape, and go through the same checks. A hand-entered
@@ -62,6 +63,7 @@ MAX_RATE = 10
 MAX_CONDITIONS = 5
 MAX_CARD_CONDITIONS = 8
 MAX_CONDITION_CHARS = 400
+MAX_QUOTE_CHARS = 600  # a rate's sentence (or two: a base rate and its boost), not the page around it
 ATTEMPTS_PER_CHUNK = 2
 
 # The catalog's fixed categories (PIPELINE.md), each with words a quote about it would use.
@@ -108,13 +110,15 @@ SELECTION_WORDS = {
     "choose": ("choice", "choose", "choosing", "chosen", "select", "pick"),
     "top-spend": ("top", "highest", "most", "greatest"),
 }
+# A relationship boost's tag, both what the rate requires and what the app must ask (Bank of America Preferred Rewards).
+TIER_BOOST = "preferred-rewards-tier"
 # What a rate can require beyond the purchase itself, and the words that must back the tag up.
 REQUIRES = {
     "apple-pay": ("apple pay",),
     "activation": ("activate", "activation", "enroll"),
     "issuer-booking": ("booked through", "booked with", "book through", "book with", "booking through",
                        "purchased through", "portal"),
-    "preferred-rewards-tier": ("preferred rewards", "rewards bonus", "reward bonus"),  # the bonus: a tier table's row
+    TIER_BOOST: ("preferred rewards", "rewards bonus", "reward bonus"),  # the bonus: a tier table's row
 }
 # Bank of America's Preferred Rewards tiers, and how a quote names each ("Platinum" alone is not Platinum Honors).
 TIERS = {
@@ -131,7 +135,7 @@ NEEDS = {
     "choice-categories": "Which category did you choose on this card?",
     "account-opened": "When did you open this card?",
     "pays-with-apple-pay": "Do you usually pay with Apple Pay?",
-    "preferred-rewards-tier": "Which Bank of America Preferred Rewards tier are you in?",
+    TIER_BOOST: "Which Bank of America Preferred Rewards tier are you in?",
 }
 MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
           "november", "december")
@@ -209,6 +213,21 @@ def has_rates(chunk: str) -> bool:
     return bool(_RATE_LOOKING.search(chunk))
 
 
+def text_blocks(text: str) -> list[str]:
+    """The page's lines with a line that starts in lower case joined to the one before. Pages break a sentence
+    across lines ("3% Cash Back at U.S." / "supermarkets") and a table cell too ("2.62 points" / "per $1 spent on
+    all other purchases"). Any other line break ends a block: headings and menus have no full stop, and joined to
+    the next line they read as one sentence about something else ("Travel Rewards & Benefits 3% Cash Back")."""
+    blocks: list[str] = []
+    for line in text.splitlines():
+        line = " ".join(line.split())
+        if line and blocks and line[0].islower():
+            blocks[-1] += " " + line
+        elif line:
+            blocks.append(line)
+    return blocks
+
+
 def normalize(text: str) -> str:
     """Text for comparing a quote to a page: same letters, ignoring case, spacing, curly quotes,
     dashes and the (R)/(TM) marks issuers scatter through names."""
@@ -269,7 +288,8 @@ BOOST_WORDS = ("preferred rewards", "rewards bonus", "reward bonus", "platinum h
 # Chase's "Sapphire Preferred rewards" is a card's name.
 NOT_A_BOOST = ("plus any", "sapphire preferred rewards", "business preferred rewards")
 # Bank of America's rewards tables have one row per tier, each cell on its own line: "Gold", "25% rewards bonus",
-# "$1350", "1.87 points on All other purchases". The row's bonus cell, and the tier just above it, start a row.
+# "$1350", "1.87 points on All other purchases". The row's bonus cell, and the tier just above it, start a row. A
+# calculator's table breaks a cell in two ("2.62 points" / "per $1 spent on all other purchases"); text_blocks joins it.
 _BONUS_CELL = re.compile(r"(?:no|\d+(?:\.\d+)?%) rewards? bonus")
 ROW_LINES = 6  # cells after the bonus cell that still belong to its row
 TABLE_CELL_CHARS = 60  # a longer line is a sentence, not a cell, and ends the table
@@ -280,7 +300,7 @@ def tier_rows(text: str) -> dict[str, str]:
     rewards bonus"), for the rows that are a boost. A cell's own words never say it is one, so its row must."""
     rows: dict[str, str] = {}
     head, previous, since = None, "", 0
-    for line in map(normalize, text.splitlines()):
+    for line in map(normalize, text_blocks(text)):  # a cell broken in two is one cell
         since += 1
         if _BONUS_CELL.fullmatch(line):
             head, since = (None if line.startswith("no ") else f"{previous} {line}"), 0
@@ -393,6 +413,8 @@ def validate_rule(rule, page_norm: str | None = None, rows: dict[str, str] | Non
         return f"rate {rate!r} is not a number from 0 to {MAX_RATE}"
     if not isinstance(quote, str) or not quote.strip():
         return "no quote"
+    if len(quote) > MAX_QUOTE_CHARS:
+        return f"quote is over {MAX_QUOTE_CHARS} characters: it should be the sentence that states the rate"
     if cap is not None and (isinstance(cap, bool) or not isinstance(cap, (int, float)) or cap <= 0):
         return f"cap {cap!r} is not a positive number"
     if period not in (None, *PERIOD_WORDS):
@@ -408,8 +430,8 @@ def validate_rule(rule, page_norm: str | None = None, rows: dict[str, str] | Non
     tier = rule.get("tier")
     if tier is not None and tier not in TIERS:
         return f"tier {tier!r} is not one of {', '.join(TIERS)}"
-    if tier is not None and "preferred-rewards-tier" not in requires:
-        return "a tier is only for a rule that requires preferred-rewards-tier"
+    if tier is not None and TIER_BOOST not in requires:
+        return f"a tier is only for a rule that requires {TIER_BOOST}"
     if not isinstance(conditions, list) or len(conditions) > MAX_CONDITIONS:
         return f"conditions must be a list of at most {MAX_CONDITIONS} quotes"
     for condition in conditions:
@@ -430,9 +452,9 @@ def validate_rule(rule, page_norm: str | None = None, rows: dict[str, str] | Non
     context = " ".join([quote_norm, *map(normalize, conditions)])
     rate_norm = normalize(_rate_sentence(quote, rate))
     row = next((head for cell, head in (rows or {}).items() if quote_norm in cell), None)
-    boost = "preferred-rewards-tier" in requires
+    boost = TIER_BOOST in requires
     if not boost and (row or mentions(rate_norm, BOOST_WORDS) and not mentions(rate_norm, NOT_A_BOOST)):
-        return "the rate is a relationship boost, not one every cardholder earns: it needs requires preferred-rewards-tier"
+        return f"the rate is a relationship boost, not one every cardholder earns: it needs requires {TIER_BOOST}"
     if row:
         context += " " + row  # a table cell's tier and bonus are in its row
     if selection == "rotating":
@@ -489,6 +511,17 @@ NAME_FILLER = {"the", "a", "an", "your", "my", "our", "this", "credit", "card", 
 NOT_IN_A_NAME = {"the", "a", "an", "your", "my", "our", "for", "with", "of", "to", "and", "on", "in", "about", "using"}
 SECTION_LINES = 12  # a card's heading reaches this many lines down (or to the next heading), so a footer isn't a card's section
 FOOTNOTE_LINES = 3  # "Footnote 2:" and the lines after it, up to the next footnote
+# A rate stated as a percent ("2% on dining"; not a boost's "75% more" or "25% rewards bonus") or in points, miles or X.
+_PERCENT_RATE = re.compile(r"\d\s*%(?!\s*(?:more|rewards? bonus))", re.I)
+_POINTS_RATE = re.compile(r"\b(?:points?|miles?)\b|\d\s*x\b", re.I)
+UNIT_SHARE = 2 / 3  # how many of a page's rate sentences must use this card's unit before the other unit marks another card
+UNIT_OF_KIND = {"cashback": "percent", "points": "per-dollar", "miles": "per-dollar"}
+
+
+def _rate_unit(text: str) -> str | None:
+    """"percent" or "per-dollar" when the text states rates in only one of them, else None."""
+    percent, points = bool(_PERCENT_RATE.search(text)), bool(_POINTS_RATE.search(text))
+    return None if percent == points else "percent" if percent else "per-dollar"
 
 
 def _name_words(name: str) -> list[str]:
@@ -552,6 +585,14 @@ class CardPage:
                 self._markers.setdefault(marker.group(1), []).append(number)
         # The names the page uses for this card. A page that never names it can't say which of its cards it is.
         self._own_names = [set(self._distinct(n)) for line in lines for n in _card_names(line) if self._is_this_card(n)]
+        # The unit this card's rates are in, when its page agrees: most of the page's rate sentences use it. Then a rate in
+        # the other unit is another card's (Bank of America's points cards carry a calculator for its cash-back cards too).
+        # The seed's kind alone can't say it: Chase's points cards say "5% cash back", Citi's cash-back cards "5 points per $1".
+        self._kind = card.get("rewardKind")
+        own_unit = UNIT_OF_KIND.get(self._kind)
+        units = [unit for unit in map(_rate_unit, rate_sentences(text)) if unit]
+        agrees = own_unit is not None and bool(units) and units.count(own_unit) >= UNIT_SHARE * len(units)
+        self._other_unit = ({"percent", "per-dollar"} - {own_unit}).pop() if agrees else None
 
     def _distinct(self, name: str) -> list[str]:
         return [word for word in _name_words(name) if word not in self._filler]
@@ -578,12 +619,22 @@ class CardPage:
         return bool(set(_name_words(name)) & self._family)
 
     def other_card_problem(self, quote: str) -> str | None:
-        """Why a quote is another card's, or None: it names another card, or it sits under another card's
-        heading and never under this card's. A place under no heading (a footer, a list without headings)
-        says nothing either way."""
+        """Why a quote is another card's, or None: it names another card, it sits under another card's heading
+        and never under this card's, or it states its rate in the unit this card's page doesn't use for its own
+        rates. A place under no heading (a footer, a list without headings) says nothing either way."""
         for name in _card_names(quote):
             if self.is_other_card(name):
                 return f"the quote names another card ({name} Card)"
+        section = self._section_problem(quote)
+        if section:
+            return section
+        if self._other_unit and _rate_unit(quote) == self._other_unit:
+            unit = "a percent" if self._other_unit == "percent" else "in points, miles or X"
+            return f"the quote's rate is {unit}, but this card earns {self._kind} as its page's rates say: it is another card's"
+        return None
+
+    def _section_problem(self, quote: str) -> str | None:
+        """The other card whose section the quote sits in, when every place it sits under a heading is another card's."""
         quote = normalize(quote)
         others = []
         at = self._flat.find(quote)
@@ -628,8 +679,8 @@ Rules:
 - unit: "percent" for cash back percent, "per-dollar" for points or miles per dollar.
 - quote: copy the exact words of one sentence or phrase from the text that states the rate. Do not change, shorten or join them.
 - capAmount and capPeriod: only if that same sentence limits how much spending earns the rate (for "up to $6,000 per year": 6000 and "year"; the period is month, quarter, year, or cycle for a billing cycle). Otherwise null for both.
-- requires: only what the text says the rate needs. "apple-pay" (must pay with Apple Pay), "activation" (must activate or enroll), "issuer-booking" (must book through the issuer's travel site or portal), "preferred-rewards-tier" (a higher rate only for members of a banking relationship program, such as Bank of America Preferred Rewards: "earn up to 75% more", "as a Platinum Honors member"). Otherwise [].
-- tier: for a "preferred-rewards-tier" rate, the tier the text gives it: "gold", "platinum", "platinum-honors" or "diamond-honors". Otherwise null. A boosted rate is its own entry; the rate every cardholder earns is a separate entry without it.
+- requires: only what the text says the rate needs. "apple-pay" (must pay with Apple Pay), "activation" (must activate or enroll), "issuer-booking" (must book through the issuer's travel site or portal), "{TIER_BOOST}" (a higher rate only for members of a banking relationship program, such as Bank of America Preferred Rewards: "earn up to 75% more", "as a Platinum Honors member"). Otherwise [].
+- tier: for a "{TIER_BOOST}" rate, the tier the text gives it: "gold", "platinum", "platinum-honors" or "diamond-honors". Otherwise null. A boosted rate is its own entry; the rate every cardholder earns is a separate entry without it.
 - validFrom and validTo: for a rate that applies only in a stated period, its first and last day as YYYY-MM-DD, and only when the text names the months and the year (October through December 2026 is 2026-10-01 and 2026-12-31). Otherwise null.
 - firstMonths: only if the text says the rate applies just during an introductory period after the account is opened ("first year", "first 6 months"): the length in months (12 for "first year"). Otherwise null.
 - conditions: copy, word for word, each sentence in the text that excludes or restricts this one rate: excluded stores, a minimum, who qualifies. These are often in footnotes, which repeat the rate with its exclusions. Never paraphrase. Use [] if there are none.
@@ -832,12 +883,12 @@ def needs_of(rule: dict) -> list[str]:
         needs.append("account-opened")
     if "apple-pay" in rule["requires"]:
         needs.append("pays-with-apple-pay")
-    if "preferred-rewards-tier" in rule["requires"]:
-        needs.append("preferred-rewards-tier")
+    if TIER_BOOST in rule["requires"]:
+        needs.append(TIER_BOOST)
     return needs
 
 
-def accepted_rule(proposal: dict, url: str, page_hash: str | None, verified: str) -> dict:
+def candidate_rule(proposal: dict, url: str, page_hash: str | None, verified: str) -> dict:
     """A rule as the candidate stores it. `verified` is "page" when its quote was found on the page and
     "manual" when a person entered it and the page could not confirm the quote."""
     return {
@@ -862,7 +913,7 @@ def accepted_rule(proposal: dict, url: str, page_hash: str | None, verified: str
     }
 
 
-def _rule_key(rule: dict) -> tuple:
+def _merge_key(rule: dict) -> tuple:
     """What makes two rules the same rule. The quote and the requirements are left out on purpose: the model
     words the same sentence differently in different parts of a page, and the requirements it finds in one
     part are merged into the rule (see extract_card)."""
@@ -872,7 +923,7 @@ def _rule_key(rule: dict) -> tuple:
     )
 
 
-def review_warnings(rules: list[dict]) -> list[str]:
+def card_warnings(rules: list[dict]) -> list[str]:
     """Things that pass every check but that a person should look at before trusting the card: the same
     thing earning two different rates with nothing to tell them apart (two base rates, say). Each of the
     rates is on the page; at most one is probably the right reading."""
@@ -891,7 +942,7 @@ def review_warnings(rules: list[dict]) -> list[str]:
         for key, rates in sorted(groups.items(), key=lambda item: repr(item[0])) if len(rates) > 1
     ]
     if rules and not any(
-        r["selection"] == "fixed" and r["categories"] == ["everything-else"] and "preferred-rewards-tier" not in r["requires"]
+        r["selection"] == "fixed" and r["categories"] == ["everything-else"] and TIER_BOOST not in r["requires"]
         for r in rules
     ):  # a boost is not the base rate: most cardholders don't earn it
         warnings.append("no rate for all other purchases was found: check the page for what everything else earns")
@@ -1023,20 +1074,10 @@ def model_text(text: str) -> str:
 def rate_sentences(text: str) -> list[str]:
     """Sentences that state a reward rate (a percent or an X multiplier next to earn, cash back, points or miles)."""
     found: list[str] = []
-    # Pages break a sentence across lines ("3% Cash Back at U.S." / "supermarkets"), so a line that starts in lower
-    # case continues the one before. Any other line break ends a sentence: headings and menus have no full stop, and
-    # joined to the next line they read as one sentence about something else ("Travel Rewards & Benefits 3% Cash Back").
-    blocks: list[str] = []
-    for line in text.splitlines():
-        line = " ".join(line.split())
-        if line and blocks and line[0].islower():
-            blocks[-1] += " " + line
-        elif line:
-            blocks.append(line)
     # A split needs a capital or digit after the full stop, so "U.S. supermarkets" stays whole. Footnote marks after
     # the full stop ("(then 1%).‡") still end the sentence: otherwise a list of them runs together past
     # MAX_CONDITION_CHARS and its rates are never looked for.
-    for block in blocks:
+    for block in text_blocks(text):
         for piece in re.split(r"(?<=[.!?])[‡†¤*§]*\s+(?=[A-Z0-9\"“‘])", block):
             if (
                 piece and len(piece) <= MAX_CONDITION_CHARS and has_rates(piece) and _REWARD_SENTENCE.search(piece)
@@ -1044,6 +1085,17 @@ def rate_sentences(text: str) -> list[str]:
             ):
                 found.append(piece)
     return found
+
+
+# "Earn up to 75% more points": the size of a relationship boost, not a rate.
+_UP_TO_MORE = re.compile(r"up to (?:an? )?\d+(?:\.\d+)?% more")
+
+
+def _only_a_boost(sentence: str, rows: dict[str, str]) -> bool:
+    """Whether a rate sentence is a boost the result needn't have and the model can't add by reading it alone: a
+    tier table's cell (tier_rows: the row that makes it a boost isn't in the sentence) or "up to 75% more"."""
+    flat = normalize(sentence)
+    return flat in rows or bool(_UP_TO_MORE.search(flat))
 
 
 def _covered(sentence: str, rules: list[dict]) -> bool:
@@ -1074,7 +1126,8 @@ def extract_card(
     (the model could not be read for at least one chunk, so the result is incomplete).
 
     After the chunks, each sentence that states a rate but that no accepted rule quotes is asked about
-    on its own (up to MAX_FOLLOW_UPS). The model skips sentences in a long chunk; asking alone catches them."""
+    on its own (up to MAX_FOLLOW_UPS). The model skips sentences in a long chunk; asking alone catches them.
+    Another card's sentences and a boost's tier cells or "up to N% more" are neither asked about nor missed."""
     candidate = _empty_candidate(card, model, PROMPT_VERSION, page_hash, "ok")
     if not name_on_page(card["name"], text):
         candidate["status"] = "wrong-page"
@@ -1103,8 +1156,8 @@ def extract_card(
             if reason:
                 candidate["rejected"].append({"rule": proposal, "reason": reason})
                 continue
-            rule = accepted_rule(proposal, card["sourceUrl"], page_hash, "page")
-            entry = accepted.setdefault(_rule_key(rule), rule)
+            rule = candidate_rule(proposal, card["sourceUrl"], page_hash, "page")
+            entry = accepted.setdefault(_merge_key(rule), rule)
             # The same rule seen again (the model words a quote a little differently in each part of a page) may carry a
             # condition or requirement the first time lacked.
             entry["conditions"] += [c for c in rule["conditions"] if c not in entry["conditions"]]
@@ -1130,7 +1183,8 @@ def extract_card(
         else:
             take(reply)
 
-    this_cards = [s for s in rate_sentences(text) if not page.other_card_problem(s)]  # another card's rates are no loss
+    # Another card's rates are no loss, and a boost's tier cell or "up to N% more" is no rate the model can add alone.
+    this_cards = [s for s in rate_sentences(text) if not page.other_card_problem(s) and not _only_a_boost(s, rows)]
     uncovered = [s for s in this_cards if not _covered(s, list(accepted.values()))][:MAX_FOLLOW_UPS] if follow_up else []
     candidate["followUps"] = len(uncovered)
     for sentence in uncovered:
@@ -1141,7 +1195,7 @@ def extract_card(
 
     candidate["rules"] = sorted(accepted.values(), key=lambda r: (r["categories"][0] if r["categories"] else "~", -r["rate"]))  # "~" sorts rotating rules last
     candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
-    candidate["warnings"] = review_warnings(candidate["rules"])
+    candidate["warnings"] = card_warnings(candidate["rules"])
     if still_missing:
         # The page states these rates and the result doesn't have them: an "ok" that isn't complete must say so.
         candidate["warnings"].append(
@@ -1167,7 +1221,7 @@ def manual_candidate(card: dict, entry: dict, text: str | None, page_hash: str |
         if problem:
             candidate["rejected"].append({"rule": proposal, "reason": problem})
             continue
-        candidate["rules"].append(accepted_rule(proposal, card["sourceUrl"], page_hash, "page" if grounded else "manual"))
+        candidate["rules"].append(candidate_rule(proposal, card["sourceUrl"], page_hash, "page" if grounded else "manual"))
     for condition in entry.get("cardConditions", []):
         problem = check_condition(condition, None)
         if problem:
@@ -1178,7 +1232,7 @@ def manual_candidate(card: dict, entry: dict, text: str | None, page_hash: str |
         normalize(c) in page_norm for c in candidate["cardConditions"]
     )
     candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
-    candidate["warnings"] = review_warnings(candidate["rules"])
+    candidate["warnings"] = card_warnings(candidate["rules"])
     if not candidate["rules"]:
         candidate["status"] = "no-rules"
     return candidate

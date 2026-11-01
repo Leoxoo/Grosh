@@ -284,7 +284,8 @@
       "discontinued": false,
       "sourceUrl": "https://www.americanexpress.com/us/credit-cards/card/green/",
       "sourceHost": "www.americanexpress.com",
-      "verified": false
+      "verified": false,
+      "needsInfo": "Closed to new applicants in July 2026 and renamed the American Express Classic Green Card; Amex took its card page down, and no page the fetcher can read states its rates. Decide where its rates come from (hand-entered rules, or a page read with a browser), or leave it out (#158)."
     },
     {
       "id": "american-express-hilton-honors",
@@ -704,7 +705,8 @@
       "discontinued": false,
       "sourceUrl": "https://cards.barclaycardus.com/banking/cards/carnival-world-mastercard/",
       "sourceHost": "cards.barclaycardus.com",
-      "verified": false
+      "verified": false,
+      "needsInfo": "The card no longer exists: Barclays replaced it with the Carnival Rewards Mastercard on September 1, 2026, and its page is a 404. Decide whether to mark it discontinued or replace it with the Carnival Rewards Mastercard, a new id (#158)."
     },
     {
       "id": "barclays-emirates-skywards-premium-world-elite",
