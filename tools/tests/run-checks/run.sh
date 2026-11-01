@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # Checks .claude/hooks/run-checks.sh without Xcode or a model: each test runs the hook on a throwaway repository whose
-# tools/check is a stand-in that fails while a Swift file says BROKEN, with the stand-ins in fakes/ for xcodebuild,
+# tools/check is a stand-in that fails while a Swift file says BROKEN, and whose tools/check-tools is one that fails
+# while a file under tools/ or .claude/hooks/ says TOOLBUG, with the stand-ins in fakes/ for xcodebuild,
 # curl (LM Studio answering) and claude (the local model) first on PATH.
 #
 #   tools/tests/run-checks/run.sh
@@ -21,8 +22,9 @@ said=
 status=
 repo=
 
-# A repository with one Swift file in Grosh/ and one in GroshTests/, and a tools/check that records its calls and fails
-# while any Swift file holds BROKEN. FAKE_CHECK_EXIT makes it exit with that status instead.
+# A repository with one Swift file in Grosh/ and one in GroshTests/, a tools/check that records its calls and fails
+# while any Swift file holds BROKEN, and a tools/check-tools that records its calls and fails while a file under tools/
+# or .claude/hooks/ holds TOOLBUG. FAKE_CHECK_EXIT makes tools/check exit with that status instead.
 make_repo() {
     repo=$work/$1
     mkdir -p "$repo/Grosh" "$repo/GroshTests" "$repo/tools"
@@ -42,7 +44,18 @@ if grep -q BROKEN Grosh/*.swift GroshTests/*.swift 2>/dev/null; then
 fi
 echo "2 passed in 1s"
 EOF
-    chmod +x "$repo/tools/check"
+    cat >"$repo/tools/check-tools" <<'EOF'
+#!/usr/bin/env bash
+printf 'tools\n' >>"$FAKE_CALLS"
+if grep -rqs "TOOL""BUG" tools .claude/hooks; then
+    echo "FAIL the Stop hook (tools/tests/run-checks/run.sh):"
+    echo "  FAIL a tool works"
+    echo "1 of 3 suites failed"
+    exit 1
+fi
+echo "3 suites passed"
+EOF
+    chmod +x "$repo/tools/check" "$repo/tools/check-tools"
     (
         cd "$repo" &&
             git init -q &&
@@ -97,6 +110,7 @@ says() {
 never_says() { ! printf '%s' "$said" | grep -qF -- "$1" || fails "printed: $1"; }
 blocks() { says '{"decision":"block","reason":"The unit tests fail. tools/check reports:'; }
 checks() { [ "$(calls check)" = "$1" ] || fails "ran tools/check $(calls check) times, not $1"; }
+checks_tools() { [ "$(calls tools)" = "$1" ] || fails "ran tools/check-tools $(calls tools) times, not $1"; }
 asks_the_model() { [ "$(calls claude)" = "$1" ] || fails "ran the local model $(calls claude) times, not $1"; }
 
 test_case() {
@@ -118,6 +132,7 @@ test_case() {
 }
 
 break_the_tests() { printf 'let broken = 1 // BROKEN\n' >>"$repo/Grosh/App.swift"; }
+break_the_tools() { mkdir -p "$repo/.claude/hooks" && printf '# TOOLBUG\n' >"$repo/.claude/hooks/new.sh"; }
 
 without_xcode() {
     make_repo without-xcode
@@ -149,6 +164,7 @@ passing() {
     stop
     silent
     checks 1
+    checks_tools 0
     stop true
     silent
     checks 1
@@ -331,6 +347,59 @@ local_attempt_counts_toward_the_limit() {
     asks_the_model 1
 }
 
+tools_change() {
+    make_repo tools-change
+    prompt
+    printf '# more\n' >>"$repo/tools/check"
+    stop
+    silent
+    checks 0
+    checks_tools 1
+    stop true
+    silent
+    checks_tools 1
+    mkdir -p "$repo/.claude/hooks" && printf '# hook\n' >"$repo/.claude/hooks/new.sh"
+    stop
+    silent
+    checks 0
+    checks_tools 2
+}
+
+failing_tools() {
+    make_repo failing-tools
+    prompt
+    break_the_tools
+    stop GROSH_LOCAL_FIX_MODEL=model FAKE_CLAUDE=fix
+    says '{"decision":"block","reason":"The tools'"'"' tests fail. tools/check-tools reports:' "FAIL a tool works" \
+        "Fix the failures before you finish."
+    never_says "tools/check reports:"
+    checks 0
+    checks_tools 1
+    asks_the_model 0
+}
+
+failing_both() {
+    make_repo failing-both
+    prompt
+    break_the_tests
+    break_the_tools
+    stop GROSH_LOCAL_FIX=0
+    says "The unit tests and the tools' tests fail. tools/check reports:" "FAIL AppTests/works()" \
+        "tools/check-tools reports:" "FAIL a tool works"
+    checks 1
+    checks_tools 1
+    printf '# fixed\n' >"$repo/.claude/hooks/new.sh"
+    stop true GROSH_LOCAL_FIX=0
+    blocks
+    never_says "check-tools"
+    checks 2
+    checks_tools 2
+    stop true GROSH_LOCAL_FIX=0
+    says "The unit tests still fail after 3 tries"
+    checks 3
+    checks_tools 2
+}
+
 nested_session_is_left_alone() {
     make_repo nested
     prompt
@@ -357,6 +426,9 @@ test_case "a failed local attempt leaves the worktree, index and stash list as t
 test_case "a local model that changes nothing is reported as such" model_that_changes_nothing
 test_case "the local attempt runs once and counts toward the three failures" local_attempt_counts_toward_the_limit
 test_case "the local model's own session is left alone" nested_session_is_left_alone
+test_case "a change to tools/ or the hooks runs the tools' tests, not the unit tests" tools_change
+test_case "failing tools' tests block the stop, without the local fix" failing_tools
+test_case "both failing are reported together, and each reruns only for its own files" failing_both
 
 echo "$passed passed, $failed failed"
 [ "$failed" -eq 0 ]

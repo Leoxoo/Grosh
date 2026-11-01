@@ -1,12 +1,15 @@
 #!/bin/bash
 #
-# Runs the unit tests when the agent stops after editing Swift, and hands the agent only the
-# failures. .claude/settings.json registers it twice.
+# Runs the unit tests when the agent stops after editing Swift, and the tools' own tests when it
+# stops after editing tools/ or the hooks, and hands the agent only the failures.
+# .claude/settings.json registers it twice.
 #
 # run-checks.sh, the Stop hook ("timeout": 300). When a .swift file under Grosh/ or GroshTests/
 # differs from the tree of the last passing run, it runs tools/check, which runs the unit tests.
-# A pass records the tree and adds nothing to the conversation. A failure blocks the stop and hands
-# the agent tools/check's failure lines. The third failure in a row lets the agent stop and shows
+# When a file under tools/ or .claude/hooks/ differs from the tree of the tools' last passing run,
+# it runs tools/check-tools, which runs the tools' tests (about 30 seconds, no simulator). Each is
+# run only for its own files. A pass records the tree and adds nothing to the conversation. A
+# failure blocks the stop and hands the agent the failure lines. The third failure in a row lets the agent stop and shows
 # the user what still fails, and the hook then stays quiet until the Swift changes again. A stop
 # that follows a message from the user (stop_hook_active is false) starts the count again. When
 # tools/check runs out of time, waiting on another session's run included, the agent stops with a
@@ -16,7 +19,7 @@
 # left. Before any run has passed, it records the tree as it is at the first prompt, so that a turn
 # without Swift changes stays quiet.
 #
-# The local fix. On the first failure in a row, before blocking, a local model served by LM Studio
+# The local fix. On the first failure in a row of the unit tests, before blocking, a local model served by LM Studio
 # on localhost:1234 gets one headless attempt, capped at 300 seconds including its tools/check rerun
 # and by what is left of the hook's own 300 seconds. It runs only when GROSH_LOCAL_FIX_MODEL holds
 # the id of the model LM Studio serves, set under "env" in .claude/settings.local.json, which is
@@ -36,6 +39,7 @@
 # State lives in the git directory, at `git rev-parse --git-path grosh-checks`, so it is never
 # tracked and each worktree keeps its own:
 #   baseline-tree    the tree of the last passing run, or of the first prompt before any run passed
+#   tools-baseline-tree  the same for the tools' tests; baseline-tree stands in until it is written
 #   failed-stops     how many stops in a row the tests failed
 #   given-up-tree    the tree whose failures were last shown to the user
 #   note             the note waiting for the user's next message
@@ -50,6 +54,7 @@ failure_limit=3
 local_url=http://localhost:1234
 local_model=${GROSH_LOCAL_FIX_MODEL:-}
 swift_paths=('Grosh/*.swift' 'GroshTests/*.swift')
+tool_paths=('tools' '.claude/hooks')
 
 # The local model's own session runs with GROSH_CHECKS_NESTED set, so its hooks leave it alone.
 [ -n "$GROSH_CHECKS_NESTED" ] && exit 0
@@ -95,7 +100,12 @@ worktree_tree() {
   [ -n "$tree" ] && printf '%s\n' "$tree"
 }
 
-same_swift() { git diff-tree --quiet -r "$1" "$2" -- "${swift_paths[@]}" >/dev/null 2>&1; }
+# same <tree> <tree> <path>...: whether the two trees hold the same files at those paths.
+same() {
+  local a=$1 b=$2
+  shift 2
+  git diff-tree --quiet -r "$a" "$b" -- "$@" >/dev/null 2>&1
+}
 
 json_string() {
   printf '%s' "$1" | tr -d '\000-\010\013-\037' |
@@ -174,8 +184,7 @@ failure_lines() {
   [ "$count" -le 80 ] || echo "($((count - 80)) more lines not shown)"
 }
 
-passed() {
-  write_state baseline-tree "$1"
+all_passed() {
   write_state failed-stops 0
   rm -f "$state/given-up-tree"
   exit 0
@@ -238,7 +247,7 @@ local_prompt() {
   printf '%s\n' \
     "tools/check builds Grosh and runs its unit tests. It reports these failures:" \
     "" \
-    "$report" \
+    "$unit_report" \
     "" \
     "Fix them by editing the Swift code under Grosh/ or GroshTests/. Do not delete or disable tests." \
     "Run tools/check to confirm that everything passes. Do not run any other command." \
@@ -247,8 +256,9 @@ local_prompt() {
 
 local_report=""
 
-# Lets the local model try the fix. Ends the hook quietly if the tests pass afterwards. Otherwise
-# it undoes the attempt and leaves what the agent needs to know about it in local_report.
+# Lets the local model try the fix. If the unit tests pass afterwards, it records the tree and
+# clears unit_report. Otherwise it undoes the attempt and leaves what the agent needs to know about
+# it in local_report.
 try_local_fix() {
   [ "${GROSH_LOCAL_FIX:-1}" != 0 ] || return
   if [ -z "$local_model" ]; then
@@ -313,7 +323,9 @@ try_local_fix() {
       echo "$summary"
     } >>"$state/note"
     snapshot=""
-    passed "$after"
+    write_state baseline-tree "$after"
+    unit_report=""
+    return
   fi
 
   if [ "$outcome" = "no: changed nothing" ]; then
@@ -339,7 +351,8 @@ Its changes could not all be undone. The worktree as it was before is tree $snap
 
 if [ "$mode" = prompt ]; then
   if [ ! -s "$state/baseline-tree" ]; then
-    tree=$(worktree_tree "${swift_paths[@]}") && write_state baseline-tree "$tree"
+    tree=$(worktree_tree "${swift_paths[@]}" "${tool_paths[@]}") && write_state baseline-tree "$tree" &&
+      write_state tools-baseline-tree "$tree"
   fi
   if mv -f "$state/note" "$state/note.sending" 2>/dev/null; then
     printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":%s}}\n' \
@@ -349,43 +362,90 @@ if [ "$mode" = prompt ]; then
   exit 0
 fi
 
-current=$(worktree_tree "${swift_paths[@]}") || exit 0
+current=$(worktree_tree "${swift_paths[@]}" "${tool_paths[@]}") || exit 0
 baseline=$(read_state baseline-tree)
-if [ -n "$baseline" ] && same_swift "$baseline" "$current"; then
+tools_baseline=$(read_state tools-baseline-tree)
+[ -n "$tools_baseline" ] || tools_baseline=$baseline
+run_unit=1
+run_tools=1
+[ -n "$baseline" ] && same "$baseline" "$current" "${swift_paths[@]}" && run_unit=0
+[ -n "$tools_baseline" ] && same "$tools_baseline" "$current" "${tool_paths[@]}" && run_tools=0
+[ -f tools/check-tools ] || run_tools=0
+if [ "$run_unit" = 0 ] && [ "$run_tools" = 0 ]; then
   write_state failed-stops 0
   exit 0
 fi
 given_up=$(read_state given-up-tree)
-[ -n "$given_up" ] && same_swift "$given_up" "$current" && exit 0
+[ -n "$given_up" ] && same "$given_up" "$current" "${swift_paths[@]}" "${tool_paths[@]}" && exit 0
 
 failures=$(read_state failed-stops)
 case $failures in '' | *[!0-9]*) failures=0 ;; esac
 printf '%s' "$input" | grep -Eq '"stop_hook_active" *: *true' || failures=0
 
-check_began=$(date +%s)
-run_limited $((deadline - check_began)) "$state/check.out" "$state/check.out" tools/check
-check_status=$?
-case $check_status in
-  0) passed "$current" ;;
-  3) exit 0 ;; # tools/check found no xcodebuild.
-  124) tell_user "tools/check did not finish within $((deadline - check_began)) seconds, so the Swift changes were not tested." ;;
-esac
-check_seconds=$(($(date +%s) - check_began))
+unit_report=""
+tools_report=""
+
+if [ "$run_unit" = 1 ]; then
+  check_began=$(date +%s)
+  run_limited $((deadline - check_began)) "$state/check.out" "$state/check.out" tools/check
+  check_status=$?
+  check_seconds=$(($(date +%s) - check_began))
+  case $check_status in
+    0) write_state baseline-tree "$current" ;;
+    3) ;; # tools/check found no xcodebuild.
+    124) tell_user "tools/check did not finish within $((deadline - check_began)) seconds, so the Swift changes were not tested." ;;
+    *)
+      unit_report=$(failure_lines "$state/check.out")
+      [ -n "$unit_report" ] || unit_report="(tools/check printed nothing and exited with status $check_status.)"
+      ;;
+  esac
+fi
+
+if [ "$run_tools" = 1 ]; then
+  tools_began=$(date +%s)
+  run_limited $((deadline - tools_began)) "$state/check-tools.out" "$state/check-tools.out" bash tools/check-tools
+  tools_status=$?
+  case $tools_status in
+    0) write_state tools-baseline-tree "$current" ;;
+    124) tell_user "tools/check-tools did not finish within $((deadline - tools_began)) seconds, so the changes to the tools were not tested." ;;
+    *)
+      tools_report=$(failure_lines "$state/check-tools.out")
+      [ -n "$tools_report" ] || tools_report="(tools/check-tools printed nothing and exited with status $tools_status.)"
+      ;;
+  esac
+fi
+
+[ -n "$unit_report" ] || [ -n "$tools_report" ] || all_passed
 
 failures=$((failures + 1))
-report=$(failure_lines "$state/check.out")
-[ -n "$report" ] || report="(tools/check printed nothing and exited with status $check_status.)"
+[ "$failures" -eq 1 ] && [ -n "$unit_report" ] && try_local_fix
+[ -n "$unit_report" ] || [ -n "$tools_report" ] || all_passed
+
+# What fails, and each report under the command that printed it.
+if [ -n "$unit_report" ] && [ -n "$tools_report" ]; then
+  failing="The unit tests and the tools' tests"
+elif [ -n "$unit_report" ]; then
+  failing="The unit tests"
+else
+  failing="The tools' tests"
+fi
+reports=""
+[ -n "$unit_report" ] && reports="tools/check reports:
+
+$unit_report"
+[ -n "$tools_report" ] && reports="${reports:+$reports
+
+}tools/check-tools reports:
+
+$tools_report"
+
 if [ "$failures" -ge "$failure_limit" ]; then
   write_state failed-stops 0
   write_state given-up-tree "$current"
-  tell_user "The unit tests still fail after $failure_limit tries, so the agent has stopped. tools/check reports:
-$report"
+  tell_user "$failing still fail after $failure_limit tries, so the agent has stopped. $reports"
 fi
 write_state failed-stops "$failures"
 
-[ "$failures" -eq 1 ] && try_local_fix
-block "The unit tests fail. tools/check reports:
-
-$report
+block "$failing fail. $reports
 
 Fix the failures before you finish.$local_report"
