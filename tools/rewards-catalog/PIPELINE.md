@@ -26,7 +26,7 @@ Each stage reads files and writes files, so any stage can be rerun alone and a f
 | **Validate** | candidates | pass/fail per candidate | Deterministic checks, below. A failing candidate is dropped, never "fixed". |
 | **Diff** | candidates vs. `catalog.json` | `report.md` | Classifies each card: unchanged, changed, new, page gone, extraction failed. |
 | **Review** | candidates | `review-decisions.json` (committed) | `review.py` and the page's Review panel, built. Accept or reject each rule; only accepted rules move on. Details below. |
-| **Publish** | accepted `catalog.json` | `rewards-catalog.json` | Versioned, sorted, byte-stable so the PR diff shows only real changes. |
+| **Publish** | seed, candidates, `review-decisions.json` | `rewards-catalog.json` (committed) | `publish.py` and the Review panel's **Publish catalog** button, built. Only accepted rules; versioned, sorted, byte-stable so the PR diff shows only real changes. Details below. |
 
 ## The fetch stage (`fetch.py`)
 
@@ -233,6 +233,50 @@ Passing the checks means a rule is supported by its page, not that it is right, 
 - **What moves on.** `review.accepted_rules(candidate)` returns only the candidate's rules a person accepted, in the candidate's order. Rejected rules and rules still waiting are left out. The publish step (#162) builds the catalog from this and nothing else.
 - Not reviewed: card-wide conditions (`cardConditions`). They are the issuer's sentences, checked word for word against the page, and are shown on the panel for reading only.
 
+## The publish stage (`publish.py`)
+
+```
+python3 tools/rewards-catalog/publish.py        # or Publish catalog on the page's Review panel
+```
+
+Reads `catalog-seed.json`, `cache/candidates/` and `review-decisions.json`, and writes `rewards-catalog.json` beside this file: the one file the app bundles (#163). It is committed, so a pull request shows exactly which rules ship.
+
+- **Only accepted rules** (`review.accepted_rules`). Rejected rules and rules still waiting are left out.
+- **A card with no accepted rule is left out**, not listed with an empty rule list. Its facts are CardPin's and nobody has checked them, and we ship only what we re-verified. So every card in the file is verified, `verified` isn't written, and `verifiedAt` is the latest day one of its rules was accepted. No decisions exist yet, so the file would hold no cards; it isn't committed until it has some.
+- **The shape**, one card shown (every key is always there, `null` when it doesn't apply, so a Swift `Codable` reader needs only optionals; dates are `YYYY-MM-DD` strings):
+
+  ```json
+  {
+    "formatVersion": 1,
+    "publishedAt": "2026-11-01",
+    "cards": [
+      {
+        "id": "capital-one-savor", "name": "Savor", "issuer": "Capital One", "network": "Visa",
+        "isBusiness": false, "annualFee": 0, "rewardKind": "cashback", "rewardProgram": null, "baseEarnRate": 1,
+        "discontinued": false, "sourceUrl": "https://www.capitalone.com/credit-cards/savor/",
+        "verifiedAt": "2026-11-01",
+        "cardConditions": ["..."],
+        "rules": [
+          {
+            "categories": ["dining"], "selection": "fixed", "picks": null, "hasOtherChoices": false,
+            "rate": 3, "unit": "percent", "capAmount": null, "capPeriod": null, "capUnknown": false,
+            "requires": [], "validFrom": null, "validTo": null, "firstMonths": null, "tier": null,
+            "needs": [], "conditions": [],
+            "evidence": {"quote": "Earn unlimited 3% cash back on dining ...", "url": "https://www.capitalone.com/credit-cards/savor/"}
+          }
+        ]
+      }
+    ]
+  }
+  ```
+
+  The file itself has its keys in alphabetical order. `baseEarnRate` is the seed's, unchecked; where a card has an accepted rule for `everything-else`, that rule is the checked one.
+- **Left out**, because only the checks and the review needed them: the page's hash, a rule's `verified` (`page` or `manual`), the seed's `sourceHost` and `verified`, and the candidate's model, prompt version, warnings, rejections and costs.
+- **Stable.** Cards in id order, rules in a fixed order, a rule's categories, requirements, needs and conditions sorted (they are sets), 3.0 written as 3, keys sorted, two-space indents. `publishedAt` changes only when the cards do, so publishing again with nothing new leaves the file byte for byte the same.
+- **`formatVersion`** goes up only for a change an older app can't read (a field renamed or retyped). Adding a field doesn't need it.
+- **Failure never deletes.** `cache/` isn't committed, so a fresh clone has no candidates: a card with no candidate keeps the entry it was last published with. A card gone from the seed leaves the file.
+- **Not handled:** a card re-extracted with changed rules publishes only the rules still accepted, so its new rules are missing from the file until someone reviews them. Publish after reviewing, not between extracting and reviewing.
+
 ## The web page (`ui.py`)
 
 ```
@@ -244,7 +288,7 @@ A small local page, standard library only, that drives the same code as `fetch.p
 - **Model panel:** the server's address, its API key (a password field), and a model box that lists what the server has (or take any id); **Test model** asks it a trivial question using the real output schema and reports the time, tokens, and how many were spent reasoning; **More settings** holds the page size sent per request, the reply limit, the time limit, extra request fields (JSON, such as `{"reasoning_effort": "none"}`), and text added to every prompt. Settings are saved in `cache/ui-settings.json`, and `extract.py` on the command line uses them as its defaults (flags override).
 - **Run:** fetch (never fetched, retry failed, ticked, all) or extract (what needs it, ticked, redo all), one job at a time, with a progress bar, the card and the part of its page being sent, a live log, and **Stop** (it stops between cards, or between parts of a card). A card is "needs extracting" when it has no result for the chosen model and the current prompt version, so switching models marks every card again.
 - **Cards:** every card with its fetch status, extraction status, rule count, model, and the questions it asks the user; search, issuer and status filters; click a card for a drawer with the page's rate-looking lines, every rule in plain words with the quote it came from, what was rejected and why, and any error. **Try the model on this page** shows the model's raw reply and what the checks make of each rule, without saving anything.
-- **Review:** every rule waiting for a decision (or all, accepted or rejected), with Accept, Reject and Undo; see the review stage above.
+- **Review:** every rule waiting for a decision (or all, accepted or rejected), with Accept, Reject and Undo; see the review stage above. **Publish catalog** writes `rewards-catalog.json` from the accepted rules (the publish stage above).
 - **Safe to leave running:** it listens on `127.0.0.1` only, refuses requests whose Host isn't local, and refuses POSTs without an `X-Requested-With` header, so a web page you visit can't drive it. It never puts page text into markup (text is set with `textContent`).
 
 ### Speed, and what was learned about `flint` (`rec serve`)
