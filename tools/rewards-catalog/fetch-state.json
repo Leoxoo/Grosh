@@ -1,140 +1,140 @@
 {
   "american-express-amazon-business": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/",
-    "hash": "e134ee1a280acfa552010b0d137bca8b6be73921034954f86f998c84325f9d95",
+    "hash": "b8c6a8df12baf5a18ebcd36cb4b3f119218edaa51dcde84c1c441a8691c8204a",
     "lastStatus": "ok",
-    "textChars": 13604,
+    "textChars": 11600,
     "url": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/amazon-business-card/"
   },
   "american-express-blue-business-cash": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/en-us/business/credit-cards/blue-business-cash/",
-    "hash": "6c0ccd7dd440dd6096f5848216a1ee0dda02f13e3e279595d5a992e48fdc1dfc",
+    "hash": "04660cb8c64ac602d3b7878a869d33efbd0b9551e78115d1955e57607afb73a9",
     "lastStatus": "ok",
-    "textChars": 20039,
+    "textChars": 20018,
     "url": "https://www.americanexpress.com/en-us/business/credit-cards/blue-business-cash/"
   },
   "american-express-blue-business-plus": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-blue-business-plus-credit-card-amex/",
-    "hash": "d1bb8f1e31e098052d800f187be12aeb21133734a30039c0ba8a8eb923e4b474",
+    "hash": "35e73032922e6514996da7fd6e7eeadf01aa2a7d5d8f8f196a7ba57036bce073",
     "lastStatus": "ok",
-    "textChars": 21087,
+    "textChars": 21066,
     "url": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-blue-business-plus-credit-card-amex/"
   },
   "american-express-blue-cash-everyday": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/card/blue-cash-everyday/",
-    "hash": "2312f3da06b6618542db59e3793e1cc32a37b924815612e60413d09b319dc2b7",
+    "hash": "888c9ded5de40a88a29d0e3be75ba74af2f56618d5dfc0e2b48c2fe4a85f2658",
     "lastStatus": "ok",
-    "textChars": 10242,
+    "textChars": 11072,
     "url": "https://www.americanexpress.com/us/credit-cards/card/blue-cash-everyday/"
   },
   "american-express-blue-cash-preferred": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/card/blue-cash-preferred/",
-    "hash": "a4de6a257862c6128bbc9729e0a6dbc145fc31ae9e9d91b3d8bae6f3366435a6",
+    "hash": "fc8ae97364ec717b7a12943d49a131295134de3c4979f80f157fb3d7f202f00e",
     "lastStatus": "ok",
-    "textChars": 11423,
+    "textChars": 10758,
     "url": "https://www.americanexpress.com/us/credit-cards/card/blue-cash-preferred/"
   },
   "american-express-business-gold": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-business-gold-card-amex/",
-    "hash": "e2a947383162f1a0e1b0ae341346a555ce8d02b1f32ff56e38b99edb4c4d4e39",
+    "hash": "ea05f6da2ed2e26e4e91ca81ed9dff025185c0d9e988792d045bed81bd72e8a4",
     "lastStatus": "ok",
-    "textChars": 29247,
+    "textChars": 29226,
     "url": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-business-gold-card-amex/"
   },
   "american-express-business-green": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-business-green-card-amex/",
-    "hash": "b8b01d5dde97998d6e599f6ada9808b566bc241e198937eb2190013d2e0242f7",
+    "hash": "bd2a149ca6fc3ed8cd094bc242aa55174ed5c6dc879828c937dc522947627586",
     "lastStatus": "ok",
-    "textChars": 22725,
+    "textChars": 22704,
     "url": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-business-green-card-amex/"
   },
   "american-express-business-platinum": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-business-platinum-credit-card-amex/",
-    "hash": "0ee4b6687ca1f05b0ac0d923184f5486edf5921559175a290df6670463b9ffe6",
+    "hash": "9f06ca6bd548b355280a5aa1703ae41ce3d2d2c3e4a1ddbe4ec151a274a5d00d",
     "lastStatus": "ok",
-    "textChars": 46146,
+    "textChars": 49082,
     "url": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-business-platinum-credit-card-amex/"
   },
   "american-express-delta-skymiles-blue": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-blue-american-express-card/",
-    "hash": "fe550c3df82c50413297959760a3890af0959c253a58ed49f437641a1e089f20",
+    "hash": "3be726dd6cdcf345ce1772699c03b2d37b028bea819c67154ccc957da1eb2f19",
     "lastStatus": "ok",
-    "textChars": 9481,
+    "textChars": 9465,
     "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-blue-american-express-card/"
   },
   "american-express-delta-skymiles-gold": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-gold-american-express-card/",
-    "hash": "55dc1604248a3a5dfe2dcc9b526c0a934e2cf31f4a2b1afdd0a3b7d770ce85ba",
+    "hash": "6b3e5037ce07ee13f78170b80bf0f0740b3075e2fbdc9d3effc855d43c71ccad",
     "lastStatus": "ok",
-    "textChars": 12034,
+    "textChars": 11962,
     "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-gold-american-express-card/"
   },
   "american-express-delta-skymiles-gold-business": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-gold/",
-    "hash": "bbf5c27baea349698a9724840ca9f7b4f909a61f7e443f1b611d0ce7a1eaa7be",
+    "hash": "bc7eb2188d65d4c1fcb780fe2bb4e8fc7f036e2bbcdb699f0dfcc50ab7735c0e",
     "lastStatus": "ok",
-    "textChars": 23939,
+    "textChars": 23918,
     "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-gold/"
   },
   "american-express-delta-skymiles-platinum": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-platinum-american-express-card/",
-    "hash": "c054ccc49197ebec48cdb9ee33410570c5570495c6a8907f5c2daf059dd6e36b",
+    "hash": "c37de4f6e6197a8043ef2c37e062c28dda26813da7133ac15122a9c626711684",
     "lastStatus": "ok",
-    "textChars": 16545,
+    "textChars": 16527,
     "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-platinum-american-express-card/"
   },
   "american-express-delta-skymiles-platinum-business": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-platinum/",
-    "hash": "e2790508be2d05b573a2f0f91948c0e68fab894c5ed6d47a24bd6f4690eb06b2",
+    "hash": "92b286e537253c890696326f584f4dc0f192462451d91428b3f418397ed2bdfa",
     "lastStatus": "ok",
-    "textChars": 28414,
+    "textChars": 28393,
     "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-platinum/"
   },
   "american-express-delta-skymiles-reserve": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-reserve-american-express-card/",
-    "hash": "12e655c387df2e7432bafff8370db5ae34ce066386677f841add852f096f09d1",
+    "hash": "062641ed9afc6bcd7ec8f66c25d3f97e6342b903f68aaaefc4f2a8a4b29f1b1f",
     "lastStatus": "ok",
-    "textChars": 18027,
+    "textChars": 18009,
     "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-reserve-american-express-card/"
   },
   "american-express-delta-skymiles-reserve-business": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-reserve/",
-    "hash": "e7f5259a70cef731d20030e250ae4aab5a20b9f3cb854614a36340270609e770",
+    "hash": "5baca69a05e77b73cad47f83ea5a57fe24b70240b8d41e3ddbdefc5fb666a097",
     "lastStatus": "ok",
-    "textChars": 34694,
+    "textChars": 34673,
     "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-reserve/"
   },
   "american-express-everyday": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "embedded": true,
-    "finalUrl": "https://www.americanexpress.com/us/credit-cards/card/amex-everyday/",
-    "hash": "88b91d6fa7a57e65ed736616b18e333b9a2f51280cd79daa2011133cd7e26d4b",
+    "finalUrl": "https://www.americanexpress.com/us/credit-cards/",
+    "hash": "139885163114c754128e180a7ad5f5a7bec5d3eea657e6008bdf1cc4acd4743b",
     "lastStatus": "ok",
-    "textChars": 202218,
+    "textChars": 202115,
     "url": "https://www.americanexpress.com/us/credit-cards/card/amex-everyday/"
   },
   "american-express-everyday-preferred": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "embedded": true,
-    "finalUrl": "https://www.americanexpress.com/us/credit-cards/card/amex-everyday-preferred/",
-    "hash": "35e6e5abf28924a4fe763de2a01f0cede551f73f435eb379219632743b130d88",
+    "finalUrl": "https://www.americanexpress.com/us/credit-cards/",
+    "hash": "139885163114c754128e180a7ad5f5a7bec5d3eea657e6008bdf1cc4acd4743b",
     "lastStatus": "ok",
-    "textChars": 202231,
+    "textChars": 202115,
     "url": "https://www.americanexpress.com/us/credit-cards/card/amex-everyday-preferred/"
   },
   "american-express-gold": {
@@ -146,76 +146,76 @@
     "url": "https://www.americanexpress.com/us/credit-cards/card/gold-card/"
   },
   "american-express-green": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "embedded": true,
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/",
-    "hash": "5a5432da3bf9f4441a1603f2fa2503e610942d00f43b84b5acc1e775bdcf1798",
+    "hash": "139885163114c754128e180a7ad5f5a7bec5d3eea657e6008bdf1cc4acd4743b",
     "lastStatus": "ok",
-    "textChars": 202372,
+    "textChars": 202115,
     "url": "https://www.americanexpress.com/us/credit-cards/card/green/"
   },
   "american-express-hilton-honors": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.hilton.com/en/hilton-honors/credit-cards/",
-    "hash": "3cb876805439ee8d1e2664a9e96adb95016ad606695eec3f6e4a1a5fe6846a0b",
+    "hash": "8e7d6e3e615dc62ecf4f772c4f61e0bc080cc66a4686da704ba7b1962a48b862",
     "lastStatus": "ok",
-    "textChars": 24132,
+    "textChars": 24179,
     "url": "https://www.hilton.com/en/hilton-honors/credit-cards/"
   },
   "american-express-hilton-honors-aspire": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.hilton.com/en/hilton-honors/credit-cards/",
-    "hash": "3cb876805439ee8d1e2664a9e96adb95016ad606695eec3f6e4a1a5fe6846a0b",
+    "hash": "8e7d6e3e615dc62ecf4f772c4f61e0bc080cc66a4686da704ba7b1962a48b862",
     "lastStatus": "ok",
-    "textChars": 24132,
+    "textChars": 24179,
     "url": "https://www.hilton.com/en/hilton-honors/credit-cards/"
   },
   "american-express-hilton-honors-business": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.hilton.com/en/hilton-honors/credit-cards/",
-    "hash": "3cb876805439ee8d1e2664a9e96adb95016ad606695eec3f6e4a1a5fe6846a0b",
+    "hash": "8e7d6e3e615dc62ecf4f772c4f61e0bc080cc66a4686da704ba7b1962a48b862",
     "lastStatus": "ok",
-    "textChars": 24132,
+    "textChars": 24179,
     "url": "https://www.hilton.com/en/hilton-honors/credit-cards/"
   },
   "american-express-hilton-honors-surpass": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.hilton.com/en/hilton-honors/credit-cards/",
-    "hash": "3cb876805439ee8d1e2664a9e96adb95016ad606695eec3f6e4a1a5fe6846a0b",
+    "hash": "8e7d6e3e615dc62ecf4f772c4f61e0bc080cc66a4686da704ba7b1962a48b862",
     "lastStatus": "ok",
-    "textChars": 24132,
+    "textChars": 24179,
     "url": "https://www.hilton.com/en/hilton-honors/credit-cards/"
   },
   "american-express-marriott-bonvoy-bevy": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/card/marriott-bonvoy-bevy/",
-    "hash": "511989493a4ceb73f08480ce1a8abee276ce1abc99bb992e09535db0e7d1bc99",
+    "hash": "148ca683f65a1b5b4269ae34b04faebae0beab619d4080585a8204cd3d59f32c",
     "lastStatus": "ok",
-    "textChars": 13113,
+    "textChars": 13083,
     "url": "https://www.americanexpress.com/us/credit-cards/card/marriott-bonvoy-bevy/"
   },
   "american-express-marriott-bonvoy-brilliant": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/card/marriott-bonvoy-brilliant/",
-    "hash": "e5e92645703b8764e933d2b10d27679a458354643fd89049c75f00eeb817ae52",
+    "hash": "b295de8534995b38e46a7fe8fcc51cbfd4d70ecbf8b68f6c03071681e11dda4c",
     "lastStatus": "ok",
-    "textChars": 16707,
+    "textChars": 16689,
     "url": "https://www.americanexpress.com/us/credit-cards/card/marriott-bonvoy-brilliant/"
   },
   "american-express-marriott-bonvoy-business": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/amex-marriott-bonvoy-business-credit-card/",
-    "hash": "f757cd7deeb27466a407115ebb0ba79fde20c6d0f0445b04c28a07375e7a7f8a",
+    "hash": "e2cbc0b167f7a3ee6354b923bf01be286c65542f8e09c7ced5e23cb4529c4462",
     "lastStatus": "ok",
-    "textChars": 24955,
+    "textChars": 24934,
     "url": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/amex-marriott-bonvoy-business-credit-card/"
   },
   "american-express-platinum": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/card/platinum/",
-    "hash": "125ec86ac7bbcb9adbe1b610fe9c94bf92068915bfa56c8ae9b8fe1e5e55e730",
+    "hash": "c173254df1a240bef0780b6598d870824142ae8f1d0705d7b0079563c7c5ddc2",
     "lastStatus": "ok",
-    "textChars": 40085,
+    "textChars": 39943,
     "url": "https://www.americanexpress.com/us/credit-cards/card/platinum/"
   },
   "american-express-rakuten": {
@@ -236,30 +236,30 @@
     "url": "https://wwws.airfrance.us/information/flyingblue/carte-bancaire-partenaire"
   },
   "bank-of-america-atmos-rewards-ascent": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "embedded": true,
     "finalUrl": "https://www.alaskaair.com/atmosrewards/content/credit-cards",
-    "hash": "9e3019e2d353d1db7f65ab748a8c5108edf297177b99a084d116ade93f051e7a",
+    "hash": "39cba3a947eef744b9488a500fe0aee6cbeb4bf3e028902ec4fb585c8463afb2",
     "lastStatus": "ok",
-    "textChars": 10706,
+    "textChars": 11151,
     "url": "https://www.alaskaair.com/atmosrewards/content/credit-cards"
   },
   "bank-of-america-atmos-rewards-business": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "embedded": true,
     "finalUrl": "https://www.alaskaair.com/atmosrewards/content/credit-cards",
-    "hash": "9e3019e2d353d1db7f65ab748a8c5108edf297177b99a084d116ade93f051e7a",
+    "hash": "39cba3a947eef744b9488a500fe0aee6cbeb4bf3e028902ec4fb585c8463afb2",
     "lastStatus": "ok",
-    "textChars": 10706,
+    "textChars": 11151,
     "url": "https://www.alaskaair.com/atmosrewards/content/credit-cards"
   },
   "bank-of-america-atmos-rewards-summit": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "embedded": true,
     "finalUrl": "https://www.alaskaair.com/atmosrewards/content/credit-cards",
-    "hash": "9e3019e2d353d1db7f65ab748a8c5108edf297177b99a084d116ade93f051e7a",
+    "hash": "39cba3a947eef744b9488a500fe0aee6cbeb4bf3e028902ec4fb585c8463afb2",
     "lastStatus": "ok",
-    "textChars": 10706,
+    "textChars": 11151,
     "url": "https://www.alaskaair.com/atmosrewards/content/credit-cards"
   },
   "bank-of-america-business-advantage-customized-cash": {
@@ -298,7 +298,7 @@
     "changedAt": "2026-10-20",
     "finalUrl": "https://www.bankofamerica.com/credit-cards/",
     "hash": "f70b68b38e21a222e5b72b5a8194c56ce0d565def4ad6edd95b37c74b5315ab3",
-    "lastStatus": "ok",
+    "lastStatus": "needs-browser",
     "textChars": 7856,
     "url": "https://www.bankofamerica.com/credit-cards/products/spirit-airlines-credit-card/"
   },
@@ -314,7 +314,7 @@
     "changedAt": "2026-10-20",
     "finalUrl": "https://www.bankofamerica.com/credit-cards/products/premium-rewards-credit-card/",
     "hash": "ab3bcaa0fff54b08362b8f312d11aeda3aa4b0e00b7c36fde3b39c700c3057af",
-    "lastStatus": "ok",
+    "lastStatus": "needs-browser",
     "textChars": 5956,
     "url": "https://www.bankofamerica.com/credit-cards/products/premium-rewards-credit-card/"
   },
@@ -322,7 +322,7 @@
     "changedAt": "2026-10-20",
     "finalUrl": "https://www.bankofamerica.com/credit-cards/products/premium-rewards-elite-credit-card/",
     "hash": "e7d9220723448408369e669cbf80323922f48a9728c918223c675522893db7bf",
-    "lastStatus": "ok",
+    "lastStatus": "needs-browser",
     "textChars": 5960,
     "url": "https://www.bankofamerica.com/credit-cards/products/premium-rewards-elite-credit-card/"
   },
@@ -330,7 +330,7 @@
     "changedAt": "2026-10-22",
     "finalUrl": "https://www.bankofamerica.com/credit-cards/products/travel-rewards-credit-card/",
     "hash": "b9a835c33261b11e6dcb55405a744b9e92ede6d6de3b794aa8ca34294b9ccd88",
-    "lastStatus": "ok",
+    "lastStatus": "needs-browser",
     "textChars": 18547,
     "url": "https://www.bankofamerica.com/credit-cards/products/travel-rewards-credit-card/"
   },
@@ -338,24 +338,24 @@
     "changedAt": "2026-10-20",
     "finalUrl": "https://www.bankofamerica.com/credit-cards/products/unlimited-cash-back-credit-card/",
     "hash": "bcbc264b464bccc41ad9a1d80a1306e81f5e98005163259f694974dd459ed390",
-    "lastStatus": "ok",
+    "lastStatus": "needs-browser",
     "textChars": 5960,
     "url": "https://www.bankofamerica.com/credit-cards/products/unlimited-cash-back-credit-card/"
   },
   "barclays-aarp-essential-rewards": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.aarp.org/membership/benefits/finance/aarp-essential-rewards-mastercard-from-barclays/",
-    "hash": "e2adf7e6fddf926a85e5a0459c03764b68abd1aa23ab0088504b1df5beee2f12",
+    "hash": "805211550e55be5a41cebb2e7d3fdb46f358bb1bb6d87fe4bba22099dcc83e0a",
     "lastStatus": "ok",
-    "textChars": 13520,
+    "textChars": 13475,
     "url": "https://www.aarp.org/membership/benefits/finance/aarp-essential-rewards-mastercard-from-barclays/"
   },
   "barclays-aarp-travel-rewards": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.aarp.org/membership/benefits/finance/aarp-travel-rewards-mastercard-from-barclays/",
-    "hash": "5fee1f5af84847a98abdf58ef2ed013dee832346c0a527202ed183a228798568",
+    "hash": "2ca5aed0fa5e6375cd41d6fc0b5d4a84383fa3eb8ba3eaa66b540ae42a99041d",
     "lastStatus": "ok",
-    "textChars": 13474,
+    "textChars": 13429,
     "url": "https://www.aarp.org/membership/benefits/finance/aarp-travel-rewards-mastercard-from-barclays/"
   },
   "barclays-breeze": {
@@ -459,27 +459,27 @@
     "url": "https://cards.barclaycardus.com/banking/cards/upromise-world-mastercard/"
   },
   "barclays-wyndham-rewards-earner": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.wyndhamrewardscreditcard.com/#earner",
-    "hash": "94014e7a2733ce758e61a49e7f6b23e0e83ce13afc9830c0a4f87a32d1f38e5d",
+    "hash": "d96b31c104785907582499dfc484d92905a3685684f0d316483c21219bd086d2",
     "lastStatus": "ok",
-    "textChars": 126168,
+    "textChars": 50222,
     "url": "https://www.wyndhamrewardscreditcard.com/#earner"
   },
   "barclays-wyndham-rewards-earner-business": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.wyndhamrewardscreditcard.com/#earnerbusiness",
-    "hash": "94014e7a2733ce758e61a49e7f6b23e0e83ce13afc9830c0a4f87a32d1f38e5d",
+    "hash": "d96b31c104785907582499dfc484d92905a3685684f0d316483c21219bd086d2",
     "lastStatus": "ok",
-    "textChars": 126168,
+    "textChars": 50222,
     "url": "https://www.wyndhamrewardscreditcard.com/#earnerbusiness"
   },
   "barclays-wyndham-rewards-earner-plus": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.wyndhamrewardscreditcard.com/#earnerplus",
-    "hash": "94014e7a2733ce758e61a49e7f6b23e0e83ce13afc9830c0a4f87a32d1f38e5d",
+    "hash": "d96b31c104785907582499dfc484d92905a3685684f0d316483c21219bd086d2",
     "lastStatus": "ok",
-    "textChars": 126168,
+    "textChars": 50222,
     "url": "https://www.wyndhamrewardscreditcard.com/#earnerplus"
   },
   "barclays-xbox": {
@@ -491,103 +491,107 @@
     "url": "https://cards.barclaycardus.com/banking/cards/xbox-mastercard/"
   },
   "capital-one-quicksilver": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.capitalone.com/credit-cards/quicksilver/",
-    "hash": "903124faaf0d0bfc7a5d79dc598f65c0fd2005788ca8772f3b72a9f664b1ff97",
+    "hash": "fcda8a8079806b25590a113fe610d01c603921c04fd6bc229130034f244869c6",
     "lastStatus": "ok",
-    "textChars": 5287,
+    "textChars": 6782,
     "url": "https://www.capitalone.com/credit-cards/quicksilver/"
   },
   "capital-one-savor": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.capitalone.com/credit-cards/savor/",
-    "hash": "3cf36d73d72d1740241e69dc8fa106fd9878d0fb6096cdd7637546d271a81767",
+    "hash": "5161e781796c4046f4ee3a233e9727e0f77d528f0dd425f75356f719ef5672d6",
     "lastStatus": "ok",
-    "textChars": 7436,
+    "textChars": 8534,
     "url": "https://www.capitalone.com/credit-cards/savor/"
   },
   "capital-one-spark-1-5-cash-select": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.capitalone.com/small-business/credit-cards/spark-cash-select/",
-    "hash": "befa4b615a3053aaaf356e901b100efa519504a1d5ac46f66051f3bc087d4e95",
+    "hash": "e18c35d0bbdac900f0394b91059e9233dd42c66ac786437f0a2e99f72006a5c7",
     "lastStatus": "ok",
-    "textChars": 10440,
+    "textChars": 8295,
     "url": "https://www.capitalone.com/small-business/credit-cards/spark-cash-select"
   },
   "capital-one-venture-business": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.capitalone.com/small-business/credit-cards/venture-business/",
-    "hash": "4d960a2e85fdf92be6fc04a1ee1fd046da5d03c0dbfd908c9d4020f89a31b828",
+    "hash": "6d451b740d7e147d164d551eb844df37ae5f5d9abaf62db338c173b348a97510",
     "lastStatus": "ok",
-    "textChars": 17680,
+    "textChars": 16906,
     "url": "https://www.capitalone.com/small-business/credit-cards/venture-business/"
   },
   "capital-one-venture-rewards": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.capitalone.com/credit-cards/venture/",
-    "hash": "e92959033c7a4ce9388b26abf338a708d81d2b6487bf275bf24432b9d735611d",
+    "hash": "80e774d79ab84943ff0ddeab99f18f1d2040780f2695016db373dc61df7848ee",
     "lastStatus": "ok",
-    "textChars": 19542,
+    "textChars": 8853,
     "url": "https://www.capitalone.com/credit-cards/venture/"
   },
   "capital-one-venture-x": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.capitalone.com/credit-cards/venture-x/",
-    "hash": "fc0486d75c19362bfffd2090bc22364870598432519cf07af4e1c507fc9bbc66",
+    "hash": "4223f944ac6ce9e54c92a4abb773a714ce673ea5273b411dcfa0af204b09a386",
     "lastStatus": "ok",
-    "textChars": 14808,
+    "textChars": 11884,
     "url": "https://www.capitalone.com/credit-cards/venture-x/"
   },
   "capital-one-ventureone": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.capitalone.com/credit-cards/ventureone/",
-    "hash": "06f219c7f3be30f987c21593bec69c4d3131f9f11a8440b2c4f793d8fed4c8a4",
+    "hash": "d784110fbcfa68d747504753c4170b6cbd07156d95a29f6057d61d5c4642cf00",
     "lastStatus": "ok",
-    "textChars": 5513,
+    "textChars": 6076,
     "url": "https://www.capitalone.com/credit-cards/ventureone/"
   },
   "capital-one-ventureone-business": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.capitalone.com/small-business/credit-cards/ventureone-business/",
-    "hash": "caa993a984a39b1b71bbbece99052c4c558c4d73e23733ded7d05715f638a60b",
+    "hash": "8fcd06a58073fd370d0a6df547048f34db1a52a1f846069e76de525f3ec213b4",
     "lastStatus": "ok",
-    "textChars": 12677,
+    "textChars": 11903,
     "url": "https://www.capitalone.com/small-business/credit-cards/ventureone-business/"
   },
   "chase-aer-lingus-signature": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/travel-credit-cards/avios/aer-lingus",
-    "hash": "a0b5bc235b63448f4e1f32ebc1c7220455f0f668398d82ae8d0bbddd3d5cc12d",
+    "hash": "0b5601a03c52086907340e3899a62c3607af49722c128b5b6052febc27fe0a87",
     "lastStatus": "ok",
-    "textChars": 34662,
+    "textChars": 33417,
     "url": "https://creditcards.chase.com/travel-credit-cards/avios/aer-lingus"
   },
   "chase-aeroplan": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/travel-credit-cards/aircanada/aeroplan",
-    "hash": "d06e814e632e0db8075e13f15bf4fe064a01d5db68021259b2b0507ce69dbc4f",
+    "hash": "df176fe112c5aebe20aab081f99bb6b68662c70781d8a1f0a149ce8a4c1696a3",
     "lastStatus": "ok",
-    "textChars": 51968,
+    "textChars": 51967,
     "url": "https://creditcards.chase.com/travel-credit-cards/aircanada/aeroplan"
   },
   "chase-amazon-prime": {
-    "lastStatus": "needs-browser",
+    "changedAt": "2026-11-01",
+    "finalUrl": "https://www.amazon.com/dp/BT00LN946S",
+    "hash": "0f13f0d3daa3598acc2e2d2dffeb3be44814a6363ab462b50e6950e500a044d8",
+    "lastStatus": "ok",
+    "textChars": 21300,
     "url": "https://www.amazon.com/dp/BT00LN946S"
   },
   "chase-british-airways-signature": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/travel-credit-cards/avios/british-airways",
-    "hash": "3f8d18c05807fe651e383137c3b13c2df7bd49f0fbf7b55cd488b3267a07cb32",
+    "hash": "8bde5f49b9bf0d3bfccd3c8b76cdb372be94d5656ef4d240034e4eb8219a320d",
     "lastStatus": "ok",
-    "textChars": 29509,
+    "textChars": 26865,
     "url": "https://creditcards.chase.com/travel-credit-cards/avios/british-airways"
   },
   "chase-disney": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/rewards-credit-cards/disney/rewards",
-    "hash": "d3c4d61d31b992308ccf1adebf8f2f8d90bfbcd303642e6598573ea79f026f9c",
+    "hash": "656252b2c6a3909a74864664ce7b78531351d6c7f0ce6596f500fc9552225ab1",
     "lastStatus": "ok",
-    "textChars": 48858,
+    "textChars": 35451,
     "url": "https://creditcards.chase.com/rewards-credit-cards/disney/rewards"
   },
   "chase-disney-premier": {
@@ -599,27 +603,27 @@
     "url": "https://creditcards.chase.com/rewards-credit-cards/disney/premier"
   },
   "chase-freedom-flex": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/cash-back-credit-cards/freedom/flex",
-    "hash": "1d5fd8f8fbf2d4658251191dedc63a06675c9e4c945b010394046c63a01b69a9",
+    "hash": "3ea7b3f156163d5a89444a2d907ea6098f1780bef07b0f1c544e67812c53d07e",
     "lastStatus": "ok",
-    "textChars": 36469,
+    "textChars": 36568,
     "url": "https://creditcards.chase.com/cash-back-credit-cards/freedom/flex"
   },
   "chase-freedom-unlimited": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/cash-back-credit-cards/freedom/unlimited",
-    "hash": "285d72a980a9034b4dcf4b87af00587c3c1096729948aa867f73e86028758723",
+    "hash": "87cea38c4d4b521adb86cf1aeeafec5111a0e450ddbed172a9f29c6ca3a198fd",
     "lastStatus": "ok",
-    "textChars": 33420,
+    "textChars": 33463,
     "url": "https://creditcards.chase.com/cash-back-credit-cards/freedom/unlimited"
   },
   "chase-iberia-signature": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/travel-credit-cards/avios/iberia",
-    "hash": "4bfa910c3ca1c3b0e4b996dec781d4bceb5e0b584a8a49384ce22f8e8bc17510",
+    "hash": "61f3231fc7d63d9215a7fc1b84be0fd1943cb483f5f1548af778797cf9851ae1",
     "lastStatus": "ok",
-    "textChars": 23580,
+    "textChars": 19073,
     "url": "https://creditcards.chase.com/travel-credit-cards/avios/iberia"
   },
   "chase-ihg-premier": {
@@ -655,11 +659,11 @@
     "url": "https://creditcards.chase.com/business-credit-cards/ink/cash"
   },
   "chase-ink-business-preferred": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/business-credit-cards/ink/business-preferred",
-    "hash": "8967b7548536acb6603026e9284d9b0868c2c43de01f19c13504063aaacb4f6a",
+    "hash": "a2381e08296320ea489a0f1133cac38d15f874b2dc6cb83f0f32cc4d25fb34c5",
     "lastStatus": "ok",
-    "textChars": 33978,
+    "textChars": 17742,
     "url": "https://creditcards.chase.com/business-credit-cards/ink/business-preferred"
   },
   "chase-ink-business-premier": {
@@ -671,19 +675,19 @@
     "url": "https://creditcards.chase.com/business-credit-cards/ink/premier"
   },
   "chase-ink-business-unlimited": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/business-credit-cards/ink/unlimited",
-    "hash": "48248d4771de1819cd3c04a27fb7cab7a200e408024ee299d6f184d28e9d5b42",
+    "hash": "12cb1697e931f68687889856c600c1405c664bb2eae9cee80d28986db4142cdb",
     "lastStatus": "ok",
-    "textChars": 33443,
+    "textChars": 19195,
     "url": "https://creditcards.chase.com/business-credit-cards/ink/unlimited"
   },
   "chase-marriott-bonvoy-bold": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/travel-credit-cards/marriott-bonvoy/bold",
-    "hash": "d5b4722347e03040c136286ba2cb062ba8d93eabd930dab0f31349eb24ede0c5",
+    "hash": "a58a3774e3a2f266584dbc1ca4694198c36978410ceba5220ec9fb14b5ec6f1f",
     "lastStatus": "ok",
-    "textChars": 28926,
+    "textChars": 41489,
     "url": "https://creditcards.chase.com/travel-credit-cards/marriott-bonvoy/bold"
   },
   "chase-marriott-bonvoy-boundless": {
@@ -695,11 +699,11 @@
     "url": "https://creditcards.chase.com/travel-credit-cards/marriott-bonvoy/boundless"
   },
   "chase-marriott-bonvoy-bountiful": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/travel-credit-cards/marriott-bonvoy/bountiful",
-    "hash": "965e1bfdbf9958be8de0d7e1a429069250ffc5202aa1c3e960b4ce9345e1e751",
+    "hash": "b03fb12c6f1cb27b83e2600adc1aa5363aec9e93ec6e6405115432830ed80cbf",
     "lastStatus": "ok",
-    "textChars": 42007,
+    "textChars": 29362,
     "url": "https://creditcards.chase.com/travel-credit-cards/marriott-bonvoy/bountiful"
   },
   "chase-sapphire-preferred": {
@@ -719,51 +723,51 @@
     "url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/reserve"
   },
   "chase-sapphire-reserve-business": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/business-credit-cards/sapphire/reserve",
-    "hash": "52cfe76d156bcafcd8f0992fc3cc3e80affbfd578dd68fad8e2f1254c613e667",
+    "hash": "28736e5bcfbae5423eb971e0fcd3187ccbea50f2fe4354a6ee86d15af3627037",
     "lastStatus": "ok",
-    "textChars": 59244,
+    "textChars": 82105,
     "url": "https://creditcards.chase.com/business-credit-cards/sapphire/reserve"
   },
   "chase-southwest-performance-business": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/business-credit-cards/southwest/performance-business",
-    "hash": "947220365046f09dbe8248e79c6b412059d26424fd049f51143960114e1dcabc",
+    "hash": "5eb94fbdd053cb1119e1288df7bc034ed4437d950bed565ff50340a74228dea7",
     "lastStatus": "ok",
-    "textChars": 38160,
+    "textChars": 36624,
     "url": "https://creditcards.chase.com/business-credit-cards/southwest/performance-business"
   },
   "chase-southwest-plus": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/travel-credit-cards/southwest/plus",
-    "hash": "7347801b881ccf8b0af4658c625aaa7bad76492e132030528c30a95431f4caaf",
+    "hash": "652fbd1afe13317920b9743ce938546ff38a244de295cd4c2c6eab63d0ebf94e",
     "lastStatus": "ok",
-    "textChars": 48697,
+    "textChars": 48269,
     "url": "https://creditcards.chase.com/travel-credit-cards/southwest/plus"
   },
   "chase-southwest-premier": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/travel-credit-cards/southwest/premier",
-    "hash": "dc2b31aadd5d2e8d99fbf8cde87583f9c8b78e3a2cd0d89f23d915e6442ef7d9",
+    "hash": "6ee7e7de6dfd5183a27dbfa24815a1fb8152b775b5fe7898aec2cc8babb98b8f",
     "lastStatus": "ok",
-    "textChars": 49798,
+    "textChars": 49361,
     "url": "https://creditcards.chase.com/travel-credit-cards/southwest/premier"
   },
   "chase-southwest-premier-business": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/business-credit-cards/southwest/premier-business",
-    "hash": "f38850171ba03096162b33ebdf53b2b101b13a92833cff90f345a4267cf9129d",
+    "hash": "45885035e3d95a52caeffaf6e1d6018957e3fee1f6c81fb840846285bd36cf9c",
     "lastStatus": "ok",
-    "textChars": 35527,
+    "textChars": 35560,
     "url": "https://creditcards.chase.com/business-credit-cards/southwest/premier-business"
   },
   "chase-southwest-priority": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/travel-credit-cards/southwest/priority",
-    "hash": "95af78d28bd3a9d11cedb6f7539d708e1cfecf3d18d860b8e85285e0b5f83a3f",
+    "hash": "92c6a8d73396645d532cc075303219c7a40cf8b06fd7e9468c1a45f914425cb2",
     "lastStatus": "ok",
-    "textChars": 47787,
+    "textChars": 47345,
     "url": "https://creditcards.chase.com/travel-credit-cards/southwest/priority"
   },
   "chase-united-business": {
@@ -791,11 +795,11 @@
     "url": "https://www.theexplorercard.com/rewards-cards/quest-card"
   },
   "chase-world-of-hyatt": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.chase.com/travel-credit-cards/world-of-hyatt-credit-card",
-    "hash": "342713c4dfcddd4659f6d7bafa8c23e6ed60dd8f81e8ac9b6cf5af8ddbadcce5",
+    "hash": "2edba3b38e1ba7214db35358199b80384a432d0fcc7f60ccccadab39ac654144",
     "lastStatus": "ok",
-    "textChars": 43439,
+    "textChars": 30408,
     "url": "https://creditcards.chase.com/travel-credit-cards/world-of-hyatt-credit-card"
   },
   "chase-world-of-hyatt-business": {
@@ -807,43 +811,43 @@
     "url": "https://creditcards.chase.com/business-credit-cards/world-of-hyatt/hyatt-business-card"
   },
   "citi-aadvantage-business-world-elite": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.aa.com/credit-cards/citi-business-card-american-airlines-direct/",
-    "hash": "235f09e38a281582ead315e52c845f7fa2fc35cf7dd4366fb74ab1ba588dc7b2",
+    "hash": "ccab86ffee368567b625327fc0d8cb52961192f80b84f3b9ad27d924e10c4c42",
     "lastStatus": "ok",
-    "textChars": 8735,
+    "textChars": 8745,
     "url": "https://creditcards.aa.com/credit-cards/citi-business-card-american-airlines-direct/"
   },
   "citi-aadvantage-executive": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.aa.com/credit-cards/citi-executive-card-american-airlines-direct/",
-    "hash": "f9aa01d41b8826f58a8fd53a8509b996413d49388fd9054556827d1dc755e1f6",
+    "hash": "a04c360ed93c53ecde16e2d79aa74a134a42d3dc04a87b20729ca27a113bed26",
     "lastStatus": "ok",
-    "textChars": 11273,
+    "textChars": 12755,
     "url": "https://creditcards.aa.com/citi-executive-card-american-airlines-direct/"
   },
   "citi-aadvantage-globe": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.aa.com/credit-cards/citi-globe-card-american-airlines-direct/",
-    "hash": "40a5048e59c1b12e04f3eb369ba3349c428c3220a209be269591f37c6c804f30",
+    "hash": "a41f5f39d64032618e71a0e46e71dbaf3dcbf5460a67a3b52c58508c8af57854",
     "lastStatus": "ok",
-    "textChars": 10319,
+    "textChars": 9443,
     "url": "https://creditcards.aa.com/credit-cards/citi-globe-card-american-airlines-direct/"
   },
   "citi-aadvantage-mileup": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.aa.com/credit-cards/citi-mileup-card-american-airlines-direct/",
-    "hash": "7779e5347be5f92b849c550d11e83032801dfda1c31239ee46b4300840faba0c",
+    "hash": "54bb57f09e79e8359f882251e338031ef6f153e271159d946d2b3e16e6b38d76",
     "lastStatus": "ok",
-    "textChars": 5944,
+    "textChars": 5901,
     "url": "https://creditcards.aa.com/citi-mileup-card-american-airlines-direct/"
   },
   "citi-aadvantage-platinum-select-world-elite": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.aa.com/credit-cards/citi-platinum-card-american-airlines-direct/",
-    "hash": "7c8ea42d9fa84d2aaba8d3f3b160f926a8b64e724ea166c7202fe14d7b470773",
+    "hash": "ee78e90303962e82e56aa52fde848d9aa97ff03cbc7d24bd96a4131b0cd8ed1d",
     "lastStatus": "ok",
-    "textChars": 7721,
+    "textChars": 7678,
     "url": "https://creditcards.aa.com/credit-cards/citi-platinum-card-american-airlines-direct/"
   },
   "citi-at-t-points-plus": {
@@ -863,35 +867,35 @@
     "url": "https://www.citi.com/usc/Multi/Featured/default.htm"
   },
   "citi-double-cash": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.citi.com/credit-cards/citi-double-cash-credit-card",
-    "hash": "001d8a47023ed5bd656024445ba6ce10ee4c7287524b5361beb81c531c51684b",
+    "hash": "0dc1ed8fe060e2c53498eee07dbe9754c4d0673143bc0ac773ec1d447c2ea298",
     "lastStatus": "ok",
-    "textChars": 12311,
+    "textChars": 12255,
     "url": "https://www.citi.com/credit-cards/citi-double-cash-credit-card"
   },
   "citi-strata": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.citi.com/credit-cards/citi-strata-credit-card",
-    "hash": "c3ccd0e756855c687aa75ad5f63d0c1be5c9d4e842fd70dc6f4113e2d5e62ca1",
+    "hash": "a04970317949b3c75f13ad1d1d48c1abb2d02fd95ec9138832f156b9d2fc45f3",
     "lastStatus": "ok",
-    "textChars": 11353,
+    "textChars": 11331,
     "url": "https://www.citi.com/credit-cards/citi-strata-credit-card"
   },
   "citi-strata-elite": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.citi.com/credit-cards/citi-strata-elite-credit-card",
-    "hash": "e78ec1c87f3556ea0ac91b22e260610248255b348cb4d3cc46d9137f624e14d1",
+    "hash": "7a0766f3203229485d0da9c6072f919c7b2fb381abfadc55fe607510c5c1a3b1",
     "lastStatus": "ok",
-    "textChars": 12031,
+    "textChars": 12009,
     "url": "https://www.citi.com/credit-cards/citi-strata-elite-credit-card"
   },
   "citi-strata-premier": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.citi.com/credit-cards/citi-strata-premier-credit-card",
-    "hash": "b7aacd47555d3c9cc6ff15eb92d243029a04a484f3d49deadf4522eca672a539",
+    "hash": "c767a8ed486f3fd144124effffe890ca12c64d708aabbbf3bb52641dcaf7a5ed",
     "lastStatus": "ok",
-    "textChars": 11023,
+    "textChars": 11001,
     "url": "https://www.citi.com/credit-cards/citi-strata-premier-credit-card"
   },
   "comenity-aaa-daily-advantage": {
@@ -913,11 +917,11 @@
     "url": "https://www.ace.aaa.com/financial/aaa-credit-card.html"
   },
   "discover-discover-it": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.discover.com/credit-cards/",
-    "hash": "4348715a2879111db27a62d663231ff873c82a7956536bf77cbdff902e1d9039",
+    "hash": "177d038b7c6e8172b54c1909ff20e775698607a1f564ba8f62ddeced1c64427a",
     "lastStatus": "ok",
-    "textChars": 28761,
+    "textChars": 36141,
     "url": "https://www.discover.com/credit-cards/"
   },
   "first-bankcard-ana-card-usa-plus": {
@@ -977,11 +981,11 @@
     "url": "https://www.bestwestern.com/en_US/offers/hotel-discounts/best-western-rewards-visa.html"
   },
   "goldman-sachs-apple-card": {
-    "changedAt": "2026-10-22",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.apple.com/apple-card/",
-    "hash": "82ab4a1af7bbf62faf81a940e358dc6a08138daec14db94150aac36f7c5ea854",
+    "hash": "edcc8c1be3f0be17d9c1fa91441d290eb47a7eef01767d456421063bce60af2e",
     "lastStatus": "ok",
-    "textChars": 43217,
+    "textChars": 47410,
     "url": "https://www.apple.com/apple-card/"
   },
   "penfed-pathfinder": {
@@ -997,7 +1001,11 @@
     "url": "https://www.penfed.org/credit-cards/power-cash-rewards-visa"
   },
   "synchrony-amazon-prime-store-card": {
-    "lastStatus": "needs-browser",
+    "changedAt": "2026-11-01",
+    "finalUrl": "https://www.amazon.com/Synchrony-Bank-Amazon-com-Store-Card/dp/B008A0GNA8",
+    "hash": "c77338844223d2728146c4f47986b85a4e3b079526a7b1344ce4e1a8c0799b7e",
+    "lastStatus": "ok",
+    "textChars": 38761,
     "url": "https://www.amazon.com/Synchrony-Bank-Amazon-com-Store-Card/dp/B008A0GNA8"
   },
   "synchrony-cathay-pacific": {
@@ -1021,91 +1029,91 @@
     "url": "https://www.virgin.com/en-us/virgin-red/rewards-credit-card"
   },
   "synchrony-walmart-onepay-cashrewards": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.onepay.com/help-center/articles/about-the-onepay-credit-card",
-    "hash": "6fa7d396e5692cb575c4ff55e0b0c18aafa949a41c7cb3a63092fb8d3c77d487",
+    "hash": "c5f6b8d7af9cf9bc9059d1868c2242ae71d3e0e9dcc18fd2ce993f371561ee80",
     "lastStatus": "ok",
-    "textChars": 8208,
+    "textChars": 8709,
     "url": "https://www.onepay.com/help-center/articles/about-the-onepay-credit-card"
   },
   "td-bank-cash": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.td.com/us/en/personal-banking/credit-cards/cash-card",
-    "hash": "748762bb6330a2536ab1f3cd4ea5c8408b856e9668af54122bef4daf79ada2f9",
+    "hash": "70866f0e510d81823fd0608db9f521f995e22f0027c34474d53d6a5ca1367f6c",
     "lastStatus": "ok",
-    "textChars": 17517,
+    "textChars": 17518,
     "url": "https://www.td.com/us/en/personal-banking/credit-cards/cash-card"
   },
   "td-bank-double-up": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.td.com/us/en/personal-banking/credit-cards/cashdoubleup",
-    "hash": "239f17af045f840ee038b39f64b785d9972cc4badd43d85b9af51c7d57b3ba94",
+    "hash": "1e5cb435fb0d10da52e517afe2ad2a5e7b0ba2da4483bd88c2581c0cfae7e761",
     "lastStatus": "ok",
-    "textChars": 13707,
+    "textChars": 13814,
     "url": "https://www.td.com/us/en/personal-banking/credit-cards/cashdoubleup"
   },
   "u-s-bank-altitude-connect": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.usbank.com/credit-cards/altitude-connect-visa-signature-credit-card.html",
-    "hash": "937029f2eff2a4ebb2115c64f8f38d0d3f35f9d94c56e3b521adef13ad714936",
+    "hash": "052bc3a1286a7b58c9963bc9ac01951aed3fa0ce684dc34bb94dab8b7261a8fa",
     "lastStatus": "ok",
-    "textChars": 18413,
+    "textChars": 20030,
     "url": "https://www.usbank.com/credit-cards/altitude-connect-visa-signature-credit-card.html"
   },
   "u-s-bank-altitude-go": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.usbank.com/credit-cards/altitude-go-visa-signature-credit-card.html",
-    "hash": "f108683110075aa8b961d45311f49c0946f0ecf39073b3ec901f98e55aff51c6",
+    "hash": "128d2d58889581bb366dca34794d69286c1812155028a08118756dfc3e818c92",
     "lastStatus": "ok",
-    "textChars": 17002,
+    "textChars": 18198,
     "url": "https://www.usbank.com/credit-cards/altitude-go-visa-signature-credit-card.html"
   },
   "u-s-bank-business-altitude-connect": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.usbank.com/business-banking/business-credit-cards/business-altitude-connect-credit-card.html",
-    "hash": "effbad12988ae8f0531cd1c987415b35b3ccbd36ffba0a23ab7024d57f56a813",
+    "hash": "165ae636fe78d964f3913b06c24cdcf8c190482196ea380916260a71ae021eb5",
     "lastStatus": "ok",
-    "textChars": 23076,
+    "textChars": 24073,
     "url": "https://www.usbank.com/business-banking/business-credit-cards/business-altitude-connect-world-elite-mastercard.html"
   },
   "u-s-bank-business-altitude-power": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.usbank.com/business-banking/business-credit-cards.html",
-    "hash": "02642f481a777a3156bcb72febbf048c49ef0515b709614d8a70985e44ea9435",
+    "hash": "2409bff60f8e7d4ef9eb1af0b8b0a768cb4de16ca21c668136f1d2e0c1b65118",
     "lastStatus": "ok",
-    "textChars": 35894,
+    "textChars": 35992,
     "url": "https://www.usbank.com/business-banking/business-credit-cards/business-altitude-power-world-elite-mastercard.html"
   },
   "u-s-bank-business-leverage": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.usbank.com/business-banking/business-credit-cards.html",
-    "hash": "02642f481a777a3156bcb72febbf048c49ef0515b709614d8a70985e44ea9435",
+    "hash": "2409bff60f8e7d4ef9eb1af0b8b0a768cb4de16ca21c668136f1d2e0c1b65118",
     "lastStatus": "ok",
-    "textChars": 35894,
+    "textChars": 35992,
     "url": "https://www.usbank.com/business-banking/business-credit-cards/business-leverage-rewards-credit-card.html"
   },
   "u-s-bank-business-triple-cash-rewards": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.usbank.com/business-banking/business-credit-cards/business-triple-cash-back-credit-card.html",
-    "hash": "4dc3943f79e11e35d66069ba62cc712e0fedfc29d93982c10bd489b95fef9694",
+    "hash": "0f2a454666fa4f040ef452adc70d00eb055b185c21133768a382bdaacbbc8fec",
     "lastStatus": "ok",
-    "textChars": 22026,
+    "textChars": 23068,
     "url": "https://www.usbank.com/business-banking/business-credit-cards/business-triple-cash-back-credit-card.html"
   },
   "u-s-bank-cash-plus": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.usbank.com/credit-cards/cash-plus-visa-signature-credit-card.html",
-    "hash": "5e33f90007e5c36434e965110b5181c835a9e6651d30243f57ca8e48ba7d063a",
+    "hash": "08cf1ea0633def10c9fe9cc83f28a3c2d313bf0ce3720e069940ab87e6684b0b",
     "lastStatus": "ok",
-    "textChars": 19909,
+    "textChars": 20104,
     "url": "https://www.usbank.com/credit-cards/cash-plus-visa-signature-credit-card.html"
   },
   "u-s-bank-shopper-cash-rewards": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.usbank.com/credit-cards.html",
-    "hash": "edc712d1be1b28ce90d37c72be66e0fee13431a19eaa9f90fbb869c130123dd0",
+    "hash": "151f43f677695af370ff65c6ff500c5f0b72b52f3dc8e7bebe848789cbf76b0f",
     "lastStatus": "ok",
-    "textChars": 35550,
+    "textChars": 37581,
     "url": "https://www.usbank.com/credit-cards/shopper-cash-rewards-visa-signature-credit-card.html"
   },
   "u-s-bank-skypass": {
@@ -1141,19 +1149,19 @@
     "url": "https://www.skypassvisa.com/credit/visaSelectCard.do"
   },
   "u-s-bank-smartly": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.usbank.com/credit-cards/bank-smartly-visa-signature-credit-card.html",
-    "hash": "01aabc230c82e3ada5d481263bcfa584860a5201bf4e2dabaec179e289060c2b",
+    "hash": "7cde077e4a0030cb806feb30b71d5a3e6f6b573815899f72846fc0013f81f35b",
     "lastStatus": "ok",
-    "textChars": 20221,
+    "textChars": 20712,
     "url": "https://www.usbank.com/credit-cards/bank-smartly-visa-signature-credit-card.html"
   },
   "webbank-gemini": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://www.gemini.com/credit-card",
-    "hash": "c0e949e3b186e33089302a086d3b34d1a4d14143c81e4d175e955f191a89acc5",
+    "hash": "bf7c25e7095574d8d2fcb9ecf152b823fe991029eab7a526fe12e7b787f3b333",
     "lastStatus": "ok",
-    "textChars": 6895,
+    "textChars": 6916,
     "url": "https://www.gemini.com/credit-card"
   },
   "wells-fargo-active-cash": {
@@ -1168,7 +1176,7 @@
     "changedAt": "2026-10-20",
     "finalUrl": "https://creditcards.wellsfargo.com/attune-world-elite-mastercard-credit-card/",
     "hash": "44ed1529cef1f56790f6a5e7368bdda3c461b692c576aea81b02b3d93cd2cc03",
-    "lastStatus": "ok",
+    "lastStatus": "needs-browser",
     "textChars": 1027,
     "url": "https://creditcards.wellsfargo.com/attune-world-elite-mastercard-credit-card"
   },
@@ -1189,19 +1197,19 @@
     "url": "https://creditcards.wellsfargo.com/autograph-journey-visa-credit-card"
   },
   "wells-fargo-choice-privileges": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.wellsfargo.com/wells-fargo-choice-privileges-credit-cards/?sub_channel=WEB&vendor_code=WF",
-    "hash": "726f9151f7d99c0eecb268fbbaeabbb871bc32ac370a7f91df83e6a0b11452aa",
+    "hash": "10d939f73515208c4bee5bf9ae866f6daa006e3be2c7fe02203ce68c927b5c78",
     "lastStatus": "ok",
-    "textChars": 28808,
+    "textChars": 28731,
     "url": "https://creditcards.wellsfargo.com/wells-fargo-choice-privileges-credit-cards"
   },
   "wells-fargo-choice-privileges-select": {
-    "changedAt": "2026-10-20",
+    "changedAt": "2026-11-01",
     "finalUrl": "https://creditcards.wellsfargo.com/wells-fargo-choice-privileges-credit-cards/?sub_channel=WEB&vendor_code=WF",
-    "hash": "726f9151f7d99c0eecb268fbbaeabbb871bc32ac370a7f91df83e6a0b11452aa",
+    "hash": "10d939f73515208c4bee5bf9ae866f6daa006e3be2c7fe02203ce68c927b5c78",
     "lastStatus": "ok",
-    "textChars": 28808,
+    "textChars": 28731,
     "url": "https://creditcards.wellsfargo.com/wells-fargo-choice-privileges-credit-cards"
   },
   "wells-fargo-expedia-one-key": {
