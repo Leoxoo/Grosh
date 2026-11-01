@@ -75,9 +75,16 @@ A card whose `sourceUrl` changed since it was fetched is picked up by `--missing
 | `needs-browser` | 4 | The two Schwab-branded Amex cards ("unable to authorize your request") and the two Amazon cards (a "continue shopping" check page). Bot walls, so a browser is unlikely to help; use the issuers' own pages instead. |
 | `failed` | 12 | Timeouts: the United cards (theexplorercard.com), E*TRADE (2 Morgan Stanley cards), PenFed (3), Air France. Retrying here didn't help; try `--retry` from your own network. |
 | `refused` | 11 | LATAM, LifeMiles, Amtrak, Best Western, Virgin, Expedia. |
-| `gone` | 1 | `barclays-carnival-world-mastercard`: Barclays removed the page and I found no official replacement, so it needs a URL from you. |
+| `gone` | 1 | `barclays-carnival-world-mastercard`: **needs-info** (below). |
 
-The 3 earlier `gone` pages (two TD, one Walmart) now fetch from corrected URLs. The Walmart OnePay card uses OnePay's help article, not a Synchrony or Walmart product page. Amex Everyday's URL pointed at a sign-in "Benefits Dashboard" and now uses its card page.
+The 3 earlier `gone` pages (two TD, one Walmart) now fetch from corrected URLs.
+
+**Needs a decision from you (needs-info, #158), checked 2026-11-01:**
+
+- `barclays-carnival-world-mastercard`: the card no longer exists. Barclays replaced it with the Carnival Rewards Mastercard on September 1, 2026 and moved its cardholders over (FunPoints became Carnival Rewards points), as reported by card-news sites; Barclays' own FAQ wasn't found. The old page is a 404. The new card's page (`https://cards.barclaycardus.com/banking/cards/carnival-rewards-mastercard/`) fetches and states its rates (up to 6x on Carnival, 2x restaurants and groceries, 1x everything else), but it is a different card with different rates and never names the old one, so swapping its URL in would fail "the page names the card". Decide whether to mark this card `discontinued` (the seed has no override for that yet) or replace it with the Carnival Rewards Mastercard (a new id).
+- `american-express-green`: closed to new applicants in July 2026 and renamed the American Express Classic Green Card in August; Amex took down its card page, and `.../card/green/` now redirects to the generic card listing. Its own pages that are left don't give the fetcher its rates: the referral page (`https://www.americanexpress.com/en-us/referral/personal/american-express-green-card`) is read as `ok` and names the card, but its 3X rates are only in its page data, which `fetch.py` reads only for thin pages (this page has a "10% back" line on its visible text, so a "no rate in the text" rule wouldn't catch it either); the cardmember benefits page (`https://global.americanexpress.com/card-benefits/view-all/amex-green`) is a browser-built `needs-browser` page that shows the rates only behind a click. The URL is left as it was.
+
+`american-express-rakuten` now uses the card's own page, `https://rakuten.imprint.co/`. Imprint runs the card and First Electronic Bank issues it under an American Express license; Amex has no page for it. That page states the rates: an extra 4% on Rakuten purchases up to $10,000 a year, 10% on Rakuten dining, 2% on groceries and restaurants, 1% on everything else. The seed lists it as a business card, but it's a personal card (not changed: the seed has no override for that). The Walmart OnePay card uses OnePay's help article, not a Synchrony or Walmart product page. Amex Everyday's URL pointed at a sign-in "Benefits Dashboard" and now uses its card page.
 
 ### Pages built in the browser: embedded data, not a browser
 
@@ -92,7 +99,7 @@ Only prose is kept: strings of two or more words that read as sentences, once ea
 Limits to know before the extract stage:
 
 - **Mixed content.** Amex's state holds marketing for many cards, so a card's page can contain other cards' rates. Extraction must keep only this card's rules, which is why "the page names the card" is a validation check and a quote that is another card's is rejected (check 13 of the extract stage).
-- **Wrong pages still read as "ok".** The embedded text of `american-express-green` is Amex's generic card listing (its page redirects there, so the Green card page has moved) and `american-express-rakuten` is the Rakuten shopping site's labels, not card terms. Both need correct URLs from you. A fetch that ends on a different page than it asked for should be flagged; not built yet.
+- **Wrong pages still read as "ok".** The embedded text of `american-express-green` is Amex's generic card listing (its page redirects there; see needs-info above). `american-express-rakuten` used to be the Rakuten shopping site's labels and now uses the card's own page. A fetch that ends on a different page than it asked for should be flagged; not built yet.
 - **Hashes are noisier.** A page that flips between thin and full text changes its hash, and embedded data can include build ids. `changed` reports how many lines differ, to tell churn from a rate change.
 - **A headless browser** is now only worth building for what this can't reach. Nothing is left that clearly needs one: the 4 `needs-browser` pages are bot walls.
 
