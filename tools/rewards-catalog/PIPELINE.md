@@ -132,10 +132,11 @@ For each card it splits the cached page text into chunks of about 12,000 charact
 5. a cap needs an amount and a period, and both appear in the quote (`$6,000`, `6K` and `6000` match; "year" or "annual"; `cycle` is a "billing cycle");
 6. every **condition** (an exclusion or restriction on the rate, such as "excluding superstores like Walmart® and Target®") is the page's own sentence, word for word. Conditions are never paraphrased, so what a person sees is what the issuer wrote. A rule with a condition that isn't on the page is rejected whole, since showing the rate without its restriction would overstate it;
 7. a rule where the cardholder chooses or the card picks (`selection` of `choose` or `top-spend`) needs a quote that says so ("of your choice", "top eligible category"), and every category it lists must be mentioned on the page;
-8. a `requires` tag (`apple-pay`, `activation`, `issuer-booking`) is accepted only if the quote or a condition has words that back it ("Apple Pay", "activate", "booked through");
+8. a `requires` tag (`apple-pay`, `activation`, `issuer-booking`, `preferred-rewards-tier`) is accepted only if the quote or a condition has words that back it ("Apple Pay", "activate", "booked through", "Preferred Rewards" or a table row's "75% rewards bonus"), and a `tier` only if they name it ("Platinum Honors");
 9. `validFrom` / `validTo` are accepted only if the quote or a condition gives that date's month and year, so a period can't be made up.
 10. `firstMonths` (a rate only for the first N months after opening, such as a first-year bonus) is accepted only if the quote or a condition says "first year", "first 12 months" or similar for that length;
-11. a `rotating` rule's quote must say the categories change ("quarter", "rotating", "bonus categories", "different places"), and any category it does name must be in the quote.
+11. a `rotating` rule's quote must say the categories change ("quarter", "rotating", "bonus categories", "different places"), and any category it does name must be in the quote;
+12. a **tier boost** (Bank of America's "up to 75% more", which turns 1.5 points into 2.62 at Platinum Honors) must be labelled as one, `requires: ["preferred-rewards-tier"]`, or it is rejected: it is never a base rate. A rate is a boost when the sentence of the quote that states it talks of Preferred Rewards, a rewards bonus or an Honors tier (not "plus any Preferred Rewards tiered bonus", which is the base rate naming the boost on top, and not a card named "Sapphire Preferred"), or when the quote is a cell of a tier table's row ("Platinum Honors", "75% rewards bonus", ..., "2.62 points on All other purchases"; the "No rewards bonus" row is the base). A base rate is judged on its own sentence, so "Earn unlimited 1.5 points ... Or, enroll in Preferred Rewards ... 2.62 points" keeps its 1.5.
 
 A rule that fails any check is listed as rejected, never edited. Before the checks, a few relabelings that change nothing about what the page says are applied: a rotating bonus the model filed as "top-spend", "choose" or the base rate is retyped as `rotating` (only when the quote says the categories change, such as "bonus categories" or "different places you shop each quarter", and not who picks them; "each quarter" alone, as in a cap, doesn't count); and the same rule found twice (the model words a quote a little differently in each part of a page) is kept once, with its conditions and requirements combined. One tidy-up happens before the checks: a `fixed` rule that lists several categories (the model likes "3% on dining, groceries and streaming") becomes one rule per category with the same quote, each checked on its own, and each keeps only the conditions that are about it or name no category. **Card-wide conditions** (`cardConditions`: sentences that limit several of a card's rates, such as Capital One's note that digital wallets may not earn the higher rate) must also be on the page word for word; one that isn't is dropped and listed under `rejected`, and the card's rules are kept.
 
@@ -171,7 +172,9 @@ A rule that fails any check is listed as rejected, never edited. Before the chec
 | Bonus categories the issuer changes every quarter (Discover, Chase Freedom Flex) | `selection: "rotating"`, `categories: []` (the page rarely names them), the rate, the cap, and `requires: ["activation"]` where the page says to activate. If a page names this period's categories with dates, they go in `categories` with `validFrom` / `validTo`. |
 | A rate for a stated period | `validFrom` / `validTo` |
 
-Not handled: relationship boosts (Bank of America Preferred Rewards), caps shared between categories, and rates at one named store (the catalog skips those). The page's own sentence about them can still ride along in `conditions`.
+| A higher rate for a banking relationship tier (Bank of America Preferred Rewards: 2.62 points at Platinum Honors where everyone else earns 1.5) | its own rule beside the base rate, with `requires: ["preferred-rewards-tier"]` and `tier` (`gold`, `platinum`, `platinum-honors`, `diamond-honors`) when the page names it; null when it doesn't |
+
+Not handled: caps shared between categories, and rates at one named store (the catalog skips those). The page's own sentence about them can still ride along in `conditions`.
 
 ### Questions only the cardholder can answer
 
@@ -182,8 +185,9 @@ Some things about a rule depend on the person, not the card. The catalog doesn't
 | `choice-categories` | `selection` is `choose` | Which category did you choose on this card? |
 | `account-opened` | `firstMonths` is set (a first-year rate) | When did you open this card? |
 | `pays-with-apple-pay` | `requires` has `apple-pay` | Do you usually pay with Apple Pay? |
+| `preferred-rewards-tier` | `requires` has `preferred-rewards-tier` | Which Bank of America Preferred Rewards tier are you in? |
 
-`top-spend` rules (Citi Custom Cash) need no answer, because Grosh can work out the top category from the user's own expenses in the statement period. Not modeled yet: Bank of America's Preferred Rewards tier (a percentage boost by tier, which the cached pages don't state). Bank of America's first-year 6% is supported by the schema (`firstMonths: 12`) but **not entered**: none of the pages we have states it, so there's no quote to take.
+`top-spend` rules (Citi Custom Cash) need no answer, because Grosh can work out the top category from the user's own expenses in the statement period. A tier boost is not the base rate, so a card with only boosts for all other purchases still gets the "no rate for all other purchases" warning, and a boost beside the base is not "two rates with nothing to tell them apart". Bank of America's first-year 6% is supported by the schema (`firstMonths: 12`) but **not entered**: none of the pages we have states it, so there's no quote to take.
 
 ### Hand-entered cards and rules
 
@@ -192,7 +196,7 @@ Some things about a rule depend on the person, not the card. The catalog doesn't
 - `manual-rules.json` (`{card id: {rules: [...], cardConditions: [...]}}`) holds rules a person writes in the same shape as the model's. They run through the same checks without needing the page, and `extract.py` needs no LM Studio for them. A rule whose quote is found on the cached page is `verified: "page"`; one the page can't confirm (no page, or the page says something else) is `verified: "manual"` and should be re-checked at review. Apple Card's two rules are in there, both `"page"`.
 - **Citi Custom Cash and Bank of America Customized Cash are entered**, from pages that state their rules: Citi's featured-cards page (its own card page now says Citi stopped accepting applications on May 28, 2026, so the FAQ on `citi.com/usc/Multi/Featured/default.htm` is the page that still has the rules) and Bank of America's "Categories & Exclusions" page. Citi's 5% is a `top-spend` rule over seven catalog categories with a $500 cap per billing cycle (`capPeriod: "cycle"`) and `hasOtherChoices` for home improvement, fitness clubs and live entertainment. Bank of America's 3% is a `choose` rule (gas, online shopping, dining, travel, drug stores; home improvement is outside the list) with a $2,500 combined quarterly cap, next to a 2% grocery rule and a 1% base rate. Its card-wide condition ("Merchants, not Bank of America, categorize and submit purchases ...") and the online-shopping exclusion are the page's own sentences. All were checked against the cached pages: `verified: "page"`.
 - Citi Custom Cash is **closed to new applicants** but still held by existing cardholders, so it stays in the catalog. There's no field for "closed to new applicants" yet.
-- Not entered: Bank of America's Preferred Rewards boost (up to 5.25% on the choice category), Citi's extra 4% on Citi Travel bookings, and Bank of America's first-year 6% offer. Pages disagree on the last one, so it needs a decision before it goes in.
+- Not entered: Bank of America's Preferred Rewards boost on Customized Cash (up to 5.25% on the choice category; the schema has it now, but the card's cached page doesn't state it, so there's no quote), Citi's extra 4% on Citi Travel bookings, and Bank of America's first-year 6% offer. Pages disagree on the last one, so it needs a decision before it goes in.
 
 **What I measured on the 138 fetched pages, without a model:** 8 are `wrong-page` (for example `u-s-bank-business-leverage`, `wells-fargo-attune`), 130 would be sent to the model, and that takes about 339 model calls: 50 pages need one call, 32 need two, and the three big Amex pages need 18 each. With a 7B model on a Mac expect a full run to take on the order of an hour or more; it can be stopped and resumed, since each card is saved as it finishes.
 
@@ -280,8 +284,9 @@ Card   id, name, issuer, network, isBusiness, annualFee, rewardKind,
        verifiedAt, cardConditions[] (the issuer's sentences that limit several rates), rules[]
 Rule   categories[], selection (fixed | choose | top-spend), picks, hasOtherChoices,
        rate, unit (percent | per-dollar), capAmount, capPeriod (month | quarter | year | cycle),
-       requires[] (apple-pay | activation | issuer-booking), validFrom, validTo, firstMonths,
-       needs[] (choice-categories | account-opened | pays-with-apple-pay; derived),
+       requires[] (apple-pay | activation | issuer-booking | preferred-rewards-tier), validFrom, validTo, firstMonths,
+       tier (gold | platinum | platinum-honors | diamond-honors; only with preferred-rewards-tier),
+       needs[] (choice-categories | account-opened | pays-with-apple-pay | preferred-rewards-tier; derived),
        conditions[] (the issuer's own sentences, verbatim), verified (page | manual),
        evidence { url, quote, pageHash }
 ```
