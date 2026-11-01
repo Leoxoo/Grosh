@@ -219,13 +219,12 @@
     "url": "https://www.americanexpress.com/us/credit-cards/card/platinum/"
   },
   "american-express-rakuten": {
-    "changedAt": "2026-10-20",
-    "embedded": true,
-    "finalUrl": "https://www.rakuten.com/american-express-card",
-    "hash": "590edf92b664be30d737ba1e8931ee211198d842cb4a6affec57631f51788374",
+    "changedAt": "2026-11-01",
+    "finalUrl": "https://rakuten.imprint.co/",
+    "hash": "2b161fd36a3522780bd95a03546c978aaec66409bc786676cfa626c469b0d79d",
     "lastStatus": "ok",
-    "textChars": 9697,
-    "url": "https://www.rakuten.com/american-express-card/"
+    "textChars": 6396,
+    "url": "https://rakuten.imprint.co/"
   },
   "american-express-schwab-investor": {
     "lastStatus": "needs-browser",
