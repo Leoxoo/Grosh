@@ -228,6 +228,11 @@ BOA_TABLE = ["For illustrative purposes only.", "Not Enrolled", "No rewards bonu
              "1.5 points on All other purchases", "Gold", "25% rewards bonus", "$1350", "3.75 points on Travel center",
              "1.87 points on All other purchases", "Platinum Honors", "75% rewards bonus", "$1890",
              "5.25 points on Travel center", "2.62 points on All other purchases", "Calculate rewards"]
+# The same card's calculator table: each cell broken in two, its rate on one line and what it is for on the next.
+BOA_CALCULATOR = ["Not Enrolled", "No rewards bonus", "3.00 points", "per $1 spent on purchases at BofA Travel", "1.50 points",
+                  "per $1 spent on all other purchases", "Platinum Honors", "75% rewards bonus", "5.25 points",
+                  "per $1 spent on purchases at BofA Travel", "2.62 points", "per $1 spent on all other purchases",
+                  "Get the card and start earning today:"]
 
 
 class TierBoostTests(unittest.TestCase):
@@ -297,6 +302,14 @@ class TierBoostTests(unittest.TestCase):
         self.assertIn("needs requires preferred-rewards-tier", unlabelled["reason"])
         self.assertIn("tier platinum-honors", wrong_tier["reason"])
         self.assertFalse([w for w in result["warnings"] if "nothing to tell them apart" in w or "no rate for all other" in w])
+
+    def test_a_tier_row_cell_broken_across_two_lines_is_still_a_boost(self):
+        text = "\n".join(["Business Advantage Travel Rewards", *BOA_CALCULATOR])
+        cell = dict(categories=["everything-else"], unit="per-dollar")
+        boost = rule(**cell, rate=2.62, quote="2.62 points per $1 spent on all other purchases")
+        base = rule(**cell, rate=1.5, quote="1.50 points per $1 spent on all other purchases")
+        self.assertIn("needs requires preferred-rewards-tier", validate_rule(boost, normalize(text), extract.tier_rows(text)))
+        self.assertIsNone(validate_rule(base, normalize(text), extract.tier_rows(text)))  # the "No rewards bonus" row
 
     def test_a_boost_alone_is_not_the_base_rate(self):
         boost = extract.accepted_rule(rule(**self.BOOST, requires=["preferred-rewards-tier"]), "u", "h", "page")

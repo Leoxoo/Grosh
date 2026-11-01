@@ -209,6 +209,21 @@ def has_rates(chunk: str) -> bool:
     return bool(_RATE_LOOKING.search(chunk))
 
 
+def text_blocks(text: str) -> list[str]:
+    """The page's lines with a line that starts in lower case joined to the one before. Pages break a sentence
+    across lines ("3% Cash Back at U.S." / "supermarkets") and a table cell too ("2.62 points" / "per $1 spent on
+    all other purchases"). Any other line break ends a block: headings and menus have no full stop, and joined to
+    the next line they read as one sentence about something else ("Travel Rewards & Benefits 3% Cash Back")."""
+    blocks: list[str] = []
+    for line in text.splitlines():
+        line = " ".join(line.split())
+        if line and blocks and line[0].islower():
+            blocks[-1] += " " + line
+        elif line:
+            blocks.append(line)
+    return blocks
+
+
 def normalize(text: str) -> str:
     """Text for comparing a quote to a page: same letters, ignoring case, spacing, curly quotes,
     dashes and the (R)/(TM) marks issuers scatter through names."""
@@ -269,7 +284,8 @@ BOOST_WORDS = ("preferred rewards", "rewards bonus", "reward bonus", "platinum h
 # Chase's "Sapphire Preferred rewards" is a card's name.
 NOT_A_BOOST = ("plus any", "sapphire preferred rewards", "business preferred rewards")
 # Bank of America's rewards tables have one row per tier, each cell on its own line: "Gold", "25% rewards bonus",
-# "$1350", "1.87 points on All other purchases". The row's bonus cell, and the tier just above it, start a row.
+# "$1350", "1.87 points on All other purchases". The row's bonus cell, and the tier just above it, start a row. A
+# calculator's table breaks a cell in two ("2.62 points" / "per $1 spent on all other purchases"); text_blocks joins it.
 _BONUS_CELL = re.compile(r"(?:no|\d+(?:\.\d+)?%) rewards? bonus")
 ROW_LINES = 6  # cells after the bonus cell that still belong to its row
 TABLE_CELL_CHARS = 60  # a longer line is a sentence, not a cell, and ends the table
@@ -280,7 +296,7 @@ def tier_rows(text: str) -> dict[str, str]:
     rewards bonus"), for the rows that are a boost. A cell's own words never say it is one, so its row must."""
     rows: dict[str, str] = {}
     head, previous, since = None, "", 0
-    for line in map(normalize, text.splitlines()):
+    for line in map(normalize, text_blocks(text)):  # a cell broken in two is one cell
         since += 1
         if _BONUS_CELL.fullmatch(line):
             head, since = (None if line.startswith("no ") else f"{previous} {line}"), 0
@@ -1023,20 +1039,10 @@ def model_text(text: str) -> str:
 def rate_sentences(text: str) -> list[str]:
     """Sentences that state a reward rate (a percent or an X multiplier next to earn, cash back, points or miles)."""
     found: list[str] = []
-    # Pages break a sentence across lines ("3% Cash Back at U.S." / "supermarkets"), so a line that starts in lower
-    # case continues the one before. Any other line break ends a sentence: headings and menus have no full stop, and
-    # joined to the next line they read as one sentence about something else ("Travel Rewards & Benefits 3% Cash Back").
-    blocks: list[str] = []
-    for line in text.splitlines():
-        line = " ".join(line.split())
-        if line and blocks and line[0].islower():
-            blocks[-1] += " " + line
-        elif line:
-            blocks.append(line)
     # A split needs a capital or digit after the full stop, so "U.S. supermarkets" stays whole. Footnote marks after
     # the full stop ("(then 1%).‡") still end the sentence: otherwise a list of them runs together past
     # MAX_CONDITION_CHARS and its rates are never looked for.
-    for block in blocks:
+    for block in text_blocks(text):
         for piece in re.split(r"(?<=[.!?])[‡†¤*§]*\s+(?=[A-Z0-9\"“‘])", block):
             if (
                 piece and len(piece) <= MAX_CONDITION_CHARS and has_rates(piece) and _REWARD_SENTENCE.search(piece)
