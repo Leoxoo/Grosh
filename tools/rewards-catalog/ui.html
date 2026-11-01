@@ -233,7 +233,9 @@
         </select>
       </label>
       <button id="reviewReload" type="button">Reload</button>
+      <button id="publish" type="button" title="Write the accepted rules to rewards-catalog.json, the file the app reads">Publish catalog</button>
       <span class="small muted" id="reviewSummary"></span>
+      <span class="small muted" id="publishResult"></span>
     </div>
     <div id="reviewList"></div>
   </section>
@@ -620,6 +622,14 @@ function reviewBox(c, r) {
 }
 $("reviewShow").addEventListener("input", renderReview);
 $("reviewReload").onclick = loadReview;
+$("publish").onclick = async (e) => {
+  e.target.disabled = true;
+  try {
+    const p = await api("POST", "/api/publish");
+    $("publishResult").textContent = `Wrote ${p.rules} accepted rule${p.rules === 1 ? "" : "s"} on ${p.cards} card${p.cards === 1 ? "" : "s"} to ${p.file} (${p.publishedAt})`;
+  } catch (err) { alert(err.message); }
+  e.target.disabled = false;
+};
 
 // ---------- start ----------
 (async function start() {

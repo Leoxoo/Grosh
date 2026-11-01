@@ -56,7 +56,7 @@ class AppCase(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         root = Path(tmp.name)
         self.paths = ui.Paths(seed=root / "seed.json", state=root / "state.json", cache=root / "cache", manual=root / "manual.json",
-                              decisions=root / "review-decisions.json")
+                              decisions=root / "review-decisions.json", catalog=root / "rewards-catalog.json")
         self.cards = [card("bank-a", "Savor Rewards"), card("bank-b", "Other Card"), card("zed-c", "Zed Card", "Zed")]
         self.paths.seed.write_text(json.dumps({"cards": self.cards}))
         self.state: dict = {}
@@ -509,6 +509,18 @@ class ReviewTests(AppCase):
             self.assertEqual(got, status, body)
             self.assertIn(message, payload["error"])
         self.assertFalse(self.paths.decisions.exists())
+
+    def test_publish_writes_the_accepted_rules_to_the_catalog_file(self):
+        facts = {"isBusiness": False, "rewardProgram": None, "baseEarnRate": 1, "discontinued": False}
+        self.paths.seed.write_text(json.dumps({"cards": [dict(c, **facts) for c in self.cards]}))
+        self.extracted()
+        key = self.app.handle("GET", "/api/review", {}, {})[1]["cards"][0]["rules"][0]["key"]
+        self.app.handle("POST", "/api/review", {}, {"cardId": "bank-a", "key": key, "decision": "accept"})
+        status, payload = self.app.handle("POST", "/api/publish", {}, {})
+        self.assertEqual((status, payload["cards"], payload["rules"]), (200, 1, 1))
+        (published,) = json.loads(self.paths.catalog.read_text())["cards"]
+        self.assertEqual([r["evidence"]["quote"] for r in published["rules"]], [RULE["quote"]])
+        self.assertEqual(ui.Paths().catalog.parent, Path(ui.__file__).parent)  # committed beside the scripts, not in cache/
 
 
 class ServerTests(AppCase):

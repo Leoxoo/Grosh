@@ -20,7 +20,8 @@ What the page does:
     need it, or the ones you tick, with a live log, a progress bar and a Stop button;
   - shows every card's fetch and extraction status, and for one card: the rules found, what was
     rejected and why, any error, the page's rate lines, and a "try" that shows the model's raw reply;
-  - reviews: every rule with its quote, source and warnings, to accept or reject (review.py).
+  - reviews: every rule with its quote, source and warnings, to accept or reject (review.py), and
+    publishes the accepted ones to rewards-catalog.json (publish.py).
 """
 
 import argparse
@@ -41,6 +42,7 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, str(Path(__file__).parent))
 import extract  # noqa: E402
 import fetch  # noqa: E402
+import publish  # noqa: E402
 import review  # noqa: E402
 
 PAGE = Path(__file__).with_name("ui.html")
@@ -57,6 +59,7 @@ class Paths:
     cache: Path = fetch.CACHE
     manual: Path = extract.MANUAL_RULES
     decisions: Path = review.DECISIONS  # committed: a person's accept or reject on each rule
+    catalog: Path = publish.OUT  # committed: the accepted rules, as the app reads them
 
     @property
     def candidates(self) -> Path:
@@ -409,6 +412,12 @@ class App:
         decisions = review.decide(candidate, str(body.get("key")), str(body.get("decision")), self.paths.decisions, date.today().isoformat())
         return {**review.card_review(candidate, decisions), "name": card["name"], "issuer": card["issuer"]}
 
+    def publish_catalog(self) -> dict:
+        """Write the accepted rules to the catalog file (publish.py) and say how much went in."""
+        document = publish.publish(self.paths.seed, self.paths.candidates, self.paths.decisions, self.paths.catalog)
+        return {"cards": len(document["cards"]), "rules": sum(len(c["rules"]) for c in document["cards"]),
+                "publishedAt": document["publishedAt"], "file": self.paths.catalog.name}
+
     # --- the model server ---------------------------------------------------------------------
 
     def lm_models(self) -> dict:
@@ -664,6 +673,8 @@ class App:
                 return self.change_profile(body)
             if path == "/api/review":
                 return self.decide(body)
+            if path == "/api/publish":
+                return self.publish_catalog()
             if path == "/api/test-model":
                 return self.test_model()
             if path == "/api/ask":
