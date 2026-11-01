@@ -77,21 +77,6 @@
       "verified": false
     },
     {
-      "id": "american-express-blue-cash-preferred-morgan-stanley",
-      "name": "Blue Cash Preferred (Morgan Stanley)",
-      "issuer": "American Express",
-      "network": "American Express",
-      "isBusiness": false,
-      "annualFee": 95,
-      "rewardKind": "cashback",
-      "rewardProgram": null,
-      "baseEarnRate": 2,
-      "discontinued": false,
-      "sourceUrl": "https://us.etrade.com/l/morgan-stanley-blue-cash-preferred",
-      "sourceHost": "us.etrade.com",
-      "verified": false
-    },
-    {
       "id": "american-express-business-gold",
       "name": "Business Gold",
       "issuer": "American Express",
@@ -419,36 +404,6 @@
       "discontinued": false,
       "sourceUrl": "https://www.americanexpress.com/us/credit-cards/card/platinum/",
       "sourceHost": "www.americanexpress.com",
-      "verified": false
-    },
-    {
-      "id": "american-express-platinum-morgan-stanley",
-      "name": "Platinum (Morgan Stanley)",
-      "issuer": "American Express",
-      "network": "American Express",
-      "isBusiness": false,
-      "annualFee": 895,
-      "rewardKind": "points",
-      "rewardProgram": "AMERICAN_EXPRESS",
-      "baseEarnRate": 1,
-      "discontinued": false,
-      "sourceUrl": "https://us.etrade.com/l/morgan-stanley-platinum",
-      "sourceHost": "us.etrade.com",
-      "verified": false
-    },
-    {
-      "id": "american-express-platinum-schwab",
-      "name": "Platinum (Schwab)",
-      "issuer": "American Express",
-      "network": "American Express",
-      "isBusiness": false,
-      "annualFee": 895,
-      "rewardKind": "points",
-      "rewardProgram": "AMERICAN_EXPRESS",
-      "baseEarnRate": 1,
-      "discontinued": false,
-      "sourceUrl": "https://www.schwab.com/credit-cards/platinum-card",
-      "sourceHost": "www.schwab.com",
       "verified": false
     },
     {

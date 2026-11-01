@@ -43,6 +43,13 @@ class BuildTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             build_seed.build([ROW], {"no-such-card": "https://x.test"})
 
+    def test_removed_cards_leave_the_seed_and_unknown_ids_stop_the_build(self):
+        catalog = build_seed.build([ROW], extra_cards=[EXTRA], removed_cards={"goldman-sachs-apple-card": "why"})
+        self.assertEqual([c["id"] for c in catalog], ["capital-one-savor"])
+        with self.assertRaises(SystemExit) as stopped:
+            build_seed.build([ROW], removed_cards={"no-such-card": "why"})
+        self.assertIn("removed-cards.json", str(stopped.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

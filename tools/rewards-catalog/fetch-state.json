@@ -39,10 +39,6 @@
     "textChars": 11423,
     "url": "https://www.americanexpress.com/us/credit-cards/card/blue-cash-preferred/"
   },
-  "american-express-blue-cash-preferred-morgan-stanley": {
-    "lastStatus": "failed",
-    "url": "https://us.etrade.com/l/morgan-stanley-blue-cash-preferred"
-  },
   "american-express-business-gold": {
     "changedAt": "2026-10-20",
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-business-gold-card-amex/",
@@ -221,14 +217,6 @@
     "lastStatus": "ok",
     "textChars": 40085,
     "url": "https://www.americanexpress.com/us/credit-cards/card/platinum/"
-  },
-  "american-express-platinum-morgan-stanley": {
-    "lastStatus": "failed",
-    "url": "https://us.etrade.com/l/morgan-stanley-platinum"
-  },
-  "american-express-platinum-schwab": {
-    "lastStatus": "needs-browser",
-    "url": "https://www.schwab.com/credit-cards/platinum-card"
   },
   "american-express-rakuten": {
     "changedAt": "2026-10-20",
