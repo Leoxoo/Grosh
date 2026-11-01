@@ -19,7 +19,9 @@ its quote must appear on the page word for word, and the rate (and any cap) must
 inside that quote. Anything else is listed under "rejected" with the reason, never fixed.
 
 A card whose page doesn't name the card is "wrong-page" and gets no rules: Amex's state
-holds many cards' marketing, and a redirect can land on a different card's page.
+holds many cards' marketing, and a redirect can land on a different card's page. On a page
+that describes several cards, a rule whose quote names another card, or sits only under
+another card's heading, is rejected too (CardPage).
 
 Rules for cards whose pages hide them (or that need a person's judgment) are entered by
 hand in manual-rules.json, in the same shape, and go through the same checks. A hand-entered
@@ -29,6 +31,7 @@ Re-running skips a model-read card whose page, model and prompt are unchanged.
 """
 
 import argparse
+import bisect
 import json
 import os
 import re
@@ -472,6 +475,133 @@ def validate_rule(rule, page_norm: str | None = None, rows: dict[str, str] | Non
     if valid_from and valid_to and valid_from > valid_to:
         return "validFrom is after validTo"
     return None
+
+
+# --- Whose rate is it -----------------------------------------------------------------------
+#
+# A page can describe several cards: Discover's lists ten "Discover it" cards, each with its own rates, and
+# the same sentence often sits under several of them. A quote on the page is not enough; it must be this
+# card's. Names are compared by their distinctive words: the issuer's name and words every card name
+# uses ("Credit Card", "Cash Back", "Visa Signature") don't tell two cards apart.
+
+NAME_FILLER = {"the", "a", "an", "your", "my", "our", "this", "credit", "card", "cash", "back", "rewards", "visa",
+               "mastercard", "signature", "world", "elite", "infinite", "amex", "consumer"}
+NOT_IN_A_NAME = {"the", "a", "an", "your", "my", "our", "for", "with", "of", "to", "and", "on", "in", "about", "using"}
+SECTION_LINES = 12  # a card's heading reaches this many lines down (or to the next heading), so a footer isn't a card's section
+FOOTNOTE_LINES = 3  # "Footnote 2:" and the lines after it, up to the next footnote
+
+
+def _name_words(name: str) -> list[str]:
+    return _alnum_words(re.sub("[®™℠©†‡]", "", re.sub(r"(?<=[a-z])(?:TM|SM)\b", "", name)))  # "SmartlyTM" is Smartly
+
+
+def _card_names(text: str) -> list[str]:
+    """The card names in the text: the capitalized words just before "Card" ("Discover it Miles Credit Card"
+    names "Discover it Miles Credit"), back to a word no name has ("Manage Your Credit Card" names nothing
+    but "Credit"). "Card Members" and a lowercase "your card" name nothing."""
+    text = re.sub(r"([.!?;:,|])(?=[A-Z])", r"\1 ", text)
+    names = []
+    for match in re.finditer(r"\bcard\b(?!\s*(?:members?|holders?)\b)", text, re.I):
+        words: list[str] = []
+        for word in reversed(text[: match.start()].split()[-8:]):
+            if (
+                re.search(r"[.!?:;,|]\W*$", word) or word.casefold() in NOT_IN_A_NAME
+                or not (word[0].isupper() or word in ("it", "&"))
+            ):
+                break
+            words.insert(0, word)
+        if words:
+            names.append(" ".join(words))
+    return names
+
+
+def _heading(line: str) -> str | None:
+    """The card a line is a heading for: a short line, no numbers, that ends with a card's name."""
+    line = line.strip()
+    if len(line.split()) > 12 or re.search(r"\d", line) or not re.search(r"\bcard[®™℠\s]*$", line, re.I):
+        return None
+    names = _card_names(line)
+    return names[-1] if names else None
+
+
+class CardPage:
+    """A card's page, read for which card each sentence is about."""
+
+    def __init__(self, card: dict, text: str) -> None:
+        issuer = set(_name_words(card["issuer"]))
+        self._filler = NAME_FILLER | issuer
+        self._own = set(self._distinct(card["name"]))
+        self._family = (self._own - {"business"}) | issuer  # a sibling card shares one of these words
+        lines = [line for line in text.splitlines() if normalize(line)]
+        self._starts: list[int] = []
+        self._flat = ""
+        for line in lines:
+            self._starts.append(len(self._flat))
+            self._flat += normalize(line) + " "
+        self._headings = [_heading(line) for line in lines]
+        # Footnotes ("Footnote 2:" and the lines after it) belong where their marker is: a sentence ending in " 2".
+        self._footnote: list[str | None] = []
+        self._markers: dict[str, list[int]] = {}
+        current, left = None, 0
+        for number, line in enumerate(lines):
+            start = re.match(r"\s*footnote\s+(\d{1,2})\b", line, re.I)
+            current, left = (start.group(1), FOOTNOTE_LINES) if start else (current, left - 1)
+            self._footnote.append(current if left > 0 else None)
+            marker = re.search(r"[.!?)]\s+(\d{1,2})\s*$", line)
+            if marker and self._footnote[-1] is None:
+                self._markers.setdefault(marker.group(1), []).append(number)
+        # The names the page uses for this card. A page that never names it can't say which of its cards it is.
+        self._own_names = [set(self._distinct(n)) for line in lines for n in _card_names(line) if self._is_this_card(n)]
+
+    def _distinct(self, name: str) -> list[str]:
+        return [word for word in _name_words(name) if word not in self._filler]
+
+    def _is_this_card(self, name: str) -> bool:
+        """A name for this card: no word this card's name lacks ("Discover it Cash Back" for Discover It), or this
+        card's name with words only in front ("Air Canada Aeroplan" for Aeroplan, "Southwest Rapid Rewards Plus")."""
+        words = self._distinct(name)
+        if not words:
+            return False
+        if set(words) <= self._own:
+            return True
+        return self._own <= set(words) and words[-1] in self._own
+
+    def is_other_card(self, name: str) -> bool:
+        """Whether a name is another card from the same family: "Discover it Miles" on Discover It's page. A
+        shorter name for one of this card's names ("IHG One Rewards" for "IHG One Rewards Traveler") is not."""
+        words = set(self._distinct(name))
+        if not self._own_names or not self._sibling(name) or "gift" in words or self._is_this_card(name):
+            return False
+        return not any(words <= own for own in self._own_names)
+
+    def _sibling(self, name: str) -> bool:
+        return bool(set(_name_words(name)) & self._family)
+
+    def other_card_problem(self, quote: str) -> str | None:
+        """Why a quote is another card's, or None: it names another card, or it sits under another card's
+        heading and never under this card's. A place under no heading (a footer, a list without headings)
+        says nothing either way."""
+        for name in _card_names(quote):
+            if self.is_other_card(name):
+                return f"the quote names another card ({name} Card)"
+        quote = normalize(quote)
+        others = []
+        at = self._flat.find(quote)
+        while at >= 0:
+            line = bisect.bisect_right(self._starts, at) - 1
+            footnote = self._footnote[line]
+            places = self._markers.get(footnote, []) if footnote else [line]
+            for heading in filter(None, map(self._section_heading, places)):
+                if not self.is_other_card(heading):
+                    return None
+                others.append(heading)
+            at = self._flat.find(quote, at + 1)
+        return f"the quote is in another card's section ({others[0]} Card)" if others else None
+
+    def _section_heading(self, line: int) -> str | None:
+        """The card heading a line sits under, if a heading of this card's family is close enough above it."""
+        window = self._headings[max(0, line - SECTION_LINES + 1) : line + 1]
+        return next((h for h in reversed(window) if h and self._sibling(h)), None)
 
 
 # --- Asking the model -----------------------------------------------------------------------
@@ -951,6 +1081,7 @@ def extract_card(
         return candidate
 
     page_norm, rows = normalize(text), tier_rows(text)
+    page = CardPage(card, text)
     accepted: dict[tuple, dict] = {}
     errors: list[str] = []
 
@@ -968,7 +1099,7 @@ def extract_card(
     def take(reply) -> None:
         proposals, card_conditions = reply
         for proposal in (split for raw in proposals for split in split_fixed(raw)):
-            reason = validate_rule(proposal, page_norm, rows)
+            reason = validate_rule(proposal, page_norm, rows) or page.other_card_problem(proposal["quote"])
             if reason:
                 candidate["rejected"].append({"rule": proposal, "reason": reason})
                 continue
@@ -999,13 +1130,14 @@ def extract_card(
         else:
             take(reply)
 
-    uncovered = [s for s in rate_sentences(text) if not _covered(s, list(accepted.values()))][:MAX_FOLLOW_UPS] if follow_up else []
+    this_cards = [s for s in rate_sentences(text) if not page.other_card_problem(s)]  # another card's rates are no loss
+    uncovered = [s for s in this_cards if not _covered(s, list(accepted.values()))][:MAX_FOLLOW_UPS] if follow_up else []
     candidate["followUps"] = len(uncovered)
     for sentence in uncovered:
         reply = ask(sentence)  # a miss here is not a failure of the card: the chunks already covered the rest
         if reply is not None:
             take(reply)
-    still_missing = [s for s in rate_sentences(text) if not _covered(s, list(accepted.values()))]
+    still_missing = [s for s in this_cards if not _covered(s, list(accepted.values()))]
 
     candidate["rules"] = sorted(accepted.values(), key=lambda r: (r["categories"][0] if r["categories"] else "~", -r["rate"]))  # "~" sorts rotating rules last
     candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
