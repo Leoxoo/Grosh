@@ -893,25 +893,46 @@ def model_text(text: str) -> str:
 def rate_sentences(text: str) -> list[str]:
     """Sentences that state a reward rate (a percent or an X multiplier next to earn, cash back, points or miles)."""
     found: list[str] = []
-    # Pages break a sentence across lines ("3% Cash Back at U.S." / "supermarkets"), so join the lines first.
-    # A split needs a capital or digit after the full stop, so "U.S. supermarkets" stays whole.
-    flat = " ".join(text.split())
-    for piece in re.split(r"(?<=[.!?])\s+(?=[A-Z0-9\"“‘])", flat):
-        piece = " ".join(piece.split())
-        if (
-            piece and len(piece) <= MAX_CONDITION_CHARS and has_rates(piece) and _REWARD_SENTENCE.search(piece)
-            and piece not in found
-        ):
-            found.append(piece)
+    # Pages break a sentence across lines ("3% Cash Back at U.S." / "supermarkets"), so a line that starts in lower
+    # case continues the one before. Any other line break ends a sentence: headings and menus have no full stop, and
+    # joined to the next line they read as one sentence about something else ("Travel Rewards & Benefits 3% Cash Back").
+    blocks: list[str] = []
+    for line in text.splitlines():
+        line = " ".join(line.split())
+        if line and blocks and line[0].islower():
+            blocks[-1] += " " + line
+        elif line:
+            blocks.append(line)
+    # A split needs a capital or digit after the full stop, so "U.S. supermarkets" stays whole. Footnote marks after
+    # the full stop ("(then 1%).‡") still end the sentence: otherwise a list of them runs together past
+    # MAX_CONDITION_CHARS and its rates are never looked for.
+    for block in blocks:
+        for piece in re.split(r"(?<=[.!?])[‡†¤*§]*\s+(?=[A-Z0-9\"“‘])", block):
+            if (
+                piece and len(piece) <= MAX_CONDITION_CHARS and has_rates(piece) and _REWARD_SENTENCE.search(piece)
+                and piece not in found
+            ):
+                found.append(piece)
     return found
 
 
 def _covered(sentence: str, rules: list[dict]) -> bool:
-    """Whether an accepted rule's quote is this sentence (or part of it, or contains it)."""
+    """Whether the result has the rate this sentence states: an accepted rule quotes it (or part of it, or all
+    of it), or accepted rules give a rate the sentence states to every category it names. Pages state a rate
+    several times (a heading, the sentence under it, an FAQ) and a rule keeps one quote, so the restatements
+    aren't missing rates. A sentence that names no category, such as a heading cut short at "U.S." ("3% Cash
+    Back at U.S."), is covered by any rule at a rate it states. A rate the result lacks is never covered."""
     flat = normalize(sentence)
-    return any(
-        normalize(rule["evidence"]["quote"]) in flat or flat in normalize(rule["evidence"]["quote"]) for rule in rules
-    )
+    if any(normalize(rule["evidence"]["quote"]) in flat or flat in normalize(rule["evidence"]["quote"]) for rule in rules):
+        return True
+    rates = numbers_in(sentence)
+    named = [name for name, words in CATEGORIES.items() if name != "everything-else" and mentions(flat, words)]
+    if not named and mentions(flat, CATEGORIES["everything-else"]):
+        named = ["everything-else"]  # "on all eligible purchases" inside a category's sentence isn't the base rate
+    stated = [rule for rule in rules if float(rule["rate"]) in rates]
+    if not named:
+        return bool(stated)
+    return all(any(name in rule["categories"] for rule in stated) for name in named)
 
 
 def extract_card(
