@@ -30,6 +30,22 @@ PAGE = "\n".join([
 ])
 PAGE_NORM = normalize(PAGE)
 
+# Blue Cash Everyday's page, cut down: each rate has a heading over the sentence that states it.
+BLUE_CASH_CARD = {**CARD, "name": "Blue Cash Everyday"}
+BLUE_GROCERIES = "Card Members can earn 3% cash back on eligible purchases at U.S. supermarkets, on up to $6,000 per year in purchases (then 1%)."
+BLUE_GAS = "3% cash back on gas at U.S. gas stations on up to $6,000 per year in purchases (then 1%)"
+BLUE_BASE = "Card Members can earn 1% cash back on other eligible purchases."
+BLUE_CASH = "\n".join([
+    "Blue Cash Everyday® Card",
+    "Rewards",
+    "3% Cash Back at U.S. Supermarkets",
+    BLUE_GROCERIES + "‡",
+    "3% Cash Back on gas at U.S. Gas Stations",
+    BLUE_GAS + "‡",
+    "1% Cash Back on Other Eligible Purchases",
+    BLUE_BASE + "‡",
+])
+
 
 def rule(**overrides) -> dict:
     base = {
@@ -45,6 +61,13 @@ def choice_rule(**overrides) -> dict:
     base = {"categories": ["gas", "online-shopping", "dining", "travel", "drugstores"], "selection": "choose",
             "picks": 1, "hasOtherChoices": True, "quote": CHOICE}
     return rule(**{**base, **overrides})
+
+
+BLUE_CASH_RULES = [
+    rule(categories=["groceries"], capAmount=6000, capPeriod="year", quote=BLUE_GROCERIES),
+    rule(categories=["gas"], capAmount=6000, capPeriod="year", quote=BLUE_GAS),
+    rule(categories=["everything-else"], rate=1, quote=BLUE_BASE),
+]
 
 
 class ValidateRuleTests(unittest.TestCase):
@@ -280,6 +303,32 @@ class WhatCountsAsWhatTests(unittest.TestCase):
         result = extract_card({**CARD, "name": "Blue Cash"}, page, "h", FakeModel([only_base]), "m", follow_up=False)
         self.assertEqual(result["status"], "ok")
         self.assertTrue(any("aren't in the result" in w for w in result["warnings"]))
+
+    def test_headings_over_rates_the_result_has_are_not_missing_rates(self):
+        result = extract_card(BLUE_CASH_CARD, BLUE_CASH, "h", FakeModel(BLUE_CASH_RULES), "m", follow_up=False)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["warnings"], [])
+
+    def test_a_line_with_no_full_stop_does_not_run_into_the_next_one(self):
+        menu = "My Account\nCards\nBanking\nTravel\nRewards & Benefits"  # "Travel" would make the heading about travel
+        page = BLUE_CASH.replace("Rewards\n", menu + "\n", 1)
+        result = extract_card(BLUE_CASH_CARD, page, "h", FakeModel(BLUE_CASH_RULES), "m", follow_up=False)
+        self.assertEqual(result["warnings"], [])
+        self.assertIn("3% Cash Back at U.S.", extract.rate_sentences(page))
+
+    def test_a_rate_the_result_lacks_is_reported_from_a_list_of_footnoted_sentences(self):
+        faq = "\n".join([
+            "With the American Express Blue Cash Everyday® Card, you can earn:",
+            "3% cash back on purchases at U.S. supermarkets, on up to $6,000 per year in purchases (then 1%).‡",
+            "3% cash back on U.S. online retail purchases, on up to $6,000 per year in purchases (then1%).‡",
+            "3% cash back on gas purchases at U.S. gas stations on up to $6,000 per year in purchases (then 1%).‡",
+            "1% cash back on other eligible purchases.‡",
+        ])
+        result = extract_card(BLUE_CASH_CARD, BLUE_CASH + "\n" + faq, "h", FakeModel(BLUE_CASH_RULES), "m", follow_up=False)
+        missing = [w for w in result["warnings"] if "aren't in the result" in w]
+        self.assertEqual(len(missing), 1)
+        self.assertIn("1 rate sentence(s)", missing[0])
+        self.assertIn("online retail", missing[0])
 
     def test_the_model_reads_rates_conditions_and_their_neighbours_only(self):
         menu = "\n".join(f"Locations and hours for branch {n}." for n in range(50))
