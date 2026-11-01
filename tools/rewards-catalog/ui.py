@@ -383,8 +383,10 @@ class App:
             lines = [line for line in text.splitlines() if extract.has_rates(line)]
             page = {"chars": len(text), "rateLines": [line[:400] for line in lines[:60]], "rateLineCount": len(lines),
                     "head": text[:1200]}
+        candidate = self.candidate(card_id)
         return {
-            "card": card, "fetch": state, "candidate": self.candidate(card_id),
+            "card": card, "fetch": state, "candidate": candidate,
+            "summaries": [review.describe(rule) for rule in (candidate or {}).get("rules", [])],  # each rule in words, as the review says it
             "manual": fetch.read_json(self.paths.manual, {}).get(card_id), "page": page,
         }
 
@@ -398,11 +400,7 @@ class App:
             candidate = self.candidate(card["id"])
             if candidate and candidate.get("rules"):
                 entries.append({**review.card_review(candidate, decisions), "name": card["name"], "issuer": card["issuer"]})
-        summary = {"cards": len(entries), "waiting": 0, "accept": 0, "reject": 0}
-        for entry in entries:
-            for name, count in entry["counts"].items():
-                summary[name] += count
-        return {"cards": entries, "summary": summary}
+        return {"cards": entries, "summary": review.summarize(entries)}
 
     def decide(self, body: dict) -> dict:
         card = self.card(str(body.get("cardId")))
@@ -414,7 +412,7 @@ class App:
 
     def publish_catalog(self) -> dict:
         """Write the accepted rules to the catalog file (publish.py) and say how much went in."""
-        document = publish.publish(self.paths.seed, self.paths.candidates, self.paths.decisions, self.paths.catalog)
+        document = publish.publish(self.paths)
         return {"cards": len(document["cards"]), "rules": sum(len(c["rules"]) for c in document["cards"]),
                 "publishedAt": document["publishedAt"], "file": self.paths.catalog.name}
 

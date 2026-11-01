@@ -228,8 +228,6 @@
         <select id="reviewShow">
           <option value="waiting">Waiting for review</option>
           <option value="">All rules</option>
-          <option value="accept">Accepted</option>
-          <option value="reject">Rejected</option>
         </select>
       </label>
       <button id="reviewReload" type="button">Reload</button>
@@ -489,25 +487,19 @@ function applyJob(job) {
 }
 
 // ---------- card detail ----------
-function describe(r) {
-  const unit = r.unit === "percent" ? "%" : "×";
-  const cats = r.categories.map((c) => c.replace("-", " ")).join(", ");
-  let what;
-  if (r.selection === "choose") what = `${r.rate}${unit} in the ${r.picks === 1 ? "category" : r.picks + " categories"} the cardholder chooses: ${cats}${r.hasOtherChoices ? " (and others)" : ""}`;
-  else if (r.selection === "rotating") what = `${r.rate}${unit} in bonus categories that change each quarter${cats ? " (this period: " + cats + ")" : ""}`;
-  else if (r.selection === "top-spend") what = `${r.rate}${unit} on the top-spend category each cycle, from: ${cats}${r.hasOtherChoices ? " (and others)" : ""}`;
-  else what = `${r.rate}${unit} on ${cats}`;
-  if (r.capAmount) what += `, up to $${r.capAmount.toLocaleString()} per ${r.capPeriod === "cycle" ? "billing cycle" : r.capPeriod}`;
-  return what;
+// What a rule requires and when it applies, as chips: the same in the card's drawer and in the review.
+function ruleChips(r) {
+  return [r.requires.map((q) => [chip("needs " + q, "info"), " "]), r.tier ? [chip(r.tier + " tier", "info"), " "] : null,
+    r.validFrom || r.validTo ? [chip(`${r.validFrom || "…"} to ${r.validTo || "…"}`), " "] : null,
+    r.firstMonths ? [chip(`first ${r.firstMonths} months`), " "] : null];
 }
-function ruleBox(r) {
+// A rule in words comes from the server (review.describe), so the drawer, the review and the decisions file say it alike.
+function ruleBox(r, summary) {
   return h("div", { class: "rule" },
-    h("div", { class: "what", text: describe(r) }),
+    h("div", { class: "what", text: summary }),
     h("div", { class: "small", style: "margin-top: 4px" },
       chip(r.verified === "page" ? "quote found on the page" : "hand-entered, not confirmed by the page", r.verified === "page" ? "ok" : "warn"), " ",
-      r.requires.map((q) => [chip("needs " + q, "info"), " "]), r.tier ? [chip(r.tier + " tier", "info"), " "] : null, r.needs.map((n) => [chip("asks: " + (NEEDS[n] || n), "info"), " "]),
-      r.validFrom || r.validTo ? chip(`${r.validFrom || "…"} to ${r.validTo || "…"}`) : null,
-      r.firstMonths ? chip(`first ${r.firstMonths} months`) : null),
+      ruleChips(r), r.needs.map((n) => [chip("asks: " + (NEEDS[n] || n), "info"), " "])),
     r.conditions.length ? h("ul", {}, r.conditions.map((c) => h("li", { text: c }))) : null,
     h("blockquote", { text: r.evidence.quote }));
 }
@@ -546,7 +538,7 @@ async function openCard(id, quiet) {
       cand.stats && cand.stats.calls ? h("p", { class: "small muted", text: `Cost: ${cand.stats.calls} model call${cand.stats.calls === 1 ? "" : "s"}, ${cand.stats.seconds}s, ${cand.stats.promptTokens.toLocaleString()} prompt tokens${cand.stats.cachedTokens ? " (" + cand.stats.cachedTokens.toLocaleString() + " cached)" : ""}, ${cand.stats.replyTokens.toLocaleString()} reply tokens${cand.stats.reasoningTokens ? " (" + cand.stats.reasoningTokens.toLocaleString() + " reasoning)" : ""}` }) : null,
       cand.warnings && cand.warnings.length ? h("div", { class: "result", style: "background: var(--warn-bg); color: var(--warn)", text: "Worth a look (every rate below is on the page, but they can't all be right):\n" + cand.warnings.join("\n") }) : null,
       cand.errors && cand.errors.length ? h("div", { class: "result bad", text: "The model call failed:\n\n" + cand.errors.join("\n\n") }) : null,
-      cand.rules.length ? cand.rules.map(ruleBox) : h("p", { class: "muted small", text: "No rules." }),
+      cand.rules.length ? cand.rules.map((r, i) => ruleBox(r, d.summaries[i])) : h("p", { class: "muted small", text: "No rules." }),
       cand.cardConditions.length ? [h("h3", { text: "Applies to the whole card" }), h("ul", {}, cand.cardConditions.map((t) => h("li", { text: t })))] : null,
       cand.rejected.length ? [h("h3", { text: `Rejected (${cand.rejected.length})` }), cand.rejected.map((r) =>
         h("div", { class: "rule rejected" }, h("div", { class: "what", text: r.reason }),
@@ -572,7 +564,12 @@ async function jobFor(kind, id, force) {
 }
 
 // ---------- review ----------
-const DECISION = { accept: ["accepted", "ok"], reject: ["rejected", "bad"] };
+// The decisions a person can make (review.DECISION_VALUES): how each shows, and the button that makes it.
+const DECISION = {
+  accept: { chip: "accepted", kind: "ok", show: "Accepted", button: "Accept", buttonClass: (chosen) => chosen ? "primary" : "" },
+  reject: { chip: "rejected", kind: "bad", show: "Rejected", button: "Reject", buttonClass: () => "danger" },
+};
+$("reviewShow").append(...Object.entries(DECISION).map(([value, d]) => h("option", { value, text: d.show })));
 async function loadReview() {
   try { state.review = await api("GET", "/api/review"); } catch (e) { fill($("reviewList"), h("div", { class: "result bad", text: e.message })); return; }
   renderReview();
@@ -597,29 +594,21 @@ function reviewBox(c, r) {
   const decided = DECISION[r.decision], rule = r.rule;
   const send = (decision) => async (e) => {
     e.target.disabled = true;
-    try {
-      const updated = await api("POST", "/api/review", { cardId: c.cardId, key: r.key, decision });
-      state.review.cards = state.review.cards.map((x) => x.cardId === c.cardId ? updated : x);
-      const s = { cards: state.review.cards.length, waiting: 0, accept: 0, reject: 0 };
-      for (const x of state.review.cards) for (const k of Object.keys(x.counts)) s[k] += x.counts[k];
-      state.review.summary = s; renderReview();
-    } catch (err) { alert(err.message); await loadReview(); }
+    try { await api("POST", "/api/review", { cardId: c.cardId, key: r.key, decision }); } catch (err) { alert(err.message); }
+    await loadReview();  // the server counts (review.summarize)
   };
   return h("div", { class: "rule" + (r.decision === "accept" ? " accepted" : r.decision === "reject" ? " rejected" : "") },
-    h("div", { class: "what", text: describe(rule) }),
+    h("div", { class: "what", text: r.summary }),
     h("div", { class: "small", style: "margin-top: 4px" },
-      decided ? chip(decided[0], decided[1]) : chip("waiting for review", "info"), " ",
-      r.warnings.map((w) => [chip(w, "warn"), " "]),
-      rule.requires.map((q) => [chip("needs " + q, "info"), " "]), rule.tier ? [chip(rule.tier + " tier", "info"), " "] : null,
-      rule.validFrom || rule.validTo ? chip(`${rule.validFrom || "…"} to ${rule.validTo || "…"}`) : null,
-      rule.firstMonths ? chip(`first ${rule.firstMonths} months`) : null),
+      decided ? chip(decided.chip, decided.kind) : chip("waiting for review", "info"), " ",
+      r.warnings.map((w) => [chip(w, "warn"), " "]), ruleChips(rule)),
     rule.conditions.length ? h("ul", {}, rule.conditions.map((t) => h("li", { text: t }))) : null,
     h("blockquote", { text: r.quote }),
     h("p", { class: "small", style: "margin: 6px 0 0" }, "Source: ",
       /^https?:\/\//.test(r.url) ? h("a", { href: r.url, target: "_blank", rel: "noopener noreferrer", text: r.url }) : r.url),
     h("div", { class: "actions" },
-      h("button", { type: "button", class: r.decision === "accept" ? "primary" : "", disabled: r.decision === "accept", text: "Accept", onclick: send("accept") }),
-      h("button", { type: "button", class: "danger", disabled: r.decision === "reject", text: "Reject", onclick: send("reject") }),
+      Object.entries(DECISION).map(([value, d]) => h("button", { type: "button", class: d.buttonClass(r.decision === value),
+        disabled: r.decision === value, text: d.button, onclick: send(value) })),
       r.decision ? h("button", { type: "button", text: "Undo", onclick: send("undo") }) : null));
 }
 $("reviewShow").addEventListener("input", renderReview);
