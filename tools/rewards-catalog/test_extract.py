@@ -795,12 +795,32 @@ class LMStudioTests(unittest.TestCase):
             ({"choices": [{"finish_reason": "length", "message": {"content": "", "reasoning_content": "Let me think " * 50}}],
               "usage": {"completion_tokens": 3000}}, ["'length'", f"3000 of {extract.DEFAULT_MAX_TOKENS}", "characters of reasoning", "raise the reply limit"]),
             ({"choices": [{"finish_reason": "stop", "message": {"content": None}}]}, ["'stop'", f"? of {extract.DEFAULT_MAX_TOKENS}", "empty reply"]),
+            # qwen3.8 on LM Studio: stopped far inside the limit, everything filed as reasoning, no answer in it.
+            ({"choices": [{"finish_reason": "stop", "message": {"content": "", "reasoning_content": "The page lists two rates."}}],
+              "usage": {"completion_tokens": 223}}, ["'stop'", "223 of", "Turn the model's thinking off"]),
         ):
             client, _ = self.client(payload)
             with self.assertRaises(ValueError) as raised:
                 client.complete([])
             for fragment in expected:
                 self.assertIn(fragment, str(raised.exception))
+
+    def test_ran_out_of_room_is_said_only_when_the_limit_was_reached(self):
+        payload = {"choices": [{"finish_reason": "stop", "message": {"content": "", "reasoning_content": "hmm"}}], "usage": {"completion_tokens": 807}}
+        client, _ = self.client(payload)
+        with self.assertRaises(ValueError) as raised:
+            client.complete([])
+        self.assertNotIn("ran out of room", str(raised.exception))
+
+    def test_an_answer_filed_under_reasoning_is_used(self):
+        answer = {"cardConditions": [], "rules": [rule()]}
+        reasoning = 'Draft: {"rules": "not yet"} then the answer ' + json.dumps(answer) + " done"
+        client, _ = self.client({"choices": [{"finish_reason": "stop", "message": {"content": "", "reasoning_content": reasoning}}]})
+        self.assertEqual(json.loads(client.complete([])), answer)
+        self.assertTrue(client.last_meta["fromReasoning"])
+        client, _ = self.client({"choices": [{"finish_reason": "stop", "message": {"content": "", "reasoning_content": '{"rules": [] '}}]})
+        with self.assertRaises(ValueError):  # half an object is not an answer
+            client.complete([])
 
     def test_extra_fields_and_a_prompt_suffix_reach_the_request(self):
         calls = []

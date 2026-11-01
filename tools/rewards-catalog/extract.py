@@ -479,9 +479,28 @@ def empty_reply_message(meta: dict) -> str:
     if meta.get("reasoningChars"):
         parts.append(f"{meta['reasoningChars']} characters of reasoning text")
     hint = ""
-    if meta.get("finishReason") == "length" or meta.get("reasoningChars"):
+    if meta.get("finishReason") == "length" or (used is not None and meta.get("maxTokens") and used >= meta["maxTokens"]):
         hint = " The model ran out of room before answering, probably because it reasons first: raise the reply limit in the page's settings, or choose a model that answers directly."
+    elif meta.get("reasoningChars"):
+        hint = (" The model stopped well inside the reply limit with everything filed as reasoning, and no answer was found there"
+                " either. Turn the model's thinking off where the server allows it, or try another response format in More settings.")
     return f"The model server returned an empty reply ({'; '.join(parts)}).{hint}"
+
+
+def answer_in_reasoning(reasoning: str) -> str | None:
+    """The answer when a server filed it under reasoning: the last JSON object in the reasoning text with a
+    "rules" list. LM Studio does this with some thinking models, leaving the reply's content empty."""
+    decoder, found, start = json.JSONDecoder(), None, reasoning.find("{")
+    while start != -1:
+        try:
+            value, end = decoder.raw_decode(reasoning, start)
+        except ValueError:
+            start = reasoning.find("{", start + 1)
+            continue
+        if isinstance(value, dict) and isinstance(value.get("rules"), list):
+            found = value
+        start = reasoning.find("{", end)
+    return None if found is None else json.dumps(found)
 
 
 # How the reply's shape is requested. Not every server accepts a JSON schema, so there are fallbacks that
@@ -595,9 +614,14 @@ class ChatServer:
                 content, called = (arguments if isinstance(arguments, str) else json.dumps(arguments)), True
                 break
         reasoning = message.get("reasoning_content") or message.get("reasoning") or ""
+        from_reasoning = False
+        if not content.strip() and reasoning and not free:
+            found = answer_in_reasoning(reasoning)
+            if found is not None:
+                content, from_reasoning = found, True
         self.last_meta = {
             "finishReason": choice.get("finish_reason"), "usage": data.get("usage"), "reasoningChars": len(reasoning),
-            "replyChars": len(content), "maxTokens": self.max_tokens, "viaTool": called,
+            "replyChars": len(content), "maxTokens": self.max_tokens, "viaTool": called, "fromReasoning": from_reasoning,
         }
         if not content.strip():
             raise ValueError(empty_reply_message(self.last_meta))
