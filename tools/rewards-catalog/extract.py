@@ -488,6 +488,7 @@ NAME_FILLER = {"the", "a", "an", "your", "my", "our", "this", "credit", "card", 
                "mastercard", "signature", "world", "elite", "infinite", "amex", "consumer"}
 NOT_IN_A_NAME = {"the", "a", "an", "your", "my", "our", "for", "with", "of", "to", "and", "on", "in", "about", "using"}
 SECTION_LINES = 12  # a card's heading reaches this many lines down (or to the next heading), so a footer isn't a card's section
+FOOTNOTE_LINES = 3  # "Footnote 2:" and the lines after it, up to the next footnote
 
 
 def _name_words(name: str) -> list[str]:
@@ -538,6 +539,17 @@ class CardPage:
             self._starts.append(len(self._flat))
             self._flat += normalize(line) + " "
         self._headings = [_heading(line) for line in lines]
+        # Footnotes ("Footnote 2:" and the lines after it) belong where their marker is: a sentence ending in " 2".
+        self._footnote: list[str | None] = []
+        self._markers: dict[str, list[int]] = {}
+        current, left = None, 0
+        for number, line in enumerate(lines):
+            start = re.match(r"\s*footnote\s+(\d{1,2})\b", line, re.I)
+            current, left = (start.group(1), FOOTNOTE_LINES) if start else (current, left - 1)
+            self._footnote.append(current if left > 0 else None)
+            marker = re.search(r"[.!?)]\s+(\d{1,2})\s*$", line)
+            if marker and self._footnote[-1] is None:
+                self._markers.setdefault(marker.group(1), []).append(number)
         # The names the page uses for this card. A page that never names it can't say which of its cards it is.
         self._own_names = [set(self._distinct(n)) for line in lines for n in _card_names(line) if self._is_this_card(n)]
 
@@ -577,16 +589,19 @@ class CardPage:
         at = self._flat.find(quote)
         while at >= 0:
             line = bisect.bisect_right(self._starts, at) - 1
-            heading = next(
-                (h for h in reversed(self._headings[max(0, line - SECTION_LINES + 1) : line + 1]) if h and self._sibling(h)),
-                None,
-            )
-            if heading is not None:
+            footnote = self._footnote[line]
+            places = self._markers.get(footnote, []) if footnote else [line]
+            for heading in filter(None, map(self._section_heading, places)):
                 if not self.is_other_card(heading):
                     return None
                 others.append(heading)
             at = self._flat.find(quote, at + 1)
         return f"the quote is in another card's section ({others[0]} Card)" if others else None
+
+    def _section_heading(self, line: int) -> str | None:
+        """The card heading a line sits under, if a heading of this card's family is close enough above it."""
+        window = self._headings[max(0, line - SECTION_LINES + 1) : line + 1]
+        return next((h for h in reversed(window) if h and self._sibling(h)), None)
 
 
 # --- Asking the model -----------------------------------------------------------------------

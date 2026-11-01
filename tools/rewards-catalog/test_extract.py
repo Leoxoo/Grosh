@@ -865,6 +865,20 @@ class OtherCardsTests(unittest.TestCase):
         self.assertEqual(result["rules"], [])
         self.assertEqual([r["reason"] for r in result["rejected"]], ["the quote names another card (Discover it Miles Card)"])
 
+    def test_a_footnote_belongs_to_the_cards_whose_sections_point_to_it(self):
+        chrome_terms = "You will earn 2% cash back on your first $1000 in combined purchases at gas stations and restaurants each calendar quarter."
+        own_terms = "You will earn 5% cash back on up to $1,500 in purchases at different places each quarter when you activate."
+        page = "\n".join([
+            DISCOVER_PAGE.replace(CHROME, CHROME + " 2").replace(DISCOVER, DISCOVER + " 1", 1),  # markers in the sections
+            "Footnote 1:", own_terms, "Footnote 2:", "2% Cash Back at gas and restaurants: " + chrome_terms,
+        ])
+        reply = [rule(categories=["gas"], rate=2, quote=chrome_terms, capAmount=1000, capPeriod="quarter"),
+                 rule(categories=[], selection="rotating", rate=5, quote=own_terms, capAmount=1500, capPeriod="quarter", requires=["activation"])]
+        result = extract_card(DISCOVER_IT, page, "h", FakeModel(reply), "m", follow_up=False)
+        self.assertEqual([(r["rate"], r["capAmount"]) for r in result["rules"]], [(5, 1500)])
+        self.assertEqual([r["reason"] for r in result["rejected"]],
+                         ["the quote is in another card's section (Discover it Chrome Gas & Restaurants Credit Card)"])
+
     def test_another_cards_rates_are_not_asked_about_again_or_missed(self):
         model = FakeModel([rule(categories=[], selection="rotating", rate=5, quote=DISCOVER, requires=["activation"]),
                            rule(categories=["everything-else"], rate=1, quote=BASE)])
