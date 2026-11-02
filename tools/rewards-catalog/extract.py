@@ -50,7 +50,7 @@ import fetch  # noqa: E402
 CANDIDATES = fetch.CACHE / "candidates"
 SAVED_SETTINGS = fetch.CACHE / "ui-settings.json"
 MANUAL_RULES = Path(__file__).with_name("manual-rules.json")
-PROMPT_VERSION = "9"
+PROMPT_VERSION = "10"
 DEFAULT_URL = "http://localhost:1234/v1"
 DEFAULT_MODEL = "k2-horizon-7b-uno-uncensored"
 # A reasoning model "thinks" before it answers and can spend a small reply limit on that alone (the first
@@ -72,30 +72,75 @@ ATTEMPTS_PER_CHUNK = 2
 CATEGORIES = {
     "dining": ("dining", "restaurant", "takeout", "take out", "food", "bars", "eating out"),
     "groceries": ("grocer", "supermarket", "food at home"),
-    "gas": ("gas", "fuel", "charging", "service station"),
-    "travel": ("travel", "flight", "airline", "hotel", "rental car", "car rental", "cruise", "vacation",
-               "airfare", "lodging", "trip", "airport"),
+    "gas": ("gas", "fuel", "service station"),
+    "ev-charging": ("ev charging", "electric vehicle charging", "charging station", "ev charg"),
+    "travel": ("travel", "rental car", "car rental", "cruise", "vacation", "trip", "airport"),
+    "airlines": ("airline", "flight", "airfare", "air travel"),
+    "hotels": ("hotel", "lodging", "resort", "motel"),
     "transit": ("transit", "rideshare", "ride share", "ride-hailing", "taxi", "train", "buses", "parking",
                 "toll", "commut"),
     "streaming": ("streaming",),
+    "entertainment": ("entertainment", "movie", "theater", "theatre", "concert", "sporting event", "amusement park"),
     "drugstores": ("drugstore", "drug store", "pharmac"),
     "online-shopping": ("online", "e-commerce", "internet retail"),
-    "utilities": ("utilit", "phone", "wireless", "cable", "internet", "electric", "cell"),
+    "home-improvement": ("home improvement", "hardware store"),
+    "fitness": ("fitness", "gym", "health club"),
+    "phone-internet": ("phone", "wireless", "cable", "internet", "cell"),
+    "utilities": ("utilit", "electricity", "electric bill", "electric compan", "water bill", "trash"),
+    "wholesale-clubs": ("wholesale club", "warehouse club", "wholesale"),
+    "department-stores": ("department store",),
     "everything-else": ("all other", "everything else", "other purchase", "other eligible", "every purchase",
                         "every $1", "every dollar", "all purchase", "all eligible", "everywhere", "each purchase",
                         "all your purchase", "on all", "on every"),
 }
+# Travel covers airlines and hotels: a quote naming travel with either is about travel.
+TRAVEL_FAMILY = {"travel", "airlines", "hotels"}
 CATEGORY_HELP = {
     "dining": "restaurants, takeout, delivery, bars",
     "groceries": "grocery stores and supermarkets",
-    "gas": "gas stations and fuel, including EV charging",
-    "travel": "airlines, hotels, car rentals, cruises and travel booked through the issuer",
+    "gas": "gas stations and fuel",
+    "ev-charging": "electric vehicle charging stations",
+    "travel": "travel in general (car rentals, cruises, travel booked through the issuer); use airlines or hotels when the rate is only for those",
+    "airlines": "airline tickets bought from the airline",
+    "hotels": "hotel stays",
     "transit": "rideshare, taxis, trains, buses, parking, tolls",
     "streaming": "streaming services",
+    "entertainment": "movies, concerts, theater, sporting events, amusement parks",
     "drugstores": "drugstores and pharmacies",
     "online-shopping": "online shopping and online retail",
-    "utilities": "phone, internet, cable and utility bills",
+    "home-improvement": "home improvement and hardware stores",
+    "fitness": "gyms and fitness clubs",
+    "phone-internet": "phone, wireless, internet and cable bills",
+    "utilities": "electricity, water, gas and trash bills",
+    "wholesale-clubs": "wholesale and warehouse clubs",
+    "department-stores": "department stores",
     "everything-else": "the base rate on all other purchases",
+}
+# How the catalog's categories read in the app and on the page, and the app's default categories
+# (DefaultCategories.swift) each one stands for, so a rate can be shown against what the user files spending under.
+# The user can rename or add categories; this is only the starting map.
+CATEGORY_LABELS = {
+    "dining": "Dining", "groceries": "Groceries", "gas": "Gas", "ev-charging": "EV charging", "travel": "Travel",
+    "airlines": "Airlines", "hotels": "Hotels", "transit": "Transit", "streaming": "Streaming",
+    "entertainment": "Entertainment", "drugstores": "Drugstores", "online-shopping": "Online shopping",
+    "home-improvement": "Home improvement", "fitness": "Fitness", "phone-internet": "Phone & internet",
+    "utilities": "Utilities", "wholesale-clubs": "Wholesale clubs", "department-stores": "Department stores",
+    "everything-else": "Everything else",
+}
+APP_CATEGORIES = {
+    "dining": ["Food & Beverage", "Café", "Restaurants"],
+    "groceries": ["Products"],
+    "gas": ["Petrol", "Other Fuel"],
+    "travel": ["Travel"],
+    "transit": ["Taxi", "Public Transport", "Parking Fees"],
+    "streaming": ["Streaming Service", "Apps"],
+    "entertainment": ["Entertainment", "Games", "Movies", "Cultural/Animals"],
+    "drugstores": ["Pharmacy"],
+    "home-improvement": ["Home Improvement"],
+    "fitness": ["Sports"],
+    "phone-internet": ["Phone Bill", "Internet Bill"],
+    "utilities": ["Water Bill", "Electricity Bill", "Gas Bill", "Valet/Trash Bill"],
+    "department-stores": ["Clothing", "Footwear", "Accessories"],
 }
 PERIOD_WORDS = {"month": ("month",), "quarter": ("quarter",), "year": ("year", "annual"),
                 "cycle": ("billing cycle", "statement period", "each cycle")}
@@ -981,6 +1026,8 @@ def _fill_base_category(proposal):
         return proposal
     quote = normalize(proposal["quote"]) if isinstance(proposal.get("quote"), str) else ""
     named = [name for name, words in CATEGORIES.items() if name != "everything-else" and mentions(quote, words)]
+    if "travel" in named and set(named) <= TRAVEL_FAMILY:  # "hotels and rental cars booked through ... Travel" is travel
+        named = ["travel"]
     if mentions(quote, ROTATING_WORDS):
         return proposal
     if mentions(quote, ("all other purchases", "everything else", "all other")) and not named:

@@ -116,8 +116,22 @@ class ValidateRuleTests(unittest.TestCase):
         for bad in (0, -1, 11, True, "3", None):
             self.assertIn("not a number", self.check(rate=bad), bad)
 
+    def test_each_category_is_backed_by_its_own_words(self):
+        def fits(category: str, quote: str) -> bool:
+            return validate_rule(rule(categories=[category], quote=quote), None) is None
+        self.assertTrue(fits("ev-charging", "Earn 3% at EV charging stations."))
+        self.assertFalse(fits("gas", "Earn 3% at EV charging stations."))
+        self.assertTrue(fits("hotels", "Earn 3% on hotel stays."))
+        self.assertTrue(fits("phone-internet", "Earn 3% on your wireless phone bill."))
+        self.assertFalse(fits("utilities", "Earn 3% on your wireless phone bill."))
+        self.assertTrue(fits("utilities", "Earn 3% on electricity and water bills."))
+        self.assertFalse(fits("utilities", "Earn 3% at electric vehicle charging stations."))
+        self.assertTrue(fits("wholesale-clubs", "Earn 3% at wholesale clubs."))
+        self.assertTrue(fits("home-improvement", "Earn 3% at home improvement stores."))
+        self.assertTrue(set(extract.CATEGORY_LABELS) == set(extract.CATEGORIES) >= set(extract.APP_CATEGORIES))
+
     def test_unknown_category_and_unit(self):
-        for bad in (["hotels"], [], "dining", ["dining", "dining"], [["dining"]]):
+        for bad in (["pets"], [], "dining", ["dining", "dining"], [["dining"]]):
             self.assertIn("categories", self.check(categories=bad), bad)
         self.assertIn("percent or per-dollar", self.check(unit="points"))
 
