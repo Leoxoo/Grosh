@@ -333,6 +333,7 @@ class App:
     def overview(self) -> dict:
         cards, state, settings = self.cards(), fetch.read_json(self.paths.state, {}), self.settings()
         manual = fetch.read_json(self.paths.manual, {})
+        decisions = review.load_decisions(self.paths.decisions)
         rows = []
         for card in cards:
             entry = state.get(card["id"], {})
@@ -361,15 +362,21 @@ class App:
                     "statsText": format_stats(candidate.get("stats")),
                 },
                 "pending": pending,
+                # how many of its rules wait for a person, or were accepted or rejected (None: nothing to review)
+                "review": review.card_review(candidate, decisions)["counts"] if candidate and candidate.get("rules") else None,
             })
-        summary: dict[str, int] = {"cards": len(rows), "fetched": 0, "pending": 0, "extracted": 0, "failed": 0}
+        summary: dict[str, int] = {"cards": len(rows), "fetched": 0, "pending": 0, "extracted": 0, "failed": 0,
+                                   **dict.fromkeys(review.COUNTS, 0)}
         for row in rows:
             summary["fetched"] += row["fetch"]["hasPage"]
             summary["pending"] += row["pending"]
             summary["extracted"] += bool(row["extract"] and row["extract"]["status"] in ("ok", "manual"))
             summary["failed"] += bool(row["extract"] and row["extract"]["status"] == "failed")
+            for name, count in (row["review"] or {}).items():
+                summary[name] += count
         return {
             "cards": rows, "summary": summary, "settings": public_settings(settings), "promptVersion": extract.PROMPT_VERSION,
+            "catalog": catalog_terms(),
             "job": self.job.snapshot(with_log=False) if self.job else None,
         }
 
@@ -386,7 +393,8 @@ class App:
         candidate = self.candidate(card_id)
         return {
             "card": card, "fetch": state, "candidate": candidate,
-            "summaries": [review.describe(rule) for rule in (candidate or {}).get("rules", [])],  # each rule in words, as the review says it
+            # each rule with its decision, as the person fixed it if they did (review.card_review)
+            "review": review.card_review(candidate, review.load_decisions(self.paths.decisions)) if candidate else None,
             "manual": fetch.read_json(self.paths.manual, {}).get(card_id), "page": page,
         }
 
@@ -407,7 +415,16 @@ class App:
         candidate = self.candidate(card["id"])
         if not candidate:
             raise Problem(f"{card['name']} has no candidate to review: extract it first.", 404)
-        decisions = review.decide(candidate, str(body.get("key")), str(body.get("decision")), self.paths.decisions, date.today().isoformat())
+        key, decision, today = str(body.get("key")), str(body.get("decision")), date.today().isoformat()
+        if decision == "edit":
+            changes = body.get("changes")
+            if not isinstance(changes, dict):
+                raise Problem("An edit needs the changes")
+            page_file = self.paths.cache / card["id"] / "latest.txt"
+            page_text = page_file.read_text(encoding="utf-8") if page_file.exists() else None
+            decisions = review.edit(candidate, key, changes, page_text, self.paths.decisions, today)
+        else:
+            decisions = review.decide(candidate, key, decision, self.paths.decisions, today)
         return {**review.card_review(candidate, decisions), "name": card["name"], "issuer": card["issuer"]}
 
     def publish_catalog(self) -> dict:
@@ -684,6 +701,17 @@ class App:
             if match := re.fullmatch(r"/api/card/([\w.-]+)/try", path):
                 return self.try_card(match.group(1))
         raise Problem("Not found", 404)
+
+
+def catalog_terms() -> dict:
+    """The catalog's fixed lists, for the page's card view and its fix form: each category with its label, what it
+    covers and the app's default categories it stands for; what a rate can require; tiers; cap periods; what the app asks."""
+    return {
+        "categories": [{"id": name, "label": extract.CATEGORY_LABELS[name], "help": extract.CATEGORY_HELP[name],
+                        "app": extract.APP_CATEGORIES.get(name, [])} for name in extract.CATEGORIES],
+        "requires": list(extract.REQUIRES), "tiers": list(extract.TIERS), "periods": list(extract.PERIOD_WORDS),
+        "needs": extract.NEEDS,
+    }
 
 
 def host_name(header: str) -> str:

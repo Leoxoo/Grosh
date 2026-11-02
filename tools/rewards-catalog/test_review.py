@@ -138,5 +138,40 @@ class CardReviewTests(ReviewCase):
         self.assertEqual(self.accepted(cand), [])  # hand-entered isn't the same as accepted
 
 
+
+class EditTests(ReviewCase):
+    PAGE = "Earn unlimited 3% cash back on dining and takeout, up to $6,000 per year. 1% on all other purchases."
+
+    def edit(self, cand: dict, index: int, changes: dict, page: str | None = PAGE) -> dict:
+        key = review.rule_key(cand["cardId"], cand["rules"][index])
+        return review.edit(cand, key, changes, page, self.path, "2026-11-02")
+
+    def test_an_edit_is_accepted_and_replaces_the_rule_in_the_catalog(self):
+        wrong = rule(quote="Earn unlimited 3% cash back on dining and takeout, up to $6,000 per year.")
+        cand = candidate(wrong)
+        self.edit(cand, 0, {"capAmount": 6000, "capPeriod": "year"})
+        [published] = self.accepted(cand)
+        self.assertEqual((published["capAmount"], published["capPeriod"], published["verified"]), (6000, "year", "page"))
+        row = review.card_review(cand, review.load_decisions(self.path))["rules"][0]
+        self.assertEqual((row["decision"], row["edited"], row["rule"]["capAmount"], row["original"]["capAmount"]), ("accept", True, 6000, None))
+
+    def test_an_edit_the_quote_does_not_back_is_refused_and_nothing_is_saved(self):
+        cand = candidate(rule(quote="Earn unlimited 3% cash back on dining and takeout, up to $6,000 per year."))
+        with self.assertRaises(ValueError) as refused:
+            self.edit(cand, 0, {"categories": ["groceries"]})
+        self.assertIn("groceries", str(refused.exception))
+        with self.assertRaises(ValueError):
+            self.edit(cand, 0, {"quote": "anything"})  # the quote is the evidence: never edited
+        self.assertEqual(review.load_decisions(self.path), {})
+
+    def test_accepting_or_undoing_drops_the_edit(self):
+        wrong = rule(quote="Earn unlimited 3% cash back on dining and takeout, up to $6,000 per year.")
+        cand = candidate(wrong)
+        self.edit(cand, 0, {"capAmount": 6000, "capPeriod": "year"})
+        self.assertEqual(self.accepted(cand)[0]["capAmount"], 6000)
+        self.decide(cand, 0, "accept")
+        self.assertEqual(self.accepted(cand), [wrong])
+
+
 if __name__ == "__main__":
     unittest.main()

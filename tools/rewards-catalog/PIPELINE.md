@@ -25,8 +25,8 @@ Each stage reads files and writes files, so any stage can be rerun alone and a f
 | **Extract** | cached text | `cache/candidates/<id>.json` (not committed) | `extract.py`, built, not yet run against a real model. Details below. |
 | **Validate** | candidates | pass/fail per candidate | Deterministic checks, below. A failing candidate is dropped, never "fixed". |
 | **Diff** | candidates vs. `catalog.json` | `report.md` | Classifies each card: unchanged, changed, new, page gone, extraction failed. |
-| **Review** | candidates | `review-decisions.json` (committed) | `review.py` and the page's Review panel, built. Accept or reject each rule; only accepted rules move on. Details below. |
-| **Publish** | seed, candidates, `review-decisions.json` | `rewards-catalog.json` (committed) | `publish.py` and the Review panel's **Publish catalog** button, built. Only accepted rules; versioned, sorted, byte-stable so the PR diff shows only real changes. Details below. |
+| **Review** | candidates | `review-decisions.json` (committed) | `review.py` and each card's view on the page, built. Accept, reject or fix each rule; only accepted rules move on. Details below. |
+| **Publish** | seed, candidates, `review-decisions.json` | `rewards-catalog.json` (committed) | `publish.py` and the **Publish catalog** button in the page's Run panel, built. Only accepted rules; versioned, sorted, byte-stable so the PR diff shows only real changes. Details below. |
 
 ## The fetch stage (`fetch.py`)
 
@@ -232,11 +232,14 @@ Some things about a rule depend on the person, not the card. The catalog doesn't
 
 ## The review stage (`review.py`)
 
-Passing the checks means a rule is supported by its page, not that it is right, so every rule waits for a person. The page's **Review** panel lists each card that has rules (model-read and hand-entered alike), and for each rule: what it says in plain words, its quote, its source URL, its conditions, and its warnings. **Accept**, **Reject** and **Undo** are saved per rule as soon as they're clicked.
+Passing the checks means a rule is supported by its page, not that it is right, so every rule waits for a person. Clicking a card on the page opens its view. **In the app** shows the card as the app will use it: one line per rate, best first and the base rate last, with its cap and requirements in plain words, the app's default categories each rate covers (`APP_CATEGORIES`), and what the app will ask the cardholder; accepted rules are what gets published, waiting ones are faded and rejected ones left out. Below it, **Review** lists each rule (model-read and hand-entered alike) with what it says, its quote, its source URL, its conditions and its warnings. **Accept**, **Reject**, **Fix…** and **Undo** are saved per rule as soon as they're clicked. The cards table counts each card's rules still waiting, and can show only those cards.
+
+- **Fixing a rule.** **Fix…** changes its categories, rate, unit, cap, requirements or tier (`review.EDITABLE`), never its quote: the quote is the evidence. The fixed rule must pass the same checks against the saved page as a proposal (a hand-entered rule the page doesn't confirm is checked as it was entered), or nothing is saved and the reason is shown. A fix is saved whole under `edited` in the rule's decision and counts as accepted; publishing takes it in place of the extracted rule. Accept or Undo drops the fix.
+- **Hand-entered cards never ask the model.** Their rules come from `manual-rules.json`, so "extract" only re-checks them against the page; the button says so. Take a card out of `manual-rules.json` to have the model read its page.
 
 - **Warnings.** A rule's own: hand-entered and not confirmed by the saved page (`verified: "manual"`), or a cap the page mentions without an amount (`capUnknown`). The card's warnings from the extract stage (two rates for one thing, no base rate, rate sentences the result missed) are about its rules taken together, so they are shown above the card's rules.
 - **Hand-entered rules are reviewed too.** `manual-rules.json` is a person's reading of a page, which is not the same as a second person checking it.
-- **Where decisions live.** `review-decisions.json`, next to this file and committed (`cache/` isn't): `{card id: {rule key: {decision, decidedAt, rule, quote}}}`. `rule` and `quote` are there so a pull request's diff reads as "accepted 3% on dining", not a hash.
+- **Where decisions live.** `review-decisions.json`, next to this file and committed (`cache/` isn't): `{card id: {rule key: {decision, decidedAt, rule, quote, edited?}}}`. `rule` and `quote` are there so a pull request's diff reads as "accepted 3% on dining", not a hash.
 - **The key is the exact rule.** It is a hash of the card id and everything the rule says: rate, unit, categories, selection, cap, dates, `firstMonths`, tier, requirements, conditions, the quote, the source URL, and whether the page confirmed it. A re-extraction that changes any of that makes a new rule, which waits for review; it never inherits the old accept. Left out: the page's hash (a page whose menus churned but whose rule is the same keeps its decision), the derived `needs`, the order of lists, and 3 vs 3.0. The same rule on two cards that share a page is reviewed once per card.
 - **Old decisions stay.** A decision whose rule is gone from the candidate is kept and does nothing; if a later extraction brings back that exact rule, its decision applies again.
 - **What moves on.** `review.accepted_rules(candidate)` returns only the candidate's rules a person accepted, in the candidate's order. Rejected rules and rules still waiting are left out. The publish step (#162) builds the catalog from this and nothing else.
@@ -245,7 +248,7 @@ Passing the checks means a rule is supported by its page, not that it is right, 
 ## The publish stage (`publish.py`)
 
 ```
-python3 tools/rewards-catalog/publish.py        # or Publish catalog on the page's Review panel
+python3 tools/rewards-catalog/publish.py        # or Publish catalog in the page's Run panel
 ```
 
 Reads `catalog-seed.json`, `cache/candidates/` and `review-decisions.json`, and writes `rewards-catalog.json` beside this file: the one file the app bundles (#163). It is committed, so a pull request shows exactly which rules ship.
@@ -370,7 +373,7 @@ Rule   categories[], selection (fixed | choose | top-spend), picks, hasOtherChoi
 ```
 
 - `validFrom` / `validTo` exist for **rotating categories** (Discover, Chase Freedom Flex): they are the reason the cadence below has a quarterly run.
-- **Catalog categories** are a small fixed list: dining, groceries, gas, travel, transit, streaming, drugstores, online shopping, utilities, everything else. A Grosh category is the user's own, so the app maps each of the user's categories to one of these once per Card, rather than the catalog guessing the user's names.
+- **Catalog categories** are a fixed list of what issuers name (`CATEGORIES` in extract.py, prompt version 10): dining, groceries, gas, EV charging, travel, airlines, hotels, transit, streaming, entertainment, drugstores, online shopping, home improvement, fitness, phone & internet, utilities, wholesale clubs, department stores, everything else. Travel covers airlines and hotels: a quote naming travel with either is travel. A Grosh category is the user's own, so the app maps each of the user's categories to one of these rather than the catalog guessing the user's names; `APP_CATEGORIES` is the starting map for the default category tree (Restaurants and Café to dining, Petrol to gas...), shown in each card's view.
 
 ## Making reruns reliable
 

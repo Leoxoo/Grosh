@@ -61,7 +61,7 @@
   th { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; }
   tbody tr { cursor: pointer; } tbody tr:hover { background: var(--bg); } tbody tr.open { background: var(--info-bg); }
   td.check { width: 28px; } .stack { display: grid; gap: 3px; justify-items: start; }
-  #drawer { position: fixed; inset: 0 0 0 auto; width: min(620px, 100vw); background: var(--panel); border-left: 1px solid var(--line);
+  #drawer { position: fixed; inset: 0 0 0 auto; width: min(780px, 100%); background: var(--panel); border-left: 1px solid var(--line);
             box-shadow: -8px 0 30px rgba(0,0,0,.18); overflow-y: auto; padding: 18px 20px 40px; z-index: 10; }
   #drawer[hidden] { display: none; }
   #drawer h3 { margin: 18px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
@@ -71,8 +71,12 @@
   .rule.rejected { border-color: var(--bad); }
   .rule.accepted { border-color: var(--ok); }
   .rule .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
-  .reviewcard { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
-  .reviewcard:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
+  .earn { width: 100%; border: 1px solid var(--line); border-radius: 8px; }
+  .earn td, .earn th { padding: 8px 10px; } .earn tr.waiting td { opacity: .55; } .earn .rate { font-size: 18px; font-weight: 700; white-space: nowrap; }
+  .fix { display: grid; gap: 10px; margin-top: 10px; padding: 10px 12px; background: var(--bg); border-radius: 8px; }
+  .fix .cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 10px; font-size: 13px; }
+  .fix .cats label, .fix .reqs label { display: flex; gap: 6px; align-items: center; font-weight: 400; }
+  .fix .reqs { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
   pre { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; overflow: auto; font: 12px/1.5 var(--mono); white-space: pre-wrap; word-break: break-word; margin: 6px 0; }
   details > summary { cursor: pointer; color: var(--muted); }
   a { color: var(--info); }
@@ -176,11 +180,17 @@
       <div class="group"><span class="name">Extract rules</span>
         <button data-job="extract:pending" class="primary" id="extractPending">What needs it</button>
         <button data-job="extract:ids">Ticked</button>
+        <button data-job="extract:ids:force" title="Asks the model again about the ticked cards, even those already extracted">Redo ticked</button>
         <button data-job="extract:all:force">Redo all</button>
+      </div>
+      <div class="group"><span class="name">Catalog</span>
+        <button id="publish" type="button" title="Write the accepted rules to rewards-catalog.json, the file the app reads">Publish catalog</button>
+        <span class="small muted" id="publishResult"></span>
       </div>
       <button id="stop" class="danger" type="button" hidden>Stop</button>
     </div>
     <div id="summary" class="small muted" style="margin-top: 10px"></div>
+    <div id="reviewSummary" class="small muted" style="margin-top: 4px"></div>
   </section>
 
   <section class="panel" id="jobPanel" hidden aria-live="polite">
@@ -206,6 +216,7 @@
           <option value="failed">Extraction failed</option>
           <option value="rules">Has rules</option>
           <option value="norules">Fetched, no rules</option>
+          <option value="review">Rules waiting for review</option>
         </select>
       </label>
       <button id="tickShown" type="button">Tick shown</button>
@@ -220,23 +231,6 @@
     </div>
   </section>
 
-  <section class="panel" aria-labelledby="review-h">
-    <h2 id="review-h">Review</h2>
-    <p class="small muted" style="margin-top: 0">Passing the checks means a rule's quote is on the page, not that the rule is right. Read each quote and accept or reject the rule; only accepted rules go into the catalog. Decisions are saved in <span class="mono">review-decisions.json</span> (committed), one per exact rule: if a new extraction changes a rule, it waits here again.</p>
-    <div class="row" style="margin-bottom: 10px">
-      <label>Show
-        <select id="reviewShow">
-          <option value="waiting">Waiting for review</option>
-          <option value="">All rules</option>
-        </select>
-      </label>
-      <button id="reviewReload" type="button">Reload</button>
-      <button id="publish" type="button" title="Write the accepted rules to rewards-catalog.json, the file the app reads">Publish catalog</button>
-      <span class="small muted" id="reviewSummary"></span>
-      <span class="small muted" id="publishResult"></span>
-    </div>
-    <div id="reviewList"></div>
-  </section>
 </main>
 
 <aside id="drawer" hidden aria-label="Card details"></aside>
@@ -377,6 +371,7 @@ async function loadOverview() {
   state.overview = data;
   const s = data.summary;
   $("summary").textContent = `${s.cards} cards · ${s.fetched} with a fetched page · ${s.extracted} with rules extracted · ${s.pending} need extracting with ${data.settings.model} · ${s.failed} failed`;
+  $("reviewSummary").textContent = `Review: ${s.waiting} rule${s.waiting === 1 ? "" : "s"} waiting · ${s.accept} accepted · ${s.reject} rejected. Open a card to review it; only accepted rules are published.`;
   const issuers = [...new Set(data.cards.map((c) => c.issuer))].sort();
   const current = $("issuer").value;
   $("issuer").replaceChildren(h("option", { value: "", text: "All issuers" }), ...issuers.map((i) => h("option", { value: i, text: i })));
@@ -396,6 +391,7 @@ function visibleCards() {
       case "failed": return ex && ex.status === "failed";
       case "rules": return ex && ex.rules > 0;
       case "norules": return c.fetch.hasPage && ex && ex.rules === 0;
+      case "review": return c.review && c.review.waiting > 0;
       default: return true;
     }
   });
@@ -424,6 +420,7 @@ function renderRows() {
         h("span", { class: "small muted", text: ex.model ? `${ex.model} · prompt ${ex.promptVersion ?? "-"}` : "" }),
         ex.statsText ? h("span", { class: "small muted", text: ex.statsText }) : null,
         c.pending ? chip("needs extracting with the chosen model", "warn") : null,
+        c.review ? (c.review.waiting ? chip(`${c.review.waiting} to review`, "info") : chip(`reviewed: ${c.review.accept} accepted`, "ok")) : null,
         ex.warnings && ex.warnings.length ? chip(`check: ${ex.warnings.length} thing${ex.warnings.length === 1 ? "" : "s"} to look at`, "warn") : null,
         ex.errors.length ? h("span", { class: "small", style: "color: var(--bad)", text: ex.errors[0].slice(0, 140) }) : null)
         : h("div", { class: "stack" }, h("span", { class: "muted", text: "not extracted" }), c.pending ? chip("needs extracting", "warn") : null)),
@@ -441,7 +438,8 @@ $("untick").onclick = () => { state.ticked.clear(); renderRows(); };
 document.querySelectorAll("[data-job]").forEach((b) => {
   b.onclick = async () => {
     const [kind, which, force] = b.dataset.job.split(":");
-    if (force && !confirm("Redo extraction for every card with a page? This asks the model about all of them again.")) return;
+    const asking = which === "ids" ? `the ${state.ticked.size} ticked card${state.ticked.size === 1 ? "" : "s"}` : "every card with a page";
+    if (force && !confirm(`Redo extraction for ${asking}? This asks the model about ${which === "ids" ? "them" : "all of them"} again, even where nothing changed.`)) return;
     if (!(await saveSettings())) return;
     try {
       state.logNext = 0; $("log").replaceChildren();
@@ -461,9 +459,26 @@ async function pollJob() {
     const { job } = await api("GET", "/api/job?since=" + state.logNext);
     if (!job) return;
     applyJob(job);
-    if (job.state !== "running") { clearInterval(state.poll); state.poll = null; await loadOverview(); await loadModels(); await loadReview(); if (state.open) openCard(state.open, true); }
+    if (job.state !== "running") { clearInterval(state.poll); state.poll = null; await loadOverview(); await loadModels(); if (state.open) openCard(state.open, true); }
     else if (job.done !== state.lastDone) { state.lastDone = job.done; loadOverview().catch(() => {}); }
   } catch (e) { /* the server may be busy; the next tick tries again */ }
+}
+// The running job, inside the open card's view: the card view covers the Job panel, so a job started from a card
+// (or any job, while a card is open) shows its progress there too.
+function renderCardJob() {
+  const box = $("cardJob"), job = state.job;
+  if (!box) return;
+  if (!job || (job.state !== "running" && !box.dataset.shown)) { fill(box); return; }
+  box.dataset.shown = "1";
+  const running = job.state === "running", kind = { running: "info", done: "ok", stopped: "warn", failed: "bad" }[job.state];
+  const mins = Math.floor(job.seconds / 60), secs = Math.round(job.seconds % 60);
+  fill(box, h("div", { class: "result", style: "margin: 10px 0" },
+    h("div", { class: "row", style: "justify-content: space-between" }, h("strong", { text: job.label }), chip(running ? "running" : job.state === "done" ? "finished" : job.state, kind)),
+    h("div", { class: "bar", role: "progressbar", "aria-label": "Cards done" }, h("span", { style: `width: ${job.total ? 100 * job.done / job.total : 0}%` })),
+    job.chunk ? h("div", { class: "bar sub" }, h("span", { style: `width: ${100 * job.chunk.done / job.chunk.total}%` })) : null,
+    h("div", { class: "small", text: `${job.done} of ${job.total} card${job.total === 1 ? "" : "s"} · ${mins}m ${secs}s` + (job.current ? ` · ${job.current}` : "") + (job.chunk ? ` · part ${job.chunk.done} of ${job.chunk.total} sent to the model` : "") + (job.error ? ` · ${job.error}` : "") }),
+    running ? h("div", { class: "small muted", text: "The model can take a minute or more per card. The rules below update when it finishes." }) : null,
+    running ? h("button", { type: "button", class: "danger", style: "margin-top: 8px", text: "Stop", onclick: () => $("stop").click() }) : null));
 }
 function applyJob(job) {
   const previous = state.job; state.job = job;
@@ -483,25 +498,127 @@ function applyJob(job) {
   }
   state.logNext = job.logNext;
   if (stick) log.scrollTop = log.scrollHeight;
-  renderRows();
+  renderRows(); renderCardJob();
 }
 
 // ---------- card detail ----------
-// What a rule requires and when it applies, as chips: the same in the card's drawer and in the review.
+const term = (id) => state.overview.catalog.categories.find((c) => c.id === id) || { id, label: id, app: [] };
+const labels = (ids) => ids.map((id) => term(id).label).join(", ");
+const rateText = (r) => `${+r.rate}${r.unit === "percent" ? "%" : "x"}`;
+// What a rate requires, as the app would say it to the cardholder.
+const REQUIRE_TEXT = { "apple-pay": "when you pay with Apple Pay", activation: "after you activate it", "issuer-booking": "when booked through the issuer", "preferred-rewards-tier": "for Preferred Rewards members" };
+// The decisions a person can make (review.DECISION_VALUES): how each shows, and the button that makes it.
+const DECISION = {
+  accept: { chip: "accepted", kind: "ok", button: "Accept" },
+  reject: { chip: "rejected", kind: "bad", button: "Reject" },
+};
+
+// What a rule requires and when it applies, as chips.
 function ruleChips(r) {
   return [r.requires.map((q) => [chip("needs " + q, "info"), " "]), r.tier ? [chip(r.tier + " tier", "info"), " "] : null,
     r.validFrom || r.validTo ? [chip(`${r.validFrom || "…"} to ${r.validTo || "…"}`), " "] : null,
     r.firstMonths ? [chip(`first ${r.firstMonths} months`), " "] : null];
 }
-// A rule in words comes from the server (review.describe), so the drawer, the review and the decisions file say it alike.
-function ruleBox(r, summary) {
-  return h("div", { class: "rule" },
-    h("div", { class: "what", text: summary }),
+// Which purchases a rule covers, as the app would name them.
+function ruleWhere(r) {
+  const list = labels(r.categories) + (r.hasOtherChoices ? " and more" : "");
+  if (r.selection === "choose") return `Your choice${r.picks > 1 ? " of " + r.picks : ""}: ${list}`;
+  if (r.selection === "top-spend") return `Your top category each cycle: ${list}`;
+  if (r.selection === "rotating") return r.categories.length ? `Rotating: ${list}` : "Rotating bonus categories";
+  return list;
+}
+// The small print under a rate: cap, requirements, tier, dates.
+function ruleTerms(r) {
+  const t = [];
+  if (r.capAmount != null) t.push(`on up to $${(+r.capAmount).toLocaleString()} per ${r.capPeriod === "cycle" ? "billing cycle" : r.capPeriod}, then the base rate`);
+  else if (r.capUnknown) t.push("capped (the page doesn't say how much)");
+  r.requires.forEach((q) => t.push(REQUIRE_TEXT[q] || q));
+  if (r.tier) t.push(`${r.tier.replace("-", " ")} tier`);
+  if (r.validFrom || r.validTo) t.push(`${r.validFrom || "…"} to ${r.validTo || "…"}`);
+  if (r.firstMonths) t.push(`for the first ${r.firstMonths} months`);
+  return t.join("; ");
+}
+
+// The card as the app will use it: one line per rate, best first and the base rate last. Accepted rules are what
+// gets published; waiting ones are faded; rejected ones are left out, as they will be in the app.
+function appPreview(rv) {
+  const rows = rv.rules.filter((x) => x.decision !== "reject")
+    .sort((a, b) => (a.rule.categories[0] === "everything-else") - (b.rule.categories[0] === "everything-else") || b.rule.rate - a.rule.rate);
+  if (!rows.length) return h("p", { class: "muted small", text: "Every rule is rejected: the app would know nothing about this card." });
+  const asks = [...new Set(rows.flatMap((x) => x.rule.needs))];
+  const base = rows.some((x) => x.rule.categories.includes("everything-else"));
+  return [
+    h("table", { class: "earn" },
+      h("thead", {}, h("tr", {}, h("th", { text: "Earns" }), h("th", { text: "On" }), h("th", { text: "Your categories" }), h("th", { text: "" }))),
+      h("tbody", {}, rows.map((x) => {
+        const r = x.rule, app = r.selection === "fixed" ? r.categories.flatMap((id) => term(id).app) : [];
+        return h("tr", { class: x.decision ? "" : "waiting" },
+          h("td", { class: "rate", text: rateText(r) }),
+          h("td", {}, h("div", { text: ruleWhere(r) }), ruleTerms(r) ? h("div", { class: "small muted", text: ruleTerms(r) }) : null),
+          h("td", { class: "small muted", text: r.categories.includes("everything-else") ? "everything not listed above" : app.join(", ") || "—" }),
+          h("td", {}, x.decision ? chip(x.edited ? "accepted, fixed" : "accepted", "ok") : chip("waiting", "info")));
+      }))),
+    base ? null : h("p", { class: "small", style: "color: var(--warn)", text: "No base rate: the app won't know what everything else earns." }),
+    asks.length ? h("p", { class: "small" }, "The app asks: ", asks.map((n) => state.overview.catalog.needs[n] || n).join(" ")) : null,
+  ];
+}
+
+// One rule to review: what it says, its evidence, and accept / reject / fix.
+function reviewRule(cardId, x) {
+  const r = x.rule, decided = DECISION[x.decision], fixArea = h("div", {});
+  const send = async (body) => {
+    await api("POST", "/api/review", { cardId, key: x.key, ...body });
+    await openCard(cardId, true); loadOverview();
+  };
+  const press = (decision) => async (e) => { e.target.disabled = true; try { await send({ decision }); } catch (err) { alert(err.message); e.target.disabled = false; } };
+  const fix = () => fill(fixArea, fixArea.childNodes.length ? null : fixForm(r, (changes) => send({ decision: "edit", changes }), () => fill(fixArea)));
+  return h("div", { class: "rule" + (x.decision === "accept" ? " accepted" : x.decision === "reject" ? " rejected" : "") },
+    h("div", { class: "what", text: x.summary }),
     h("div", { class: "small", style: "margin-top: 4px" },
-      chip(r.verified === "page" ? "quote found on the page" : "hand-entered, not confirmed by the page", r.verified === "page" ? "ok" : "warn"), " ",
-      ruleChips(r), r.needs.map((n) => [chip("asks: " + (NEEDS[n] || n), "info"), " "])),
-    r.conditions.length ? h("ul", {}, r.conditions.map((c) => h("li", { text: c }))) : null,
-    h("blockquote", { text: r.evidence.quote }));
+      decided ? chip(decided.chip, decided.kind) : chip("waiting for review", "info"), " ",
+      x.edited ? [h("span", { title: "Extracted as: " + JSON.stringify({ categories: x.original.categories, rate: x.original.rate, unit: x.original.unit, capAmount: x.original.capAmount, requires: x.original.requires }) }, chip("fixed by you", "info")), " "] : null,
+      x.warnings.map((w) => [chip(w, "warn"), " "]), ruleChips(r)),
+    r.conditions.length ? h("ul", {}, r.conditions.map((t) => h("li", { text: t }))) : null,
+    h("blockquote", { text: x.quote }),
+    h("p", { class: "small", style: "margin: 6px 0 0" }, "Source: ",
+      /^https?:\/\//.test(x.url) ? h("a", { href: x.url, target: "_blank", rel: "noopener noreferrer", text: x.url }) : x.url),
+    h("div", { class: "actions" },
+      Object.entries(DECISION).map(([value, d]) => h("button", { type: "button", class: value === "accept" && !x.decision ? "primary" : value === "reject" ? "danger" : "",
+        disabled: x.decision === value && !x.edited, text: d.button, onclick: press(value) })),
+      h("button", { type: "button", text: "Fix…", title: "Change its category, rate, cap or requirements; the quote must still back it", onclick: fix }),
+      x.decision ? h("button", { type: "button", text: "Undo", onclick: press("undo") }) : null),
+    fixArea);
+}
+
+// The fields a person may fix on a rule (review.EDITABLE). The server checks the result against the quote.
+function fixForm(r, save, cancel) {
+  const cat = state.overview.catalog, error = h("div", {});
+  const cats = cat.categories.map((c) => h("input", { type: "checkbox", value: c.id, checked: r.categories.includes(c.id) }));
+  const reqs = cat.requires.map((q) => h("input", { type: "checkbox", value: q, checked: r.requires.includes(q) }));
+  const rate = h("input", { type: "number", step: "0.01", min: "0", value: r.rate, style: "width: 90px" });
+  const unit = h("select", {}, h("option", { value: "percent", text: "% cash back" }), h("option", { value: "per-dollar", text: "points or miles per $1" }));
+  const capAmount = h("input", { type: "number", step: "1", min: "0", value: r.capAmount ?? "", placeholder: "no cap", style: "width: 110px" });
+  const capPeriod = h("select", {}, h("option", { value: "", text: "—" }), cat.periods.map((p) => h("option", { value: p, text: p === "cycle" ? "billing cycle" : p })));
+  const tier = h("select", {}, h("option", { value: "", text: "no tier" }), cat.tiers.map((t) => h("option", { value: t, text: t.replace("-", " ") })));
+  unit.value = r.unit; capPeriod.value = r.capPeriod || ""; tier.value = r.tier || "";
+  const submit = async (e) => {
+    e.target.disabled = true; fill(error);
+    const cap = capAmount.value === "" ? null : +capAmount.value;
+    try {
+      await save({
+        categories: cats.filter((b) => b.checked).map((b) => b.value), rate: +rate.value, unit: unit.value,
+        capAmount: cap, capPeriod: cap == null ? null : capPeriod.value || null,
+        requires: reqs.filter((b) => b.checked).map((b) => b.value), tier: tier.value || null,
+      });
+    } catch (err) { fill(error, h("div", { class: "result bad", text: err.message })); e.target.disabled = false; }
+  };
+  return h("div", { class: "fix" },
+    h("div", { class: "small muted", text: r.selection === "fixed" ? "A fixed rate has one category." : `This rule is "${r.selection}": tick every category it offers.` }),
+    h("div", { class: "cats" }, cat.categories.map((c, i) => h("label", { title: c.help }, cats[i], c.label))),
+    h("div", { class: "row" }, h("label", {}, "Rate ", rate), h("label", {}, "Unit ", unit), h("label", {}, "Cap $ ", capAmount), h("label", {}, "per ", capPeriod), h("label", {}, "Tier ", tier)),
+    h("div", { class: "reqs" }, "Requires: ", cat.requires.map((q, i) => h("label", {}, reqs[i], q))),
+    error,
+    h("div", { class: "row" }, h("button", { type: "button", class: "primary", text: "Save and accept", onclick: submit }), h("button", { type: "button", text: "Cancel", onclick: cancel })));
 }
 
 async function openCard(id, quiet) {
@@ -510,7 +627,8 @@ async function openCard(id, quiet) {
   if (!quiet) drawer.replaceChildren(h("p", { class: "muted", text: "Loading…" }));
   let d;
   try { d = await api("GET", "/api/card/" + encodeURIComponent(id)); } catch (e) { drawer.replaceChildren(h("p", { text: e.message })); return; }
-  const c = d.card, cand = d.candidate, busy = state.job && state.job.state === "running";
+  const c = d.card, cand = d.candidate, rv = d.review, busy = state.job && state.job.state === "running";
+  const scroll = drawer.scrollTop;
   const tryOut = h("div", {});
   const tryBtn = h("button", { type: "button", disabled: !d.page, text: "Try the model on this page", onclick: async () => {
     tryBtn.disabled = true; tryOut.replaceChildren(h("p", { class: "muted", text: "Asking the model about the first part of the page… nothing is saved." }));
@@ -524,27 +642,36 @@ async function openCard(id, quiet) {
     h("p", { class: "small" }, /^https?:\/\//.test(c.sourceUrl) ? h("a", { href: c.sourceUrl, target: "_blank", rel: "noopener noreferrer", text: c.sourceUrl }) : c.sourceUrl),
     h("div", { class: "row" },
       h("button", { type: "button", disabled: busy, text: "Fetch this page", onclick: () => jobFor("fetch", id) }),
-      h("button", { type: "button", disabled: busy || !d.page, text: "Extract rules (redo)", onclick: () => jobFor("extract", id, true) }), tryBtn),
+      d.manual
+        ? h("button", { type: "button", disabled: busy, text: "Re-check hand-entered rules", title: "Checks the rules in manual-rules.json against the saved page. The model isn't asked.", onclick: () => jobFor("extract", id, true) })
+        : h("button", { type: "button", disabled: busy || !d.page, text: "Extract rules again", title: "Asks the model about this page again, even if nothing changed", onclick: () => jobFor("extract", id, true) }),
+      tryBtn),
+    h("div", { id: "cardJob" }),
+    d.manual ? h("p", { class: "small muted", text: "This card's rules are typed in by hand (manual-rules.json), so extracting never asks the model: it only re-checks them against the page. Fix a rule below, or take the card out of manual-rules.json to have the model read the page." }) : null,
     tryOut,
-    h("h3", { text: "Page" }),
-    d.fetch ? h("p", { class: "small" }, chip(d.fetch.lastStatus, fetchKind[d.fetch.lastStatus] ?? "warn"), ` ${(d.fetch.textChars || 0).toLocaleString()} characters · changed ${d.fetch.changedAt || "-"}${d.fetch.embedded ? " · text comes from the page's embedded data" : ""}`)
-            : h("p", { class: "muted small", text: "Not fetched yet." }),
-    d.page ? h("details", {}, h("summary", { text: `Lines that look like rates (${d.page.rateLineCount})` }), h("pre", { text: d.page.rateLines.join("\n") || "none" }),
-                              h("details", {}, h("summary", { text: "Start of the page" }), h("pre", { text: d.page.head }))) : null,
-    h("h3", { text: "Extraction" }),
-    cand ? [
-      h("p", { class: "small" }, chip(cand.status, extractKind[cand.status] ?? ""), ` ${cand.model || ""}${cand.promptVersion ? " · prompt " + cand.promptVersion : ""}`,
-        cand.needs.length ? [" · asks: ", cand.needs.map((n) => NEEDS[n] || n).join(", ")] : null),
+    h("h3", { text: "In the app" }),
+    rv && rv.rules.length ? appPreview(rv) : h("p", { class: "muted small", text: cand ? "No rules found on this page." : "Not extracted yet: fetch the page, then extract its rules." }),
+    rv && rv.cardConditions.length ? [h("h3", { text: "Applies to the whole card" }), h("ul", { class: "small" }, rv.cardConditions.map((t) => h("li", { text: t })))] : null,
+    rv && rv.rules.length ? [
+      h("h3", { text: `Review · ${rv.counts.waiting} waiting · ${rv.counts.accept} accepted · ${rv.counts.reject} rejected` }),
+      h("p", { class: "small muted", style: "margin-top: 0", text: "Passing the checks means a rule's quote is on the page, not that the rule is right. Read each quote, then accept, reject, or fix what the rule says. Decisions are saved in review-decisions.json (committed); if a new extraction changes a rule, it waits again." }),
+      rv.warnings.length ? h("div", { class: "result", style: "background: var(--warn-bg); color: var(--warn)", text: "Worth a look (every rate is on the page, but they can't all be right):\n" + rv.warnings.join("\n") }) : null,
+      rv.rules.map((x) => reviewRule(id, x)),
+    ] : null,
+    cand ? h("details", {}, h("summary", { text: "Extraction details" }),
+      h("p", { class: "small" }, chip(cand.status, extractKind[cand.status] ?? ""), ` ${cand.model || ""}${cand.promptVersion ? " · prompt " + cand.promptVersion : ""}`),
       cand.stats && cand.stats.calls ? h("p", { class: "small muted", text: `Cost: ${cand.stats.calls} model call${cand.stats.calls === 1 ? "" : "s"}, ${cand.stats.seconds}s, ${cand.stats.promptTokens.toLocaleString()} prompt tokens${cand.stats.cachedTokens ? " (" + cand.stats.cachedTokens.toLocaleString() + " cached)" : ""}, ${cand.stats.replyTokens.toLocaleString()} reply tokens${cand.stats.reasoningTokens ? " (" + cand.stats.reasoningTokens.toLocaleString() + " reasoning)" : ""}` }) : null,
-      cand.warnings && cand.warnings.length ? h("div", { class: "result", style: "background: var(--warn-bg); color: var(--warn)", text: "Worth a look (every rate below is on the page, but they can't all be right):\n" + cand.warnings.join("\n") }) : null,
       cand.errors && cand.errors.length ? h("div", { class: "result bad", text: "The model call failed:\n\n" + cand.errors.join("\n\n") }) : null,
-      cand.rules.length ? cand.rules.map((r, i) => ruleBox(r, d.summaries[i])) : h("p", { class: "muted small", text: "No rules." }),
-      cand.cardConditions.length ? [h("h3", { text: "Applies to the whole card" }), h("ul", {}, cand.cardConditions.map((t) => h("li", { text: t })))] : null,
-      cand.rejected.length ? [h("h3", { text: `Rejected (${cand.rejected.length})` }), cand.rejected.map((r) =>
-        h("div", { class: "rule rejected" }, h("div", { class: "what", text: r.reason }),
-          h("blockquote", { text: r.rule ? (r.rule.quote || JSON.stringify(r.rule)) : r.cardCondition }))) ] : null,
-    ] : h("p", { class: "muted small", text: "Not extracted yet." }),
-    d.manual ? h("p", { class: "small muted", text: "These rules were entered by hand in manual-rules.json." }) : null);
+      cand.rejected.length ? [h("p", { class: "small", text: `Proposals the checks rejected (${cand.rejected.length}):` }), cand.rejected.map((x) =>
+        h("div", { class: "rule rejected" }, h("div", { class: "what", text: x.reason }),
+          h("blockquote", { text: x.rule ? (x.rule.quote || JSON.stringify(x.rule)) : x.cardCondition })))] : h("p", { class: "small muted", text: "The checks rejected nothing." })) : null,
+    h("details", {}, h("summary", { text: "Page" }),
+      d.fetch ? h("p", { class: "small" }, chip(d.fetch.lastStatus, fetchKind[d.fetch.lastStatus] ?? "warn"), ` ${(d.fetch.textChars || 0).toLocaleString()} characters · changed ${d.fetch.changedAt || "-"}${d.fetch.embedded ? " · text comes from the page's embedded data" : ""}`)
+              : h("p", { class: "muted small", text: "Not fetched yet." }),
+      d.page ? [h("details", {}, h("summary", { text: `Lines that look like rates (${d.page.rateLineCount})` }), h("pre", { text: d.page.rateLines.join("\n") || "none" })),
+                h("details", {}, h("summary", { text: "Start of the page" }), h("pre", { text: d.page.head }))] : null));
+  if (quiet) drawer.scrollTop = scroll;
+  renderCardJob();
 }
 function renderTry(el, r) {
   const parts = [h("p", { class: "small muted", text: `${r.chunks} part(s) of the page could state a rate; this used the first. Prompt ${(r.promptChars || 0).toLocaleString()} characters.${r.seconds != null ? " Answered in " + r.seconds + "s." : ""}` })];
@@ -559,60 +686,11 @@ function renderTry(el, r) {
 }
 async function jobFor(kind, id, force) {
   if (!(await saveSettings())) return;
-  try { state.logNext = 0; $("log").replaceChildren(); applyJob(await api("POST", "/api/job", { kind, which: "ids", ids: [id], force: !!force })); startPolling(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  try { state.logNext = 0; $("log").replaceChildren(); applyJob(await api("POST", "/api/job", { kind, which: "ids", ids: [id], force: !!force })); startPolling(); }
   catch (e) { alert(e.message); }
 }
 
-// ---------- review ----------
-// The decisions a person can make (review.DECISION_VALUES): how each shows, and the button that makes it.
-const DECISION = {
-  accept: { chip: "accepted", kind: "ok", show: "Accepted", button: "Accept", buttonClass: (chosen) => chosen ? "primary" : "" },
-  reject: { chip: "rejected", kind: "bad", show: "Rejected", button: "Reject", buttonClass: () => "danger" },
-};
-$("reviewShow").append(...Object.entries(DECISION).map(([value, d]) => h("option", { value, text: d.show })));
-async function loadReview() {
-  try { state.review = await api("GET", "/api/review"); } catch (e) { fill($("reviewList"), h("div", { class: "result bad", text: e.message })); return; }
-  renderReview();
-}
-function renderReview() {
-  const data = state.review; if (!data) return;
-  const show = $("reviewShow").value, s = data.summary;
-  $("reviewSummary").textContent = `${s.cards} card${s.cards === 1 ? "" : "s"} with rules · ${s.waiting} waiting · ${s.accept} accepted · ${s.reject} rejected`;
-  const wanted = (r) => show === "" || (show === "waiting" ? r.decision == null : r.decision === show);
-  const cards = data.cards.filter((c) => c.rules.some(wanted));
-  if (!cards.length) { fill($("reviewList"), h("p", { class: "muted small", text: show === "waiting" ? "Nothing is waiting for review." : "No rules to show." })); return; }
-  fill($("reviewList"), cards.map((c) => h("div", { class: "reviewcard" },
-    h("div", { class: "row", style: "justify-content: space-between" },
-      h("div", {}, h("strong", { text: c.name }), h("span", { class: "small muted", text: ` ${c.issuer} · ${c.status}` })),
-      h("span", { class: "small muted", text: `${c.counts.waiting} waiting · ${c.counts.accept} accepted · ${c.counts.reject} rejected` })),
-    c.warnings.length ? h("div", { class: "result", style: "background: var(--warn-bg); color: var(--warn)", text: "Check across this card's rules:\n" + c.warnings.join("\n") }) : null,
-    c.cardConditions.length ? h("details", {}, h("summary", { class: "small", text: `Applies to the whole card (${c.cardConditions.length})` }),
-                                h("ul", { class: "small" }, c.cardConditions.map((t) => h("li", { text: t })))) : null,
-    c.rules.filter(wanted).map((r) => reviewBox(c, r)))));
-}
-function reviewBox(c, r) {
-  const decided = DECISION[r.decision], rule = r.rule;
-  const send = (decision) => async (e) => {
-    e.target.disabled = true;
-    try { await api("POST", "/api/review", { cardId: c.cardId, key: r.key, decision }); } catch (err) { alert(err.message); }
-    await loadReview();  // the server counts (review.summarize)
-  };
-  return h("div", { class: "rule" + (r.decision === "accept" ? " accepted" : r.decision === "reject" ? " rejected" : "") },
-    h("div", { class: "what", text: r.summary }),
-    h("div", { class: "small", style: "margin-top: 4px" },
-      decided ? chip(decided.chip, decided.kind) : chip("waiting for review", "info"), " ",
-      r.warnings.map((w) => [chip(w, "warn"), " "]), ruleChips(rule)),
-    rule.conditions.length ? h("ul", {}, rule.conditions.map((t) => h("li", { text: t }))) : null,
-    h("blockquote", { text: r.quote }),
-    h("p", { class: "small", style: "margin: 6px 0 0" }, "Source: ",
-      /^https?:\/\//.test(r.url) ? h("a", { href: r.url, target: "_blank", rel: "noopener noreferrer", text: r.url }) : r.url),
-    h("div", { class: "actions" },
-      Object.entries(DECISION).map(([value, d]) => h("button", { type: "button", class: d.buttonClass(r.decision === value),
-        disabled: r.decision === value, text: d.button, onclick: send(value) })),
-      r.decision ? h("button", { type: "button", text: "Undo", onclick: send("undo") }) : null));
-}
-$("reviewShow").addEventListener("input", renderReview);
-$("reviewReload").onclick = loadReview;
+// ---------- catalog ----------
 $("publish").onclick = async (e) => {
   e.target.disabled = true;
   try {
@@ -626,7 +704,7 @@ $("publish").onclick = async (e) => {
 (async function start() {
   try {
     fillSettings(await api("GET", "/api/settings"));
-    await loadProfiles(); await loadModels(); await loadOverview(); await loadReview();
+    await loadProfiles(); await loadModels(); await loadOverview();
     const { job } = await api("GET", "/api/job?since=0");
     if (job) { applyJob(job); if (job.state === "running") startPolling(); }
   } catch (e) { $("server").className = "pill bad"; $("server").textContent = "Can't reach the page's server: " + e.message; }

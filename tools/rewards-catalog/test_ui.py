@@ -516,6 +516,30 @@ class ReviewTests(AppCase):
             self.assertIn(message, payload["error"])
         self.assertFalse(self.paths.decisions.exists())
 
+    def test_the_card_view_carries_each_rules_review_and_the_overview_counts_it(self):
+        self.extracted()
+        detail = self.app.card_detail("bank-a")
+        (row,) = detail["review"]["rules"]
+        self.assertEqual((row["decision"], row["summary"]), (None, "3% on dining"))
+        overview = self.app.overview()
+        counts = {r["id"]: r["review"] for r in overview["cards"]}
+        self.assertEqual((counts["bank-a"], counts["bank-b"]), ({"waiting": 1, "accept": 0, "reject": 0}, None))
+        self.assertEqual((overview["summary"]["waiting"], overview["summary"]["accept"]), (1, 0))
+        dining = next(c for c in overview["catalog"]["categories"] if c["id"] == "dining")
+        self.assertEqual((dining["label"], "Restaurants" in dining["app"]), ("Dining", True))
+        self.assertIn("activation", overview["catalog"]["requires"])
+
+    def test_a_fix_is_saved_when_the_quote_backs_it_and_refused_when_it_does_not(self):
+        self.extracted()
+        key = self.app.card_detail("bank-a")["review"]["rules"][0]["key"]
+        status, payload = self.app.handle("POST", "/api/review", {}, {"cardId": "bank-a", "key": key, "decision": "edit", "changes": {"categories": ["groceries"]}})
+        self.assertEqual(status, 400)
+        self.assertIn("groceries", payload["error"])
+        status, payload = self.app.handle("POST", "/api/review", {}, {"cardId": "bank-a", "key": key, "decision": "edit", "changes": {"categories": ["entertainment"]}})
+        self.assertEqual((status, payload["rules"][0]["decision"], payload["rules"][0]["rule"]["categories"]), (200, "accept", ["entertainment"]))
+        accepted = review.accepted_rules(self.app.candidate("bank-a"), review.load_decisions(self.paths.decisions))
+        self.assertEqual([r["categories"] for r in accepted], [["entertainment"]])
+
     def test_publish_writes_the_accepted_rules_to_the_catalog_file(self):
         facts = {"isBusiness": False, "rewardProgram": None, "baseEarnRate": 1, "discontinued": False}
         self.paths.seed.write_text(json.dumps({"cards": [dict(c, **facts) for c in self.cards]}))

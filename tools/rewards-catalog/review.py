@@ -4,8 +4,10 @@ rules move on to the catalog.
 
 Passing the checks in extract.py means a rule is *supported* by its page, not that it is right, so
 every rule waits for a person. Decisions are saved in review-decisions.json (committed, unlike
-cache/), as {card id: {rule key: {"decision": "accept" | "reject", "decidedAt", "rule", "quote"}}}: the
-date, and the rule described in a few words with its quote, so the file reads in a diff.
+cache/), as {card id: {rule key: {"decision": "accept" | "reject", "decidedAt", "rule", "quote", "edited"?}}}:
+the date, and the rule described in a few words with its quote, so the file reads in a diff. A person can also
+fix what a rule says (its categories, rate, cap or requirements, never its quote): the fixed rule is kept whole
+under "edited", accepted, and goes to the catalog in place of the extracted one. It must still pass the page checks.
 
 A rule's key is a hash of the card id and everything the rule says (its rate, categories, cap,
 dates, requirements, conditions, quote, source URL, and whether the page confirmed it), so a
@@ -22,6 +24,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+import extract  # noqa: E402
 import fetch  # noqa: E402
 
 DECISIONS = Path(__file__).with_name("review-decisions.json")
@@ -29,6 +32,8 @@ DECISION_VALUES = ("accept", "reject")
 COUNTS = ("waiting", *DECISION_VALUES)  # how a card's rules, and all of them, are counted
 # Lists that are sets: their order is whatever the model gave, so it is sorted wherever a rule is compared or written.
 SET_FIELDS = ("categories", "requires", "conditions", "needs")
+# What a person may fix on a rule. The quote is the evidence, and the rest (selection, dates) is rare enough to re-extract.
+EDITABLE = ("categories", "rate", "unit", "capAmount", "capPeriod", "requires", "tier")
 
 
 def rule_key(card_id: str, rule: dict) -> str:
@@ -52,7 +57,7 @@ def describe(rule: dict) -> str:
     """The rule in a few words, as the web page shows it and the decisions file keeps it: "3% on dining, up to
     $6,000 per year", "3% in the category the cardholder chooses: gas, online shopping (and others)"."""
     rate = f"{float(rule['rate']):g}{'%' if rule['unit'] == 'percent' else 'x'}"
-    categories = ", ".join(category.replace("-", " ") for category in rule["categories"])
+    categories = ", ".join(extract.CATEGORY_LABELS[category].lower() for category in rule["categories"])
     others = " (and others)" if rule.get("hasOtherChoices") else ""
     picks = rule.get("picks")
     chosen = "category" if picks in (None, 1) else f"{picks} categories"
@@ -72,9 +77,7 @@ def decide(candidate: dict, key: str, decision: str, path: Path = DECISIONS, tod
     rules, named by its rule_key. Returns every decision. ValueError if the decision or key is wrong."""
     if decision not in (*DECISION_VALUES, "undo"):
         raise ValueError("A decision is accept, reject or undo")
-    rule = next((r for r in candidate.get("rules", []) if rule_key(candidate["cardId"], r) == key), None)
-    if rule is None:
-        raise ValueError("That rule is no longer in the card's candidate (was it extracted again?). Reload the review.")
+    rule = _find(candidate, key)
     decisions = load_decisions(path)
     card_decisions = decisions.setdefault(candidate["cardId"], {})
     if decision == "undo":
@@ -84,6 +87,38 @@ def decide(candidate: dict, key: str, decision: str, path: Path = DECISIONS, tod
     decisions = {card: saved for card, saved in decisions.items() if saved}
     fetch.write_json(path, decisions)
     return decisions
+
+
+def edit(candidate: dict, key: str, changes: dict, page_text: str | None, path: Path = DECISIONS, today: str = "") -> dict:
+    """Fix what one of the candidate's rules says (EDITABLE fields only) and accept the fixed rule. It is checked
+    like any proposal, against `page_text` when there is one; a hand-entered rule whose quote the page doesn't
+    confirm is checked without it, as it was entered. ValueError, and nothing saved, if the fix doesn't hold."""
+    rule = _find(candidate, key)
+    if not changes or set(changes) - set(EDITABLE):
+        raise ValueError(f"Only these can be changed: {', '.join(EDITABLE)}")
+    proposal = {field: rule.get(field) for field in extract.RULE_SCHEMA["required"] if field != "quote"}
+    proposal.update(changes, quote=rule["evidence"]["quote"])
+    page_norm, rows = (extract.normalize(page_text), extract.tier_rows(page_text)) if page_text else (None, None)
+    problem = extract.validate_rule(proposal, page_norm, rows)
+    verified = "page"
+    if problem and page_norm is not None and rule.get("verified") == "manual":
+        problem, verified = extract.validate_rule(proposal, None), "manual"
+    if problem:
+        raise ValueError(f"The quote doesn't back that change: {problem}")
+    edited = extract.candidate_rule(proposal, rule["evidence"]["url"], rule["evidence"]["pageHash"], verified if page_norm else rule["verified"])
+    decisions = load_decisions(path)
+    decisions.setdefault(candidate["cardId"], {})[key] = {
+        "decision": "accept", "decidedAt": today, "rule": describe(edited), "quote": rule["evidence"]["quote"], "edited": edited,
+    }
+    fetch.write_json(path, decisions)
+    return decisions
+
+
+def _find(candidate: dict, key: str) -> dict:
+    rule = next((r for r in candidate.get("rules", []) if rule_key(candidate["cardId"], r) == key), None)
+    if rule is None:
+        raise ValueError("That rule is no longer in the card's candidate (was it extracted again?). Reload the card.")
+    return rule
 
 
 def summarize(entries: list[dict]) -> dict:
@@ -111,10 +146,13 @@ def card_review(candidate: dict, decisions: dict) -> dict:
     rate...), which are about its rules taken together."""
     card_decisions = decisions.get(candidate["cardId"], {})
     rules = []
-    for rule in candidate.get("rules", []):
-        key = rule_key(candidate["cardId"], rule)
+    for extracted in candidate.get("rules", []):
+        key = rule_key(candidate["cardId"], extracted)
+        saved = card_decisions.get(key, {})
+        rule = saved.get("edited") or extracted  # what goes to the catalog if accepted
         rules.append({
-            "key": key, "rule": rule, "decision": card_decisions.get(key, {}).get("decision"), "summary": describe(rule),
+            "key": key, "rule": rule, "decision": saved.get("decision"), "summary": describe(rule),
+            "edited": "edited" in saved, "original": extracted if "edited" in saved else None,
             "quote": rule["evidence"]["quote"], "url": rule["evidence"]["url"], "warnings": rule_warnings(rule),
         })
     counts = dict.fromkeys(COUNTS, 0)
@@ -125,8 +163,9 @@ def card_review(candidate: dict, decisions: dict) -> dict:
 
 
 def accepted_rules(candidate: dict, decisions: dict | None = None) -> list[dict]:
-    """The candidate's rules a person accepted, in the candidate's order. Rejected rules and rules
-    still waiting for review are left out."""
+    """The candidate's rules a person accepted, in the candidate's order, each as the person fixed it if they
+    did. Rejected rules and rules still waiting for review are left out."""
     decisions = load_decisions() if decisions is None else decisions
     card_decisions = decisions.get(candidate["cardId"], {})
-    return [r for r in candidate.get("rules", []) if card_decisions.get(rule_key(candidate["cardId"], r), {}).get("decision") == "accept"]
+    saved = [card_decisions.get(rule_key(candidate["cardId"], r), {}) for r in candidate.get("rules", [])]
+    return [entry.get("edited") or r for r, entry in zip(candidate.get("rules", []), saved) if entry.get("decision") == "accept"]
