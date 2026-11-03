@@ -52,7 +52,7 @@ class CatalogTests(unittest.TestCase):
             "categories": ["dining"], "selection": "fixed", "picks": None, "hasOtherChoices": False, "rate": 3,
             "unit": "percent", "capAmount": None, "capPeriod": None, "capUnknown": False, "requires": [],
             "validFrom": None, "validTo": None, "firstMonths": None, "tier": None, "needs": [], "conditions": [],
-            "evidence": {"quote": "Earn unlimited 3% cash back on dining.", "url": URL},  # no page hash, no "verified"
+            "merchants": [], "evidence": {"quote": "Earn unlimited 3% cash back on dining.", "url": URL},  # no page hash, no "verified"
         }])
 
     def test_a_card_carries_its_seed_facts_its_card_wide_conditions_and_the_day_its_last_rule_was_accepted(self):
@@ -63,8 +63,25 @@ class CatalogTests(unittest.TestCase):
             "id": "bank-savor", "name": "Savor", "issuer": "Capital One", "network": "Mastercard", "isBusiness": False,
             "annualFee": 0, "rewardKind": "cashback", "rewardProgram": None, "baseEarnRate": 1, "discontinued": False,
             "sourceUrl": URL, "verifiedAt": "2026-11-01",
-            "cardConditions": ["Digital wallets may not earn the higher rate."],
+            "cardConditions": ["Digital wallets may not earn the higher rate."], "bonusesStack": False,
         })  # sourceHost is the URL's, and every published card is verified, so neither is written
+
+    def test_a_card_whose_bonuses_add_up_says_so(self):
+        cand = candidate(self.dining, self.base)
+        decisions = decided(cand, (0, "accept", "2026-11-01"))
+        options = {"bank-savor": {"bonusesStack": True, "setAt": "2026-11-01"}}
+        (card,) = publish.catalog([SAVOR], {"bank-savor": cand}, decisions, None, "2026-11-02", options)["cards"]
+        self.assertIs(card["bonusesStack"], True)
+
+    def test_a_calendar_rule_carries_its_quarter_and_the_merchants_it_names(self):
+        quarter = dict(rule(categories=[], selection="rotating", rate=5, quote="5% in rotating bonus categories each quarter."),
+                       categories=["groceries", "dining"], validFrom="2026-10-01", validTo="2026-12-31",
+                       merchants=["American Red Cross®"], verified="calendar")
+        cand = candidate(quarter)
+        (card,) = publish.catalog([SAVOR], {"bank-savor": cand}, decided(cand, (0, "accept", "2026-11-01")), None, "2026-11-02")["cards"]
+        (published,) = card["rules"]
+        self.assertEqual((published["categories"], published["validFrom"], published["validTo"], published["merchants"]),
+                         (["dining", "groceries"], "2026-10-01", "2026-12-31", ["American Red Cross®"]))
 
     def test_a_card_no_person_accepted_a_rule_on_is_left_out(self):
         other = dict(SAVOR, id="bank-quicksilver", name="Quicksilver")
@@ -122,7 +139,7 @@ class PublishTests(unittest.TestCase):
         cand = candidate(rule())
         (candidates / "bank-savor.json").write_text(json.dumps(cand))
         decisions.write_text(json.dumps(decided(cand, (0, "accept", "2026-11-01"))))
-        paths = SimpleNamespace(seed=seed, candidates=candidates, decisions=decisions, catalog=out)
+        paths = SimpleNamespace(seed=seed, candidates=candidates, decisions=decisions, options=root / "options.json", catalog=out)
         written = publish.publish(paths, today="2026-11-01")
         text = out.read_text(encoding="utf-8")
         self.assertEqual((json.loads(text), [r["evidence"]["quote"] for r in written["cards"][0]["rules"]]),

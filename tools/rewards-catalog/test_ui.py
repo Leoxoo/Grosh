@@ -56,7 +56,8 @@ class AppCase(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         root = Path(tmp.name)
         self.paths = ui.Paths(seed=root / "seed.json", state=root / "state.json", cache=root / "cache", manual=root / "manual.json",
-                              decisions=root / "review-decisions.json", catalog=root / "rewards-catalog.json")
+                              decisions=root / "review-decisions.json", options=root / "card-options.json",
+                              catalog=root / "rewards-catalog.json")
         self.cards = [card("bank-a", "Savor Rewards"), card("bank-b", "Other Card"), card("zed-c", "Zed Card", "Zed")]
         self.paths.seed.write_text(json.dumps({"cards": self.cards}))
         self.state: dict = {}
@@ -551,6 +552,20 @@ class ReviewTests(AppCase):
         (published,) = json.loads(self.paths.catalog.read_text())["cards"]
         self.assertEqual([r["evidence"]["quote"] for r in published["rules"]], [RULE["quote"]])
         self.assertEqual(ui.Paths().catalog.parent, Path(ui.__file__).parent)  # committed beside the scripts, not in cache/
+
+    def test_a_card_option_is_saved_shown_in_the_card_and_published(self):
+        facts = {"isBusiness": False, "rewardProgram": None, "baseEarnRate": 1, "discontinued": False}
+        self.paths.seed.write_text(json.dumps({"cards": [dict(c, **facts) for c in self.cards]}))
+        self.extracted()
+        status, payload = self.app.handle("POST", "/api/card-options", {}, {"cardId": "bank-a", "name": "bonusesStack", "value": True})
+        self.assertEqual((status, payload["options"]["bonusesStack"]), (200, True))
+        self.assertTrue(self.app.handle("GET", "/api/card/bank-a", {}, {})[1]["options"]["bonusesStack"])
+        key = self.app.handle("GET", "/api/review", {}, {})[1]["cards"][0]["rules"][0]["key"]
+        self.app.handle("POST", "/api/review", {}, {"cardId": "bank-a", "key": key, "decision": "accept"})
+        self.app.handle("POST", "/api/publish", {}, {})
+        self.assertIs(json.loads(self.paths.catalog.read_text())["cards"][0]["bonusesStack"], True)
+        self.assertEqual(self.app.handle("POST", "/api/card-options", {}, {"cardId": "bank-a", "name": "x", "value": True})[0], 400)
+        self.assertNotIn(fetch.CACHE, ui.Paths().options.parents)  # committed, like the decisions
 
 
 class ServerTests(AppCase):

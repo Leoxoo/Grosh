@@ -3,8 +3,9 @@
 
     python3 tools/rewards-catalog/publish.py
 
-reads catalog-seed.json (the cards), cache/candidates/ (each card's rules) and review-decisions.json (what
-a person accepted), and writes rewards-catalog.json beside this script.
+reads catalog-seed.json (the cards), cache/candidates/ (each card's rules), review-decisions.json (what
+a person accepted) and card-options.json (whether a card's bonuses add up), and writes rewards-catalog.json
+beside this script.
 """
 
 import json
@@ -29,7 +30,7 @@ FORMAT_VERSION = 1
 CARD_FIELDS = ("id", "name", "issuer", "network", "isBusiness", "annualFee", "rewardKind", "rewardProgram", "baseEarnRate",
                "discontinued", "sourceUrl")
 RULE_FIELDS = ("categories", "selection", "picks", "hasOtherChoices", "rate", "unit", "capAmount", "capPeriod",
-               "capUnknown", "requires", "validFrom", "validTo", "firstMonths", "tier", "needs", "conditions")
+               "capUnknown", "requires", "validFrom", "validTo", "firstMonths", "tier", "needs", "conditions", "merchants")
 
 
 def number(value):
@@ -41,14 +42,16 @@ def published_rule(rule: dict) -> dict:
     published = {field: rule.get(field) for field in RULE_FIELDS}
     for field in review.SET_FIELDS:
         published[field] = sorted(published[field] or [])
+    published["merchants"] = sorted(published["merchants"] or [])  # only a calendar's rules have merchants
     published["rate"], published["capAmount"] = number(published["rate"]), number(published["capAmount"])
     published["evidence"] = {"quote": rule["evidence"]["quote"], "url": rule["evidence"]["url"]}
     return published
 
 
-def catalog(cards: list[dict], candidates: dict[str, dict], decisions: dict, previous: dict | None, today: str) -> dict:
+def catalog(cards: list[dict], candidates: dict[str, dict], decisions: dict, previous: dict | None, today: str,
+            options: dict | None = None) -> dict:
     """The catalog the app reads: every seed card a person accepted at least one rule on, with only those
-    rules. `previous` is the catalog published last time, or None. A card with no candidate (cache/ isn't
+    rules, and its options (review.CARD_OPTIONS, off unless `options` turns them on). `previous` is the catalog published last time, or None. A card with no candidate (cache/ isn't
     committed, so a fresh clone has none) keeps its last published entry: failure never deletes."""
     before = {card["id"]: card for card in (previous or {}).get("cards", [])}
     published = []
@@ -65,6 +68,7 @@ def catalog(cards: list[dict], candidates: dict[str, dict], decisions: dict, pre
             **{field: card[field] for field in CARD_FIELDS},
             "verifiedAt": max(card_decisions[review.rule_key(card["id"], r)]["decidedAt"] for r in rules),
             "cardConditions": sorted(candidate.get("cardConditions", [])),
+            **{name: bool((options or {}).get(card["id"], {}).get(name)) for name in review.CARD_OPTIONS},
             "rules": sorted((published_rule(r) for r in rules), key=lambda r: json.dumps(r, sort_keys=True)),
         })
     # The date says when the catalog last changed, so a rerun that changes nothing else keeps it.
@@ -72,9 +76,9 @@ def catalog(cards: list[dict], candidates: dict[str, dict], decisions: dict, pre
     return {"formatVersion": FORMAT_VERSION, "publishedAt": previous["publishedAt"] if unchanged else today, "cards": published}
 
 
-# Where publish reads and writes: the seed, the candidates, the decisions and the catalog. ui.Paths has the same
+# Where publish reads and writes: the seed, the candidates, the decisions, the card options and the catalog. ui.Paths has the same
 # fields, for the web page's own (test) folders.
-PATHS = SimpleNamespace(seed=SEED, candidates=extract.CANDIDATES, decisions=review.DECISIONS, catalog=OUT)
+PATHS = SimpleNamespace(seed=SEED, candidates=extract.CANDIDATES, decisions=review.DECISIONS, options=review.OPTIONS, catalog=OUT)
 
 
 def publish(paths=PATHS, today: str = "") -> dict:
@@ -83,7 +87,7 @@ def publish(paths=PATHS, today: str = "") -> dict:
     cards = fetch.read_json(paths.seed, {"cards": []})["cards"]
     found = {path.stem: fetch.read_json(path, None) for path in sorted(paths.candidates.glob("*.json"))}
     document = catalog(cards, found, review.load_decisions(paths.decisions), fetch.read_json(paths.catalog, None),
-                       today or date.today().isoformat())
+                       today or date.today().isoformat(), review.load_options(paths.options))
     fetch.write_json(paths.catalog, document)
     return document
 

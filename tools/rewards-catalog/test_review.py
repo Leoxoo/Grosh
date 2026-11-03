@@ -173,5 +173,45 @@ class EditTests(ReviewCase):
         self.assertEqual(self.accepted(cand), [wrong])
 
 
+
+def calendar_rule() -> dict:
+    """A quarter read from the page's calendar (extract.calendar_rules)."""
+    quarter = rule(categories=[], selection="rotating", rate=5, quote="Earn 5% in rotating bonus categories each quarter.",
+                   capAmount=1500, capPeriod="quarter")
+    return dict(quarter, categories=["groceries", "dining"], merchants=["American Red Cross®"], validFrom="2026-10-01",
+                validTo="2026-12-31", verified="calendar", evidence=dict(quarter["evidence"], quote="OCT-DEC\n2026\nGrocery Stores"))
+
+
+class CalendarRuleTests(ReviewCase):
+    def test_a_quarter_in_words_says_its_dates_categories_and_merchants(self):
+        self.assertEqual(review.describe(calendar_rule()),
+                         "5% in rotating bonus categories from 2026-10-01 to 2026-12-31: groceries, dining "
+                         "(also at American Red Cross®), up to $1,500 per quarter")
+
+    def test_it_says_where_it_came_from_and_cannot_be_fixed(self):
+        cand = candidate(calendar_rule())
+        (row,) = review.card_review(cand, {})["rules"]
+        self.assertTrue(any("quarterly calendar" in w for w in row["warnings"]))
+        with self.assertRaisesRegex(ValueError, "quarterly calendar"):
+            review.edit(cand, row["key"], {"rate": 4}, None, self.path, "2026-11-01")
+        self.assertFalse(self.path.exists())
+
+
+class CardOptionTests(ReviewCase):
+    def test_turning_stacking_on_and_off_saves_only_what_is_on(self):
+        path = self.path.with_name("card-options.json")
+        self.assertEqual(review.set_option("bank-savor", "bonusesStack", True, path, "2026-11-02"),
+                         {"bank-savor": {"bonusesStack": True, "setAt": "2026-11-02"}})
+        self.assertEqual(review.load_options(path), {"bank-savor": {"bonusesStack": True, "setAt": "2026-11-02"}})
+        self.assertEqual(review.set_option("bank-savor", "bonusesStack", False, path, "2026-11-03"), {})
+
+    def test_an_unknown_option_or_value_is_refused(self):
+        path = self.path.with_name("card-options.json")
+        for name, value in (("autoPilot", True), ("bonusesStack", "yes")):
+            with self.assertRaises(ValueError):
+                review.set_option("bank-savor", name, value, path)
+        self.assertFalse(path.exists())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -46,6 +46,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import fetch  # noqa: E402
+import quarters  # noqa: E402
 
 CANDIDATES = fetch.CACHE / "candidates"
 SAVED_SETTINGS = fetch.CACHE / "ui-settings.json"
@@ -987,6 +988,14 @@ def card_warnings(rules: list[dict]) -> list[str]:
         f"{key[0]} earns {' and '.join(f'{rate:g}' for rate in sorted(rates))} with nothing to tell them apart"
         for key, rates in sorted(groups.items(), key=lambda item: repr(item[0])) if len(rates) > 1
     ]
+    listed: dict[str, set] = {}
+    for rule in rules:
+        if rule.get("verified") == "calendar":
+            listed.setdefault(rule["validFrom"], set()).add((tuple(rule["categories"]), tuple(rule.get("merchants", []))))
+    warnings += [
+        f"the page's calendars list the quarter from {quarter} two ways: keep the one that is right"
+        for quarter, lists in sorted(listed.items()) if len(lists) > 1
+    ]
     if rules and not any(
         r["selection"] == "fixed" and r["categories"] == ["everything-else"] and TIER_BOOST not in r["requires"]
         for r in rules
@@ -1095,6 +1104,40 @@ def _conditions_about(conditions, category) -> list:
     return kept
 
 
+def calendar_rules(rules: list[dict], text: str, today: str) -> list[dict]:
+    """A dated rotating rule for each quarter the page's calendar names (quarters.read_calendar) that hasn't ended
+    by `today`: the card's rotating rule, with its rate, cap and activation, given that quarter's dates and the
+    categories its names stand for. A name that is no category (a charity, Amazon: brands aren't category words)
+    is kept in "merchants", so the bonus still says where it applies. No calendar rule without a rotating rule:
+    the calendar names no rate. Each is marked verified "calendar": its quote is the calendar's lines, which
+    name no rate, so the quote checks (and fixing it in the review) don't apply."""
+    rotating = [r for r in rules if r["selection"] == "rotating" and not r["categories"] and r["validFrom"] is None]
+    if not rotating:
+        return []
+    base = max(rotating, key=lambda r: (r["capAmount"] is not None, len(r["requires"]), len(r["conditions"])))
+    made = []
+    for quarter in quarters.read_calendar(text):
+        if quarter.end < today:
+            continue
+        categories, merchants = [], []
+        for name in quarter.names:
+            flat = normalize(name)
+            named = [c for c, words in CATEGORIES.items() if c != "everything-else" and mentions(flat, words)]
+            if "travel" in named and set(named) <= TRAVEL_FAMILY:  # "Chase Travel", "Norwegian Cruise Line"
+                named = ["travel"]
+            if len(named) == 1:
+                categories += [c for c in named if c not in categories]
+            else:
+                merchants.append(name)
+        conditions = base["conditions"] + [note for note in quarter.notes if note not in base["conditions"]]
+        made.append({
+            **base, "categories": categories, "merchants": merchants, "validFrom": quarter.start, "validTo": quarter.end,
+            "conditions": conditions[:MAX_CONDITIONS], "verified": "calendar",
+            "evidence": {**base["evidence"], "quote": quarter.quote},
+        })
+    return made
+
+
 MAX_FOLLOW_UPS = 6
 _REWARD_SENTENCE = re.compile(r"\b(earn|earns|earning|cash back|points|miles)\b", re.I)
 
@@ -1117,6 +1160,16 @@ def model_text(text: str) -> str:
         if has_rates(line) or _RELEVANT.search(line):
             keep.update(j for j in (i - 1, i, i + 1) if 0 <= j < len(lines))
     return "\n".join(lines[i] for i in sorted(keep) if lines[i].strip())
+
+
+# "2% additional Cash Back rewards on top of the 1%": the page saying a bonus is added to the base rate.
+_ON_TOP = re.compile(r"\badditional\b.*\bon top of\b|\bin addition to (?:the|your) (?:base|\d)", re.I)
+
+
+def stacking_quotes(text: str, limit: int = 3) -> list[str]:
+    """Rate sentences that say a bonus is on top of the base rate. They are what a person reads before turning on
+    "bonuses add up" for a card (review.set_option); no rule is changed by them."""
+    return [sentence for sentence in rate_sentences(text) if _ON_TOP.search(sentence)][:limit]
 
 
 def rate_sentences(text: str) -> list[str]:
@@ -1168,7 +1221,7 @@ def _covered(sentence: str, rules: list[dict]) -> bool:
 
 def extract_card(
     card: dict, text: str, page_hash: str, complete, model: str, max_chars: int = CHUNK_CHARS, progress=None,
-    follow_up: bool = True,
+    follow_up: bool = True, today: str | None = None,
 ) -> dict:
     """The candidate for one card: accepted rules, card-wide conditions, rejected proposals with reasons,
     and a status: ok, no-rules (the page states none), wrong-page (it doesn't name the card) or failed
@@ -1177,7 +1230,8 @@ def extract_card(
     After the chunks, each sentence that states a rate but that no accepted rule covers yet is asked about
     on its own (up to MAX_FOLLOW_UPS), the longest first. The model skips sentences in a long chunk; asking alone
     catches them. Before that, a long part the model returned no rules for is asked again in pieces
-    (RETRY_CHUNK_CHARS).
+    (RETRY_CHUNK_CHARS). Last, the page's quarterly calendar gives the rotating rule a dated rule for each quarter
+    it names that hasn't ended by `today` (calendar_rules).
     Another card's sentences and a boost's tier cells or "up to N% more" are neither asked about nor missed."""
     candidate = _empty_candidate(card, model, PROMPT_VERSION, page_hash, "ok")
     if not name_on_page(card["name"], text):
@@ -1255,6 +1309,8 @@ def extract_card(
         reply = ask(sentence)  # a miss here is not a failure of the card: the chunks already covered the rest
         if reply is not None:
             take(reply)
+    for rule in calendar_rules(list(accepted.values()), text, today or date.today().isoformat()):
+        accepted.setdefault(_merge_key(rule), rule)  # two calendars naming a quarter the same way are one rule
     still_missing = [s for s in this_cards if not _covered(s, list(accepted.values()))]
 
     candidate["rules"] = sorted(accepted.values(), key=lambda r: (r["categories"][0] if r["categories"] else "~", -r["rate"]))  # "~" sorts rotating rules last

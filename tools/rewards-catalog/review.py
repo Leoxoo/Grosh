@@ -16,6 +16,10 @@ rule, waiting for review, and never inherits the old accept. Only the page's has
 page that churns without changing the rule keeps its decision.
 
 The publish step calls accepted_rules(candidate, decisions): it returns only rules a person accepted.
+
+A person also sets options on a whole card, saved in card-options.json (committed) as {card id: {option: value,
+"setAt"}}. The one option, "bonusesStack", says the card's bonuses add up: a purchase earns the base rate plus
+what each bonus covering it adds over the base, not only the best single rate (CARD_OPTIONS).
 """
 
 import hashlib
@@ -28,6 +32,11 @@ import extract  # noqa: E402
 import fetch  # noqa: E402
 
 DECISIONS = Path(__file__).with_name("review-decisions.json")
+OPTIONS = Path(__file__).with_name("card-options.json")
+# What a person can turn on for a card, and what it means. Every option is off until someone turns it on.
+CARD_OPTIONS = {
+    "bonusesStack": "Bonuses add up: a purchase earns the base rate plus what every bonus covering it adds over the base",
+}
 DECISION_VALUES = ("accept", "reject")
 COUNTS = ("waiting", *DECISION_VALUES)  # how a card's rules, and all of them, are counted
 # Lists that are sets: their order is whatever the model gave, so it is sorted wherever a rule is compared or written.
@@ -64,12 +73,43 @@ def describe(rule: dict) -> str:
     what = {
         "choose": f"{rate} in the {chosen} the cardholder chooses: {categories}{others}",
         "top-spend": f"{rate} on the top-spend category each billing cycle, from: {categories}{others}",
-        "rotating": f"{rate} in rotating bonus categories" + (f" (this period: {categories})" if categories else ""),
+        "rotating": f"{rate} in rotating bonus categories" + _period(rule, categories),
     }.get(rule["selection"], f"{rate} on {categories}")
     if rule.get("capAmount") is not None:
         period = "billing cycle" if rule["capPeriod"] == "cycle" else rule["capPeriod"]
         what += f", up to ${float(rule['capAmount']):,.0f} per {period}"
     return what
+
+
+def _period(rule: dict, categories: str) -> str:
+    """A rotating rule's categories for its quarter: " from 2026-10-01 to 2026-12-31: groceries, dining (also at American Red Cross®)"."""
+    named = categories + (f" (also at {', '.join(rule['merchants'])})" if rule.get("merchants") else "")
+    if rule.get("validFrom"):
+        return f" from {rule['validFrom']} to {rule['validTo']}: {named.strip() or 'nothing named'}"
+    return f" (this period: {named})" if named else ""
+
+
+def load_options(path: Path = OPTIONS) -> dict:
+    return fetch.read_json(path, {})
+
+
+def set_option(card_id: str, name: str, value: bool, path: Path = OPTIONS, today: str = "") -> dict:
+    """Turn one of CARD_OPTIONS on or off for a card. Off is the default, so it isn't kept. Returns every card's options."""
+    if name not in CARD_OPTIONS:
+        raise ValueError(f"A card option is one of {', '.join(CARD_OPTIONS)}")
+    if not isinstance(value, bool):
+        raise ValueError("A card option is on or off")
+    options = load_options(path)
+    mine = {k: v for k, v in options.get(card_id, {}).items() if k != "setAt"}
+    mine.pop(name, None)
+    if value:
+        mine[name] = True
+    if mine:
+        options[card_id] = {**mine, "setAt": today}
+    else:
+        options.pop(card_id, None)
+    fetch.write_json(path, options)
+    return options
 
 
 def decide(candidate: dict, key: str, decision: str, path: Path = DECISIONS, today: str = "") -> dict:
@@ -94,6 +134,8 @@ def edit(candidate: dict, key: str, changes: dict, page_text: str | None, path: 
     like any proposal, against `page_text` when there is one; a hand-entered rule whose quote the page doesn't
     confirm is checked without it, as it was entered. ValueError, and nothing saved, if the fix doesn't hold."""
     rule = _find(candidate, key)
+    if rule.get("verified") == "calendar":
+        raise ValueError("A rule read from the quarterly calendar can't be fixed: reject it, and fix the rotating rule its rate comes from")
     if not changes or set(changes) - set(EDITABLE):
         raise ValueError(f"Only these can be changed: {', '.join(EDITABLE)}")
     proposal = {field: rule.get(field) for field in extract.RULE_SCHEMA["required"] if field != "quote"}
@@ -135,6 +177,8 @@ def rule_warnings(rule: dict) -> list[str]:
     warnings = []
     if rule.get("verified") == "manual":
         warnings.append("hand-entered, and the saved page doesn't confirm the quote: check it on the page")
+    if rule.get("verified") == "calendar":
+        warnings.append("read from the page's quarterly calendar: its rate, cap and activation are the rotating rule's")
     if rule.get("capUnknown"):
         warnings.append("the page says there is a cap but doesn't state the amount")
     return warnings

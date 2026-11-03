@@ -587,6 +587,45 @@ class WhatCountsAsWhatTests(unittest.TestCase):
         extract_card(CARD, "Savor Rewards\nEarn 3% on dining.", "h", model, "m", follow_up=False)
         self.assertEqual(len(model.asked), 1)
 
+    def test_the_quarterly_calendar_gives_the_rotating_rule_a_dated_rule_for_each_quarter_still_to_come(self):
+        rotating = "Earn 5% cash back on up to $1,500 in rotating categories each quarter you activate."
+        page = "\n".join(["Chase Freedom Flex", rotating, "Earn 1% on all other purchases.",
+                           "JUL-SEP", "2026", "Gas Stations", "Activation period closed",
+                           "OCT-DEC", "2026", "CURRENT Quarter", "Grocery Stores", "(excluding Walmart® and Target®)",
+                           "Dining", "American Red Cross®", "Activate starting September 15, 2026",
+                           "Your 5% quarterly cash back 2026 calendar", "October – December", "Grocery Stores | Dining | American Red Cross®"])
+        model = FakeModel([rule(categories=[], selection="rotating", rate=5, quote=rotating, capAmount=1500, capPeriod="quarter",
+                                requires=["activation"]),
+                           rule(categories=["everything-else"], rate=1, quote="Earn 1% on all other purchases.")])
+        result = extract_card({**CARD, "name": "Chase Freedom Flex"}, page, "h", model, "m", follow_up=False, today="2026-11-02")
+        dated = [r for r in result["rules"] if r["validFrom"]]
+        self.assertEqual(len(model.asked), 1)  # the calendar is read, not asked about
+        self.assertEqual([(r["validFrom"], r["validTo"], r["categories"], r["merchants"]) for r in dated],
+                         [("2026-10-01", "2026-12-31", ["groceries", "dining"], ["American Red Cross®"])])  # July is over
+        (october,) = dated
+        self.assertEqual((october["rate"], october["capAmount"], october["requires"], october["verified"]),
+                         (5, 1500, ["activation"], "calendar"))
+        self.assertIn("Grocery Stores (excluding Walmart® and Target®)", october["conditions"])
+        self.assertEqual(result["warnings"], [])  # the second calendar names October the same way: one rule
+
+    def test_no_calendar_rule_without_a_rotating_rule_to_take_the_rate_from(self):
+        page = "Savor Rewards\nEarn 3% on dining.\nOCT-DEC\n2026\nDining"
+        result = extract_card(CARD, page, "h", FakeModel([rule(quote="Earn 3% on dining.")]), "m", follow_up=False, today="2026-11-02")
+        self.assertEqual([r["selection"] for r in result["rules"]], ["fixed"])
+
+    def test_two_calendars_that_disagree_on_a_quarter_are_a_warning(self):
+        base = rule(categories=[], selection="rotating", rate=5, quote="5% in rotating categories each quarter.")
+        text = "OCT-DEC\n2026\nDining\nActivate\nYour 2026 calendar\nOctober – December\nGas Stations"
+        made = extract.calendar_rules([extract.candidate_rule(base, "u", "h", "page")], text, "2026-11-02")
+        self.assertEqual(len(made), 2)
+        self.assertTrue(any("two ways" in w for w in extract.card_warnings(made)))
+
+    def test_sentences_saying_a_bonus_is_on_top_of_the_base_are_found_for_the_reviewer(self):
+        page = ("You'll earn 3% Cash Back rewards total on dining (2% additional Cash Back rewards on top of the 1% Cash Back "
+                "rewards earned on each purchase).\nEarn 5% on travel.")
+        self.assertEqual(len(extract.stacking_quotes(page)), 1)
+        self.assertEqual(extract.stacking_quotes("Earn 5% on travel."), [])
+
     def test_a_cap_the_page_does_not_state_is_unknown_not_invented(self):
         invented = rule(categories=[], selection="rotating", rate=5, quote=DISCOVER, requires=["activation"], capAmount=6000, capPeriod="quarter")
         kept = extract.split_fixed(invented)[0]

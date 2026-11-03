@@ -59,6 +59,7 @@ class Paths:
     cache: Path = fetch.CACHE
     manual: Path = extract.MANUAL_RULES
     decisions: Path = review.DECISIONS  # committed: a person's accept or reject on each rule
+    options: Path = review.OPTIONS  # committed: what a person turned on for a whole card (bonuses add up)
     catalog: Path = publish.OUT  # committed: the accepted rules, as the app reads them
 
     @property
@@ -389,14 +390,24 @@ class App:
             text = page_file.read_text(encoding="utf-8")
             lines = [line for line in text.splitlines() if extract.has_rates(line)]
             page = {"chars": len(text), "rateLines": [line[:400] for line in lines[:60]], "rateLineCount": len(lines),
-                    "head": text[:1200]}
+                    "head": text[:1200], "stackingQuotes": extract.stacking_quotes(text)}
         candidate = self.candidate(card_id)
         return {
             "card": card, "fetch": state, "candidate": candidate,
             # each rule with its decision, as the person fixed it if they did (review.card_review)
             "review": review.card_review(candidate, review.load_decisions(self.paths.decisions)) if candidate else None,
             "manual": fetch.read_json(self.paths.manual, {}).get(card_id), "page": page,
+            "options": review.load_options(self.paths.options).get(card_id, {}),
         }
+
+    def set_card_option(self, body: dict) -> dict:
+        """Turn a card option (review.CARD_OPTIONS) on or off; returns the card's options."""
+        card = self.card(str(body.get("cardId")))
+        try:
+            options = review.set_option(card["id"], str(body.get("name")), body.get("value"), self.paths.options, date.today().isoformat())
+        except ValueError as problem:
+            raise Problem(str(problem)) from problem
+        return {"options": options.get(card["id"], {})}
 
     # --- review ---------------------------------------------------------------------------------
 
@@ -690,6 +701,8 @@ class App:
                 return self.decide(body)
             if path == "/api/publish":
                 return self.publish_catalog()
+            if path == "/api/card-options":
+                return self.set_card_option(body)
             if path == "/api/test-model":
                 return self.test_model()
             if path == "/api/ask":
@@ -710,7 +723,7 @@ def catalog_terms() -> dict:
         "categories": [{"id": name, "label": extract.CATEGORY_LABELS[name], "help": extract.CATEGORY_HELP[name],
                         "app": extract.APP_CATEGORIES.get(name, [])} for name in extract.CATEGORIES],
         "requires": list(extract.REQUIRES), "tiers": list(extract.TIERS), "periods": list(extract.PERIOD_WORDS),
-        "needs": extract.NEEDS,
+        "needs": extract.NEEDS, "options": review.CARD_OPTIONS,
     }
 
 

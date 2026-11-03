@@ -227,6 +227,7 @@ Some things about a rule depend on the person, not the card. The catalog doesn't
 - **Mixed pages.** Amex pages hold other cards' marketing. The prompt tells the model to take only this card's rates, and a quote under another card's heading or naming another card is rejected (check 13), but a quote the page doesn't place under any card's heading still passes. Review Amex candidates by hand.
 - **Conditions come from the same chunk as the rate.** A footnote far from its headline, in another 12,000-character chunk, is missed, and the rule looks unrestricted. A second pass that hunts for footnotes is the fix if this shows up in real runs. Whether a condition really belongs to the rate, and not to a neighbouring one, can't be checked automatically; that's for the reviewer.
 - **Rotating categories** (Discover 5%, Freedom Flex) carry `validFrom` / `validTo`, but only when the page names the months and the year. Pages that say "this quarter" give the extractor nothing to date.
+- **Quarterly calendars are read, not asked about.** After the model's rules, `quarters.read_calendar` reads a calendar laid out one item a line (a month range such as "OCT-DEC" or "October – December", its year on the next line or in a heading such as "Your 5% quarterly cash back 2026 calendar", then the quarter's names, one a line or split by "|", up to its "Activate ..." line). For each quarter that names something and hasn't ended, the card's undated rotating rule gets a copy with that quarter's dates (`validFrom` / `validTo`) and categories (`extract.calendar_rules`): the rate, cap, activation and conditions are the rotating rule's, plus a bracketed note under a name ("Grocery Stores (excluding Walmart® and Target®)"). A name that is no category (American Red Cross®, Amazon: brands aren't category words) goes in `merchants`. Its quote is the calendar's own lines, which name no rate, so it is marked `verified: "calendar"`, the quote checks don't apply, and it can be accepted or rejected but not fixed. A quarter listed two ways (two calendars on one page that disagree) is a card warning. No model is asked: the layout says which names go with which quarter, which a model reading the run of text has to guess. On Freedom Flex (2026-11-02) this gives Oct–Dec 2026 (groceries, dining, also American Red Cross®) and Jan–Mar 2027 (groceries, streaming); the page's second, older calendar says "Coming Soon" for October, which names nothing. Discover's card page has no calendar (its calendar is a page of its own, not fetched), so Discover It keeps an undated rotating rule.
 - **Chunks with no rate in them aren't sent**, so a footnote-only chunk holding a card-wide condition can be skipped on big pages.
 - **Category words** are a guess at what a quote about a category says. Valid rules the list misses show up in `rejected` as "quote doesn't mention ...", and the fix is to add the word to `CATEGORIES`.
 
@@ -235,9 +236,10 @@ Some things about a rule depend on the person, not the card. The catalog doesn't
 Passing the checks means a rule is supported by its page, not that it is right, so every rule waits for a person. Clicking a card on the page opens its view. **In the app** shows the card as the app will use it: one line per rate, best first and the base rate last, with its cap and requirements in plain words, the app's default categories each rate covers (`APP_CATEGORIES`), and what the app will ask the cardholder; accepted rules are what gets published, waiting ones are faded and rejected ones left out. Below it, **Review** lists each rule (model-read and hand-entered alike) with what it says, its quote, its source URL, its conditions and its warnings. **Accept**, **Reject**, **Fix…** and **Undo** are saved per rule as soon as they're clicked. The cards table counts each card's rules still waiting, and can show only those cards.
 
 - **Fixing a rule.** **Fix…** changes its categories, rate, unit, cap, requirements or tier (`review.EDITABLE`), never its quote: the quote is the evidence. The fixed rule must pass the same checks against the saved page as a proposal (a hand-entered rule the page doesn't confirm is checked as it was entered), or nothing is saved and the reason is shown. A fix is saved whole under `edited` in the rule's decision and counts as accepted; publishing takes it in place of the extracted rule. Accept or Undo drops the fix.
+- **Bonuses add up** is a switch on each card's view, off for every card until a person turns it on (`card-options.json`, committed: `{card id: {bonusesStack: true, setAt}}`; `review.CARD_OPTIONS`). On, the app gives a purchase the base rate plus what every bonus covering it adds over the base, instead of the best single rate. Freedom Flex's terms say each bonus is "additional ... on top of the 1%", so in a quarter whose categories include dining, dining earns 1% + 4% (the quarter) + 2% (dining) = 7%. Pages rarely say outright that two bonuses combine, so a person decides; the view lists the page's sentences that say a bonus is on top of the base (`extract.stacking_quotes`) and, with the switch on, each place a quarter's bonus meets a category's bonus, with its total. The switch changes no rule.
 - **Hand-entered cards never ask the model.** Their rules come from `manual-rules.json`, so "extract" only re-checks them against the page; the button says so. Take a card out of `manual-rules.json` to have the model read its page.
 
-- **Warnings.** A rule's own: hand-entered and not confirmed by the saved page (`verified: "manual"`), or a cap the page mentions without an amount (`capUnknown`). The card's warnings from the extract stage (two rates for one thing, no base rate, rate sentences the result missed) are about its rules taken together, so they are shown above the card's rules.
+- **Warnings.** A rule's own: hand-entered and not confirmed by the saved page (`verified: "manual"`), read from the quarterly calendar (`verified: "calendar"`), or a cap the page mentions without an amount (`capUnknown`). The card's warnings from the extract stage (two rates for one thing, no base rate, rate sentences the result missed) are about its rules taken together, so they are shown above the card's rules.
 - **Hand-entered rules are reviewed too.** `manual-rules.json` is a person's reading of a page, which is not the same as a second person checking it.
 - **Where decisions live.** `review-decisions.json`, next to this file and committed (`cache/` isn't): `{card id: {rule key: {decision, decidedAt, rule, quote, edited?}}}`. `rule` and `quote` are there so a pull request's diff reads as "accepted 3% on dining", not a hash.
 - **The key is the exact rule.** It is a hash of the card id and everything the rule says: rate, unit, categories, selection, cap, dates, `firstMonths`, tier, requirements, conditions, the quote, the source URL, and whether the page confirmed it. A re-extraction that changes any of that makes a new rule, which waits for review; it never inherits the old accept. Left out: the page's hash (a page whose menus churned but whose rule is the same keeps its decision), the derived `needs`, the order of lists, and 3 vs 3.0. The same rule on two cards that share a page is reviewed once per card.
@@ -251,7 +253,7 @@ Passing the checks means a rule is supported by its page, not that it is right, 
 python3 tools/rewards-catalog/publish.py        # or Publish catalog in the page's Run panel
 ```
 
-Reads `catalog-seed.json`, `cache/candidates/` and `review-decisions.json`, and writes `rewards-catalog.json` beside this file: the one file the app bundles (#163). It is committed, so a pull request shows exactly which rules ship.
+Reads `catalog-seed.json`, `cache/candidates/`, `review-decisions.json` and `card-options.json`, and writes `rewards-catalog.json` beside this file: the one file the app bundles (#163). It is committed, so a pull request shows exactly which rules ship.
 
 - **Only accepted rules** (`review.accepted_rules`). Rejected rules and rules still waiting are left out.
 - **A card with no accepted rule is left out**, not listed with an empty rule list. Its facts are CardPin's and nobody has checked them, and we ship only what we re-verified. So every card in the file is verified, `verified` isn't written, and `verifiedAt` is the latest day one of its rules was accepted. No decisions exist yet, so the file would hold no cards; it isn't committed until it has some.
@@ -267,13 +269,13 @@ Reads `catalog-seed.json`, `cache/candidates/` and `review-decisions.json`, and 
         "isBusiness": false, "annualFee": 0, "rewardKind": "cashback", "rewardProgram": null, "baseEarnRate": 1,
         "discontinued": false, "sourceUrl": "https://www.capitalone.com/credit-cards/savor/",
         "verifiedAt": "2026-11-01",
-        "cardConditions": ["..."],
+        "cardConditions": ["..."], "bonusesStack": false,
         "rules": [
           {
             "categories": ["dining"], "selection": "fixed", "picks": null, "hasOtherChoices": false,
             "rate": 3, "unit": "percent", "capAmount": null, "capPeriod": null, "capUnknown": false,
             "requires": [], "validFrom": null, "validTo": null, "firstMonths": null, "tier": null,
-            "needs": [], "conditions": [],
+            "needs": [], "conditions": [], "merchants": [],
             "evidence": {"quote": "Earn unlimited 3% cash back on dining ...", "url": "https://www.capitalone.com/credit-cards/savor/"}
           }
         ]
@@ -282,8 +284,8 @@ Reads `catalog-seed.json`, `cache/candidates/` and `review-decisions.json`, and 
   }
   ```
 
-  The file itself has its keys in alphabetical order. `baseEarnRate` is the seed's, unchecked; where a card has an accepted rule for `everything-else`, that rule is the checked one.
-- **Left out**, because only the checks and the review needed them: the page's hash, a rule's `verified` (`page` or `manual`), the seed's `sourceHost` and `verified`, and the candidate's model, prompt version, warnings, rejections and costs.
+  The file itself has its keys in alphabetical order. `bonusesStack` is the card's switch (above): when it is true, a purchase earns the base rate plus what each matching rule adds over it (a dated quarter's rule matches only between its `validFrom` and `validTo`); when false, the best single rate. `merchants` is only filled on a quarter read from a calendar. `baseEarnRate` is the seed's, unchecked; where a card has an accepted rule for `everything-else`, that rule is the checked one.
+- **Left out**, because only the checks and the review needed them: the page's hash, a rule's `verified` (`page`, `manual` or `calendar`), the seed's `sourceHost` and `verified`, and the candidate's model, prompt version, warnings, rejections and costs.
 - **Stable.** Cards in id order, rules in a fixed order, a rule's categories, requirements, needs and conditions sorted (they are sets), 3.0 written as 3, keys sorted, two-space indents. `publishedAt` changes only when the cards do, so publishing again with nothing new leaves the file byte for byte the same.
 - **`formatVersion`** goes up only for a change an older app can't read (a field renamed or retyped). Adding a field doesn't need it.
 - **Failure never deletes.** `cache/` isn't committed, so a fresh clone has no candidates: a card with no candidate keeps the entry it was last published with. A card gone from the seed leaves the file.
@@ -362,13 +364,14 @@ A fetch that fails, a page that vanished or an extraction that fails validation 
 ```
 Card   id, name, issuer, network, isBusiness, annualFee, rewardKind,
        rewardProgram, baseEarnRate, discontinued, sourceUrl, verified,
-       verifiedAt, cardConditions[] (the issuer's sentences that limit several rates), rules[]
-Rule   categories[], selection (fixed | choose | top-spend), picks, hasOtherChoices,
+       verifiedAt, cardConditions[] (the issuer's sentences that limit several rates), bonusesStack, rules[]
+Rule   categories[], selection (fixed | choose | top-spend | rotating), picks, hasOtherChoices,
        rate, unit (percent | per-dollar), capAmount, capPeriod (month | quarter | year | cycle),
        requires[] (apple-pay | activation | issuer-booking | preferred-rewards-tier), validFrom, validTo, firstMonths,
        tier (gold | platinum | platinum-honors | diamond-honors; only with preferred-rewards-tier),
        needs[] (choice-categories | account-opened | pays-with-apple-pay | preferred-rewards-tier; derived),
-       conditions[] (the issuer's own sentences, verbatim), verified (page | manual),
+       conditions[] (the issuer's own sentences, verbatim), merchants[] (a calendar quarter's names that are no category),
+       verified (page | manual | calendar),
        evidence { url, quote, pageHash }
 ```
 

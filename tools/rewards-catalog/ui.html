@@ -504,7 +504,11 @@ function applyJob(job) {
 // ---------- card detail ----------
 const term = (id) => state.overview.catalog.categories.find((c) => c.id === id) || { id, label: id, app: [] };
 const labels = (ids) => ids.map((id) => term(id).label).join(", ");
-const rateText = (r) => `${+r.rate}${r.unit === "percent" ? "%" : "x"}`;
+const num = (n) => `${+(+n).toFixed(2)}`;
+const unitText = (r) => (r.unit === "percent" ? "%" : "x");
+const rateText = (r) => `${num(r.rate)}${unitText(r)}`;
+const day = (iso) => new Date(iso + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+const span = (r) => `${r.validFrom ? day(r.validFrom) : "…"} – ${r.validTo ? day(r.validTo) : "…"}`;
 // What a rate requires, as the app would say it to the cardholder.
 const REQUIRE_TEXT = { "apple-pay": "when you pay with Apple Pay", activation: "after you activate it", "issuer-booking": "when booked through the issuer", "preferred-rewards-tier": "for Preferred Rewards members" };
 // The decisions a person can make (review.DECISION_VALUES): how each shows, and the button that makes it.
@@ -524,7 +528,11 @@ function ruleWhere(r) {
   const list = labels(r.categories) + (r.hasOtherChoices ? " and more" : "");
   if (r.selection === "choose") return `Your choice${r.picks > 1 ? " of " + r.picks : ""}: ${list}`;
   if (r.selection === "top-spend") return `Your top category each cycle: ${list}`;
-  if (r.selection === "rotating") return r.categories.length ? `Rotating: ${list}` : "Rotating bonus categories";
+  if (r.selection === "rotating") {
+    const named = [labels(r.categories), ...(r.merchants || [])].filter(Boolean).join(", ");
+    if (r.validFrom) return `Quarterly bonus, ${span(r)}: ${named || "nothing named"}`;
+    return named ? `Rotating: ${named}` : "Rotating bonus categories";
+  }
   return list;
 }
 // The small print under a rate: cap, requirements, tier, dates.
@@ -534,7 +542,7 @@ function ruleTerms(r) {
   else if (r.capUnknown) t.push("capped (the page doesn't say how much)");
   r.requires.forEach((q) => t.push(REQUIRE_TEXT[q] || q));
   if (r.tier) t.push(`${r.tier.replace("-", " ")} tier`);
-  if (r.validFrom || r.validTo) t.push(`${r.validFrom || "…"} to ${r.validTo || "…"}`);
+  if ((r.validFrom || r.validTo) && r.selection !== "rotating") t.push(span(r));  // a quarter's dates are in its name
   if (r.firstMonths) t.push(`for the first ${r.firstMonths} months`);
   return t.join("; ");
 }
@@ -551,7 +559,7 @@ function appPreview(rv) {
     h("table", { class: "earn" },
       h("thead", {}, h("tr", {}, h("th", { text: "Earns" }), h("th", { text: "On" }), h("th", { text: "Your categories" }), h("th", { text: "" }))),
       h("tbody", {}, rows.map((x) => {
-        const r = x.rule, app = r.selection === "fixed" ? r.categories.flatMap((id) => term(id).app) : [];
+        const r = x.rule, app = r.selection === "fixed" || r.validFrom ? r.categories.flatMap((id) => term(id).app) : [];
         return h("tr", { class: x.decision ? "" : "waiting" },
           h("td", { class: "rate", text: rateText(r) }),
           h("td", {}, h("div", { text: ruleWhere(r) }), ruleTerms(r) ? h("div", { class: "small muted", text: ruleTerms(r) }) : null),
@@ -561,6 +569,42 @@ function appPreview(rv) {
     base ? null : h("p", { class: "small", style: "color: var(--warn)", text: "No base rate: the app won't know what everything else earns." }),
     asks.length ? h("p", { class: "small" }, "The app asks: ", asks.map((n) => state.overview.catalog.needs[n] || n).join(" ")) : null,
   ];
+}
+
+// Whether the card's bonuses add up (review.CARD_OPTIONS, saved in card-options.json), with what the page says about it.
+function stackingBox(id, d, rv) {
+  const on = !!d.options.bonusesStack, quotes = (d.page && d.page.stackingQuotes) || [];
+  const box = h("input", { type: "checkbox", checked: on, onchange: async (e) => {
+    e.target.disabled = true;
+    try { await api("POST", "/api/card-options", { cardId: id, name: "bonusesStack", value: e.target.checked }); await openCard(id, true); }
+    catch (err) { alert(err.message); e.target.checked = on; e.target.disabled = false; } } });
+  return h("div", { class: "fix" },
+    h("label", {}, box, " Bonuses add up on this card"),
+    h("p", { class: "small muted", text: "Turn on only when the card's terms say each bonus is on top of the base rate. The app then gives a purchase the base rate plus what every bonus covering it adds; off, it takes the best single rate. Saved in card-options.json." }),
+    quotes.length ? [h("p", { class: "small", text: "The page says:" }), quotes.map((q) => h("blockquote", { text: q }))]
+                  : h("p", { class: "small muted", text: "Nothing on the saved page says a bonus is on top of the base rate." }),
+    on ? stackedLines(rv) : null);
+}
+// With bonuses adding up: what a purchase earns where a quarter's bonus and a category's bonus both cover it (a 5%
+// quarter on dining and 3% dining: 1% + 4% + 2% = 7%). Only rules that aren't rejected, in the base rate's unit.
+function stackedLines(rv) {
+  const live = rv.rules.filter((x) => x.decision !== "reject").map((x) => x.rule);
+  const base = live.find((r) => r.selection === "fixed" && r.categories[0] === "everything-else" && !r.requires.length);
+  if (!base) return h("p", { class: "small", style: "color: var(--warn)", text: "Adding bonuses up needs the base rate, and this card has none." });
+  const extra = (r) => r.rate - base.rate, u = unitText(base);
+  const lines = [];
+  for (const q of live.filter((r) => r.selection === "rotating" && r.validFrom && r.unit === base.unit)) {
+    for (const id of q.categories) {
+      const also = live.filter((r) => r.selection === "fixed" && r.categories[0] === id && r.unit === base.unit && extra(r) > 0);
+      if (!also.length) continue;
+      const total = base.rate + extra(q) + also.reduce((sum, r) => sum + extra(r), 0);
+      lines.push(h("li", {}, `${term(id).label}, ${span(q)}: `, h("strong", { text: num(total) + u }),
+        ` (${num(base.rate)}${u} base + ${num(extra(q))}${u} quarterly bonus + ${also.map((r) => `${num(extra(r))}${u} ${term(id).label.toLowerCase()} bonus`).join(" + ")})`,
+        q.capAmount != null ? `; the quarterly bonus on up to $${(+q.capAmount).toLocaleString()} per ${q.capPeriod}` : ""));
+    }
+  }
+  return lines.length ? [h("p", { class: "small", text: "Where bonuses meet:" }), h("ul", { class: "small" }, lines)]
+                      : h("p", { class: "small muted", text: "No quarter's bonus covers a category with its own bonus yet, so nothing adds up beyond each rate." });
 }
 
 // One rule to review: what it says, its evidence, and accept / reject / fix.
@@ -585,7 +629,7 @@ function reviewRule(cardId, x) {
     h("div", { class: "actions" },
       Object.entries(DECISION).map(([value, d]) => h("button", { type: "button", class: value === "accept" && !x.decision ? "primary" : value === "reject" ? "danger" : "",
         disabled: x.decision === value && !x.edited, text: d.button, onclick: press(value) })),
-      h("button", { type: "button", text: "Fix…", title: "Change its category, rate, cap or requirements; the quote must still back it", onclick: fix }),
+      r.verified === "calendar" ? null : h("button", { type: "button", text: "Fix…", title: "Change its category, rate, cap or requirements; the quote must still back it", onclick: fix }),
       x.decision ? h("button", { type: "button", text: "Undo", onclick: press("undo") }) : null),
     fixArea);
 }
@@ -651,6 +695,7 @@ async function openCard(id, quiet) {
     tryOut,
     h("h3", { text: "In the app" }),
     rv && rv.rules.length ? appPreview(rv) : h("p", { class: "muted small", text: cand ? "No rules found on this page." : "Not extracted yet: fetch the page, then extract its rules." }),
+    rv && rv.rules.length ? stackingBox(id, d, rv) : null,
     rv && rv.cardConditions.length ? [h("h3", { text: "Applies to the whole card" }), h("ul", { class: "small" }, rv.cardConditions.map((t) => h("li", { text: t })))] : null,
     rv && rv.rules.length ? [
       h("h3", { text: `Review · ${rv.counts.waiting} waiting · ${rv.counts.accept} accepted · ${rv.counts.reject} rejected` }),
