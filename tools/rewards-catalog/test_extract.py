@@ -448,7 +448,7 @@ class WhatCountsAsWhatTests(unittest.TestCase):
         page = BLUE_CASH.replace("Rewards\n", menu + "\n", 1)
         result = extract_card(BLUE_CASH_CARD, page, "h", FakeModel(BLUE_CASH_RULES), "m", follow_up=False)
         self.assertEqual(result["warnings"], [])
-        self.assertIn("3% Cash Back at U.S.", extract.rate_sentences(page))
+        self.assertIn("3% Cash Back at U.S. Supermarkets", extract.rate_sentences(page))
 
     def test_a_rate_the_result_lacks_is_reported_from_a_list_of_footnoted_sentences(self):
         faq = "\n".join([
@@ -513,6 +513,78 @@ class WhatCountsAsWhatTests(unittest.TestCase):
         model = FakeModel([rule(quote="Earn unlimited 3% cash back on dining, entertainment and popular streaming services.")])
         result = extract_card(CARD, page, "h", model, "m")
         self.assertEqual(result["followUps"], 0)
+        self.assertEqual(len(model.asked), 1)
+
+    def test_a_heading_with_us_in_it_is_one_sentence(self):
+        text = "3% Cash Back on gas at U.S. Gas Stations\n3% cash back on gas at U.S. gas stations on up to $6,000 per year."
+        self.assertEqual(extract.rate_sentences(text), [
+            "3% Cash Back on gas at U.S. Gas Stations", "3% cash back on gas at U.S. gas stations on up to $6,000 per year.",
+        ])
+
+    def test_follow_ups_ask_the_full_sentences_first_and_skip_what_they_covered(self):
+        # Blue Cash Everyday: the model returned nothing for the chunk, and each heading sits above the sentence
+        # that states its cap. Asked in page order, the six follow-ups went to the 3% headings and sentences, a
+        # heading gave an uncapped gas rule, and the 1% base rate was never asked about.
+        stated = [
+            ("3% Cash Back at U.S. Supermarkets", None),
+            ("Card Members can earn 3% cash back on eligible purchases at U.S. supermarkets, on up to $6,000 per year in purchases (then 1%).", "groceries"),
+            ("3% Cash Back on U.S. Online Retail Purchases", None),
+            ("Card Members can earn 3% cash back on eligible U.S. online retail purchases, on up to $6,000 per year in purchases (then 1%).", "online-shopping"),
+            ("3% Cash Back on gas at U.S. Gas Stations", None),
+            ("3% cash back on gas at U.S. gas stations on up to $6,000 per year in purchases (then 1%)", "gas"),
+            ("1% Cash Back on Other Eligible Purchases", None),
+            ("Card Members can earn 1% cash back on other eligible purchases.", "everything-else"),
+        ]
+        page = "\n".join(["Blue Cash Everyday"] + [line for line, _ in stated])
+        rules = {}
+        for line, category in stated:
+            if category == "everything-else":
+                rules[line] = rule(categories=[category], rate=1, quote=line)
+            elif category:
+                rules[line] = rule(categories=[category], rate=3, quote=line, capAmount=6000, capPeriod="year")
+        rules["3% Cash Back on gas at U.S. Gas Stations"] = rule(categories=["gas"], rate=3, quote="3% Cash Back on gas at U.S. Gas Stations")
+        asked = []
+
+        def complete(messages):
+            alone = next((line for line, _ in stated if '"""\n' + line + '\n"""' in messages[-1]["content"]), None)
+            asked.append(alone)
+            return json.dumps({"cardConditions": [], "rules": [rules[alone]] if alone in rules else []})
+
+        result = extract_card(BLUE_CASH_CARD, page, "h", complete, "m")
+        self.assertEqual(
+            sorted((r["categories"][0], r["rate"], r["capAmount"]) for r in result["rules"]),
+            [("everything-else", 1, None), ("gas", 3, 6000), ("groceries", 3, 6000), ("online-shopping", 3, 6000)],
+        )
+        self.assertEqual(result["followUps"], 4)  # the four sentences; the headings were covered by then
+        self.assertNotIn("3% Cash Back on gas at U.S. Gas Stations", asked)
+        self.assertEqual(result["warnings"], [])
+
+    def test_a_part_the_model_returns_nothing_for_is_asked_again_in_smaller_pieces(self):
+        # qwen answered Blue Cash Everyday's whole rates section (5,151 characters) with no rules in 3 seconds, and
+        # its first 24 lines with 4.
+        grocery = "Earn 3% cash back at U.S. supermarkets, on up to $6,000 per year."
+        base = "Earn 1% cash back on all other purchases."
+        terms = [f"Excludes purchases of type {n} and anything like them." for n in range(40)]
+        page = "\n".join(["Blue Cash Everyday", grocery, *terms, base])
+        replies = {grocery: rule(categories=["groceries"], rate=3, quote=grocery, capAmount=6000, capPeriod="year"),
+                   base: rule(categories=["everything-else"], rate=1, quote=base)}
+        sizes = []
+
+        def complete(messages):
+            part = messages[-1]["content"].split('"""\n', 1)[1].rsplit('\n"""', 1)[0]
+            sizes.append(len(part))
+            found = [] if len(part) > extract.RETRY_CHUNK_CHARS else [r for q, r in replies.items() if q in part]
+            return json.dumps({"cardConditions": [], "rules": found})
+
+        result = extract_card(BLUE_CASH_CARD, page, "h", complete, "m", follow_up=False)
+        self.assertEqual(sorted(r["rate"] for r in result["rules"]), [1, 3])
+        self.assertGreater(sizes[0], extract.RETRY_CHUNK_CHARS)
+        self.assertTrue(all(size <= extract.RETRY_CHUNK_CHARS for size in sizes[1:]))
+        self.assertEqual((result["status"], result["warnings"]), ("ok", []))
+
+    def test_a_short_part_with_no_rules_is_not_asked_again(self):
+        model = FakeModel([])
+        extract_card(CARD, "Savor Rewards\nEarn 3% on dining.", "h", model, "m", follow_up=False)
         self.assertEqual(len(model.asked), 1)
 
     def test_a_cap_the_page_does_not_state_is_unknown_not_invented(self):

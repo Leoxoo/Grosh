@@ -59,6 +59,7 @@ DEFAULT_MAX_TOKENS = 8000
 DEFAULT_TIMEOUT = 600
 CHUNK_CHARS = 12_000
 CHUNK_OVERLAP_LINES = 3
+RETRY_CHUNK_CHARS = 1_500  # a part the model returned no rules for is asked again in pieces this size
 MAX_RATE = 10
 MAX_CONDITIONS = 5
 MAX_CARD_CONDITIONS = 8
@@ -1121,11 +1122,12 @@ def model_text(text: str) -> str:
 def rate_sentences(text: str) -> list[str]:
     """Sentences that state a reward rate (a percent or an X multiplier next to earn, cash back, points or miles)."""
     found: list[str] = []
-    # A split needs a capital or digit after the full stop, so "U.S. supermarkets" stays whole. Footnote marks after
-    # the full stop ("(then 1%).‡") still end the sentence: otherwise a list of them runs together past
-    # MAX_CONDITION_CHARS and its rates are never looked for.
+    # A split needs a capital or digit after the full stop, so "U.S. supermarkets" stays whole, and never follows an
+    # abbreviation like "U.S.", so a heading's "U.S. Gas Stations" does too. Footnote marks after the full stop
+    # ("(then 1%).‡") still end the sentence: otherwise a list of them runs together past MAX_CONDITION_CHARS and its
+    # rates are never looked for.
     for block in text_blocks(text):
-        for piece in re.split(r"(?<=[.!?])[‡†¤*§]*\s+(?=[A-Z0-9\"“‘])", block):
+        for piece in re.split(r"(?<=[.!?])(?<!\b[A-Z]\.[A-Z]\.)[‡†¤*§]*\s+(?=[A-Z0-9\"“‘])", block):
             if (
                 piece and len(piece) <= MAX_CONDITION_CHARS and has_rates(piece) and _REWARD_SENTENCE.search(piece)
                 and piece not in found
@@ -1172,8 +1174,10 @@ def extract_card(
     and a status: ok, no-rules (the page states none), wrong-page (it doesn't name the card) or failed
     (the model could not be read for at least one chunk, so the result is incomplete).
 
-    After the chunks, each sentence that states a rate but that no accepted rule quotes is asked about
-    on its own (up to MAX_FOLLOW_UPS). The model skips sentences in a long chunk; asking alone catches them.
+    After the chunks, each sentence that states a rate but that no accepted rule covers yet is asked about
+    on its own (up to MAX_FOLLOW_UPS), the longest first. The model skips sentences in a long chunk; asking alone
+    catches them. Before that, a long part the model returned no rules for is asked again in pieces
+    (RETRY_CHUNK_CHARS).
     Another card's sentences and a boost's tier cells or "up to N% more" are neither asked about nor missed."""
     candidate = _empty_candidate(card, model, PROMPT_VERSION, page_hash, "ok")
     if not name_on_page(card["name"], text):
@@ -1227,14 +1231,27 @@ def extract_card(
         reply = ask(chunk)
         if reply is None:
             failures += 1
-        else:
-            take(reply)
+            continue
+        take(reply)
+        if not reply[0] and len(chunk) > RETRY_CHUNK_CHARS:
+            # No rules for a part that states rates: qwen answers a long part with none at once and finds them in
+            # its pieces. Follow-ups alone can't make up for it: they stop at MAX_FOLLOW_UPS.
+            for piece in (p for p in chunk_lines(chunk, RETRY_CHUNK_CHARS) if has_rates(p)):
+                retry = ask(piece)  # like a follow-up, a miss here is no failure: the part's own reply was read
+                if retry is not None:
+                    take(retry)
 
     # Another card's rates are no loss, and a boost's tier cell or "up to N% more" is no rate the model can add alone.
     this_cards = [s for s in rate_sentences(text) if not page.other_card_problem(s) and not _only_a_boost(s, rows)]
-    uncovered = [s for s in this_cards if not _covered(s, list(accepted.values()))][:MAX_FOLLOW_UPS] if follow_up else []
-    candidate["followUps"] = len(uncovered)
-    for sentence in uncovered:
+    # The longest first: a sentence carries the cap and terms its heading leaves out, and once it is a rule the
+    # heading is covered and needn't use up a follow-up (or give the rule again without its cap).
+    candidate["followUps"] = 0
+    for sentence in sorted(this_cards, key=len, reverse=True) if follow_up else []:
+        if candidate["followUps"] == MAX_FOLLOW_UPS:
+            break
+        if _covered(sentence, list(accepted.values())):
+            continue
+        candidate["followUps"] += 1
         reply = ask(sentence)  # a miss here is not a failure of the card: the chunks already covered the rest
         if reply is not None:
             take(reply)
