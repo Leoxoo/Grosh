@@ -6,6 +6,7 @@ import unittest
 import urllib.error
 
 import extract
+import fetch
 from extract import extract_card, manual_candidate, normalize, validate_rule
 
 CARD = {"id": "bank-savor", "name": "Savor Rewards", "issuer": "Bank", "rewardKind": "cashback", "sourceUrl": "https://x.test/savor"}
@@ -608,6 +609,20 @@ class WhatCountsAsWhatTests(unittest.TestCase):
         self.assertIn("Grocery Stores (excluding Walmart® and Target®)", october["conditions"])
         self.assertEqual(result["warnings"], [])  # the second calendar names October the same way: one rule
 
+    def test_a_calendar_page_gives_the_rotating_rule_its_quarters(self):
+        rotating = "Earn 5% cash back on everyday purchases at different places you shop each quarter, up to the quarterly maximum when you activate."
+        calendar = ("Earn 5% Cashback Bonus at Gas Stations, Transportation and Drug Stores, July 1 to September 30, 2026, on up to $1,500 in purchases.\n"
+                    "Earn 5% Cashback Bonus at Restaurants, Entertainment and Utilities, now to December 31, 2026, on up to $1,500 in purchases when you activate.")
+        card = {**CARD, "name": "Discover It", "calendarUrl": "https://x.test/calendar"}
+        model = FakeModel([rule(categories=[], selection="rotating", rate=5, quote=rotating, requires=["activation"])])
+        result = extract_card(card, f"Discover it Cash Back\n{rotating}", "h", model, "m", follow_up=False, today="2026-11-03", calendar=calendar)
+        (october,) = [r for r in result["rules"] if r["validFrom"]]  # July is over
+        self.assertEqual((october["validFrom"], october["validTo"], october["categories"], october["verified"]),
+                         ("2026-10-01", "2026-12-31", ["dining", "entertainment", "utilities"], "calendar"))
+        self.assertIn(october["evidence"]["quote"], calendar.splitlines())
+        self.assertEqual(october["evidence"]["url"], "https://x.test/calendar")  # the page the quote is on
+        self.assertEqual(len(model.asked), 1)  # the calendar is read, not asked about
+
     def test_no_calendar_rule_without_a_rotating_rule_to_take_the_rate_from(self):
         page = "Savor Rewards\nEarn 3% on dining.\nOCT-DEC\n2026\nDining"
         result = extract_card(CARD, page, "h", FakeModel([rule(quote="Earn 3% on dining.")]), "m", follow_up=False, today="2026-11-02")
@@ -1127,6 +1142,57 @@ class StatsTests(unittest.TestCase):
             saved = json.loads((cache / "c" / f"{CARD['id']}.json").read_text())
         self.assertEqual((saved["stats"]["calls"], saved["stats"]["promptTokens"], saved["stats"]["cachedTokens"]), (1, 90, 80))
         self.assertEqual(events[-1]["stats"], saved["stats"])
+
+    def calendar_card_run(self, cache, state: dict, replies: list[dict]) -> list[dict]:
+        """One extraction of a card with a calendar page. The model is asked only if the card needs it."""
+        def urlopen(request, timeout):
+            replies.append({})
+            return io.BytesIO(json.dumps({"choices": [{"message": {"content": json.dumps({"cardConditions": [], "rules": [
+                rule(categories=[], selection="rotating", rate=5, quote=self.ROTATING)]})}}], "usage": {}}).encode())
+        events = []
+        extract.process_cards([self.CALENDAR_CARD], state=state, manual={}, client=extract.ChatServer("http://x", "m", urlopen=urlopen),
+                              chunk_chars=12000, force=False, cache=cache, candidates=cache / "c", emit=events.append, follow_up=False)
+        return events
+
+    ROTATING = "Earn 5% cash back at different places you shop each quarter when you activate."
+    CALENDAR_CARD = {**CARD, "calendarUrl": "https://x.test/calendar"}
+
+    def test_a_card_is_read_with_its_saved_calendar_page_and_again_when_that_page_changes(self):
+        import tempfile
+        from datetime import date
+        from pathlib import Path
+        year = date.today().year + 1
+        sentence = f"Earn 5% Cashback Bonus at Restaurants, now to December 31, {year}, on up to $1,500 in purchases."
+        with tempfile.TemporaryDirectory() as tmp:
+            cache, asked = Path(tmp), []
+            (cache / CARD["id"]).mkdir()
+            (cache / CARD["id"] / "latest.txt").write_text(f"Savor Rewards\n{self.ROTATING}")
+            (cache / CARD["id"] / "calendar.txt").write_text(sentence)
+            state = {CARD["id"]: {"hash": "h", "calendarHash": "one"}}
+            self.calendar_card_run(cache, state, asked)
+            saved = json.loads((cache / "c" / f"{CARD['id']}.json").read_text())
+            self.assertEqual([r["validTo"] for r in saved["rules"] if r["validFrom"]], [f"{year}-12-31"])
+            self.assertEqual(saved["pageHash"], fetch.pages_hash(state[CARD["id"]]))
+            self.assertEqual(len(asked), 1)
+
+            self.calendar_card_run(cache, state, asked)
+            self.assertEqual(len(asked), 1)  # nothing changed: up to date
+
+            state[CARD["id"]]["calendarHash"] = "two"
+            self.calendar_card_run(cache, state, asked)
+            self.assertEqual(len(asked), 2)  # the card's page is the same, its calendar page isn't
+
+    def test_a_card_whose_calendar_text_is_not_saved_has_no_page_to_read_yet(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp)
+            (cache / CARD["id"]).mkdir()
+            (cache / CARD["id"] / "latest.txt").write_text("Savor Rewards")
+            state = {CARD["id"]: {"hash": "h", "calendarHash": "one"}}
+            self.assertFalse(extract.has_page(self.CALENDAR_CARD, state, cache))  # or it would be read with no quarters, as up to date
+            (cache / CARD["id"] / "calendar.txt").write_text("saved")
+            self.assertTrue(extract.has_page(self.CALENDAR_CARD, state, cache))
 
 
 class ManualRulesTests(unittest.TestCase):

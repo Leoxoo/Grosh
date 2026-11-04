@@ -24,6 +24,9 @@ reported, but is an expected outcome, not a failure.
 
 A card whose fetch did not succeed keeps its last hash. Failure never erases.
 
+A card can name a second page, `calendarUrl`, for its quarterly calendar. It is read after the
+card's page, saved as cache/<id>/calendar.txt, and hashed on its own (`calendarHash`).
+
 Only the standard library is used, so it runs anywhere python3 does (PIPELINE.md).
 """
 
@@ -212,6 +215,18 @@ def embedded_text(html: str) -> str:
     for script_type, body in parser.scripts:
         for value in _embedded_json(script_type, body):
             _strings(value, found)
+    return _prose_lines(found)
+
+
+def data_text(body: str) -> str:
+    """The sentences a JSON reply carries, kept the way embedded_text keeps them. A calendar a script builds from its
+    own data (Discover's) has no visible text to read, so this is its text. Raises ValueError if it isn't JSON."""
+    found: list[str] = []
+    _strings(json.loads(body), found)
+    return _prose_lines(found)
+
+
+def _prose_lines(found: list[str]) -> str:
     lines: list[str] = []
     seen: set[str] = set()
     total = 0
@@ -392,15 +407,18 @@ def render_with_browser(url: str, timeout_ms: int = 45_000) -> str:
         raise RuntimeError(f"the browser couldn't load the page: {type(problem).__name__}: {problem}") from problem
 
 
-def fetch_page(url: str, get, robots: Robots, throttle: Throttle, validators: dict[str, str], render=None) -> PageResult:
+def fetch_page(
+    url: str, get, robots: Robots, throttle: Throttle, validators: dict[str, str], render=None, calendar: bool = False,
+) -> PageResult:
     """Read one page. `render(url) -> html` is tried when the plain fetch comes back as a shell (needs-browser):
-    it can turn that into a read page, or leave it needs-browser with the reason."""
+    it can turn that into a read page, or leave it needs-browser with the reason. A `calendar` page may also
+    answer with JSON (data_text); a card page that does isn't a web page."""
     if not robots.allowed(url):
         problem = robots.problems.get(robots.origin(url))
         return PageResult("failed", error=problem) if problem else PageResult("robots")
     headers = {
         "User-Agent": USER_AGENT,
-        "Accept": "text/html,application/xhtml+xml",
+        "Accept": "application/json,text/html,application/xhtml+xml" if calendar else "text/html,application/xhtml+xml",
         "Accept-Language": "en-US,en;q=0.9",
         # Uncompressed: some issuers cut a gzip body off mid-stream, and half a page must not pass as a page.
         "Accept-Encoding": "identity",
@@ -428,13 +446,14 @@ def fetch_page(url: str, get, robots: Robots, throttle: Throttle, validators: di
             if len(response.body) > MAX_BYTES:
                 return PageResult("failed", error="page larger than the size limit")
             content_type = response.headers.get("content-type", "")
-            if content_type and "html" not in content_type and "text" not in content_type:
+            is_json = calendar and "json" in content_type
+            if content_type and not is_json and "html" not in content_type and "text" not in content_type:
                 return PageResult("failed", error=f"not a web page ({content_type})")
             try:
                 html = decode(response)
-                text = visible_text(html)
+                text = data_text(html) if is_json else visible_text(html)
                 embedded = False
-                if len(text) < MIN_TEXT_CHARS:
+                if len(text) < MIN_TEXT_CHARS and not is_json:
                     # A page built in the browser: look for its content in the data it ships with.
                     data = embedded_text(html)
                     text, embedded = (f"{text}\n{data}".strip(), True) if data else (text, False)
@@ -467,6 +486,9 @@ def fetch_page(url: str, get, robots: Robots, throttle: Throttle, validators: di
 
 
 # --- One run ---------------------------------------------------------------------------
+
+CALENDAR_FILE = "calendar.txt"
+CALENDAR_FIELDS = ("calendarUrl", "calendarHash", "calendarStatus")  # what fetch-state.json holds of a card's calendar page
 
 
 @dataclass
@@ -509,6 +531,14 @@ def write_json(path: Path, value) -> None:
     path.write_text(json_text(value), encoding="utf-8")
 
 
+def pages_hash(entry: dict) -> str | None:
+    """What a card's text hashes to, for telling whether it needs extracting: its page's hash, joined with its calendar
+    page's when it has one, so either page changing is the card changing."""
+    if not entry.get("calendarHash"):
+        return entry.get("hash")
+    return text_hash(f'{entry.get("hash")}\n{entry["calendarHash"]}')
+
+
 def run(
     cards: list[dict], state: dict, cache: Path, get, throttle: Throttle, today: str, after_each=None,
     before_each=None, should_stop=None, render=None,
@@ -522,6 +552,7 @@ def run(
     """
     robots = Robots(get, throttle)
     summary = RunSummary()
+    calendars: dict[str, PageResult] = {}  # like a card page, a calendar page that cards share is read once
     by_url: dict[str, list[dict]] = {}
     for card in cards:
         by_url.setdefault(card["sourceUrl"], []).append(card)
@@ -542,6 +573,11 @@ def run(
             validators = {}  # last time the server's "not modified" hid a shell: ask for the whole page again
         page = fetch_page(url, get, robots, throttle, validators, render=render)
         outcomes = [_record(card, url, page, state, cache, today) for card in sharing]
+        for card, outcome in zip(sharing, outcomes):
+            if calendar_url := card.get("calendarUrl"):
+                if calendar_url not in calendars:
+                    calendars[calendar_url] = fetch_page(calendar_url, get, robots, throttle, {}, calendar=True)
+                _record_calendar(card, calendars[calendar_url], outcome, state, cache, today)
         summary.outcomes.extend(outcomes)
         if after_each:
             after_each(outcomes)
@@ -583,6 +619,7 @@ def _record(card: dict, url: str, page: PageResult, state: dict, cache: Path, to
             "changedAt": today if status in ("new", "changed") else entry.get("changedAt", today),
             "lastStatus": "ok",
             **({"embedded": True} if page.embedded else {}),
+            **{name: entry[name] for name in CALENDAR_FIELDS if name in entry},
         }
         return CardOutcome(card_id, url, status, detail)
 
@@ -600,6 +637,25 @@ def _record(card: dict, url: str, page: PageResult, state: dict, cache: Path, to
     # Anything else leaves the last good hash alone and records only why this fetch fell short.
     state[card_id] = {**entry, "url": url, "lastStatus": page.status}
     return CardOutcome(card_id, url, page.status, page.error)
+
+
+def _record_calendar(card: dict, page: PageResult, outcome: CardOutcome, state: dict, cache: Path, today: str) -> None:
+    """Save a card's calendar page beside its own and fold what came of it into the card's outcome. A changed calendar
+    is a changed card, whatever its page did; one that wasn't read keeps its last text and hash, like a card's page."""
+    entry = state[card["id"]]
+    entry.update(calendarUrl=card["calendarUrl"], calendarStatus=page.status)
+    if page.status == "ok" and text_hash(page.text) == entry.get("calendarHash"):
+        return
+    note = f"calendar page: {page.status}"
+    if page.status == "ok":
+        saved = cache / card["id"] / CALENDAR_FILE
+        note = f'calendar page: {changed_line_count(saved.read_text(encoding="utf-8") if saved.exists() else "", page.text)} lines changed'
+        saved.parent.mkdir(parents=True, exist_ok=True)
+        saved.write_text(page.text, encoding="utf-8")
+        entry.update(calendarHash=text_hash(page.text), changedAt=today)
+        if outcome.status == "unchanged":
+            outcome.status = "changed"
+    outcome.detail = f"{outcome.detail}; {note}" if outcome.detail else note
 
 
 def report(summary: RunSummary, total_cards: int) -> str:
@@ -624,8 +680,12 @@ RETRYABLE = ("failed", "gone", "needs-browser")
 
 
 def text_saved(card_id: str, entry: dict, cache: Path) -> bool:
-    """Whether a card's fetched text is in the cache. A card that never got a page has nothing to save."""
-    return not entry.get("hash") or (cache / card_id / "latest.txt").exists()
+    """Whether a card's fetched text is in the cache, its calendar page's too. A card that never got a page has
+    nothing to save."""
+    folder = cache / card_id
+    return (not entry.get("hash") or (folder / "latest.txt").exists()) and (
+        not entry.get("calendarHash") or (folder / CALENDAR_FILE).exists()
+    )
 
 
 def select(
@@ -652,10 +712,11 @@ def select(
         if missing or retry:
             entry = state.get(card["id"])
             wanted = (missing and (entry is None or (cache is not None and not text_saved(card["id"], entry, cache)))) or (
-                retry and entry is not None and entry["lastStatus"] in RETRYABLE
+                retry and entry is not None and (entry["lastStatus"] in RETRYABLE or entry.get("calendarStatus") in RETRYABLE)
             )
-            # A card whose page moved in the seed since it was fetched needs a fresh look too.
+            # A card whose page moved in the seed since it was fetched needs a fresh look too, and so does its calendar page.
             wanted = wanted or (entry is not None and entry.get("url") != card["sourceUrl"])
+            wanted = wanted or (entry is not None and card.get("calendarUrl") not in (None, entry.get("calendarUrl")))
             if not wanted:
                 continue
         chosen.append(card)

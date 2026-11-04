@@ -47,6 +47,18 @@ def throttle() -> Throttle:
 
 ALLOW = Response(200, {"content-type": "text/plain"}, b"User-agent: *\nAllow: /\n", "")
 
+CALENDAR_URL = "https://x.test/calendar"
+SENTENCE = "Earn <b>5% <i>Cashback Bonus</i></b> at <b>Restaurants, Entertainment and Utilities,</b> now to December 31, 2026, on up to $1,500 in purchases when you activate."
+SAID = "Earn 5% Cashback Bonus at Restaurants, Entertainment and Utilities, now to December 31, 2026, on up to $1,500 in purchases when you activate."
+
+
+def calendar_data(sentence: str = SENTENCE) -> Response:
+    """Discover's calendar data, cut down: what the page's script builds its calendar from."""
+    quarter = {"offerDescUnenrolled": sentence, "offerId": 34285, "offerStatus": "qualification",
+               "quarterLabelEndDate": "December 31, 2026", "title": "Restaurants, Entertainment and Utilities"}
+    filler = {"note": "You always earn cash back on purchases when you use your card at any merchant in the U.S. " * 5}
+    return Response(200, {"content-type": "application/json"}, json.dumps({**filler, "quarters": [quarter]}).encode(), CALENDAR_URL)
+
 
 class VisibleTextTests(unittest.TestCase):
     def test_drops_scripts_and_styles_and_collapses_spacing(self):
@@ -200,6 +212,28 @@ class FetchPageTests(unittest.TestCase):
         self.assertEqual(web.fetched(self.URL), 0)
 
 
+class CalendarDataTests(unittest.TestCase):
+    def fetch(self, reply: Response, calendar: bool) -> fetch.PageResult:
+        web = FakeWeb()
+        web.route("https://x.test/robots.txt", ALLOW)
+        web.route(CALENDAR_URL, reply)
+        return fetch.fetch_page(CALENDAR_URL, web, fetch.Robots(web, throttle()), throttle(), {}, calendar=calendar)
+
+    def test_a_calendar_can_be_a_pages_json_data_and_its_sentences_are_what_is_saved(self):
+        result = self.fetch(calendar_data(), calendar=True)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.text.splitlines()[1:], [SAID, "Restaurants, Entertainment and Utilities"])
+
+    def test_a_card_page_answering_json_is_still_not_a_web_page(self):
+        self.assertEqual(self.fetch(calendar_data(), calendar=False).status, "failed")
+
+    def test_calendar_data_that_is_not_json_is_a_failed_read(self):
+        reply = Response(200, {"content-type": "application/json"}, b"<html>Oops</html>", CALENDAR_URL)
+        result = self.fetch(reply, calendar=True)
+        self.assertEqual(result.status, "failed")
+        self.assertIn("unreadable", result.error)
+
+
 class BrowserTests(unittest.TestCase):
     URL = "https://x.test/card"
     MENU = "<p>Home</p><p>Cash Back Credit Cards</p>" + "<p>Locations near you.</p>" * 40
@@ -343,6 +377,91 @@ class RunTests(unittest.TestCase):
         self.assertNotIn("## unchanged", text)
 
 
+class CalendarPageTests(unittest.TestCase):
+    """A card that names a calendar page: the page is fetched and saved with the card's own."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.cache = Path(self.dir.name)
+        self.card = {"id": "a", "sourceUrl": "https://x.test/a", "calendarUrl": CALENDAR_URL}
+        self.web = FakeWeb()
+        self.web.route("https://x.test/robots.txt", ALLOW)
+        self.web.route("https://x.test/a", page())
+        self.web.route(CALENDAR_URL, calendar_data())
+        self.state: dict = {}
+
+    def go(self, *cards, day="2026-10-20") -> dict[str, fetch.CardOutcome]:
+        summary = fetch.run(list(cards) or [self.card], self.state, self.cache, self.web, throttle(), day)
+        return {o.card_id: o for o in summary.outcomes}
+
+    def saved(self, name: str) -> str:
+        return (self.cache / "a" / name).read_text(encoding="utf-8")
+
+    def test_the_calendar_is_saved_beside_the_cards_page(self):
+        self.go()
+        self.assertIn(SAID, self.saved("calendar.txt").splitlines())
+        entry = self.state["a"]
+        self.assertEqual((entry["calendarUrl"], entry["calendarStatus"]), (CALENDAR_URL, "ok"))
+        self.assertEqual(entry["calendarHash"], fetch.text_hash(self.saved("calendar.txt")))
+
+    def test_the_cards_own_hash_is_its_own_pages(self):
+        self.go()
+        self.assertEqual(self.state["a"]["hash"], fetch.text_hash(self.saved("latest.txt")))
+
+    def test_a_rerun_with_no_changes_changes_nothing(self):
+        self.go()
+        before = copy.deepcopy(self.state)
+        self.assertEqual(self.go(day="2026-11-20")["a"].status, "unchanged")
+        self.assertEqual(self.state, before)
+
+    def test_a_changed_calendar_is_a_changed_card_though_its_page_is_the_same(self):
+        self.go()
+        hashed = fetch.pages_hash(self.state["a"])
+        self.web.route(CALENDAR_URL, calendar_data(SENTENCE.replace("Utilities", "Gas Stations")))
+        outcome = self.go(day="2026-11-20")["a"]
+        self.assertEqual(outcome.status, "changed")
+        self.assertIn("calendar page", outcome.detail)
+        self.assertEqual(self.state["a"]["changedAt"], "2026-11-20")
+        self.assertNotEqual(fetch.pages_hash(self.state["a"]), hashed)
+
+    def test_a_changed_calendar_counts_when_the_server_says_the_card_page_is_not_modified(self):
+        self.web.route("https://x.test/a", page(etag='"v1"'))
+        self.go()
+        self.web.route("https://x.test/a", Response(304, {}, b"", "https://x.test/a"))
+        self.web.route(CALENDAR_URL, calendar_data(SENTENCE.replace("Utilities", "Gas Stations")))
+        self.assertEqual(self.go(day="2026-11-20")["a"].status, "changed")
+
+    def test_a_card_given_a_calendar_after_it_was_fetched_has_changed(self):
+        self.go({"id": "a", "sourceUrl": "https://x.test/a"})
+        self.assertEqual(self.go(day="2026-11-20")["a"].status, "changed")
+
+    def test_a_calendar_that_fails_keeps_what_was_saved_and_says_so(self):
+        self.go()
+        saved, before = self.saved("calendar.txt"), fetch.pages_hash(self.state["a"])
+        self.web.route(CALENDAR_URL, Response(403, {}, b"", CALENDAR_URL))
+        outcome = self.go(day="2026-11-20")["a"]
+        self.assertEqual(outcome.status, "unchanged")  # the card's page is fine: the card isn't a failed fetch
+        self.assertIn("calendar page: refused", outcome.detail)
+        self.assertEqual(self.state["a"]["calendarStatus"], "refused")
+        self.assertEqual(fetch.pages_hash(self.state["a"]), before)
+        self.assertEqual(self.saved("calendar.txt"), saved)
+
+    def test_cards_that_share_a_calendar_fetch_it_once(self):
+        self.web.route("https://x.test/b", page())
+        self.go(self.card, {"id": "b", "sourceUrl": "https://x.test/b", "calendarUrl": CALENDAR_URL})
+        self.assertEqual(self.web.fetched(CALENDAR_URL), 1)
+        self.assertTrue((self.cache / "b" / "calendar.txt").exists())
+
+    def test_a_card_with_no_calendar_page_has_the_state_and_hash_it_always_had(self):
+        self.go({"id": "a", "sourceUrl": "https://x.test/a"})
+        entry = self.state["a"]
+        self.assertEqual(set(entry), {"url", "hash", "textChars", "finalUrl", "changedAt", "lastStatus"})
+        self.assertEqual(fetch.pages_hash(entry), entry["hash"])
+        self.assertEqual(self.web.fetched(CALENDAR_URL), 0)
+        self.assertFalse((self.cache / "a" / "calendar.txt").exists())
+
+
 class SelectTests(unittest.TestCase):
     CARDS = [
         {"id": "chase-a", "issuer": "Chase", "sourceUrl": "https://x.test/a"},
@@ -387,6 +506,30 @@ class SelectTests(unittest.TestCase):
     def test_a_card_whose_page_moved_is_refetched(self):
         # citi-b was fetched from /b but the seed now says /new-b.
         self.assertIn("citi-b", self.ids(state=self.STATE, retry=True))
+
+    def select_calendar_card(self, entry: dict, **kwargs) -> list[str]:
+        card = {"id": "d", "issuer": "Discover", "sourceUrl": "https://x.test/d", "calendarUrl": CALENDAR_URL}
+        state = {"d": {"url": "https://x.test/d", "lastStatus": "ok", **entry}}
+        return [c["id"] for c in fetch.select([card], [], "", None, state, **kwargs)]
+
+    def test_a_card_whose_calendar_page_was_never_read_is_picked_up(self):
+        self.assertEqual(self.select_calendar_card({}, missing=True), ["d"])
+        self.assertEqual(self.select_calendar_card({"calendarUrl": "https://x.test/old"}, retry=True), ["d"])
+
+    def test_a_card_whose_calendar_page_failed_is_retried(self):
+        read = {"calendarUrl": CALENDAR_URL, "calendarStatus": "ok"}
+        self.assertEqual(self.select_calendar_card(read, retry=True), [])
+        self.assertEqual(self.select_calendar_card({**read, "calendarStatus": "failed"}, retry=True), ["d"])
+
+    def test_missing_picks_up_a_card_whose_calendar_text_is_not_saved(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp)
+            (cache / "d").mkdir()
+            (cache / "d" / "latest.txt").write_text("saved")
+            read = {"hash": "h", "calendarUrl": CALENDAR_URL, "calendarHash": "c", "calendarStatus": "ok"}
+            self.assertEqual(self.select_calendar_card(read, missing=True, cache=cache), ["d"])
+            (cache / "d" / "calendar.txt").write_text("saved")
+            self.assertEqual(self.select_calendar_card(read, missing=True, cache=cache), [])
 
 
 if __name__ == "__main__":

@@ -33,6 +33,18 @@ Activation period closed
 October – December
 Coming Soon"""
 
+# Discover's calendar data, 2026-11-03, as fetch.data_text saves it: one sentence says a quarter's names and dates.
+DISCOVER = """You activated to earn 5% Cashback Bonus at Grocery Stores, Wholesale Clubs, and Select Streaming Services, PARENT_ENROLLMENT_DATE to March 31, 2026, on up to $1,500 in purchases.
+Earn 5% Cashback Bonus at Grocery Stores, Wholesale Clubs, and Select Streaming Services, January 1 to March 31, 2026, on up to $1,500 in purchases.
+Grocery Stores, Wholesale Clubs, and Select Streaming Services
+Earn 5% Cashback Bonus at Restaurants and Home Improvement Stores, April 1 to June 30, 2026, on up to $1,500 in purchases.
+Restaurants and Home Improvement Stores
+FIRST TIME EVER: Earn 5% on Entertainment
+You activated to earn 5% Cashback Bonus at Restaurants, Entertainment and Utilities, PARENT_ENROLLMENT_DATE to December 31, 2026, on up to $1,500 in purchases.
+Earn 5% Cashback Bonus at Restaurants, Entertainment and Utilities, now to December 31, 2026, on up to $1,500 in purchases when you activate.
+September 01, 2026
+Restaurants, Entertainment and Utilities"""
+
 
 class ReadCalendarTests(unittest.TestCase):
     def test_each_quarter_gets_its_dates_and_the_names_listed_under_it(self):
@@ -58,6 +70,25 @@ class ReadCalendarTests(unittest.TestCase):
 
     def test_a_month_range_that_is_not_a_quarter_is_not_a_calendar(self):
         self.assertEqual(quarters.read_calendar("2026 calendar\nJan - Dec\nDining\nFeb - Apr\nGas"), [])
+
+    def test_a_sentence_can_say_a_quarters_names_and_dates_on_one_line(self):
+        found = [(q.start, q.end, q.names) for q in quarters.read_calendar(DISCOVER)]
+        self.assertEqual(found, [
+            ("2026-01-01", "2026-03-31", ("Grocery Stores", "Wholesale Clubs", "Select Streaming Services")),
+            ("2026-04-01", "2026-06-30", ("Restaurants", "Home Improvement Stores")),
+            ("2026-10-01", "2026-12-31", ("Restaurants", "Entertainment", "Utilities")),  # "now to": its end says which quarter
+        ])
+
+    def test_the_quote_of_a_quarter_in_a_sentence_is_that_sentence(self):
+        october = quarters.read_calendar(DISCOVER)[-1]
+        self.assertEqual(october.quote, "Earn 5% Cashback Bonus at Restaurants, Entertainment and Utilities, "
+                                        "now to December 31, 2026, on up to $1,500 in purchases when you activate.")
+        self.assertIn(october.quote, DISCOVER.splitlines())
+
+    def test_a_sentence_about_dates_that_are_not_a_quarter_is_not_a_calendar(self):
+        promotion = "Earn 5% Cashback Bonus at Best Buy, November 25 to December 31, 2026, on up to $1,500 in purchases."
+        self.assertEqual(quarters.read_calendar(promotion), [])
+        self.assertEqual(quarters.read_calendar(promotion.replace("November 25", "now").replace("December 31", "December 24")), [])
 
 
 if __name__ == "__main__":

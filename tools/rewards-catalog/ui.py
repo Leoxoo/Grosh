@@ -343,7 +343,7 @@ class App:
             hand_entered = card["id"] in manual
             pending = (
                 False if hand_entered or not page
-                else not extract.up_to_date(self.paths.candidates / f"{card['id']}.json", entry["hash"], settings["model"])
+                else not extract.up_to_date(self.paths.candidates / f"{card['id']}.json", fetch.pages_hash(entry), settings["model"])
             )
             rows.append({
                 "id": card["id"], "name": card["name"], "issuer": card["issuer"], "kind": card["rewardKind"],
@@ -566,7 +566,7 @@ class App:
         model = self.settings()["model"]
         chosen = [
             c for c in with_pages
-            if c["id"] in manual or not extract.up_to_date(self.paths.candidates / f"{c['id']}.json", state[c["id"]]["hash"], model)
+            if c["id"] in manual or not extract.up_to_date(self.paths.candidates / f"{c['id']}.json", fetch.pages_hash(state[c["id"]]), model)
         ]
         return chosen, "cards that need extracting"
 

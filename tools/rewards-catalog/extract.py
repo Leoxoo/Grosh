@@ -1104,13 +1104,14 @@ def _conditions_about(conditions, category) -> list:
     return kept
 
 
-def calendar_rules(rules: list[dict], text: str, today: str) -> list[dict]:
+def calendar_rules(rules: list[dict], text: str, today: str, url: str | None = None) -> list[dict]:
     """A dated rotating rule for each quarter the page's calendar names (quarters.read_calendar) that hasn't ended
     by `today`: the card's rotating rule, with its rate, cap and activation, given that quarter's dates and the
     categories its names stand for. A name that is no category (a charity, Amazon: brands aren't category words)
     is kept in "merchants", so the bonus still says where it applies. No calendar rule without a rotating rule:
     the calendar names no rate. Each is marked verified "calendar": its quote is the calendar's lines, which
-    name no rate, so the quote checks (and fixing it in the review) don't apply."""
+    name no rate, so the quote checks (and fixing it in the review) don't apply. `url` is the calendar's page,
+    when that isn't the page the rotating rule came from."""
     rotating = [r for r in rules if r["selection"] == "rotating" and not r["categories"] and r["validFrom"] is None]
     if not rotating:
         return []
@@ -1133,7 +1134,7 @@ def calendar_rules(rules: list[dict], text: str, today: str) -> list[dict]:
         made.append({
             **base, "categories": categories, "merchants": merchants, "validFrom": quarter.start, "validTo": quarter.end,
             "conditions": conditions[:MAX_CONDITIONS], "verified": "calendar",
-            "evidence": {**base["evidence"], "quote": quarter.quote},
+            "evidence": {**base["evidence"], "quote": quarter.quote, "url": url or base["evidence"]["url"]},
         })
     return made
 
@@ -1221,7 +1222,7 @@ def _covered(sentence: str, rules: list[dict]) -> bool:
 
 def extract_card(
     card: dict, text: str, page_hash: str, complete, model: str, max_chars: int = CHUNK_CHARS, progress=None,
-    follow_up: bool = True, today: str | None = None,
+    follow_up: bool = True, today: str | None = None, calendar: str | None = None,
 ) -> dict:
     """The candidate for one card: accepted rules, card-wide conditions, rejected proposals with reasons,
     and a status: ok, no-rules (the page states none), wrong-page (it doesn't name the card) or failed
@@ -1231,7 +1232,8 @@ def extract_card(
     on its own (up to MAX_FOLLOW_UPS), the longest first. The model skips sentences in a long chunk; asking alone
     catches them. Before that, a long part the model returned no rules for is asked again in pieces
     (RETRY_CHUNK_CHARS). Last, the page's quarterly calendar gives the rotating rule a dated rule for each quarter
-    it names that hasn't ended by `today` (calendar_rules).
+    it names that hasn't ended by `today` (calendar_rules); `calendar` is the text of the card's calendar page, if
+    it has one, and only that page is read for quarters then.
     Another card's sentences and a boost's tier cells or "up to N% more" are neither asked about nor missed."""
     candidate = _empty_candidate(card, model, PROMPT_VERSION, page_hash, "ok")
     if not name_on_page(card["name"], text):
@@ -1309,7 +1311,8 @@ def extract_card(
         reply = ask(sentence)  # a miss here is not a failure of the card: the chunks already covered the rest
         if reply is not None:
             take(reply)
-    for rule in calendar_rules(list(accepted.values()), text, today or date.today().isoformat()):
+    calendar_url = card.get("calendarUrl") if calendar else None
+    for rule in calendar_rules(list(accepted.values()), calendar or text, today or date.today().isoformat(), calendar_url):
         accepted.setdefault(_merge_key(rule), rule)  # two calendars naming a quarter the same way are one rule
     still_missing = [s for s in this_cards if not _covered(s, list(accepted.values()))]
 
@@ -1404,7 +1407,8 @@ def load_manual(cards: list[dict], path: Path = MANUAL_RULES) -> dict:
 
 
 def has_page(card: dict, state: dict, cache: Path) -> bool:
-    return bool(state.get(card["id"], {}).get("hash")) and (cache / card["id"] / "latest.txt").exists()
+    entry = state.get(card["id"], {})
+    return bool(entry.get("hash")) and fetch.text_saved(card["id"], entry, cache)
 
 
 def summarize_calls(calls: list[dict]) -> dict:
@@ -1438,8 +1442,10 @@ def process_cards(
         if should_stop and should_stop():
             raise Stopped
         base = {"index": number, "total": len(chosen), "id": card["id"], "name": card["name"]}
-        page_hash = state.get(card["id"], {}).get("hash")
+        page_hash = fetch.pages_hash(state.get(card["id"], {}))
         text = (cache / card["id"] / "latest.txt").read_text(encoding="utf-8") if has_page(card, state, cache) else None
+        calendar_file = cache / card["id"] / fetch.CALENDAR_FILE
+        calendar = calendar_file.read_text(encoding="utf-8") if card.get("calendarUrl") and calendar_file.exists() else None
         path = candidates / f"{card['id']}.json"
         if card["id"] in manual:
             emit({"event": "card-start", **base, "kind": "hand-entered"})
@@ -1466,7 +1472,7 @@ def process_cards(
             candidate = extract_card(
                 card, text, page_hash, timed, client.model, chunk_chars,
                 progress=(lambda done, total, _id=card["id"]: progress(_id, done, total)) if progress else None,
-                follow_up=follow_up,
+                follow_up=follow_up, calendar=calendar,
             )
             candidate["stats"] = summarize_calls(calls)
         fetch.write_json(path, candidate)

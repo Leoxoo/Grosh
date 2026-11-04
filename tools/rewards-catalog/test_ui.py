@@ -206,6 +206,25 @@ class OverviewTests(AppCase):
         row = next(r for r in self.app.overview()["cards"] if r["id"] == "bank-a")
         self.assertTrue(row["pending"])  # same page, different model
 
+    def test_a_changed_calendar_page_makes_a_card_pending_again(self):
+        self.give_page("bank-a")
+        self.state["bank-a"]["calendarHash"] = "one"
+        (self.paths.cache / "bank-a" / "calendar.txt").write_text("saved")
+        self.paths.state.write_text(json.dumps(self.state))
+        self.app.save_settings({"model": "good-model"})
+        self.app.start_job({"kind": "extract", "which": "pending"})
+        self.wait()
+        row = next(r for r in self.app.overview()["cards"] if r["id"] == "bank-a")
+        self.assertFalse(row["pending"])
+        self.state["bank-a"]["calendarHash"] = "two"
+        self.paths.state.write_text(json.dumps(self.state))
+        row = next(r for r in self.app.overview()["cards"] if r["id"] == "bank-a")
+        self.assertTrue(row["pending"])  # same page, different calendar page
+        self.app.start_job({"kind": "extract", "which": "pending"})
+        self.wait()
+        row = next(r for r in self.app.overview()["cards"] if r["id"] == "bank-a")
+        self.assertFalse(row["pending"])  # the job picked it up too
+
     def test_hand_entered_cards_are_never_pending_and_the_summary_counts(self):
         self.give_page("bank-a")
         self.paths.manual.write_text(json.dumps({"bank-a": {"rules": []}}))
