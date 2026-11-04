@@ -447,6 +447,26 @@ class CalendarPageTests(unittest.TestCase):
         self.assertEqual(fetch.pages_hash(self.state["a"]), before)
         self.assertEqual(self.saved("calendar.txt"), saved)
 
+    def test_a_calendar_that_fails_is_an_error_in_the_report_though_the_card_is_unchanged(self):
+        self.go()
+        self.web.route(CALENDAR_URL, Response(403, {}, b"", CALENDAR_URL))
+        summary = fetch.run([self.card], self.state, self.cache, self.web, throttle(), "2026-11-20")
+        self.assertEqual(summary.outcomes[0].calendar_error, "refused: HTTP 403")
+        text = fetch.report(summary, 1)
+        self.assertIn("| calendar page not read | 1 |", text)
+        self.assertIn("## calendar page not read", text)
+        self.assertIn("- `a` refused: HTTP 403", text)
+
+    def test_a_calendar_robots_blocks_is_an_error_too(self):
+        self.web.route("https://y.test/robots.txt", Response(200, {"content-type": "text/plain"}, b"User-agent: *\nDisallow: /\n", ""))
+        card = {**self.card, "calendarUrl": "https://y.test/calendar"}
+        self.assertEqual(self.go(card)["a"].calendar_error, "robots")
+
+    def test_a_calendar_that_was_read_is_no_error_and_the_report_has_no_such_part(self):
+        summary = fetch.run([self.card], self.state, self.cache, self.web, throttle(), "2026-11-20")
+        self.assertEqual(summary.outcomes[0].calendar_error, "")
+        self.assertNotIn("calendar page not read", fetch.report(summary, 1))
+
     def test_cards_that_share_a_calendar_fetch_it_once(self):
         self.web.route("https://x.test/b", page())
         self.go(self.card, {"id": "b", "sourceUrl": "https://x.test/b", "calendarUrl": CALENDAR_URL})

@@ -55,6 +55,17 @@ class CatalogTests(unittest.TestCase):
             "merchants": [], "evidence": {"quote": "Earn unlimited 3% cash back on dining.", "url": URL},  # no page hash, no "verified"
         }])
 
+    def test_an_accepted_quarter_stays_published_when_its_calendar_rewords_it_as_it_begins(self):
+        def quarter(said: str) -> dict:
+            made = extract.candidate_rule({**PROPOSAL, "categories": ["dining"], "selection": "rotating", "rate": 5, "validFrom": "2027-01-01",
+                                           "validTo": "2027-03-31", "quote": said}, URL, "hash-1", "calendar")
+            return {**made, "merchants": []}
+
+        before = candidate(quarter("Earn 5% Cashback Bonus at Restaurants, January 1 to March 31, 2027, on up to $1,500 in purchases."))
+        after = candidate(quarter("Earn 5% Cashback Bonus at Restaurants, now to March 31, 2027, on up to $1,500 in purchases when you activate."))
+        doc = publish.catalog([SAVOR], {"bank-savor": after}, decided(before, (0, "accept", "2026-12-20")), None, "2027-01-02")
+        self.assertIn("now to March 31", doc["cards"][0]["rules"][0]["evidence"]["quote"])
+
     def test_a_card_carries_its_seed_facts_its_card_wide_conditions_and_the_day_its_last_rule_was_accepted(self):
         cand = candidate(self.dining, self.base, card_conditions=["Digital wallets may not earn the higher rate."])
         decisions = decided(cand, (0, "accept", "2026-10-30"), (1, "accept", "2026-11-01"))

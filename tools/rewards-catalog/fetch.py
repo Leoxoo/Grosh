@@ -497,6 +497,7 @@ class CardOutcome:
     url: str
     status: str  # new, unchanged, changed, or one of PageResult's non-ok statuses
     detail: str = ""
+    calendar_error: str = ""  # why the card's calendar page wasn't read; "" if it was, or the card has none
 
 
 @dataclass
@@ -641,12 +642,12 @@ def _record(card: dict, url: str, page: PageResult, state: dict, cache: Path, to
 
 def _record_calendar(card: dict, page: PageResult, outcome: CardOutcome, state: dict, cache: Path, today: str) -> None:
     """Save a card's calendar page beside its own and fold what came of it into the card's outcome. A changed calendar
-    is a changed card, whatever its page did; one that wasn't read keeps its last text and hash, like a card's page."""
+    is a changed card, whatever its page did; one that wasn't read keeps its last text and hash, like a card's page,
+    and the outcome's `calendar_error` says why: the card's own status is about its own page."""
     entry = state[card["id"]]
     entry.update(calendarUrl=card["calendarUrl"], calendarStatus=page.status)
     if page.status == "ok" and text_hash(page.text) == entry.get("calendarHash"):
         return
-    note = f"calendar page: {page.status}"
     if page.status == "ok":
         saved = cache / card["id"] / CALENDAR_FILE
         note = f'calendar page: {changed_line_count(saved.read_text(encoding="utf-8") if saved.exists() else "", page.text)} lines changed'
@@ -655,6 +656,9 @@ def _record_calendar(card: dict, page: PageResult, outcome: CardOutcome, state: 
         entry.update(calendarHash=text_hash(page.text), changedAt=today)
         if outcome.status == "unchanged":
             outcome.status = "changed"
+    else:
+        outcome.calendar_error = f"{page.status}: {page.error}" if page.error else page.status
+        note = f"calendar page: {outcome.calendar_error}"
     outcome.detail = f"{outcome.detail}; {note}" if outcome.detail else note
 
 
@@ -667,12 +671,18 @@ def report(summary: RunSummary, total_cards: int) -> str:
     for status in order + sorted(set(groups) - set(order)):
         if status in groups:
             lines.append(f"| {status} | {len(groups[status])} |")
+    unread = [outcome for outcome in summary.outcomes if outcome.calendar_error]
+    if unread:
+        lines.append(f"| calendar page not read | {len(unread)} |")
     for status in order:
         if status in groups and status != "unchanged":
             lines += ["", f"## {status}", ""]
             for outcome in groups[status]:
                 note = f": {outcome.detail}" if outcome.detail else ""
                 lines.append(f"- `{outcome.card_id}` {outcome.url}{note}")
+    if unread:
+        lines += ["", "## calendar page not read", ""]
+        lines += [f"- `{outcome.card_id}` {outcome.calendar_error}" for outcome in unread]
     return "\n".join(lines) + "\n"
 
 

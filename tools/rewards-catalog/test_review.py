@@ -213,6 +213,34 @@ class CardOptionTests(ReviewCase):
         self.assertFalse(path.exists())
 
 
+def quarter_rule(quote: str = "Earn 5% Cashback Bonus at Restaurants, January 1 to March 31, 2027, on up to $1,500 in purchases.", **changes) -> dict:
+    """A rule read from a calendar, as extract.calendar_rules makes it."""
+    made = extract.candidate_rule({**PROPOSAL, "categories": ["dining"], "selection": "rotating", "rate": 5, "validFrom": "2027-01-01",
+                                   "validTo": "2027-03-31", "quote": quote}, URL, "hash-1", "calendar")
+    return {**made, "merchants": [], **changes}
+
+
+class RuleKeyTests(unittest.TestCase):
+    def key(self, rule_: dict) -> str:
+        return review.rule_key("bank-savor", rule_)
+
+    def test_a_quarter_keeps_its_key_when_its_calendar_rewords_it(self):
+        reworded = quarter_rule("Earn 5% Cashback Bonus at Restaurants, now to March 31, 2027, on up to $1,500 in purchases when you activate.")
+        self.assertEqual(self.key(reworded), self.key(quarter_rule()))
+
+    def test_a_quarter_gets_a_new_key_when_what_it_says_changes(self):
+        for changes in ({"validFrom": "2027-04-01"}, {"validTo": "2027-06-30"}, {"rate": 3}, {"categories": ["gas"]}, {"merchants": ["Amazon"]}):
+            self.assertNotEqual(self.key(quarter_rule(**changes)), self.key(quarter_rule()), changes)
+
+    def test_other_rules_keep_the_keys_they_have_always_had(self):
+        self.assertEqual(self.key(rule()), "65d69ab1e23eefef")  # worked out before quarter rules changed: decisions are saved under these
+        dated = rule(categories=[], selection="rotating", rate=5, validFrom="2026-01-01", validTo="2026-03-31")
+        self.assertEqual(self.key(dated), "7d299cb843cd417c")
+
+    def test_a_rule_read_from_a_page_still_changes_key_with_its_quote(self):
+        self.assertNotEqual(self.key(rule(quote="Earn 3% cash back on dining.")), self.key(rule()))
+
+
 class QuarterStatusTests(ReviewCase):
     def setUp(self) -> None:
         super().setUp()

@@ -47,8 +47,11 @@ EDITABLE = ("categories", "rate", "unit", "capAmount", "capPeriod", "requires", 
 
 
 def rule_key(card_id: str, rule: dict) -> str:
-    """What a decision is saved under: the same for the same rule on the same card, different if anything it says changes."""
-    content = dict(rule, evidence={k: v for k, v in rule["evidence"].items() if k != "pageHash"})
+    """What a decision is saved under: the same for the same rule on the same card, different if anything it says changes.
+    A quarter rule's quote is left out: a calendar rewords a quarter as it comes round ("January 1 to March 31", then "now
+    to March 31"), and all the rule says is in its dates, rate, categories and merchants."""
+    left_out = ("pageHash", "quote") if rule.get("verified") == "calendar" else ("pageHash",)
+    content = dict(rule, evidence={k: v for k, v in rule["evidence"].items() if k not in left_out})
     for field in SET_FIELDS:
         content[field] = sorted(content.get(field) or [])
     del content["needs"]  # worked out from the rest

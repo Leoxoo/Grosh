@@ -598,6 +598,26 @@ class RefreshTests(AppCase):
         self.assertTrue(any("page not read (gone)" in line["text"] for line in job["log"] if line["level"] == "error"))
         self.assertIn("waiting for review", log)
 
+    def test_a_calendar_page_that_cannot_be_read_is_an_error_and_is_not_said_to_name_nothing(self):
+        self.give_candidate("bank-a", ROTATING_PAGE, ROTATING_RULE)
+        self.give_calendar("bank-a", "Earn 5% cash back.\n" + CALENDAR_FILLER)  # its saved copy names no quarter
+        self.serve({"https://x.test/bank-a": ROTATING_PAGE})  # the calendar page answers 404
+        self.use()
+        job, log = self.refresh()
+        errors = [line["text"] for line in job["log"] if line["level"] == "error"]
+        self.assertTrue(any("Savor Rewards: calendar page not read (gone: HTTP 404), so this is from the saved copy" in e for e in errors), errors)
+        self.assertTrue(any("→ unchanged  Savor Rewards  calendar page: gone" in e for e in errors), errors)
+        self.assertNotIn("no quarter ahead", log)
+
+    def test_a_calendar_page_with_no_saved_copy_says_so(self):
+        self.give_candidate("bank-a", ROTATING_PAGE, ROTATING_RULE)
+        self.paths.seed.write_text(json.dumps({"cards": [{**c, "calendarUrl": "https://x.test/calendar"} for c in self.cards]}))
+        self.serve({"https://x.test/bank-a": ROTATING_PAGE})
+        self.use()
+        _, log = self.refresh()
+        self.assertIn("calendar page not read (gone: HTTP 404), and no copy is saved", log)
+        self.assertNotIn("no quarter ahead", log)
+
     def test_a_failed_extraction_is_an_error(self):
         self.give_candidate("bank-a", ROTATING_PAGE, ROTATING_RULE)
         self.serve({"https://x.test/bank-a": ROTATING_PAGE + NEXT_QUARTER})

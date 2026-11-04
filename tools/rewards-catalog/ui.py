@@ -657,7 +657,7 @@ class App:
         def after(outcomes) -> None:
             fetch.write_json(self.paths.state, state)  # saved after every page, as on the command line
             for outcome in outcomes:
-                bad = outcome.status in ("failed", "gone")
+                bad = outcome.status in ("failed", "gone") or outcome.calendar_error
                 job.card_done(names.get(outcome.card_id, outcome.card_id), outcome.status, outcome.detail, "error" if bad else "info")
 
         render = fetch.render_with_browser if self.settings()["browser"] else None
@@ -714,8 +714,13 @@ class App:
             if extract.add_calendar_rules(candidate, text, today, card.get("calendarUrl") if calendar else None):
                 fetch.write_json(self.paths.candidates / f"{card['id']}.json", candidate)
             outcome = outcomes.get(card["id"])
-            if outcome and outcome.status not in ("new", "changed", "unchanged"):
+            page_unread = outcome and outcome.status not in ("new", "changed", "unchanged")
+            calendar_unread = outcome and outcome.calendar_error
+            if page_unread:
                 job.log(f"  {name}: page not read ({outcome.status}), so this is from the saved copy. {outcome.detail}".rstrip(), "error")
+            if calendar_unread:
+                copy = "so this is from the saved copy" if calendar else "and no copy is saved"
+                job.log(f"  {name}: calendar page not read ({outcome.calendar_error}), {copy}", "error")
             if candidate.get("status") not in ("ok", "manual"):
                 job.log(f"  {name}: extraction says {candidate.get('status')}. {' '.join(candidate.get('errors', [])[:1])}".rstrip(), "error")
             status = review.quarter_status(candidate, text, decisions, today)
@@ -729,7 +734,7 @@ class App:
                 job.log(f"  {name}: its rotating rule is no longer in the candidate: check the card", "warn")
             elif status["decided"]:
                 job.log(f"  {name}: nothing waiting, {status['decided']} quarter rule(s) decided")
-            elif not status["comingSoon"]:
+            elif not status["comingSoon"] and not page_unread and not calendar_unread:
                 job.log(f"  {name}: no quarter rules: its page names no quarter ahead")
         job.log(f"Quarter rules waiting for review on: {', '.join(waiting)}." if waiting else "No quarter rules are waiting for review.")
 
