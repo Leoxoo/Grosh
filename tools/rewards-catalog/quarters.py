@@ -14,6 +14,10 @@ Chase Freedom Flex's page (2026-11-01) lays its calendar out one item a line:
 and, further down, again as "Your 5% quarterly cash back 2026 calendar" / "July – September" / "Gas Stations | Public
 Transit | ...". A model reading that as one run of text has to guess which names go with which quarter; the layout
 says it, so no model is asked. extract.calendar_rules turns the quarters into dated rotating rules.
+
+Discover's calendar (2026-11-03) says each quarter in one sentence instead:
+
+    Earn 5% Cashback Bonus at Restaurants, Entertainment and Utilities, now to December 31, 2026, on up to $1,500 in purchases when you activate.
 """
 
 import re
@@ -32,6 +36,9 @@ _END = re.compile(r"^(?:activat|coming soon)", re.I)
 _COMING_SOON = re.compile(r"^coming soon", re.I)
 _LINK = re.compile(r"\*?\s*Opens (?:offer details overlay|in a new window|overlay)\s*$", re.I)
 MAX_LINES = 10  # a quarter's list is a few lines; past this it isn't a calendar
+# "Earn ... at <names>, now to December 31, 2026, on up to ...": the running quarter says "now", the others its first day.
+_SENTENCE = re.compile(rf"^Earn .+? at (.+?), (?:now|{_MONTH} \d{{1,2}}) to {_MONTH} (\d{{1,2}}), (20\d\d), on up to ", re.I)
+_NAME_BREAK = re.compile(r",\s+and\s+|,\s+|\s+and\s+")
 
 
 @dataclass(frozen=True)
@@ -43,10 +50,24 @@ class Quarter:
     quote: str  # the calendar's lines for the quarter, word for word
 
 
+def _sentence_quarter(line: str) -> Quarter | None:
+    """The quarter a line says in one sentence, or None if it says none, or dates that aren't a calendar quarter."""
+    match = _SENTENCE.match(line)
+    if not match:
+        return None
+    names, opened, closed, day, year = match.groups()
+    last = MONTHS.index(closed.lower()[:3]) + 1
+    first = last - 2
+    if QUARTER_ENDS.get(first) != f"{last:02d}-{int(day):02d}" or (opened and MONTHS.index(opened.lower()[:3]) + 1 != first):
+        return None
+    return Quarter(f"{year}-{first:02d}-01", f"{year}-{QUARTER_ENDS[first]}", tuple(_NAME_BREAK.split(names)), (), line)
+
+
 def read_calendar(text: str) -> list[Quarter]:
-    """Every quarter a calendar on the page names something for, in page order. A quarter with nothing named
-    ("Coming Soon") and a month range that isn't a calendar quarter are left out, and so is a quarter whose
-    year the page doesn't give: on its line, the line after, or a heading above ("2026 calendar")."""
+    """Every quarter a calendar on the page names something for, in page order, laid out one item a line or said
+    in one sentence. A quarter with nothing named ("Coming Soon") and a month range that isn't a calendar quarter
+    are left out, and so is a quarter whose year the page doesn't give: on its line, the line after, or a heading
+    above ("2026 calendar")."""
     return [quarter for quarter in _listed(text) if quarter.names]
 
 
@@ -66,6 +87,9 @@ def _listed(text: str) -> list[Quarter]:
     for i, line in enumerate(lines):
         if match := _CALENDAR_YEAR.search(line):
             heading_year = int(match.group(1) or match.group(2))
+        if quarter := _sentence_quarter(line):
+            found.append(quarter)
+            continue
         label = _LABEL.match(line)
         if not label:
             continue

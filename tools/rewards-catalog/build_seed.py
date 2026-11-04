@@ -37,6 +37,9 @@ REMOVED_CARDS = Path(__file__).with_name("removed-cards.json")
 # Cards waiting on a person's decision, {card id: what is needed}: a card that no longer exists, or one whose
 # rates no page states. Each gets a "needsInfo" field with that text, which the web page (ui.py) shows.
 NEEDS_INFO = Path(__file__).with_name("needs-info.json")
+# Cards whose quarterly calendar is on a page of its own, {card id: url}. Each gets a "calendarUrl" field, which
+# fetch.py reads and saves with the card's page.
+CALENDAR_PAGES = Path(__file__).with_name("calendar-pages.json")
 
 # CardPin's issuer codes, as people would write them.
 ISSUER_NAMES = {
@@ -135,10 +138,12 @@ def build(
     extra_cards: list[dict] | None = None,
     removed_cards: dict[str, str] | None = None,
     needs_info: dict[str, str] | None = None,
+    calendar_pages: dict[str, str] | None = None,
 ) -> list[dict]:
     url_overrides = url_overrides or {}
     removed_cards = removed_cards or {}
     needs_info = needs_info or {}
+    calendar_pages = calendar_pages or {}
     cards: dict[str, dict] = {}
     for row in rows:
         # A card with several sign-up offers has several rows that differ only in
@@ -174,12 +179,17 @@ def build(
     unmarked = sorted(set(needs_info) - set(ids))
     if unmarked:
         sys.exit(f"needs-info.json names cards that aren't in the CSV: {unmarked}")
+    no_card = sorted(set(calendar_pages) - set(ids))
+    if no_card:
+        sys.exit(f"calendar-pages.json names cards that aren't in the CSV: {no_card}")
     for card in catalog:
         if card["id"] in url_overrides:
             card["sourceUrl"] = url_overrides[card["id"]]
             card["sourceHost"] = urlparse(card["sourceUrl"]).netloc
         if card["id"] in needs_info:
             card["needsInfo"] = needs_info[card["id"]]
+        if card["id"] in calendar_pages:
+            card["calendarUrl"] = calendar_pages[card["id"]]
     duplicates = {i for i in ids if ids.count(i) > 1}
     if duplicates:
         sys.exit(f"Two cards share an id, so one would overwrite the other: {sorted(duplicates)}")
@@ -194,7 +204,8 @@ def main() -> None:
         extras = json.loads(EXTRA_CARDS.read_text(encoding="utf-8")) if EXTRA_CARDS.exists() else []
         removed = json.loads(REMOVED_CARDS.read_text(encoding="utf-8")) if REMOVED_CARDS.exists() else {}
         needs_info = json.loads(NEEDS_INFO.read_text(encoding="utf-8")) if NEEDS_INFO.exists() else {}
-        catalog = build(list(csv.DictReader(file)), overrides, extras, removed, needs_info)
+        calendars = json.loads(CALENDAR_PAGES.read_text(encoding="utf-8")) if CALENDAR_PAGES.exists() else {}
+        catalog = build(list(csv.DictReader(file)), overrides, extras, removed, needs_info, calendars)
     document = {
         "seededFrom": "CardPin raw_import.csv (MIT)",
         "cards": catalog,

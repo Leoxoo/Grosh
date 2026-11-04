@@ -1786,7 +1786,8 @@
       "discontinued": false,
       "sourceUrl": "https://www.discover.com/credit-cards/",
       "sourceHost": "www.discover.com",
-      "verified": false
+      "verified": false,
+      "calendarUrl": "https://card.discover.com/cardissuer/public/rewards/offer/v1/offer-categories"
     },
     {
       "id": "first-bankcard-ana-card-usa-plus",

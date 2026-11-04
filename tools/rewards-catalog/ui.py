@@ -350,7 +350,7 @@ class App:
             hand_entered = card["id"] in manual
             pending = (
                 False if hand_entered or not page
-                else not extract.up_to_date(self.paths.candidates / f"{card['id']}.json", entry["hash"], settings["model"])
+                else not extract.up_to_date(self.paths.candidates / f"{card['id']}.json", fetch.pages_hash(entry), settings["model"])
             )
             rows.append({
                 "id": card["id"], "name": card["name"], "issuer": card["issuer"], "kind": card["rewardKind"],
@@ -579,7 +579,7 @@ class App:
         model = self.settings()["model"]
         chosen = [
             c for c in with_pages
-            if c["id"] in manual or not extract.up_to_date(self.paths.candidates / f"{c['id']}.json", state[c["id"]]["hash"], model)
+            if c["id"] in manual or not extract.up_to_date(self.paths.candidates / f"{c['id']}.json", fetch.pages_hash(state[c["id"]]), model)
         ]
         return chosen, "cards that need extracting"
 
@@ -708,9 +708,10 @@ class App:
         job.log("Quarters:")
         for card in chosen:
             name, page_file = card["name"], self.paths.cache / card["id"] / "latest.txt"
-            text = page_file.read_text(encoding="utf-8") if page_file.exists() else ""
+            calendar = extract.saved_calendar(card, self.paths.cache)  # a card with a calendar page has its quarters there
+            text = calendar or (page_file.read_text(encoding="utf-8") if page_file.exists() else "")
             candidate = self.candidate(card["id"])
-            if extract.add_calendar_rules(candidate, text, today):
+            if extract.add_calendar_rules(candidate, text, today, card.get("calendarUrl") if calendar else None):
                 fetch.write_json(self.paths.candidates / f"{card['id']}.json", candidate)
             outcome = outcomes.get(card["id"])
             if outcome and outcome.status not in ("new", "changed", "unchanged"):

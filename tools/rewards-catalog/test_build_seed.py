@@ -58,6 +58,20 @@ class BuildTests(unittest.TestCase):
             build_seed.build([ROW], needs_info={"no-such-card": "why"})
         self.assertIn("needs-info.json", str(stopped.exception))
 
+    def test_a_card_can_name_a_calendar_page_and_unknown_ids_stop_the_build(self):
+        catalog = build_seed.build([ROW], extra_cards=[EXTRA], calendar_pages={"capital-one-savor": "https://x.test/calendar"})
+        self.assertEqual([c.get("calendarUrl") for c in catalog], ["https://x.test/calendar", None])
+        self.assertNotIn("calendarUrl", catalog[1])  # a card with no calendar page is the card it always was
+        with self.assertRaises(SystemExit) as stopped:
+            build_seed.build([ROW], calendar_pages={"no-such-card": "https://x.test/calendar"})
+        self.assertIn("calendar-pages.json", str(stopped.exception))
+
+    def test_the_committed_seed_carries_every_calendar_page(self):
+        pages = json.loads(build_seed.CALENDAR_PAGES.read_text(encoding="utf-8"))
+        seed = json.loads(build_seed.OUT.read_text(encoding="utf-8"))["cards"]
+        self.assertEqual({c["id"]: c["calendarUrl"] for c in seed if c.get("calendarUrl")}, pages)
+        self.assertIn("discover-discover-it", pages)
+
     def test_the_committed_seed_carries_every_needs_info_mark(self):
         marks = json.loads(build_seed.NEEDS_INFO.read_text(encoding="utf-8"))
         seed = json.loads(build_seed.OUT.read_text(encoding="utf-8"))["cards"]

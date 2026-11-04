@@ -206,6 +206,25 @@ class OverviewTests(AppCase):
         row = next(r for r in self.app.overview()["cards"] if r["id"] == "bank-a")
         self.assertTrue(row["pending"])  # same page, different model
 
+    def test_a_changed_calendar_page_makes_a_card_pending_again(self):
+        self.give_page("bank-a")
+        self.state["bank-a"]["calendarHash"] = "one"
+        (self.paths.cache / "bank-a" / "calendar.txt").write_text("saved")
+        self.paths.state.write_text(json.dumps(self.state))
+        self.app.save_settings({"model": "good-model"})
+        self.app.start_job({"kind": "extract", "which": "pending"})
+        self.wait()
+        row = next(r for r in self.app.overview()["cards"] if r["id"] == "bank-a")
+        self.assertFalse(row["pending"])
+        self.state["bank-a"]["calendarHash"] = "two"
+        self.paths.state.write_text(json.dumps(self.state))
+        row = next(r for r in self.app.overview()["cards"] if r["id"] == "bank-a")
+        self.assertTrue(row["pending"])  # same page, different calendar page
+        self.app.start_job({"kind": "extract", "which": "pending"})
+        self.wait()
+        row = next(r for r in self.app.overview()["cards"] if r["id"] == "bank-a")
+        self.assertFalse(row["pending"])  # the job picked it up too
+
     def test_hand_entered_cards_are_never_pending_and_the_summary_counts(self):
         self.give_page("bank-a")
         self.paths.manual.write_text(json.dumps({"bank-a": {"rules": []}}))
@@ -436,6 +455,8 @@ ROTATING_RULE = {**RULE, "categories": [], "selection": "rotating", "rate": 5, "
 ROTATING_PAGE = f"Savor Rewards\n{ROTATING_QUOTE}\n" + "".join(f"Filler line number {n}.\n" for n in range(30))
 NEXT_QUARTER = "JAN-MAR\n2099\nGrocery Stores\nActivate starting December 15, 2098\n"
 COMING_SOON = "APR-JUN\n2099\nComing Soon\nActivate starting March 15, 2099\n"
+CALENDAR_SENTENCE = "Earn 5% Cashback Bonus at Grocery Stores, now to December 31, 2099, on up to $1,500 in purchases when you activate.\n"
+CALENDAR_FILLER = "".join(f"Filler line number {n}.\n" for n in range(30))
 
 
 class RefreshTests(AppCase):
@@ -520,6 +541,41 @@ class RefreshTests(AppCase):
         job, log = self.refresh()
         self.assertEqual((job["state"], lm.asked), ("done", []))
         self.assertIn("Savor Rewards: no quarter rules: its page names no quarter ahead", log)
+
+    def give_calendar(self, card_id: str, text: str) -> str:
+        """Give a card a calendar page, already fetched and extracted, as Discover It has. Returns its URL."""
+        url, text = "https://x.test/calendar", text.strip()
+        self.paths.seed.write_text(json.dumps({"cards": [{**c, "calendarUrl": url} if c["id"] == card_id else c for c in self.cards]}))
+        (self.paths.cache / card_id / "calendar.txt").write_text(text)
+        self.state[card_id].update(calendarUrl=url, calendarHash=fetch.text_hash(text), calendarStatus="ok")
+        self.paths.state.write_text(json.dumps(self.state))
+        path = self.paths.candidates / f"{card_id}.json"
+        fetch.write_json(path, {**fetch.read_json(path, {}), "pageHash": fetch.pages_hash(self.state[card_id])})
+        return url
+
+    def test_a_card_with_a_calendar_page_gets_its_quarters_from_that_page(self):
+        calendar = CALENDAR_SENTENCE + CALENDAR_FILLER
+        self.give_candidate("bank-a", ROTATING_PAGE, ROTATING_RULE)  # its own page names no quarter
+        url = self.give_calendar("bank-a", calendar)
+        self.serve({"https://x.test/bank-a": ROTATING_PAGE, url: calendar})
+        lm = self.use()
+        _, log = self.refresh()
+        self.assertEqual(lm.asked, [])
+        (quarter,) = [r for r in self.app.candidate("bank-a")["rules"] if r["validFrom"]]
+        self.assertEqual((quarter["validFrom"], quarter["evidence"]["url"]), ("2099-10-01", url))
+        self.assertIn(quarter["evidence"]["quote"], calendar.splitlines())
+        self.assertIn("waiting for review: 5% in rotating bonus categories from 2099-10-01 to 2099-12-31: groceries", log)
+        self.assertNotIn("no quarter ahead", log)
+
+    def test_coming_soon_on_a_calendar_page_is_reported(self):
+        calendar = COMING_SOON + "Earn 5% cash back.\n" + CALENDAR_FILLER
+        self.give_candidate("bank-a", ROTATING_PAGE, ROTATING_RULE)
+        url = self.give_calendar("bank-a", calendar)
+        self.serve({"https://x.test/bank-a": ROTATING_PAGE, url: calendar})
+        self.use()
+        _, log = self.refresh()
+        self.assertIn("2099-04-01 to 2099-06-30 is Coming Soon on its page", log)
+        self.assertNotIn("no quarter ahead", log)
 
     def test_coming_soon_is_reported_and_is_no_failure(self):
         page = ROTATING_PAGE + COMING_SOON
