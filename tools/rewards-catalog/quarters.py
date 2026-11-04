@@ -29,6 +29,7 @@ _CALENDAR_YEAR = re.compile(r"\b(20\d\d)\b.*\bcalendar\b|\bcalendar\b.*\b(20\d\d
 _STATUS = re.compile(r"^(?:previous|current|next|this) quarter$", re.I)
 # What ends a quarter's list: its activation line, "Coming Soon" (nothing named yet), or the next quarter.
 _END = re.compile(r"^(?:activat|coming soon)", re.I)
+_COMING_SOON = re.compile(r"^coming soon", re.I)
 _LINK = re.compile(r"\*?\s*Opens (?:offer details overlay|in a new window|overlay)\s*$", re.I)
 MAX_LINES = 10  # a quarter's list is a few lines; past this it isn't a calendar
 
@@ -46,6 +47,19 @@ def read_calendar(text: str) -> list[Quarter]:
     """Every quarter a calendar on the page names something for, in page order. A quarter with nothing named
     ("Coming Soon") and a month range that isn't a calendar quarter are left out, and so is a quarter whose
     year the page doesn't give: on its line, the line after, or a heading above ("2026 calendar")."""
+    return [quarter for quarter in _listed(text) if quarter.names]
+
+
+def coming_soon(text: str) -> list[Quarter]:
+    """The quarters a calendar on the page marks "Coming Soon" and no calendar on it names, each once, in page
+    order. Chase's older calendar still says it for a quarter its newer one has filled in."""
+    listed = _listed(text)
+    named = {quarter.start for quarter in listed if quarter.names}
+    return list({quarter.start: quarter for quarter in listed if quarter.start not in named}.values())
+
+
+def _listed(text: str) -> list[Quarter]:
+    """Every quarter a calendar names something for or marks "Coming Soon" (its `names` empty), in page order."""
     lines = [line.strip() for line in text.splitlines()]
     found: list[Quarter] = []
     heading_year = None
@@ -75,7 +89,7 @@ def read_calendar(text: str) -> list[Quarter]:
                 names += [name.strip() for name in item.split("|") if name.strip()]
             j += 1
             last_line = j
-        if names:
+        if names or (j < len(lines) and _COMING_SOON.match(lines[j])):
             found.append(Quarter(f"{year}-{first:02d}-01", f"{year}-{QUARTER_ENDS[first]}", tuple(names), tuple(notes),
                                  "\n".join(lines[i:last_line])))
     return found
