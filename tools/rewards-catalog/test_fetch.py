@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 import fetch
+import quarters
 from fetch import Response, Throttle
 
 BODY = "".join(f"<p>Earn {n}% back on category number {n} every month.</p>" for n in range(1, 30))
@@ -56,8 +57,7 @@ def calendar_data(sentence: str = SENTENCE) -> Response:
     """Discover's calendar data, cut down: what the page's script builds its calendar from."""
     quarter = {"offerDescUnenrolled": sentence, "offerId": 34285, "offerStatus": "qualification",
                "quarterLabelEndDate": "December 31, 2026", "title": "Restaurants, Entertainment and Utilities"}
-    filler = {"note": "You always earn cash back on purchases when you use your card at any merchant in the U.S. " * 5}
-    return Response(200, {"content-type": "application/json"}, json.dumps({**filler, "quarters": [quarter]}).encode(), CALENDAR_URL)
+    return Response(200, {"content-type": "application/json"}, json.dumps({"quarters": [quarter]}).encode(), CALENDAR_URL)
 
 
 class VisibleTextTests(unittest.TestCase):
@@ -213,23 +213,53 @@ class FetchPageTests(unittest.TestCase):
 
 
 class CalendarDataTests(unittest.TestCase):
-    def fetch(self, reply: Response, calendar: bool) -> fetch.PageResult:
+    def fetch(self, reply: Response, accepts_json: bool = True) -> fetch.PageResult:
         web = FakeWeb()
         web.route("https://x.test/robots.txt", ALLOW)
         web.route(CALENDAR_URL, reply)
-        return fetch.fetch_page(CALENDAR_URL, web, fetch.Robots(web, throttle()), throttle(), {}, calendar=calendar)
+        return fetch.fetch_page(CALENDAR_URL, web, fetch.Robots(web, throttle()), throttle(), {}, accepts_json=accepts_json)
 
     def test_a_calendar_can_be_a_pages_json_data_and_its_sentences_are_what_is_saved(self):
-        result = self.fetch(calendar_data(), calendar=True)
-        self.assertEqual(result.status, "ok")
-        self.assertEqual(result.text.splitlines()[1:], [SAID, "Restaurants, Entertainment and Utilities"])
+        result = self.fetch(calendar_data())
+        self.assertEqual(result.status, "ok")  # one quarter is a short reply, and a whole one
+        self.assertEqual(result.text.splitlines(), [SAID, "Restaurants, Entertainment and Utilities"])
+
+    def test_the_body_says_a_reply_is_json_whatever_its_content_type_says(self):
+        for headers in ({"content-type": "text/plain"}, {"content-type": "text/html"}, {"content-type": "application/octet-stream"}, {}):
+            result = self.fetch(Response(200, headers, calendar_data().body, CALENDAR_URL))
+            self.assertEqual((result.status, result.text.splitlines()[0]), ("ok", SAID), headers)
+
+    def test_a_line_break_inside_a_sentence_does_not_split_it(self):
+        for tag in ("<br>", "<br/>", "<BR />"):
+            result = self.fetch(calendar_data(SENTENCE.replace(",</b> now", f",</b>{tag}now")))
+            self.assertIn(SAID, result.text.splitlines(), tag)
+            self.assertEqual(len(quarters.read_calendar(result.text)), 1, tag)
+
+    def test_a_non_breaking_space_with_no_tag_near_it_is_a_space(self):
+        result = self.fetch(calendar_data(SAID.replace("Entertainment and", "Entertainment&nbsp;and")))
+        self.assertEqual(quarters.read_calendar(result.text)[0].names, ("Restaurants", "Entertainment", "Utilities"))
+
+    def test_a_card_pages_embedded_text_is_kept_as_it_was(self):
+        page = '<script type="application/json">{"a": "Earn more on food &amp; drink", "b": "Earn more<br>every day"}</script>'
+        self.assertEqual(fetch.embedded_text(page), "Earn more on food &amp; drink\nEarn more\nevery day")
+
+    def test_a_json_reply_that_says_nothing_about_earning_is_a_failed_read(self):
+        reply = Response(200, {"content-type": "application/json"}, b'{"error": "Service not available today"}', CALENDAR_URL)
+        result = self.fetch(reply)
+        self.assertEqual(result.status, "failed")
+        self.assertIn("says nothing about earning", result.error)
+
+    def test_a_thin_html_reply_is_not_a_calendar(self):
+        for headers in ({"content-type": "text/html"}, {}):
+            reply = Response(200, headers, b"<html><body>Pardon our interruption. Earn nothing here.</body></html>", CALENDAR_URL)
+            self.assertEqual(self.fetch(reply).status, "needs-browser", headers)
 
     def test_a_card_page_answering_json_is_still_not_a_web_page(self):
-        self.assertEqual(self.fetch(calendar_data(), calendar=False).status, "failed")
+        self.assertEqual(self.fetch(calendar_data(), accepts_json=False).status, "failed")
 
     def test_calendar_data_that_is_not_json_is_a_failed_read(self):
         reply = Response(200, {"content-type": "application/json"}, b"<html>Oops</html>", CALENDAR_URL)
-        result = self.fetch(reply, calendar=True)
+        result = self.fetch(reply)
         self.assertEqual(result.status, "failed")
         self.assertIn("unreadable", result.error)
 
@@ -446,6 +476,39 @@ class CalendarPageTests(unittest.TestCase):
         self.assertEqual(self.state["a"]["calendarStatus"], "refused")
         self.assertEqual(fetch.pages_hash(self.state["a"]), before)
         self.assertEqual(self.saved("calendar.txt"), saved)
+
+    def test_a_calendar_that_fails_is_an_error_in_the_report_though_the_card_is_unchanged(self):
+        self.go()
+        self.web.route(CALENDAR_URL, Response(403, {}, b"", CALENDAR_URL))
+        summary = fetch.run([self.card], self.state, self.cache, self.web, throttle(), "2026-11-20")
+        self.assertEqual(summary.outcomes[0].calendar_error, "refused: HTTP 403")
+        text = fetch.report(summary, 1)
+        self.assertIn("| calendar page not read | 1 |", text)
+        self.assertIn("## calendar page not read", text)
+        self.assertIn("- `a` refused: HTTP 403", text)
+
+    def test_a_bot_wall_answered_with_html_is_not_saved_as_the_calendar_and_is_an_error(self):
+        self.go()
+        saved, before = self.saved("calendar.txt"), fetch.pages_hash(self.state["a"])
+        self.web.route(CALENDAR_URL, Response(200, {"content-type": "text/html"}, b"<p>Are you a robot?</p>", CALENDAR_URL))
+        outcome = self.go(day="2026-11-20")["a"]
+        self.assertEqual((outcome.status, outcome.calendar_error), ("unchanged", "needs-browser"))
+        self.assertEqual((self.saved("calendar.txt"), fetch.pages_hash(self.state["a"])), (saved, before))
+
+    def test_json_sent_as_plain_text_does_not_change_the_card(self):
+        self.go()
+        self.web.route(CALENDAR_URL, Response(200, {"content-type": "text/plain"}, calendar_data().body, CALENDAR_URL))
+        self.assertEqual(self.go(day="2026-11-20")["a"].status, "unchanged")
+
+    def test_a_calendar_robots_blocks_is_an_error_too(self):
+        self.web.route("https://y.test/robots.txt", Response(200, {"content-type": "text/plain"}, b"User-agent: *\nDisallow: /\n", ""))
+        card = {**self.card, "calendarUrl": "https://y.test/calendar"}
+        self.assertEqual(self.go(card)["a"].calendar_error, "robots")
+
+    def test_a_calendar_that_was_read_is_no_error_and_the_report_has_no_such_part(self):
+        summary = fetch.run([self.card], self.state, self.cache, self.web, throttle(), "2026-11-20")
+        self.assertEqual(summary.outcomes[0].calendar_error, "")
+        self.assertNotIn("calendar page not read", fetch.report(summary, 1))
 
     def test_cards_that_share_a_calendar_fetch_it_once(self):
         self.web.route("https://x.test/b", page())

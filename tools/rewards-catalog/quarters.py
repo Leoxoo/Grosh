@@ -31,9 +31,9 @@ _LABEL = re.compile(rf"^{_MONTH}\s*[-–—]\s*{_MONTH}(?:,?\s+(20\d\d))?$", re.
 _YEAR = re.compile(r"^(20\d\d)$")
 _CALENDAR_YEAR = re.compile(r"\b(20\d\d)\b.*\bcalendar\b|\bcalendar\b.*\b(20\d\d)\b", re.I)
 _STATUS = re.compile(r"^(?:previous|current|next|this) quarter$", re.I)
-# What ends a quarter's list: its activation line, "Coming Soon" (nothing named yet), or the next quarter.
-_END = re.compile(r"^(?:activat|coming soon)", re.I)
 _COMING_SOON = re.compile(r"^coming soon", re.I)
+# What ends a quarter's list: its activation line, "Coming Soon" (nothing named yet), or the next quarter.
+_END = re.compile(rf"^activat|{_COMING_SOON.pattern}", re.I)
 _LINK = re.compile(r"\*?\s*Opens (?:offer details overlay|in a new window|overlay)\s*$", re.I)
 MAX_LINES = 10  # a quarter's list is a few lines; past this it isn't a calendar
 # "Earn ... at <names>, now to December 31, 2026, on up to ...": the running quarter says "now", the others its first day.
@@ -50,17 +50,27 @@ class Quarter:
     quote: str  # the calendar's lines for the quarter, word for word
 
 
+def _month_number(name: str) -> int:
+    """1 for "Jan" or "January"."""
+    return MONTHS.index(name.lower()[:3]) + 1
+
+
+def _quarter(year: int | str, first: int, names, notes, quote: str) -> Quarter:
+    """The quarter of `year` that starts in month `first`."""
+    return Quarter(f"{year}-{first:02d}-01", f"{year}-{QUARTER_ENDS[first]}", tuple(names), tuple(notes), quote)
+
+
 def _sentence_quarter(line: str) -> Quarter | None:
     """The quarter a line says in one sentence, or None if it says none, or dates that aren't a calendar quarter."""
     match = _SENTENCE.match(line)
     if not match:
         return None
     names, opened, closed, day, year = match.groups()
-    last = MONTHS.index(closed.lower()[:3]) + 1
+    last = _month_number(closed)
     first = last - 2
-    if QUARTER_ENDS.get(first) != f"{last:02d}-{int(day):02d}" or (opened and MONTHS.index(opened.lower()[:3]) + 1 != first):
+    if QUARTER_ENDS.get(first) != f"{last:02d}-{int(day):02d}" or (opened and _month_number(opened) != first):
         return None
-    return Quarter(f"{year}-{first:02d}-01", f"{year}-{QUARTER_ENDS[first]}", tuple(_NAME_BREAK.split(names)), (), line)
+    return _quarter(year, first, _NAME_BREAK.split(names), (), line)
 
 
 def read_calendar(text: str) -> list[Quarter]:
@@ -79,6 +89,13 @@ def coming_soon(text: str) -> list[Quarter]:
     return list({quarter.start: quarter for quarter in listed if quarter.start not in named}.values())
 
 
+def next_not_announced(text: str, today: str) -> bool:
+    """Whether a calendar on the page reads fine but names no quarter that starts after `today`. Discover's sentences
+    have no way to say "Coming Soon": its next quarter is simply missing until it is announced."""
+    named = read_calendar(text)
+    return bool(named) and all(quarter.start <= today for quarter in named)
+
+
 def _listed(text: str) -> list[Quarter]:
     """Every quarter a calendar names something for or marks "Coming Soon" (its `names` empty), in page order."""
     lines = [line.strip() for line in text.splitlines()]
@@ -93,7 +110,7 @@ def _listed(text: str) -> list[Quarter]:
         label = _LABEL.match(line)
         if not label:
             continue
-        first, last = (MONTHS.index(label.group(n).lower()[:3]) + 1 for n in (1, 2))
+        first, last = (_month_number(label.group(n)) for n in (1, 2))
         if first not in QUARTER_ENDS or last != first + 2:
             continue
         year, j = (int(label.group(3)) if label.group(3) else None), i + 1
@@ -114,6 +131,5 @@ def _listed(text: str) -> list[Quarter]:
             j += 1
             last_line = j
         if names or (j < len(lines) and _COMING_SOON.match(lines[j])):
-            found.append(Quarter(f"{year}-{first:02d}-01", f"{year}-{QUARTER_ENDS[first]}", tuple(names), tuple(notes),
-                                 "\n".join(lines[i:last_line])))
+            found.append(_quarter(year, first, names, notes, "\n".join(lines[i:last_line])))
     return found

@@ -721,7 +721,7 @@ class WhatCountsAsWhatTests(unittest.TestCase):
 
     def test_rotating_rules_have_no_picks_or_everything_else_and_other_kinds_need_a_category(self):
         for bad in (dict(picks=1), dict(hasOtherChoices=True), dict(categories=["everything-else"])):
-            self.assertIn("rotating rule has no", self.check(**{"categories": [], "selection": "rotating", "rate": 5, "quote": FREEDOM, **bad}))
+            self.assertIn("rotating bonus has no", self.check(**{"categories": [], "selection": "rotating", "rate": 5, "quote": FREEDOM, **bad}))
         self.assertIn("categories must be", self.check(categories=[], selection="fixed"))
         self.assertIn("categories must be", self.check(categories=[], selection="choose", picks=1, hasOtherChoices=True))
 

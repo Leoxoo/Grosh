@@ -18,7 +18,7 @@ What the page does:
   - tests the model on the real output schema, which shows at once whether the server accepts it;
   - runs one job at a time, either "fetch pages" or "extract rules", on all cards, the ones that
     need it, or the ones you tick, with a live log, a progress bar and a Stop button; or "refresh
-    rotating cards", both stages on only the cards with a rotating rule, which ends by saying what
+    rotating cards", both stages on only the cards with a rotating bonus, which ends by saying what
     each card's quarters need;
   - shows every card's fetch and extraction status, and for one card: the rules found, what was
     rejected and why, any error, the page's rate lines, and a "try" that shows the model's raw reply;
@@ -549,11 +549,11 @@ class App:
         kind, which, ids = body.get("kind"), body.get("which"), body.get("ids") or []
         cards, state = self.cards(), fetch.read_json(self.paths.state, {})
         if kind == "refresh":
-            rotating = [c["id"] for c in cards if any(r["selection"] == "rotating" for r in (self.candidate(c["id"]) or {}).get("rules", []))]
+            rotating = [c["id"] for c in cards if c.get("calendarUrl") or extract.rotates(self.candidate(c["id"]))]
             if not rotating:  # fetch.select would take no ids to mean every card
-                raise Problem("No card has a rotating rule yet: extract rules first.")
+                raise Problem("No card has a rotating bonus yet: extract rules first.")
             chosen = fetch.select(cards, rotating, "", None)
-            return chosen, f"{len(chosen)} card(s) with a rotating rule"
+            return chosen, f"{len(chosen)} card(s) with a rotating bonus"
         if which == "ids":
             chosen = [card for card in cards if card["id"] in set(ids)]
             if kind == "extract":
@@ -577,17 +577,21 @@ class App:
         if which == "all":
             return with_pages, "every card with a page"
         model = self.settings()["model"]
-        chosen = [
-            c for c in with_pages
-            if c["id"] in manual or not extract.up_to_date(self.paths.candidates / f"{c['id']}.json", fetch.pages_hash(state[c["id"]]), model)
-        ]
-        return chosen, "cards that need extracting"
+        return [c for c in with_pages if c["id"] in manual or not self._extracted(c, state, model)], "cards that need extracting"
+
+    def _extracted(self, card: dict, state: dict, model: str) -> bool:
+        return extract.up_to_date(self.paths.candidates / f"{card['id']}.json", fetch.pages_hash(state[card["id"]]), model)
 
     def start_job(self, body: dict) -> dict:
+        kinds = {  # each kind of job: its name in the log, the `which` it takes, and what runs it
+            "fetch": ("Fetch pages", ("ids", "missing", "retry", "all"), self._run_fetch),
+            "extract": ("Extract rules", ("ids", "pending", "all"), self._run_extract),
+            "refresh": ("Refresh rotating cards", ("rotating",), self._run_refresh),
+        }
         kind = body.get("kind")
-        if kind not in ("fetch", "extract", "refresh"):
-            raise Problem("kind must be fetch, extract or refresh")
-        allowed = {"fetch": ("ids", "missing", "retry", "all"), "extract": ("ids", "pending", "all"), "refresh": ("rotating",)}[kind]
+        if kind not in kinds:
+            raise Problem(f"kind must be one of: {', '.join(kinds)}")
+        label, allowed, target = kinds[kind]
         if body.get("which") not in allowed:
             raise Problem(f"For {kind}, which must be one of: {', '.join(allowed)}")
         with self._job_lock:
@@ -599,10 +603,8 @@ class App:
                 raise Problem(str(problem)) from problem
             if not chosen:
                 raise Problem("Nothing to do: no cards match.")
-            label = {"fetch": "Fetch pages", "extract": "Extract rules", "refresh": "Refresh rotating cards"}[kind]
             job = Job(kind, f"{label}: {what}", len(chosen))
             self.job = job
-            target = {"fetch": self._run_fetch, "extract": self._run_extract, "refresh": self._run_refresh}[kind]
             self._thread = threading.Thread(target=target, args=(job, chosen, bool(body.get("force"))), daemon=True)
             self._thread.start()
         return job.snapshot()
@@ -623,14 +625,25 @@ class App:
     def _run_refresh(self, job: Job, chosen: list[dict], force: bool) -> None:
         """Fetch the chosen cards, extract those whose page, model or prompt changed, then say where each stands.
         Nothing is forced: on an unchanged page a model run would only risk rewording rules a person has decided on,
-        and a calendar doesn't need one. A card whose page can't be had keeps its candidate, and the report says so."""
+        and a calendar doesn't need one. A card whose page can't be had keeps its candidate, and the report says so. With
+        the model server down the report still comes: of the cards that needed no model, and naming those that did. The
+        job then fails, with the server's problem."""
         def work() -> None:
             fetched = self._fetch_pages(job, chosen)
             state, manual = fetch.read_json(self.paths.state, {}), fetch.read_json(self.paths.manual, {})
             ready = [c for c in chosen if extract.has_page(c, state, self.paths.cache) or c["id"] in manual]
             job.next_stage(len(ready))
-            self._extract_rules(job, ready, force=False)
-            self._report_quarters(job, chosen, fetched)
+            server_problem, not_extracted = None, set()
+            try:
+                self._extract_rules(job, ready, force=False)
+            except extract.ServerProblem as problem:
+                server_problem = problem
+                model = self.settings()["model"]
+                not_extracted = {c["id"] for c in ready if c["id"] not in manual and not self._extracted(c, state, model)}
+            self._add_quarter_rules(chosen, not_extracted)
+            self._report_quarters(job, chosen, fetched, not_extracted)
+            if server_problem:
+                raise server_problem
 
         self._guarded(job, work)
 
@@ -657,7 +670,7 @@ class App:
         def after(outcomes) -> None:
             fetch.write_json(self.paths.state, state)  # saved after every page, as on the command line
             for outcome in outcomes:
-                bad = outcome.status in ("failed", "gone")
+                bad = outcome.status in ("failed", "gone") or outcome.calendar_error
                 job.card_done(names.get(outcome.card_id, outcome.card_id), outcome.status, outcome.detail, "error" if bad else "info")
 
         render = fetch.render_with_browser if self.settings()["browser"] else None
@@ -698,24 +711,50 @@ class App:
             follow_up=settings["followUps"],
         )
 
-    def _report_quarters(self, job: Job, chosen: list[dict], fetched: fetch.RunSummary) -> None:
-        """End a refresh by saying what each card's quarters need. A rotating rule with no quarter rules gets them
-        here from the saved page, without a model. "Coming Soon" is the issuer not having said yet, so it is reported
-        like any other news; a page that couldn't be read or a failed extraction is what shows as an error."""
+    def _quarters_page(self, card: dict) -> tuple[str, str | None]:
+        """The saved text a card's quarters are read from, and that page's URL if it is a calendar page of its own."""
+        page = self.paths.cache / card["id"] / "latest.txt"
+        text = page.read_text(encoding="utf-8") if page.exists() else ""
+        return extract.quarters_page(card, text, fetch.saved_calendar(card, self.paths.cache))
+
+    def _add_quarter_rules(self, chosen: list[dict], not_extracted: set[str]) -> None:
+        """Give each card's candidate the quarter rules its saved page has and it lacks. No model is asked: a calendar
+        is read, so a rotating rule with no quarter rules gets them here even when nothing changed. A card in
+        `not_extracted` is left for its extraction: its candidate is of an older page."""
+        today = date.today().isoformat()
+        for card in chosen:
+            candidate = None if card["id"] in not_extracted else self.candidate(card["id"])
+            text, url = self._quarters_page(card)
+            if candidate and extract.add_calendar_rules(candidate, text, today, url):
+                fetch.write_json(self.paths.candidates / f"{card['id']}.json", candidate)
+
+    def _report_quarters(self, job: Job, chosen: list[dict], fetched: fetch.RunSummary, not_extracted: set[str]) -> None:
+        """End a refresh by saying what each card's quarters need. "Coming Soon" is the issuer not having said yet, so it
+        is reported like any other news; a page that couldn't be read or a card that wasn't or couldn't be extracted
+        (`not_extracted`: the model server is down) is what shows as an error."""
         today, decisions = date.today().isoformat(), review.load_decisions(self.paths.decisions)
         outcomes = {outcome.card_id: outcome for outcome in fetched.outcomes}
         waiting = []
         job.log("Quarters:")
         for card in chosen:
-            name, page_file = card["name"], self.paths.cache / card["id"] / "latest.txt"
-            calendar = extract.saved_calendar(card, self.paths.cache)  # a card with a calendar page has its quarters there
-            text = calendar or (page_file.read_text(encoding="utf-8") if page_file.exists() else "")
+            name, outcome = card["name"], outcomes.get(card["id"])
+            text, calendar_url = self._quarters_page(card)
             candidate = self.candidate(card["id"])
-            if extract.add_calendar_rules(candidate, text, today, card.get("calendarUrl") if calendar else None):
-                fetch.write_json(self.paths.candidates / f"{card['id']}.json", candidate)
-            outcome = outcomes.get(card["id"])
-            if outcome and outcome.status not in ("new", "changed", "unchanged"):
+            page_unread = outcome and outcome.status not in ("new", "changed", "unchanged")
+            calendar_unread = outcome and outcome.calendar_error
+            # What the page its quarters come from says now isn't known, so neither is what it leaves out.
+            unread = calendar_unread or (page_unread and not calendar_url)
+            if page_unread:
                 job.log(f"  {name}: page not read ({outcome.status}), so this is from the saved copy. {outcome.detail}".rstrip(), "error")
+            if calendar_unread:
+                copy = "so this is from the saved copy" if calendar_url else "and no copy is saved"
+                job.log(f"  {name}: calendar page not read ({outcome.calendar_error}), {copy}", "error")
+            if card["id"] in not_extracted:
+                job.log(f"  {name}: couldn't be extracted, as the model server isn't available: extract it when it is", "error")
+                continue
+            if candidate is None:
+                job.log(f"  {name}: not extracted yet, so it has no quarters to report", "error")
+                continue
             if candidate.get("status") not in ("ok", "manual"):
                 job.log(f"  {name}: extraction says {candidate.get('status')}. {' '.join(candidate.get('errors', [])[:1])}".rstrip(), "error")
             status = review.quarter_status(candidate, text, decisions, today)
@@ -723,13 +762,15 @@ class App:
                 job.log(f"  {name}: waiting for review: {summary}", "warn")
             for quarter in status["comingSoon"]:
                 job.log(f"  {name}: {quarter['start']} to {quarter['end']} is Coming Soon on its page: nothing named yet, run this again nearer then")
+            if status["notAnnounced"] and not unread:
+                job.log(f"  {name}: next quarter not announced yet: run this again nearer then")
             if status["waiting"]:
                 waiting.append(name)
             elif not status["rotating"]:
-                job.log(f"  {name}: its rotating rule is no longer in the candidate: check the card", "warn")
+                job.log(f"  {name}: its rotating bonus is no longer in the candidate: check the card", "warn")
             elif status["decided"]:
                 job.log(f"  {name}: nothing waiting, {status['decided']} quarter rule(s) decided")
-            elif not status["comingSoon"]:
+            elif not status["comingSoon"] and not status["notAnnounced"] and not unread:
                 job.log(f"  {name}: no quarter rules: its page names no quarter ahead")
         job.log(f"Quarter rules waiting for review on: {', '.join(waiting)}." if waiting else "No quarter rules are waiting for review.")
 

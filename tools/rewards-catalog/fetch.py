@@ -44,6 +44,7 @@ import urllib.request
 import zlib
 from dataclasses import dataclass, field
 from datetime import date
+from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlparse
@@ -125,6 +126,7 @@ EMBEDDED_CHARS_LIMIT = 200_000
 _STATE_ASSIGNMENT = re.compile(r"window\.[\w$]+\s*=\s*(?:JSON\.parse\()?")
 # Markup, code and style rather than something a reader would read.
 _NOT_PROSE = re.compile(r"[{}]|=>|\bfunction\b|\bvar \w|^(?:https?:)?//|^[~#/.]")
+_LINE_BREAK = re.compile(r"<br\s*/?>", re.I)
 
 
 class _Embedded(HTMLParser):
@@ -218,12 +220,21 @@ def embedded_text(html: str) -> str:
     return _prose_lines(found)
 
 
-def data_text(body: str) -> str:
+def data_text(reply: str) -> str:
     """The sentences a JSON reply carries, kept the way embedded_text keeps them. A calendar a script builds from its
-    own data (Discover's) has no visible text to read, so this is its text. Raises ValueError if it isn't JSON."""
+    own data (Discover's) has no visible text to read, so this is its text. A <br> or an &nbsp; in a sentence is only
+    spacing, so a sentence stays on one line. Raises ValueError if it isn't JSON."""
     found: list[str] = []
-    _strings(json.loads(body), found)
-    return _prose_lines(found)
+    _strings(json.loads(reply), found)
+    return _prose_lines([_LINE_BREAK.sub(" ", unescape(string)) for string in found])
+
+
+def _is_json(reply: str) -> bool:
+    """Whether a reply's body is a JSON object or list, whatever its content type says."""
+    try:
+        return isinstance(json.loads(reply), (dict, list))
+    except ValueError:
+        return False
 
 
 def _prose_lines(found: list[str]) -> str:
@@ -408,17 +419,18 @@ def render_with_browser(url: str, timeout_ms: int = 45_000) -> str:
 
 
 def fetch_page(
-    url: str, get, robots: Robots, throttle: Throttle, validators: dict[str, str], render=None, calendar: bool = False,
+    url: str, get, robots: Robots, throttle: Throttle, validators: dict[str, str], render=None, accepts_json: bool = False,
 ) -> PageResult:
     """Read one page. `render(url) -> html` is tried when the plain fetch comes back as a shell (needs-browser):
-    it can turn that into a read page, or leave it needs-browser with the reason. A `calendar` page may also
-    answer with JSON (data_text); a card page that does isn't a web page."""
+    it can turn that into a read page, or leave it needs-browser with the reason. With `accepts_json` (a calendar page)
+    a reply whose body is JSON is read too (data_text), however short: one quarter is a whole reply. It only has to say
+    something about earning. A card page that answers JSON isn't a web page."""
     if not robots.allowed(url):
         problem = robots.problems.get(robots.origin(url))
         return PageResult("failed", error=problem) if problem else PageResult("robots")
     headers = {
         "User-Agent": USER_AGENT,
-        "Accept": "application/json,text/html,application/xhtml+xml" if calendar else "text/html,application/xhtml+xml",
+        "Accept": "application/json,text/html,application/xhtml+xml" if accepts_json else "text/html,application/xhtml+xml",
         "Accept-Language": "en-US,en;q=0.9",
         # Uncompressed: some issuers cut a gzip body off mid-stream, and half a page must not pass as a page.
         "Accept-Encoding": "identity",
@@ -446,21 +458,23 @@ def fetch_page(
             if len(response.body) > MAX_BYTES:
                 return PageResult("failed", error="page larger than the size limit")
             content_type = response.headers.get("content-type", "")
-            is_json = calendar and "json" in content_type
-            if content_type and not is_json and "html" not in content_type and "text" not in content_type:
-                return PageResult("failed", error=f"not a web page ({content_type})")
             try:
-                html = decode(response)
-                text = data_text(html) if is_json else visible_text(html)
+                reply = decode(response)
+                is_json = accepts_json and ("json" in content_type or _is_json(reply))
+                if content_type and not is_json and "html" not in content_type and "text" not in content_type:
+                    return PageResult("failed", error=f"not a web page ({content_type})")
+                text = data_text(reply) if is_json else visible_text(reply)
                 embedded = False
                 if len(text) < MIN_TEXT_CHARS and not is_json:
                     # A page built in the browser: look for its content in the data it ships with.
-                    data = embedded_text(html)
+                    data = embedded_text(reply)
                     text, embedded = (f"{text}\n{data}".strip(), True) if data else (text, False)
             except (OSError, EOFError, ValueError, zlib.error) as problem:
                 return PageResult("failed", error=f"unreadable reply: {problem}")
+            if is_json and not REWARD_WORDS.search(text):
+                return PageResult("failed", error="the JSON reply says nothing about earning")
             result = PageResult(
-                "ok" if len(text) >= MIN_TEXT_CHARS and REWARD_WORDS.search(text) else "needs-browser",
+                "ok" if is_json or (len(text) >= MIN_TEXT_CHARS and REWARD_WORDS.search(text)) else "needs-browser",
                 text=text,
                 embedded=embedded and len(text) >= MIN_TEXT_CHARS,
                 final_url=response.url,
@@ -497,6 +511,7 @@ class CardOutcome:
     url: str
     status: str  # new, unchanged, changed, or one of PageResult's non-ok statuses
     detail: str = ""
+    calendar_error: str = ""  # why the card's calendar page wasn't read; "" if it was, or the card has none
 
 
 @dataclass
@@ -576,7 +591,7 @@ def run(
         for card, outcome in zip(sharing, outcomes):
             if calendar_url := card.get("calendarUrl"):
                 if calendar_url not in calendars:
-                    calendars[calendar_url] = fetch_page(calendar_url, get, robots, throttle, {}, calendar=True)
+                    calendars[calendar_url] = fetch_page(calendar_url, get, robots, throttle, {}, accepts_json=True)
                 _record_calendar(card, calendars[calendar_url], outcome, state, cache, today)
         summary.outcomes.extend(outcomes)
         if after_each:
@@ -641,12 +656,12 @@ def _record(card: dict, url: str, page: PageResult, state: dict, cache: Path, to
 
 def _record_calendar(card: dict, page: PageResult, outcome: CardOutcome, state: dict, cache: Path, today: str) -> None:
     """Save a card's calendar page beside its own and fold what came of it into the card's outcome. A changed calendar
-    is a changed card, whatever its page did; one that wasn't read keeps its last text and hash, like a card's page."""
+    is a changed card, whatever its page did; one that wasn't read keeps its last text and hash, like a card's page,
+    and the outcome's `calendar_error` says why: the card's own status is about its own page."""
     entry = state[card["id"]]
     entry.update(calendarUrl=card["calendarUrl"], calendarStatus=page.status)
     if page.status == "ok" and text_hash(page.text) == entry.get("calendarHash"):
         return
-    note = f"calendar page: {page.status}"
     if page.status == "ok":
         saved = cache / card["id"] / CALENDAR_FILE
         note = f'calendar page: {changed_line_count(saved.read_text(encoding="utf-8") if saved.exists() else "", page.text)} lines changed'
@@ -655,6 +670,9 @@ def _record_calendar(card: dict, page: PageResult, outcome: CardOutcome, state: 
         entry.update(calendarHash=text_hash(page.text), changedAt=today)
         if outcome.status == "unchanged":
             outcome.status = "changed"
+    else:
+        outcome.calendar_error = f"{page.status}: {page.error}" if page.error else page.status
+        note = f"calendar page: {outcome.calendar_error}"
     outcome.detail = f"{outcome.detail}; {note}" if outcome.detail else note
 
 
@@ -667,12 +685,18 @@ def report(summary: RunSummary, total_cards: int) -> str:
     for status in order + sorted(set(groups) - set(order)):
         if status in groups:
             lines.append(f"| {status} | {len(groups[status])} |")
+    unread = [outcome for outcome in summary.outcomes if outcome.calendar_error]
+    if unread:
+        lines.append(f"| calendar page not read | {len(unread)} |")
     for status in order:
         if status in groups and status != "unchanged":
             lines += ["", f"## {status}", ""]
             for outcome in groups[status]:
                 note = f": {outcome.detail}" if outcome.detail else ""
                 lines.append(f"- `{outcome.card_id}` {outcome.url}{note}")
+    if unread:
+        lines += ["", "## calendar page not read", ""]
+        lines += [f"- `{outcome.card_id}` {outcome.calendar_error}" for outcome in unread]
     return "\n".join(lines) + "\n"
 
 
@@ -686,6 +710,12 @@ def text_saved(card_id: str, entry: dict, cache: Path) -> bool:
     return (not entry.get("hash") or (folder / "latest.txt").exists()) and (
         not entry.get("calendarHash") or (folder / CALENDAR_FILE).exists()
     )
+
+
+def saved_calendar(card: dict, cache: Path) -> str | None:
+    """The saved text of the card's calendar page, or None if it has no calendar page, or none saved yet."""
+    saved = cache / card["id"] / CALENDAR_FILE
+    return saved.read_text(encoding="utf-8") if card.get("calendarUrl") and saved.exists() else None
 
 
 def select(
