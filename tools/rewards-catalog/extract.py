@@ -1107,7 +1107,7 @@ def _conditions_about(conditions, category) -> list:
 def calendar_rules(rules: list[dict], text: str, today: str, url: str | None = None) -> list[dict]:
     """A dated rotating rule for each quarter the page's calendar names (quarters.read_calendar) that hasn't ended
     by `today`: the card's rotating rule, with its rate, cap and activation, given that quarter's dates and the
-    categories its names stand for. A name that is no category (a charity, Amazon: brands aren't category words)
+    categories its names stand for, and its cap if the quarter states one. A name that is no category (a charity, Amazon: brands aren't category words)
     is kept in "merchants", so the bonus still says where it applies. No calendar rule without a rotating rule:
     the calendar names no rate. Each is marked verified "calendar": its quote is the calendar's lines, which
     usually name no rate, so the quote checks (and fixing it in the review) don't apply. `url` is the calendar's page,
@@ -1131,8 +1131,9 @@ def calendar_rules(rules: list[dict], text: str, today: str, url: str | None = N
             else:
                 merchants.append(name)
         conditions = base["conditions"] + [note for note in quarter.notes if note not in base["conditions"]]
+        cap = {} if quarter.cap is None else {"capAmount": quarter.cap, "capPeriod": "quarter", "capUnknown": False}
         made.append({
-            **base, "categories": categories, "merchants": merchants, "validFrom": quarter.start, "validTo": quarter.end,
+            **base, **cap, "categories": categories, "merchants": merchants, "validFrom": quarter.start, "validTo": quarter.end,
             "conditions": conditions[:MAX_CONDITIONS], "verified": "calendar",
             "evidence": {**base["evidence"], "quote": quarter.quote, "url": url or base["evidence"]["url"]},
         })
@@ -1155,11 +1156,15 @@ def quarters_page(card: dict, page_text: str, calendar: str | None) -> tuple[str
 def add_calendar_rules(candidate: dict, text: str, today: str, url: str | None = None) -> int:
     """Give a candidate the dated rules its saved page's calendar has for it and it lacks, and say how many. The
     calendar is read, not asked about, so a card extracted before its calendar could be read gets its quarters
-    without a model run, and the rules a person has already decided on stay exactly as they are. `url` is the
-    calendar's page, as for calendar_rules."""
-    rules = {_merge_key(rule): rule for rule in candidate["rules"]}
+    without a model run, and the rules a person has already decided on stay exactly as they are. A saved quarter
+    rule the calendar now reads differently (the same quarter and names, another cap) is replaced, so it waits for
+    review again. `url` is the calendar's page, as for calendar_rules."""
+    read = calendar_rules(candidate["rules"], text, today, url)
+    named = {_quarter_names(rule): _merge_key(rule) for rule in read}
+    rules = {_merge_key(rule): rule for rule in candidate["rules"]
+             if rule["verified"] != "calendar" or named.get(_quarter_names(rule), _merge_key(rule)) == _merge_key(rule)}
     before = len(rules)
-    for rule in calendar_rules(candidate["rules"], text, today, url):
+    for rule in read:
         rules.setdefault(_merge_key(rule), rule)
     added = len(rules) - before
     if added:
@@ -1167,6 +1172,11 @@ def add_calendar_rules(candidate: dict, text: str, today: str, url: str | None =
         candidate["needs"] = _needs(candidate["rules"])
         candidate["warnings"] += [w for w in card_warnings(candidate["rules"]) if w not in candidate["warnings"]]
     return added
+
+
+def _quarter_names(rule: dict) -> tuple:
+    """Which quarter a calendar's rule is about, and what it names for it."""
+    return rule["validFrom"], rule["validTo"], tuple(rule["categories"]), tuple(rule.get("merchants") or [])
 
 
 def _needs(rules: list[dict]) -> list[str]:

@@ -37,7 +37,7 @@ _END = re.compile(rf"^activat|{_COMING_SOON.pattern}", re.I)
 _LINK = re.compile(r"\*?\s*Opens (?:offer details overlay|in a new window|overlay)\s*$", re.I)
 MAX_LINES = 10  # a quarter's list is a few lines; past this it isn't a calendar
 # "Earn ... at <names>, now to December 31, 2026, on up to ...": the running quarter says "now", the others its first day.
-_SENTENCE = re.compile(rf"^Earn .+? at (.+?), (?:now|{_MONTH} \d{{1,2}}) to {_MONTH} (\d{{1,2}}), (20\d\d), on up to ", re.I)
+_SENTENCE = re.compile(rf"^Earn .+? at (.+?), (?:now|{_MONTH} \d{{1,2}}) to {_MONTH} (\d{{1,2}}), (20\d\d), on up to (?:\$([\d,]+))?", re.I)
 _NAME_BREAK = re.compile(r",\s+and\s+|,\s+|\s+and\s+")
 
 
@@ -48,6 +48,7 @@ class Quarter:
     names: tuple[str, ...]  # as the calendar lists them: "Grocery Stores", "Dining", "American Red Cross®"
     notes: tuple[str, ...]  # a line in brackets, with the name it is about: "Grocery Stores (excluding Walmart® and Target®)"
     quote: str  # the calendar's lines for the quarter, word for word
+    cap: int | None = None  # the spending the quarter's own words limit the bonus to: 1500 for "on up to $1,500 in purchases"
 
 
 def _month_number(name: str) -> int:
@@ -55,9 +56,9 @@ def _month_number(name: str) -> int:
     return MONTHS.index(name.lower()[:3]) + 1
 
 
-def _quarter(year: int | str, first: int, names, notes, quote: str) -> Quarter:
+def _quarter(year: int | str, first: int, names, notes, quote: str, cap: int | None = None) -> Quarter:
     """The quarter of `year` that starts in month `first`."""
-    return Quarter(f"{year}-{first:02d}-01", f"{year}-{QUARTER_ENDS[first]}", tuple(names), tuple(notes), quote)
+    return Quarter(f"{year}-{first:02d}-01", f"{year}-{QUARTER_ENDS[first]}", tuple(names), tuple(notes), quote, cap)
 
 
 def _sentence_quarter(line: str) -> Quarter | None:
@@ -65,12 +66,12 @@ def _sentence_quarter(line: str) -> Quarter | None:
     match = _SENTENCE.match(line)
     if not match:
         return None
-    names, opened, closed, day, year = match.groups()
+    names, opened, closed, day, year, cap = match.groups()
     last = _month_number(closed)
     first = last - 2
     if QUARTER_ENDS.get(first) != f"{last:02d}-{int(day):02d}" or (opened and _month_number(opened) != first):
         return None
-    return _quarter(year, first, _NAME_BREAK.split(names), (), line)
+    return _quarter(year, first, _NAME_BREAK.split(names), (), line, int(cap.replace(",", "")) if cap else None)
 
 
 def read_calendar(text: str) -> list[Quarter]:

@@ -182,7 +182,7 @@ def rule_warnings(rule: dict) -> list[str]:
     if rule.get("verified") == "manual":
         warnings.append("hand-entered, and the saved page doesn't confirm the quote: check it on the page")
     if rule.get("verified") == "calendar":
-        warnings.append("read from the page's quarterly calendar: its rate, cap and activation are the rotating bonus's")
+        warnings.append("read from the page's quarterly calendar: its rate and activation are the rotating bonus's")
     if rule.get("capUnknown"):
         warnings.append("the page says there is a cap but doesn't state the amount")
     return warnings

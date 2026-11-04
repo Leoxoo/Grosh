@@ -71,6 +71,9 @@ BLUE_CASH_RULES = [
 ]
 
 
+DISCOVER_OCTOBER = "Earn 5% Cashback Bonus at Restaurants, Entertainment and Utilities, now to December 31, 2026, on up to $1,500 in purchases when you activate."
+
+
 class ValidateRuleTests(unittest.TestCase):
     def check(self, **overrides) -> str | None:
         return validate_rule(rule(**overrides), PAGE_NORM)
@@ -627,6 +630,24 @@ class WhatCountsAsWhatTests(unittest.TestCase):
         page = "Savor Rewards\nEarn 3% on dining.\nOCT-DEC\n2026\nDining"
         result = extract_card(CARD, page, "h", FakeModel([rule(quote="Earn 3% on dining.")]), "m", follow_up=False, today="2026-11-02")
         self.assertEqual([r["selection"] for r in result["rules"]], ["fixed"])
+
+    def test_a_quarter_that_states_its_cap_uses_it(self):
+        base = extract.candidate_rule(rule(categories=[], selection="rotating", rate=5, requires=["activation"], quote=FREEDOM), "u", "h", "page")
+        (october,) = extract.calendar_rules([base], DISCOVER_OCTOBER, "2026-11-03")
+        self.assertEqual((october["capAmount"], october["capPeriod"], october["capUnknown"]), (1500, "quarter", False))
+
+    def test_a_quarter_that_states_no_cap_keeps_the_rotating_rules(self):
+        base = extract.candidate_rule(rule(categories=[], selection="rotating", rate=5, capAmount=1500, capPeriod="quarter", quote=FREEDOM), "u", "h", "page")
+        (january,) = extract.calendar_rules([base], "JAN-MAR\n2027\nGrocery Stores\nActivate", "2026-12-24")
+        self.assertEqual((january["capAmount"], january["capPeriod"]), (1500, "quarter"))
+
+    def test_a_saved_quarter_rule_read_without_its_cap_is_replaced_not_doubled(self):
+        base = extract.candidate_rule(rule(categories=[], selection="rotating", rate=5, requires=["activation"], quote=FREEDOM), "u", "h", "page")
+        (saved,) = extract.calendar_rules([base], DISCOVER_OCTOBER, "2026-11-03")
+        saved.update(capAmount=None, capPeriod=None)
+        candidate = {"rules": [base, saved], "needs": [], "warnings": []}
+        self.assertEqual(extract.add_calendar_rules(candidate, DISCOVER_OCTOBER, "2026-11-03"), 1)
+        self.assertEqual([r["capAmount"] for r in candidate["rules"] if r["validFrom"]], [1500])
 
     def test_a_candidate_with_an_undated_rotating_rule_gains_the_quarters_its_saved_page_names(self):
         base = extract.candidate_rule(rule(categories=[], selection="rotating", rate=5, requires=["activation"], quote=FREEDOM), "u", "h", "page")

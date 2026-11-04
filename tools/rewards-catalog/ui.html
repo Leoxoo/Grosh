@@ -66,7 +66,12 @@
   #drawer[hidden] { display: none; }
   #drawer h3 { margin: 18px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
   .rule { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
-  .rule .what { font-weight: 600; } .rule blockquote { margin: 8px 0 0; padding-left: 10px; border-left: 3px solid var(--line); color: var(--muted); font-size: 13px; }
+  .rule .what { font-weight: 600; } .rule .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+  .rule .head .rate { font-size: 22px; font-weight: 700; } .rule .head .kind { font-weight: 600; }
+  .fields { display: grid; grid-template-columns: max-content 1fr; gap: 5px 14px; margin: 10px 0 0; font-size: 13px; }
+  .fields dt { color: var(--muted); } .fields dd { margin: 0; }
+  .said { margin: 10px 0 0; font-size: 12px; color: var(--muted); } .rule .said + blockquote { margin-top: 3px; }
+  .rule blockquote { margin: 8px 0 0; padding-left: 10px; border-left: 3px solid var(--line); color: var(--muted); font-size: 13px; }
   .rule ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
   .rule.rejected { border-color: var(--bad); }
   .rule.accepted { border-color: var(--ok); }
@@ -521,11 +526,6 @@ const DECISION = {
 };
 
 // What a rule requires and when it applies, as chips.
-function ruleChips(r) {
-  return [r.requires.map((q) => [chip("needs " + q, "info"), " "]), r.tier ? [chip(r.tier + " tier", "info"), " "] : null,
-    r.validFrom || r.validTo ? [chip(`${r.validFrom || "…"} to ${r.validTo || "…"}`), " "] : null,
-    r.firstMonths ? [chip(`first ${r.firstMonths} months`), " "] : null];
-}
 // Which purchases a rule covers, as the app would name them.
 function ruleWhere(r) {
   const list = labels(r.categories) + (r.hasOtherChoices ? " and more" : "");
@@ -550,6 +550,37 @@ function ruleTerms(r) {
   return t.join("; ");
 }
 
+// The Grosh categories a rule reaches. A rule the person chooses, or a rotating one with no dates, reaches none yet.
+const appCategories = (r) => (r.selection === "fixed" || r.validFrom ? r.categories.flatMap((id) => term(id).app) : []);
+const REQUIRE_LABEL = { "apple-pay": "Apple Pay", activation: "Activation", "issuer-booking": "Booking through the issuer", "preferred-rewards-tier": "Preferred Rewards membership" };
+function ruleKind(r) {
+  if (r.selection === "choose") return `You choose ${r.picks > 1 ? r.picks : "1"}`;
+  if (r.selection === "top-spend") return "Your top category each cycle";
+  if (r.selection === "rotating") return r.validFrom ? "Quarterly bonus" : "Rotating bonus, no dates";
+  return r.categories.includes("everything-else") ? "Base rate" : "Fixed rate";
+}
+function ruleCap(r) {
+  if (r.capAmount != null) return `$${(+r.capAmount).toLocaleString()} per ${r.capPeriod === "cycle" ? "billing cycle" : r.capPeriod}, then the base rate`;
+  return r.capUnknown ? "Capped, but the page doesn't say how much" : "No cap";
+}
+// A rule's values as the catalog will hold them, one per line. An empty value is shown too ("No cap", "None named"):
+// it's what the app will use, so it's as much to check as a filled one.
+function ruleFields(r) {
+  const row = (name, ...value) => [h("dt", { text: name }), h("dd", {}, value)];
+  const app = r.categories.includes("everything-else") ? "Everything not listed above" : appCategories(r).join(", ");
+  return h("dl", { class: "fields" },
+    row("Categories", r.categories.length ? r.categories.map((id) => [chip(term(id).label), " "]) : "None named"),
+    r.hasOtherChoices ? row("Also", "More choices than the page lists") : null,
+    r.merchants && r.merchants.length ? row("Also at", r.merchants.map((m) => [chip(m), " "])) : null,
+    app ? row("Your categories", app) : null,
+    row("Cap", ruleCap(r)),
+    row("Dates", r.validFrom || r.validTo ? span(r) : "Always"),
+    row("Requires", r.requires.length ? r.requires.map((q) => REQUIRE_LABEL[q] || q).join(", ") : "Nothing"),
+    r.tier ? row("Tier", r.tier.replace("-", " ")) : null,
+    r.firstMonths ? row("Lasts", `The first ${r.firstMonths} months`) : null,
+    r.needs.length ? row("App asks", r.needs.map((n) => state.overview.catalog.needs[n] || n).join(" ")) : null);
+}
+
 // The card as the app will use it: one line per rate, best first and the base rate last. Accepted rules are what
 // gets published; waiting ones are faded; rejected ones are left out, as they will be in the app.
 function appPreview(rv) {
@@ -562,7 +593,7 @@ function appPreview(rv) {
     h("table", { class: "earn" },
       h("thead", {}, h("tr", {}, h("th", { text: "Earns" }), h("th", { text: "On" }), h("th", { text: "Your categories" }), h("th", { text: "" }))),
       h("tbody", {}, rows.map((x) => {
-        const r = x.rule, app = r.selection === "fixed" || r.validFrom ? r.categories.flatMap((id) => term(id).app) : [];
+        const r = x.rule, app = appCategories(r);
         return h("tr", { class: x.decision ? "" : "waiting" },
           h("td", { class: "rate", text: rateText(r) }),
           h("td", {}, h("div", { text: ruleWhere(r) }), ruleTerms(r) ? h("div", { class: "small muted", text: ruleTerms(r) }) : null),
@@ -610,7 +641,7 @@ function stackedLines(rv) {
                       : h("p", { class: "small muted", text: "No quarter's bonus covers a category with its own bonus yet, so nothing adds up beyond each rate." });
 }
 
-// One rule to review: what it says, its evidence, and accept / reject / fix.
+// One rule to review: the values the app will use, the quote they came from, and accept / reject / fix.
 function reviewRule(cardId, x) {
   const r = x.rule, decided = DECISION[x.decision], fixArea = h("div", {});
   const send = async (body) => {
@@ -620,12 +651,14 @@ function reviewRule(cardId, x) {
   const press = (decision) => async (e) => { e.target.disabled = true; try { await send({ decision }); } catch (err) { alert(err.message); e.target.disabled = false; } };
   const fix = () => fill(fixArea, fixArea.childNodes.length ? null : fixForm(r, (changes) => send({ decision: "edit", changes }), () => fill(fixArea)));
   return h("div", { class: "rule" + (x.decision === "accept" ? " accepted" : x.decision === "reject" ? " rejected" : "") },
-    h("div", { class: "what", text: x.summary }),
+    h("div", { class: "head" }, h("span", { class: "rate", text: rateText(r) }), h("span", { class: "kind", text: ruleKind(r) })),
     h("div", { class: "small", style: "margin-top: 4px" },
       decided ? chip(decided.chip, decided.kind) : chip("waiting for review", "info"), " ",
       x.edited ? [h("span", { title: "Extracted as: " + JSON.stringify({ categories: x.original.categories, rate: x.original.rate, unit: x.original.unit, capAmount: x.original.capAmount, requires: x.original.requires }) }, chip("fixed by you", "info")), " "] : null,
-      x.warnings.map((w) => [chip(w, "warn"), " "]), ruleChips(r)),
+      x.warnings.map((w) => [chip(w, "warn"), " "])),
+    ruleFields(r),
     r.conditions.length ? h("ul", {}, r.conditions.map((t) => h("li", { text: t }))) : null,
+    h("p", { class: "said", text: "The page says" }),
     h("blockquote", { text: x.quote }),
     h("p", { class: "small", style: "margin: 6px 0 0" }, "Source: ",
       /^https?:\/\//.test(x.url) ? h("a", { href: x.url, target: "_blank", rel: "noopener noreferrer", text: x.url }) : x.url),

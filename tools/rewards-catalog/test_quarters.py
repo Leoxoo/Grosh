@@ -96,6 +96,13 @@ class ReadCalendarTests(unittest.TestCase):
                                         "now to December 31, 2026, on up to $1,500 in purchases when you activate.")
         self.assertIn(october.quote, DISCOVER.splitlines())
 
+    def test_a_quarter_in_a_sentence_says_its_cap(self):
+        self.assertEqual(quarters.read_calendar(DISCOVER)[-1].cap, 1500)
+
+    def test_a_quarter_in_a_list_has_no_cap_of_its_own(self):
+        (quarter,) = quarters.read_calendar("JAN-MAR\n2027\nGrocery Stores\nActivate")
+        self.assertIsNone(quarter.cap)
+
     def test_a_sentence_about_dates_that_are_not_a_quarter_is_not_a_calendar(self):
         promotion = "Earn 5% Cashback Bonus at Best Buy, November 25 to December 31, 2026, on up to $1,500 in purchases."
         self.assertEqual(quarters.read_calendar(promotion), [])
