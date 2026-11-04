@@ -24,7 +24,7 @@
     {"categories": [], "selection": "rotating", "rate": 5, "requires": ["activation"]}
   ],
   "goldman-sachs-apple-card": [
-    {"categories": ["everything-else"], "selection": "fixed", "rate": 2, "requires": ["apple-pay"]},
+    {"categories": [], "selection": "fixed", "rate": 2, "paysWith": "Apple Pay"},
     {"categories": ["everything-else"], "selection": "fixed", "rate": 1}
   ]
 }

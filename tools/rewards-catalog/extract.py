@@ -51,7 +51,7 @@ import quarters  # noqa: E402
 CANDIDATES = fetch.CACHE / "candidates"
 SAVED_SETTINGS = fetch.CACHE / "ui-settings.json"
 MANUAL_RULES = Path(__file__).with_name("manual-rules.json")
-PROMPT_VERSION = "10"
+PROMPT_VERSION = "11"
 DEFAULT_URL = "http://localhost:1234/v1"
 DEFAULT_MODEL = "k2-horizon-7b-uno-uncensored"
 # A reasoning model "thinks" before it answers and can spend a small reply limit on that alone (the first
@@ -161,7 +161,6 @@ SELECTION_WORDS = {
 TIER_BOOST = "preferred-rewards-tier"
 # What a rate can require beyond the purchase itself, and the words that must back the tag up.
 REQUIRES = {
-    "apple-pay": ("apple pay",),
     "activation": ("activate", "activation", "enroll"),
     "issuer-booking": ("booked through", "booked with", "book through", "book with", "booking through",
                        "purchased through", "portal"),
@@ -176,12 +175,10 @@ TIERS = {
 }
 # Questions only the cardholder can answer, with the wording the app can ask. A rule's `needs` is worked out
 # from the rule itself (needs_of), never taken from the model: a choose rule needs the category picked, a
-# rate for the first N months needs the date the card was opened, an Apple Pay rate needs to know whether
-# the cardholder pays that way, a Preferred Rewards boost needs the cardholder's tier.
+# rate for the first N months needs the date the card was opened, a Preferred Rewards boost needs the cardholder's tier.
 NEEDS = {
     "choice-categories": "Which category did you choose on this card?",
     "account-opened": "When did you open this card?",
-    "pays-with-apple-pay": "Do you usually pay with Apple Pay?",
     TIER_BOOST: "Which Bank of America Preferred Rewards tier are you in?",
 }
 MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
@@ -199,6 +196,8 @@ RULE_SCHEMA = {
         "capAmount": {"type": ["number", "null"]},
         "capPeriod": {"type": ["string", "null"], "enum": [*PERIOD_WORDS, None]},
         "requires": {"type": "array", "items": {"type": "string", "enum": list(REQUIRES)}},
+        "paysWith": {"type": ["string", "null"]},
+        "merchants": {"type": "array", "items": {"type": "string"}},
         "validFrom": {"type": ["string", "null"]},
         "validTo": {"type": ["string", "null"]},
         "firstMonths": {"type": ["integer", "null"]},
@@ -207,7 +206,7 @@ RULE_SCHEMA = {
         "conditions": {"type": "array", "items": {"type": "string"}},
     },
     "required": ["categories", "selection", "picks", "hasOtherChoices", "rate", "unit", "capAmount", "capPeriod",
-                 "requires", "validFrom", "validTo", "firstMonths", "tier", "quote", "conditions"],
+                 "requires", "paysWith", "merchants", "validFrom", "validTo", "firstMonths", "tier", "quote", "conditions"],
     "additionalProperties": False,
 }
 SCHEMA = {
@@ -370,7 +369,7 @@ def _category_fits(category: str, quote_norm: str, boost: bool = False) -> bool:
             return False
         if mentions(quote_norm, CATEGORIES[category]):
             return True
-        # "Get 2% back when you use Apple Pay" is a base rate without saying "all other purchases":
+        # "Get 2% back on every purchase" is a base rate without saying "all other purchases":
         # it fits if it names no other category.
         return not any(mentions(quote_norm, words) for name, words in CATEGORIES.items() if name != category)
     return mentions(quote_norm, CATEGORIES[category])
@@ -427,12 +426,23 @@ def validate_rule(rule, page_norm: str | None = None, rows: dict[str, str] | Non
     other, rate, unit = rule.get("hasOtherChoices"), rule.get("rate"), rule.get("unit")
     quote, cap, period = rule.get("quote"), rule.get("capAmount"), rule.get("capPeriod")
     requires, conditions = rule.get("requires"), rule.get("conditions")
+    pays_with, merchants = rule.get("paysWith"), rule.get("merchants") or []
 
     if selection not in SELECTIONS:
         return f"selection {selection!r} is not fixed, choose or top-spend"
+    if pays_with is not None and (not isinstance(pays_with, str) or not pays_with.strip()):
+        return "paysWith must be the way of paying the page names, or null"
+    if (
+        not isinstance(merchants, list)
+        or not all(isinstance(m, str) and m.strip() for m in merchants)
+        or len(set(merchants)) != len(merchants)
+    ):
+        return "merchants must be a list of the distinct merchants the page names"
+    # A rate for a way of paying or for named merchants has no category: it isn't for a kind of purchase.
+    needs_a_category = selection != "rotating" and not (selection == "fixed" and (pays_with or merchants))
     if (
         not isinstance(categories, list)
-        or (not categories and selection != "rotating")
+        or (not categories and needs_a_category)
         or not all(isinstance(c, str) and c in CATEGORIES for c in categories)
         or len(set(categories)) != len(categories)
     ):
@@ -443,7 +453,7 @@ def validate_rule(rule, page_norm: str | None = None, rows: dict[str, str] | Non
         if "everything-else" in categories or picks is not None or other:
             return "a rotating bonus has no everything-else, no picks and no other choices"
     elif selection == "fixed":
-        if len(categories) != 1 or picks is not None or other:
+        if len(categories) > 1 or picks is not None or other:
             return "a fixed rule has one category, no picks and no other choices"
     else:
         if "everything-else" in categories:
@@ -512,8 +522,8 @@ def validate_rule(rule, page_norm: str | None = None, rows: dict[str, str] | Non
                 return f"quote doesn't mention {category}"
     elif selection == "fixed":
         # A base rate is judged on its own sentence, so a boost beside it ("Or, enroll in Preferred Rewards") doesn't count.
-        fit_text = rate_norm if categories[0] == "everything-else" else quote_norm
-        if not _category_fits(categories[0], fit_text, boost):
+        fit_text = rate_norm if categories[:1] == ["everything-else"] else quote_norm
+        if categories and not _category_fits(categories[0], fit_text, boost):
             return f"quote doesn't mention {categories[0]}"
     else:
         if not mentions(quote_norm, SELECTION_WORDS[selection]):
@@ -529,6 +539,11 @@ def validate_rule(rule, page_norm: str | None = None, rows: dict[str, str] | Non
     for tag in requires:
         if not mentions(context, REQUIRES[tag]):
             return f"requires {tag}, but neither the quote nor a condition says so"
+    if pays_with and not mentions(context, (normalize(pays_with),)):
+        return f"paysWith {pays_with}, but neither the quote nor a condition says so"
+    for merchant in merchants:
+        if not mentions(context, (normalize(merchant),)):
+            return f"merchant {merchant}, but neither the quote nor a condition names it"
     if tier is not None and not re.search(r"(?<![a-z0-9])" + TIERS[tier], context):
         return f"tier {tier}, but neither the quote nor a condition names it"
     first = rule.get("firstMonths")
@@ -719,14 +734,16 @@ Rules:
 - Only rates for the card named at the end. The text may also describe other cards; ignore their rates.
 - One entry per rate. categories must come from this list:
 {categories}
-  Skip a rate that fits none of these, and a rate for one named store.
-- selection: "fixed" when the rate always applies to one category (list exactly that one). "choose" when the cardholder picks which categories earn the rate. "top-spend" when the card applies the rate by itself to the eligible category where the cardholder spends the most. For "choose" and "top-spend", list every eligible category that is in the list above, set picks to how many categories earn the rate (1 for "your top category"), and set hasOtherChoices to true if the text also lists eligible categories that are not in the list above. For "fixed", picks is null and hasOtherChoices is false.
+  Skip a rate that fits none of these, unless it is for a way of paying or named merchants (see paysWith and merchants).
+- selection: "fixed" when the rate always applies to one category (list exactly that one), or to a way of paying or named merchants. "choose" when the cardholder picks which categories earn the rate. "top-spend" when the card applies the rate by itself to the eligible category where the cardholder spends the most. For "choose" and "top-spend", list every eligible category that is in the list above, set picks to how many categories earn the rate (1 for "your top category"), and set hasOtherChoices to true if the text also lists eligible categories that are not in the list above. For "fixed", picks is null and hasOtherChoices is false.
 - "rotating" when the issuer changes the bonus categories every quarter or month (such as "5% in bonus categories that change each quarter"): leave categories as [] unless the text names them for a stated period, set picks to null and hasOtherChoices to false, and include requires ["activation"] if the text says to activate.
 - rate: the number alone (3 for "3%" and for "3X points").
 - unit: "percent" for cash back percent, "per-dollar" for points or miles per dollar.
 - quote: copy the exact words of one sentence or phrase from the text that states the rate. Do not change, shorten or join them.
 - capAmount and capPeriod: only if that same sentence limits how much spending earns the rate (for "up to $6,000 per year": 6000 and "year"; the period is month, quarter, year, or cycle for a billing cycle). Otherwise null for both.
-- requires: only what the text says the rate needs. "apple-pay" (must pay with Apple Pay), "activation" (must activate or enroll), "issuer-booking" (must book through the issuer's travel site or portal), "{TIER_BOOST}" (a higher rate only for members of a banking relationship program, such as Bank of America Preferred Rewards: "earn up to 75% more", "as a Platinum Honors member"). Otherwise [].
+- requires: only what the text says the rate needs. "activation" (must activate or enroll), "issuer-booking" (must book through the issuer's travel site or portal), "{TIER_BOOST}" (a higher rate only for members of a banking relationship program, such as Bank of America Preferred Rewards: "earn up to 75% more", "as a Platinum Honors member"). Otherwise [].
+- paysWith: the wallet, app or payment service the purchase must be paid with, written as the text writes it ("Apple Pay", "PayPal", "Venmo"). Leave categories as [] if the rate is for any purchase paid that way, even when the text says online purchases. Otherwise null. Paying with this card itself doesn't count.
+- merchants: the stores or brands the rate applies only at, written as the text writes them ("Amazon", "Costco", "Whole Foods Market"). Leave categories as [] unless the rate also covers a whole category. Otherwise []. Booking through the issuer's own travel site is requires "issuer-booking", not a merchant.
 - tier: for a "{TIER_BOOST}" rate, the tier the text gives it: "gold", "platinum", "platinum-honors" or "diamond-honors". Otherwise null. A boosted rate is its own entry; the rate every cardholder earns is a separate entry without it.
 - validFrom and validTo: for a rate that applies only in a stated period, its first and last day as YYYY-MM-DD, and only when the text names the months and the year (October through December 2026 is 2026-10-01 and 2026-12-31). Otherwise null.
 - firstMonths: only if the text says the rate applies just during an introductory period after the account is opened ("first year", "first 6 months"): the length in months (12 for "first year"). Otherwise null.
@@ -928,8 +945,6 @@ def needs_of(rule: dict) -> list[str]:
         needs.append("choice-categories")
     if rule.get("firstMonths") is not None:
         needs.append("account-opened")
-    if "apple-pay" in rule["requires"]:
-        needs.append("pays-with-apple-pay")
     if TIER_BOOST in rule["requires"]:
         needs.append(TIER_BOOST)
     return needs
@@ -948,6 +963,8 @@ def candidate_rule(proposal: dict, url: str, page_hash: str | None, verified: st
         "capAmount": proposal["capAmount"],
         "capPeriod": proposal["capPeriod"],
         "requires": list(proposal["requires"]),
+        "paysWith": proposal.get("paysWith"),
+        "merchants": list(proposal.get("merchants") or []),
         "validFrom": proposal["validFrom"],
         "validTo": proposal["validTo"],
         "firstMonths": proposal.get("firstMonths"),
@@ -967,6 +984,7 @@ def _merge_key(rule: dict) -> tuple:
     return (
         tuple(rule["categories"]), rule["selection"], rule["picks"], float(rule["rate"]), rule["unit"],
         rule["capAmount"], rule["capPeriod"], rule["validFrom"], rule["validTo"], rule["firstMonths"], rule["tier"],
+        rule.get("paysWith"), tuple(sorted(rule.get("merchants") or [])),
     )
 
 
@@ -978,7 +996,8 @@ def card_warnings(rules: list[dict]) -> list[str]:
     for rule in rules:
         if rule["selection"] != "fixed" or rule["capAmount"] is not None:
             continue
-        key = (rule["categories"][0], tuple(rule["requires"]), rule["validFrom"], rule["validTo"], rule["firstMonths"], rule["tier"])
+        where = ", ".join([*rule["categories"], *(rule.get("merchants") or []), *filter(None, [rule.get("paysWith")])])
+        key = (where, tuple(rule["requires"]), rule["validFrom"], rule["validTo"], rule["firstMonths"], rule["tier"])
         groups.setdefault(key, set()).add(rule["rate"])
     warnings = [
         f"{rule['categories'] or 'a rotating bonus'} at {rule['rate']:g}%: the page says it has a cap but doesn't state the amount"
@@ -1031,8 +1050,13 @@ def _fill_base_category(proposal):
     - "all other purchases" (and no other category named) is the base rate, everything-else;
     - a rotating rule whose quote says the categories change is left alone for the checks;
     - otherwise a single named category (a booking, "hotels", "gas") makes it a fixed rule for that category.
-    The model sometimes gives a fixed rate the wrong selection and no categories; the words carry the meaning."""
-    if not isinstance(proposal, dict) or proposal.get("categories") != []:
+    The model sometimes gives a fixed rate the wrong selection and no categories; the words carry the meaning.
+    A rule for a way of paying or for named merchants has none on purpose: any purchase paid that way isn't the base rate."""
+    if not isinstance(proposal, dict):
+        return proposal
+    if proposal.get("paysWith") or proposal.get("merchants"):
+        return {**proposal, "categories": []} if proposal.get("categories") == ["everything-else"] else proposal
+    if proposal.get("categories") != []:
         return proposal
     quote = normalize(proposal["quote"]) if isinstance(proposal.get("quote"), str) else ""
     named = [name for name, words in CATEGORIES.items() if name != "everything-else" and mentions(quote, words)]
@@ -1172,6 +1196,17 @@ def add_calendar_rules(candidate: dict, text: str, today: str, url: str | None =
         candidate["needs"] = _needs(candidate["rules"])
         candidate["warnings"] += [w for w in card_warnings(candidate["rules"]) if w not in candidate["warnings"]]
     return added
+
+
+def without_covered(rules: list[dict]) -> list[dict]:
+    """The rules without any that says less than another: a category paid one way, beside the same rate for any
+    purchase paid that way. A page says both ("3% on online purchases made through PayPal", "3% when you checkout
+    with PayPal"), and only the wider one is needed."""
+    def terms(rule):
+        return _merge_key(rule)[1:]  # all it says but its categories
+
+    wide = {terms(rule) for rule in rules if rule.get("paysWith") and not rule["categories"] and not rule.get("merchants")}
+    return [rule for rule in rules if not (rule.get("paysWith") and rule["categories"] and terms(rule) in wide)]
 
 
 def _quarter_names(rule: dict) -> tuple:
@@ -1364,7 +1399,7 @@ def extract_card(
         accepted.setdefault(_merge_key(rule), rule)  # two calendars naming a quarter the same way are one rule
     still_missing = [s for s in this_cards if not _covered(s, list(accepted.values()))]
 
-    candidate["rules"] = _in_order(accepted.values())
+    candidate["rules"] = _in_order(without_covered(list(accepted.values())))
     candidate["needs"] = _needs(candidate["rules"])
     candidate["warnings"] = card_warnings(candidate["rules"])
     if still_missing:

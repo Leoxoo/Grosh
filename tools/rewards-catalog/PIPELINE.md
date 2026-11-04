@@ -141,7 +141,7 @@ For each card it splits the cached page text into chunks of about 12,000 charact
 5. a cap needs an amount and a period, and both appear in the quote (`$6,000`, `6K` and `6000` match; "year" or "annual"; `cycle` is a "billing cycle");
 6. every **condition** (an exclusion or restriction on the rate, such as "excluding superstores like Walmart® and Target®") is the page's own sentence, word for word. Conditions are never paraphrased, so what a person sees is what the issuer wrote. A rule with a condition that isn't on the page is rejected whole, since showing the rate without its restriction would overstate it;
 7. a rule where the cardholder chooses or the card picks (`selection` of `choose` or `top-spend`) needs a quote that says so ("of your choice", "top eligible category"), and every category it lists must be mentioned on the page;
-8. a `requires` tag (`apple-pay`, `activation`, `issuer-booking`, `preferred-rewards-tier`) is accepted only if the quote or a condition has words that back it ("Apple Pay", "activate", "booked through", "Preferred Rewards" or a table row's "75% rewards bonus"), and a `tier` only if they name it ("Platinum Honors");
+8. a `paysWith` or a merchant must be named in the quote or a condition, and a `requires` tag (`activation`, `issuer-booking`, `preferred-rewards-tier`) is accepted only if the quote or a condition has words that back it ("Apple Pay", "activate", "booked through", "Preferred Rewards" or a table row's "75% rewards bonus"), and a `tier` only if they name it ("Platinum Honors");
 9. `validFrom` / `validTo` are accepted only if the quote or a condition gives that date's month and year, so a period can't be made up.
 10. `firstMonths` (a rate only for the first N months after opening, such as a first-year bonus) is accepted only if the quote or a condition says "first year", "first 12 months" or similar for that length;
 11. a `rotating` rule's quote must say the categories change ("quarter", "rotating", "bonus categories", "different places"), and any category it does name must be in the quote;
@@ -187,7 +187,8 @@ A rule that fails any check is listed as rejected, never edited. Before the chec
 
 | Case | How a rule says it |
 |---|---|
-| Needs a way of paying (Apple Card's 2% with Apple Pay) | `requires: ["apple-pay"]` |
+| Needs a way of paying (Apple Card's 2% with Apple Pay, PayPal's 3% through PayPal) | `paysWith: "Apple Pay"`, as the page writes it. `categories: []` if any purchase paid that way earns it, which is not the base rate: it's only for those who pay that way. A category paid that way at the same rate is then dropped, since it says less |
+| Only at named merchants (5% at Amazon, 2% at Costco) | `merchants: ["Amazon"]`, as the page writes them, and `categories: []` unless the rate also covers a whole category. A brand is never filed under a category: "online shopping" for PayPal's 3% would give it to every online purchase |
 | Needs activation or booking through the issuer | `requires: ["activation"]` or `["issuer-booking"]` |
 | The cardholder picks the categories (Bank of America Customized Cash) | `selection: "choose"`, the eligible `categories`, `picks`, and `hasOtherChoices: true` if the page lists choices outside the catalog list |
 | The card applies the rate to the top-spend category (Citi Custom Cash) | `selection: "top-spend"`, same fields |
@@ -196,7 +197,7 @@ A rule that fails any check is listed as rejected, never edited. Before the chec
 
 | A higher rate for a banking relationship tier (Bank of America Preferred Rewards: 2.62 points at Platinum Honors where everyone else earns 1.5) | its own rule beside the base rate, with `requires: ["preferred-rewards-tier"]` and `tier` (`gold`, `platinum`, `platinum-honors`, `diamond-honors`) when the page names it; null when it doesn't |
 
-Not handled: caps shared between categories, and rates at one named store (the catalog skips those). The page's own sentence about them can still ride along in `conditions`.
+Not handled: caps shared between categories. The page's own sentence about them can still ride along in `conditions`.
 
 ### Questions only the cardholder can answer
 
@@ -206,7 +207,6 @@ Some things about a rule depend on the person, not the card. The catalog doesn't
 |---|---|---|
 | `choice-categories` | `selection` is `choose` | Which category did you choose on this card? |
 | `account-opened` | `firstMonths` is set (a first-year rate) | When did you open this card? |
-| `pays-with-apple-pay` | `requires` has `apple-pay` | Do you usually pay with Apple Pay? |
 | `preferred-rewards-tier` | `requires` has `preferred-rewards-tier` | Which Bank of America Preferred Rewards tier are you in? |
 
 `top-spend` rules (Citi Custom Cash) need no answer, because Grosh can work out the top category from the user's own expenses in the statement period. A tier boost is not the base rate, so a card with only boosts for all other purchases still gets the "no rate for all other purchases" warning, and a boost beside the base is not "two rates with nothing to tell them apart". Bank of America's first-year 6% is supported by the schema (`firstMonths: 12`) but **not entered**: none of the pages we have states it, so there's no quote to take.
@@ -369,16 +369,17 @@ Card   id, name, issuer, network, isBusiness, annualFee, rewardKind,
        verifiedAt, cardConditions[] (the issuer's sentences that limit several rates), bonusesStack, rules[]
 Rule   categories[], selection (fixed | choose | top-spend | rotating), picks, hasOtherChoices,
        rate, unit (percent | per-dollar), capAmount, capPeriod (month | quarter | year | cycle),
-       requires[] (apple-pay | activation | issuer-booking | preferred-rewards-tier), validFrom, validTo, firstMonths,
+       requires[] (activation | issuer-booking | preferred-rewards-tier), paysWith (Apple Pay, PayPal...),
+       validFrom, validTo, firstMonths,
        tier (gold | platinum | platinum-honors | diamond-honors; only with preferred-rewards-tier),
-       needs[] (choice-categories | account-opened | pays-with-apple-pay | preferred-rewards-tier; derived),
-       conditions[] (the issuer's own sentences, verbatim), merchants[] (a calendar quarter's names that are no category),
+       needs[] (choice-categories | account-opened | preferred-rewards-tier; derived),
+       conditions[] (the issuer's own sentences, verbatim), merchants[] (where the rate applies: only there with no categories, or as well as them),
        verified (page | manual | calendar),
        evidence { url, quote, pageHash }
 ```
 
 - `validFrom` / `validTo` exist for **rotating categories** (Discover, Chase Freedom Flex): they are the reason the cadence below has a quarterly run.
-- **Catalog categories** are a fixed list of what issuers name (`CATEGORIES` in extract.py, prompt version 10): dining, groceries, gas, EV charging, travel, airlines, hotels, transit, streaming, entertainment, drugstores, online shopping, home improvement, fitness, phone & internet, utilities, wholesale clubs, department stores, everything else. Travel covers airlines and hotels: a quote naming travel with either is travel. A Grosh category is the user's own, so the app maps each of the user's categories to one of these rather than the catalog guessing the user's names; `APP_CATEGORIES` is the starting map for the default category tree (Restaurants and Café to dining, Petrol to gas...), shown in each card's view.
+- **Catalog categories** are a fixed list of what issuers name (`CATEGORIES` in extract.py, prompt version 11): dining, groceries, gas, EV charging, travel, airlines, hotels, transit, streaming, entertainment, drugstores, online shopping, home improvement, fitness, phone & internet, utilities, wholesale clubs, department stores, everything else. Travel covers airlines and hotels: a quote naming travel with either is travel. A Grosh category is the user's own, so the app maps each of the user's categories to one of these rather than the catalog guessing the user's names; `APP_CATEGORIES` is the starting map for the default category tree (Restaurants and Café to dining, Petrol to gas...), shown in each card's view.
 
 ## Making reruns reliable
 

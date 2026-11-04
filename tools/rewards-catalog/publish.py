@@ -30,7 +30,7 @@ FORMAT_VERSION = 1
 CARD_FIELDS = ("id", "name", "issuer", "network", "isBusiness", "annualFee", "rewardKind", "rewardProgram", "baseEarnRate",
                "discontinued", "sourceUrl")
 RULE_FIELDS = ("categories", "selection", "picks", "hasOtherChoices", "rate", "unit", "capAmount", "capPeriod",
-               "capUnknown", "requires", "validFrom", "validTo", "firstMonths", "tier", "needs", "conditions", "merchants")
+               "capUnknown", "requires", "paysWith", "validFrom", "validTo", "firstMonths", "tier", "needs", "conditions", "merchants")
 
 
 def number(value):
@@ -42,7 +42,7 @@ def published_rule(rule: dict) -> dict:
     published = {field: rule.get(field) for field in RULE_FIELDS}
     for field in review.SET_FIELDS:
         published[field] = sorted(published[field] or [])
-    published["merchants"] = sorted(published["merchants"] or [])  # only a calendar's rules have merchants
+    published["merchants"] = sorted(published["merchants"] or [])
     published["rate"], published["capAmount"] = number(published["rate"]), number(published["capAmount"])
     published["evidence"] = {"quote": rule["evidence"]["quote"], "url": rule["evidence"]["url"]}
     return published

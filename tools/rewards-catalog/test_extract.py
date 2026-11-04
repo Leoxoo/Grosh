@@ -52,7 +52,7 @@ def rule(**overrides) -> dict:
     base = {
         "categories": ["dining"], "selection": "fixed", "picks": None, "hasOtherChoices": False,
         "rate": 3, "unit": "percent", "capAmount": None, "capPeriod": None, "requires": [],
-        "validFrom": None, "validTo": None, "firstMonths": None, "tier": None, "conditions": [],
+        "paysWith": None, "merchants": [], "validFrom": None, "validTo": None, "firstMonths": None, "tier": None, "conditions": [],
         "quote": "Earn unlimited 3% cash back on dining, entertainment and popular streaming services.",
     }
     return {**base, **overrides}
@@ -105,7 +105,7 @@ class ValidateRuleTests(unittest.TestCase):
         self.assertIsNone(self.check(categories=["everything-else"], rate=1, quote="Earn 1% cash back on all other purchases."))
 
     def test_a_base_rate_may_leave_out_all_other_if_it_names_no_other_category(self):
-        self.assertIsNone(self.check(categories=["everything-else"], rate=2, requires=["apple-pay"], quote=APPLE))
+        self.assertIsNone(self.check(categories=["everything-else"], rate=2, quote=APPLE))
         self.assertIn("doesn't mention everything-else", self.check(categories=["everything-else"], rate=3))
 
     def test_category_words_must_start_a_word(self):
@@ -209,11 +209,11 @@ class RequiresAndDatesTests(unittest.TestCase):
     def test_a_requirement_must_be_said_in_the_quote_or_a_condition(self):
         booked = dict(categories=["travel"], rate=5, quote=BOOKED)
         self.assertIsNone(self.check(**booked, requires=["issuer-booking"]))
-        self.assertIn("requires apple-pay", self.check(**booked, requires=["apple-pay"]))
-        self.assertIsNone(self.check(**booked, requires=["apple-pay"], conditions=[APPLE]))
+        self.assertIn("requires activation", self.check(**booked, requires=["activation"]))
+        self.assertIsNone(self.check(**booked, requires=["activation"], conditions=[ROTATING]))
 
     def test_unknown_or_repeated_requirements(self):
-        for bad in (["bitcoin"], ["apple-pay", "apple-pay"], "apple-pay", [3], None):
+        for bad in (["bitcoin"], ["apple-pay"], ["activation", "activation"], "activation", [3], None):
             self.assertIn("requires must be", self.check(requires=bad), bad)
 
     def test_a_period_needs_its_months_and_year_in_the_quote(self):
@@ -403,13 +403,13 @@ class WhatCountsAsWhatTests(unittest.TestCase):
         self.assertEqual(extract.split_fixed(real_base), [real_base])
 
     def test_the_same_quote_seen_twice_is_one_rule_with_the_requirements_combined(self):
-        first = rule(categories=["everything-else"], rate=2, quote=APPLE, requires=["apple-pay"])
-        again = rule(categories=["everything-else"], rate=2, quote=APPLE, requires=[])
-        page = PAGE + "\n" + APPLE
+        first = rule(categories=["travel"], rate=5, quote=BOOKED, requires=["issuer-booking"])
+        again = rule(categories=["travel"], rate=5, quote=BOOKED, requires=[])
+        page = PAGE + "\n" + BOOKED
         for order in ((first, again), (again, first)):
             result = extract_card(CARD, page, "h", FakeModel([order[0]], [order[1]]), "m", max_chars=150)
-            two = [r for r in result["rules"] if r["rate"] == 2]
-            self.assertEqual([(r["requires"], r["needs"]) for r in two], [(["apple-pay"], ["pays-with-apple-pay"])])
+            two = [r for r in result["rules"] if r["rate"] == 5]
+            self.assertEqual([r["requires"] for r in two], [["issuer-booking"]])
 
     def test_a_base_rate_left_uncategorized_is_everything_else(self):
         base = rule(categories=[], rate=1, quote="Earn 1% on all other purchases.")
@@ -810,16 +810,16 @@ class FirstMonthsAndNeedsTests(unittest.TestCase):
     def test_needs_come_from_the_rule_not_the_model(self):
         self.assertEqual(extract.needs_of(choice_rule()), ["choice-categories"])
         self.assertEqual(extract.needs_of(choice_rule(firstMonths=12)), ["choice-categories", "account-opened"])
-        self.assertEqual(extract.needs_of(rule(requires=["apple-pay"])), ["pays-with-apple-pay"])
+        self.assertEqual(extract.needs_of(rule(paysWith="Apple Pay")), [])  # the rule says it; nobody is asked
         self.assertEqual(extract.needs_of(rule(requires=["activation"])), [])
         self.assertEqual(extract.needs_of({"selection": "fixed", "requires": []}), [])
-        self.assertTrue(set(extract.needs_of(choice_rule(firstMonths=12, requires=["apple-pay"]))) <= set(extract.NEEDS))
+        self.assertTrue(set(extract.needs_of(choice_rule(firstMonths=12, paysWith="PayPal"))) <= set(extract.NEEDS))
 
     def test_a_candidate_lists_every_question_its_rules_ask(self):
-        reply = [choice_rule(rate=6, quote=FIRST_YEAR, firstMonths=12), rule(), rule(categories=["everything-else"], rate=2,
-                 requires=["apple-pay"], quote=APPLE)]
+        reply = [choice_rule(rate=6, quote=FIRST_YEAR, firstMonths=12), rule(), rule(categories=[], rate=2,
+                 paysWith="Apple Pay", quote=APPLE)]
         result = extract_card(CARD, PAGE, "h", FakeModel(reply), "m")
-        self.assertEqual(result["needs"], ["account-opened", "choice-categories", "pays-with-apple-pay"])
+        self.assertEqual(result["needs"], ["account-opened", "choice-categories"])
         by_rate = {r["rate"]: r for r in result["rules"]}
         self.assertEqual((by_rate[6]["firstMonths"], by_rate[6]["needs"]), (12, ["choice-categories", "account-opened"]))
 
@@ -973,7 +973,7 @@ class ExtractCardTests(unittest.TestCase):
         user = model.asked[0][1]["content"]
         self.assertIn('"Savor Rewards"', user)
         self.assertIn("Earn 5% cash back on hotels", user)
-        for word in ("choose", "top-spend", "apple-pay", "validFrom", "cardConditions", "preferred-rewards-tier", "tier:"):
+        for word in ("choose", "top-spend", "paysWith", "merchants", "validFrom", "cardConditions", "preferred-rewards-tier", "tier:"):
             self.assertIn(word, user)
 
     def test_everything_that_is_the_same_for_every_card_comes_first_so_servers_can_cache_it(self):
@@ -1241,8 +1241,84 @@ class StatsTests(unittest.TestCase):
             self.assertTrue(extract.has_page(self.CALENDAR_CARD, state, cache))
 
 
+class PaidWithAndMerchantsTests(unittest.TestCase):
+    PAYPAL = "You will continue to earn 3% cash back on eligible online purchases made through PayPal and 1.5% cash back on all other eligible purchases."
+    AMAZON = "Earn 5% back at Amazon.com and Whole Foods Market."
+
+    def check(self, quote, **overrides):
+        return validate_rule(rule(quote=quote, **overrides), normalize(quote))
+
+    def test_a_rate_for_a_way_of_paying_needs_no_category(self):
+        self.assertIsNone(self.check(self.PAYPAL, categories=[], paysWith="PayPal"))
+
+    def test_a_rate_at_named_merchants_needs_no_category(self):
+        self.assertIsNone(self.check(self.AMAZON, categories=[], rate=5, merchants=["Amazon", "Whole Foods Market"]))
+
+    def test_a_category_can_also_need_a_way_of_paying(self):
+        self.assertIsNone(self.check("Earn 3% on dining with Apple Pay.", paysWith="Apple Pay"))
+
+    def test_a_fixed_rule_still_needs_something_to_apply_to(self):
+        self.assertIn("categories must be", self.check(self.PAYPAL, categories=[]))
+
+    def test_the_way_of_paying_must_be_said_in_the_quote_or_a_condition(self):
+        self.assertIn("paysWith Venmo", self.check(self.PAYPAL, categories=[], paysWith="Venmo"))
+        self.assertIsNone(validate_rule(rule(quote=APPLE, categories=[], rate=2, paysWith="Venmo", conditions=["Pay with Venmo."]),
+                                        normalize(APPLE + " Pay with Venmo.")))
+
+    def test_every_merchant_must_be_in_the_quote_or_a_condition(self):
+        self.assertIn("merchant Target", self.check(self.AMAZON, categories=[], rate=5, merchants=["Amazon", "Target"]))
+
+    def test_bad_values_are_refused(self):
+        for bad in ("", "  ", 3, True):
+            self.assertIn("paysWith must be", self.check(self.PAYPAL, categories=[], paysWith=bad), bad)
+        for bad in ("Amazon", [""], [3], ["Amazon", "Amazon"]):
+            self.assertIn("merchants must be", self.check(self.AMAZON, categories=[], rate=5, merchants=bad), bad)
+
+    def test_a_rate_for_any_purchase_paid_one_way_is_not_the_base_rate(self):
+        proposal = rule(categories=["everything-else"], quote=self.PAYPAL, paysWith="PayPal")
+        self.assertEqual([p["categories"] for p in extract.split_fixed(proposal)], [[]])
+
+    def test_a_rule_with_no_category_is_not_filled_in_when_it_has_a_way_of_paying_or_merchants(self):
+        self.assertEqual([p["categories"] for p in extract.split_fixed(rule(categories=[], quote=self.PAYPAL, paysWith="PayPal"))], [[]])
+        self.assertEqual([p["categories"] for p in extract.split_fixed(rule(categories=[], rate=5, quote=self.AMAZON, merchants=["Amazon"]))], [[]])
+
+    def test_a_candidate_keeps_them(self):
+        kept = extract.candidate_rule(rule(categories=[], quote=self.PAYPAL, paysWith="PayPal", merchants=["Etsy"]), "u", "h", "page")
+        self.assertEqual((kept["paysWith"], kept["merchants"], kept["needs"]), ("PayPal", ["Etsy"], []))
+
+    def test_a_rule_without_them_says_so(self):
+        kept = extract.candidate_rule(rule(), "u", "h", "page")
+        self.assertEqual((kept["paysWith"], kept["merchants"], kept["needs"]), (None, [], []))
+
+    def test_the_same_rate_paid_two_ways_or_at_two_merchants_is_two_rules(self):
+        quote = "Earn 3% with PayPal, 3% with Venmo, 3% at Amazon and 3% at Target."
+        reply = [rule(categories=[], quote=quote, paysWith="PayPal"), rule(categories=[], quote=quote, paysWith="Venmo"),
+                 rule(categories=[], quote=quote, merchants=["Amazon"]), rule(categories=[], quote=quote, merchants=["Target"])]
+        result = extract_card(CARD, f"{PAGE}\n{quote}", "h", FakeModel(reply), "m", follow_up=False)
+        self.assertEqual(len(result["rules"]), 4)
+
+    def test_a_category_paid_one_way_gives_way_to_the_same_rate_for_any_purchase_paid_that_way(self):
+        narrow = "Earn 3% on online purchases made through PayPal."
+        wide = "Earn 3% when you checkout with PayPal."
+        reply = [rule(categories=["online-shopping"], quote=narrow, paysWith="PayPal"), rule(categories=[], quote=wide, paysWith="PayPal")]
+        result = extract_card(CARD, f"{PAGE}\n{narrow}\n{wide}", "h", FakeModel(reply), "m", follow_up=False)
+        self.assertEqual([(r["categories"], r["evidence"]["quote"]) for r in result["rules"] if r["paysWith"]], [([], wide)])
+
+    def test_a_category_paid_one_way_stays_beside_another_rate_or_way_of_paying(self):
+        def paid(categories, rate, way):
+            return extract.candidate_rule(rule(categories=categories, rate=rate, paysWith=way), "u", "h", "page")
+        rules = [paid(["dining"], 3, "PayPal"), paid([], 2, "PayPal"), paid([], 3, "Venmo")]
+        self.assertEqual(extract.without_covered(rules), rules)
+
+    def test_two_rates_for_one_way_of_paying_are_a_warning_and_a_rule_with_no_category_is_no_base_rate(self):
+        rules = [extract.candidate_rule(rule(categories=[], rate=rate, quote=self.PAYPAL, paysWith="PayPal"), "u", "h", "page") for rate in (3, 1.5)]
+        warnings = extract.card_warnings(rules)
+        self.assertTrue(any("PayPal earns 1.5 and 3" in w for w in warnings), warnings)
+        self.assertTrue(any("no rate for all other purchases" in w for w in warnings), warnings)
+
+
 class ManualRulesTests(unittest.TestCase):
-    APPLE_RULE = rule(categories=["everything-else"], rate=2, requires=["apple-pay"], quote=APPLE)
+    APPLE_RULE = rule(categories=[], rate=2, paysWith="Apple Pay", quote=APPLE)
 
     def candidate(self, entry, text=PAGE):
         return manual_candidate(CARD, entry, text, "hash1")

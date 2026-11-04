@@ -274,7 +274,7 @@ async function api(method, path, body) {
 
 const fetchKind = { "not-saved": "warn", ok: "ok", new: "ok", unchanged: "ok", changed: "ok", never: "", "needs-browser": "warn", refused: "warn", robots: "warn", gone: "bad", failed: "bad" };
 const extractKind = { ok: "ok", manual: "info", "no-rules": "", "wrong-page": "warn", failed: "bad" };
-const NEEDS = { "choice-categories": "picks a category", "account-opened": "date opened", "pays-with-apple-pay": "uses Apple Pay", "preferred-rewards-tier": "Preferred Rewards tier" };
+const NEEDS = { "choice-categories": "picks a category", "account-opened": "date opened", "preferred-rewards-tier": "Preferred Rewards tier" };
 
 // ---------- profiles ----------
 async function loadProfiles() {
@@ -518,7 +518,7 @@ const rateText = (r) => `${num(r.rate)}${unitText(r)}`;
 const day = (iso) => new Date(iso + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 const span = (r) => `${r.validFrom ? day(r.validFrom) : "…"} – ${r.validTo ? day(r.validTo) : "…"}`;
 // What a rate requires, as the app would say it to the cardholder.
-const REQUIRE_TEXT = { "apple-pay": "when you pay with Apple Pay", activation: "after you activate it", "issuer-booking": "when booked through the issuer", "preferred-rewards-tier": "for Preferred Rewards members" };
+const REQUIRE_TEXT = { activation: "after you activate it", "issuer-booking": "when booked through the issuer", "preferred-rewards-tier": "for Preferred Rewards members" };
 // The decisions a person can make (review.DECISION_VALUES): how each shows, and the button that makes it.
 const DECISION = {
   accept: { chip: "accepted", kind: "ok", button: "Accept" },
@@ -536,11 +536,14 @@ function ruleWhere(r) {
     if (r.validFrom) return `Quarterly bonus, ${span(r)}: ${named || "nothing named"}`;
     return named ? `Rotating: ${named}` : "Rotating bonus categories";
   }
-  return list;
+  const at = (r.merchants || []).join(", ");
+  if (at) return list ? `${list}, also at ${at}` : `At ${at}`;
+  return list || "Any purchase";
 }
 // The small print under a rate: cap, requirements, tier, dates.
 function ruleTerms(r) {
   const t = [];
+  if (r.paysWith) t.push(`when you pay with ${r.paysWith}`);
   if (r.capAmount != null) t.push(`on up to $${(+r.capAmount).toLocaleString()} per ${r.capPeriod === "cycle" ? "billing cycle" : r.capPeriod}, then the base rate`);
   else if (r.capUnknown) t.push("capped (the page doesn't say how much)");
   r.requires.forEach((q) => t.push(REQUIRE_TEXT[q] || q));
@@ -552,12 +555,14 @@ function ruleTerms(r) {
 
 // The Grosh categories a rule reaches. A rule the person chooses, or a rotating one with no dates, reaches none yet.
 const appCategories = (r) => (r.selection === "fixed" || r.validFrom ? r.categories.flatMap((id) => term(id).app) : []);
-const REQUIRE_LABEL = { "apple-pay": "Apple Pay", activation: "Activation", "issuer-booking": "Booking through the issuer", "preferred-rewards-tier": "Preferred Rewards membership" };
+const REQUIRE_LABEL = { activation: "Activation", "issuer-booking": "Booking through the issuer", "preferred-rewards-tier": "Preferred Rewards membership" };
 function ruleKind(r) {
   if (r.selection === "choose") return `You choose ${r.picks > 1 ? r.picks : "1"}`;
   if (r.selection === "top-spend") return "Your top category each cycle";
   if (r.selection === "rotating") return r.validFrom ? "Quarterly bonus" : "Rotating bonus, no dates";
-  return r.categories.includes("everything-else") ? "Base rate" : "Fixed rate";
+  if (r.categories.includes("everything-else")) return "Base rate";
+  if (r.categories.length) return "Fixed rate";
+  return r.paysWith ? `Paid with ${r.paysWith}` : "At named merchants";
 }
 function ruleCap(r) {
   if (r.capAmount != null) return `$${(+r.capAmount).toLocaleString()} per ${r.capPeriod === "cycle" ? "billing cycle" : r.capPeriod}, then the base rate`;
@@ -568,14 +573,16 @@ function ruleCap(r) {
 function ruleFields(r) {
   const row = (name, ...value) => [h("dt", { text: name }), h("dd", {}, value)];
   const app = r.categories.includes("everything-else") ? "Everything not listed above" : appCategories(r).join(", ");
+  const merchants = r.merchants || [];
+  const noCategories = r.selection === "rotating" ? "None named" : merchants.length ? "None" : "Any purchase";
   return h("dl", { class: "fields" },
-    row("Categories", r.categories.length ? r.categories.map((id) => [chip(term(id).label), " "]) : "None named"),
+    row("Categories", r.categories.length ? r.categories.map((id) => [chip(term(id).label), " "]) : noCategories),
     r.hasOtherChoices ? row("Also", "More choices than the page lists") : null,
-    r.merchants && r.merchants.length ? row("Also at", r.merchants.map((m) => [chip(m), " "])) : null,
+    merchants.length ? row(r.categories.length ? "Also at" : "Only at", merchants.map((m) => [chip(m), " "])) : null,
     app ? row("Your categories", app) : null,
     row("Cap", ruleCap(r)),
     row("Dates", r.validFrom || r.validTo ? span(r) : "Always"),
-    row("Requires", r.requires.length ? r.requires.map((q) => REQUIRE_LABEL[q] || q).join(", ") : "Nothing"),
+    row("Requires", [r.paysWith, ...r.requires.map((q) => REQUIRE_LABEL[q] || q)].filter(Boolean).join(", ") || "Nothing"),
     r.tier ? row("Tier", r.tier.replace("-", " ")) : null,
     r.firstMonths ? row("Lasts", `The first ${r.firstMonths} months`) : null,
     r.needs.length ? row("App asks", r.needs.map((n) => state.overview.catalog.needs[n] || n).join(" ")) : null);
@@ -680,6 +687,8 @@ function fixForm(r, save, cancel) {
   const capAmount = h("input", { type: "number", step: "1", min: "0", value: r.capAmount ?? "", placeholder: "no cap", style: "width: 110px" });
   const capPeriod = h("select", {}, h("option", { value: "", text: "—" }), cat.periods.map((p) => h("option", { value: p, text: p === "cycle" ? "billing cycle" : p })));
   const tier = h("select", {}, h("option", { value: "", text: "no tier" }), cat.tiers.map((t) => h("option", { value: t, text: t.replace("-", " ") })));
+  const paysWith = h("input", { type: "text", value: r.paysWith || "", placeholder: "PayPal, Apple Pay", style: "width: 160px" });
+  const merchants = h("input", { type: "text", value: (r.merchants || []).join(", "), placeholder: "Amazon, Costco", style: "width: 240px" });
   unit.value = r.unit; capPeriod.value = r.capPeriod || ""; tier.value = r.tier || "";
   const submit = async (e) => {
     e.target.disabled = true; fill(error);
@@ -689,14 +698,16 @@ function fixForm(r, save, cancel) {
         categories: cats.filter((b) => b.checked).map((b) => b.value), rate: +rate.value, unit: unit.value,
         capAmount: cap, capPeriod: cap == null ? null : capPeriod.value || null,
         requires: reqs.filter((b) => b.checked).map((b) => b.value), tier: tier.value || null,
+        paysWith: paysWith.value.trim() || null, merchants: merchants.value.split(",").map((m) => m.trim()).filter(Boolean),
       });
     } catch (err) { fill(error, h("div", { class: "result bad", text: err.message })); e.target.disabled = false; }
   };
   return h("div", { class: "fix" },
-    h("div", { class: "small muted", text: r.selection === "fixed" ? "A fixed rate has one category." : `This rule is "${r.selection}": tick every category it offers.` }),
+    h("div", { class: "small muted", text: r.selection === "fixed" ? "A fixed rate has one category, or none if it's for a way of paying or named merchants." : `This rule is "${r.selection}": tick every category it offers.` }),
     h("div", { class: "cats" }, cat.categories.map((c, i) => h("label", { title: c.help }, cats[i], c.label))),
     h("div", { class: "row" }, h("label", {}, "Rate ", rate), h("label", {}, "Unit ", unit), h("label", {}, "Cap $ ", capAmount), h("label", {}, "per ", capPeriod), h("label", {}, "Tier ", tier)),
-    h("div", { class: "reqs" }, "Requires: ", cat.requires.map((q, i) => h("label", {}, reqs[i], q))),
+    h("div", { class: "reqs" }, "Requires: ", cat.requires.map((q, i) => h("label", {}, reqs[i], q)), h("label", {}, "paying with ", paysWith)),
+    h("div", { class: "row" }, h("label", {}, "Only at ", merchants)),
     error,
     h("div", { class: "row" }, h("button", { type: "button", class: "primary", text: "Save and accept", onclick: submit }), h("button", { type: "button", text: "Cancel", onclick: cancel })));
 }

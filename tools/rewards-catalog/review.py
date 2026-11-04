@@ -43,7 +43,7 @@ COUNTS = ("waiting", *DECISION_VALUES)  # how a card's rules, and all of them, a
 # Lists that are sets: their order is whatever the model gave, so it is sorted wherever a rule is compared or written.
 SET_FIELDS = ("categories", "requires", "conditions", "needs")
 # What a person may fix on a rule. The quote is the evidence, and the rest (selection, dates) is rare enough to re-extract.
-EDITABLE = ("categories", "rate", "unit", "capAmount", "capPeriod", "requires", "tier")
+EDITABLE = ("categories", "rate", "unit", "capAmount", "capPeriod", "requires", "tier", "paysWith", "merchants")
 
 
 def rule_key(card_id: str, rule: dict) -> str:
@@ -55,6 +55,11 @@ def rule_key(card_id: str, rule: dict) -> str:
     for field in SET_FIELDS:
         content[field] = sorted(content.get(field) or [])
     del content["needs"]  # worked out from the rest
+    # A rule with neither is hashed as it was before they existed, so a decision saved under its key still finds it.
+    content["merchants"] = sorted(content.get("merchants") or [])
+    for field in ("paysWith", "merchants"):
+        if not content.get(field):
+            content.pop(field, None)
     for field in ("rate", "capAmount"):  # 3 and 3.0 are the same rate
         if content.get(field) is not None:
             content[field] = float(content[field])
@@ -78,11 +83,20 @@ def describe(rule: dict) -> str:
         "choose": f"{rate} in the {chosen} the cardholder chooses: {categories}{others}",
         "top-spend": f"{rate} on the top-spend category each billing cycle, from: {categories}{others}",
         "rotating": f"{rate} in rotating bonus categories" + _period(rule, categories),
-    }.get(rule["selection"], f"{rate} on {categories}")
+    }.get(rule["selection"], _fixed(rate, categories, rule.get("merchants")))
+    if rule.get("paysWith"):
+        what += f" when paying with {rule['paysWith']}"
     if rule.get("capAmount") is not None:
         period = "billing cycle" if rule["capPeriod"] == "cycle" else rule["capPeriod"]
         what += f", up to ${float(rule['capAmount']):,.0f} per {period}"
     return what
+
+
+def _fixed(rate: str, categories: str, merchants: list[str] | None) -> str:
+    """A fixed rate and what it covers: "3% on dining", "5% at Amazon", "3% on dining and at Etsy"."""
+    where = [f"on {categories}"] if categories else []
+    where += [f"at {', '.join(merchants)}"] if merchants else []
+    return " ".join([rate, " and ".join(where)]).strip()
 
 
 def _period(rule: dict, categories: str) -> str:

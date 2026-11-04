@@ -39,6 +39,36 @@ class ReviewCase(unittest.TestCase):
         return review.accepted_rules(cand, review.load_decisions(self.path))
 
 
+class PaidWithAndMerchantsTests(ReviewCase):
+    PAYPAL = "Earn 3% cash back on purchases made through PayPal."
+
+    def paypal(self) -> dict:
+        return rule(categories=[], rate=3, paysWith="PayPal", quote=self.PAYPAL)
+
+    def test_a_rule_says_how_it_is_paid_and_where(self):
+        self.assertEqual(review.describe(self.paypal()), "3% when paying with PayPal")
+        self.assertEqual(review.describe(rule(categories=[], rate=5, merchants=["Amazon"])), "5% at Amazon")
+        self.assertEqual(review.describe(rule(rate=3, merchants=["Etsy"], paysWith="PayPal")), "3% on dining and at Etsy when paying with PayPal")
+
+    def test_a_person_can_fix_the_way_of_paying_and_the_merchants(self):
+        wrong = rule(categories=["online-shopping"], rate=3, quote="Earn 3% on online purchases made through PayPal at Etsy.")
+        cand = candidate(wrong)
+        key = review.rule_key(cand["cardId"], wrong)
+        saved = review.edit(cand, key, {"categories": [], "paysWith": "PayPal", "merchants": ["Etsy"]}, wrong["evidence"]["quote"], self.path, "2026-11-03")
+        edited = saved[cand["cardId"]][key]["edited"]
+        self.assertEqual((edited["categories"], edited["paysWith"], edited["merchants"], edited["needs"]), ([], "PayPal", ["Etsy"], []))
+
+    def test_a_fix_the_quote_does_not_back_is_refused(self):
+        rate = self.paypal()
+        cand = candidate(rate)
+        with self.assertRaisesRegex(ValueError, "paysWith Venmo"):
+            review.edit(cand, review.rule_key(cand["cardId"], rate), {"paysWith": "Venmo"}, self.PAYPAL, self.path, "2026-11-03")
+
+    def test_the_order_of_merchants_does_not_change_a_rule(self):
+        one, other = rule(merchants=["Amazon", "Target"]), rule(merchants=["Target", "Amazon"])
+        self.assertEqual(review.rule_key("c", one), review.rule_key("c", other))
+
+
 class AcceptedRulesTests(ReviewCase):
     def test_only_rules_a_person_accepted_come_back(self):
         cand = candidate(self.dining, self.base)

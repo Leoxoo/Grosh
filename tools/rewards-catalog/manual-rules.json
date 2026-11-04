@@ -114,17 +114,14 @@
       {
         "capAmount": null,
         "capPeriod": null,
-        "categories": [
-          "everything-else"
-        ],
+        "categories": [],
         "conditions": [],
         "hasOtherChoices": false,
+        "paysWith": "Apple Pay",
         "picks": null,
         "quote": "Get 2% Daily Cash back when you use Apple Card with Apple Pay.",
         "rate": 2,
-        "requires": [
-          "apple-pay"
-        ],
+        "requires": [],
         "selection": "fixed",
         "unit": "percent",
         "validFrom": null,

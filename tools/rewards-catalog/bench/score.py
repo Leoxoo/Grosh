@@ -23,6 +23,8 @@ def matches(expected: dict, found: dict) -> bool:
         return False
     if abs(float(expected["rate"]) - float(found["rate"])) > 1e-9:
         return False
+    if expected.get("paysWith") != found.get("paysWith"):
+        return False
     if "requires" in expected and sorted(expected["requires"]) != sorted(found.get("requires", [])):
         return False
     if "capAmount" in expected and expected["capAmount"] != found.get("capAmount"):

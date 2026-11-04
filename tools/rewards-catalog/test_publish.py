@@ -50,7 +50,7 @@ class CatalogTests(unittest.TestCase):
         (card,) = doc["cards"]
         self.assertEqual(card["rules"], [{
             "categories": ["dining"], "selection": "fixed", "picks": None, "hasOtherChoices": False, "rate": 3,
-            "unit": "percent", "capAmount": None, "capPeriod": None, "capUnknown": False, "requires": [],
+            "unit": "percent", "capAmount": None, "capPeriod": None, "capUnknown": False, "requires": [], "paysWith": None,
             "validFrom": None, "validTo": None, "firstMonths": None, "tier": None, "needs": [], "conditions": [],
             "merchants": [], "evidence": {"quote": "Earn unlimited 3% cash back on dining.", "url": URL},  # no page hash, no "verified"
         }])
@@ -157,6 +157,16 @@ class PublishTests(unittest.TestCase):
                          (written, ["Earn unlimited 3% cash back on dining."]))
         publish.publish(paths, today="2026-12-01")
         self.assertEqual(out.read_text(encoding="utf-8"), text)
+
+
+
+class PaidWithTests(unittest.TestCase):
+    def test_a_rule_says_how_it_is_paid_and_at_which_merchants(self):
+        proposal = {"categories": [], "selection": "fixed", "picks": None, "hasOtherChoices": False, "rate": 3, "unit": "percent", "capAmount": None,
+                    "capPeriod": None, "requires": [], "validFrom": None, "validTo": None, "conditions": [], "quote": "3% through PayPal at Target and Amazon.",
+                    "paysWith": "PayPal", "merchants": ["Target", "Amazon"]}
+        published = publish.published_rule(extract.candidate_rule(proposal, "u", "h", "page"))
+        self.assertEqual((published["paysWith"], published["merchants"], published["needs"]), ("PayPal", ["Amazon", "Target"], []))
 
 
 if __name__ == "__main__":
