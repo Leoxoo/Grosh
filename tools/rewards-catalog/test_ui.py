@@ -657,6 +657,17 @@ class RefreshTests(AppCase):
         _, log = self.refresh()
         self.assertNotIn("not announced", log)
 
+    def test_a_card_page_that_fails_says_nothing_against_a_calendar_page_that_was_read(self):
+        past = "Earn 5% Cashback Bonus at Grocery Stores, January 1 to March 31, 2020, on up to $1,500 in purchases.\n"
+        calendar = past + CALENDAR_FILLER
+        self.give_candidate("bank-a", ROTATING_PAGE, ROTATING_RULE)
+        url = self.give_calendar("bank-a", calendar)
+        self.serve({url: calendar})  # the card's own page answers 404
+        self.use()
+        _, log = self.refresh()
+        self.assertIn("page not read (gone)", log)
+        self.assertIn("next quarter not announced yet", log)
+
     def test_a_failed_extraction_is_an_error(self):
         self.give_candidate("bank-a", ROTATING_PAGE, ROTATING_RULE)
         self.serve({"https://x.test/bank-a": ROTATING_PAGE + NEXT_QUARTER})

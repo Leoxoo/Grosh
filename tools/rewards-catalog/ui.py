@@ -742,7 +742,8 @@ class App:
             candidate = self.candidate(card["id"])
             page_unread = outcome and outcome.status not in ("new", "changed", "unchanged")
             calendar_unread = outcome and outcome.calendar_error
-            unread = page_unread or calendar_unread  # what the page says now isn't known, so neither is what it leaves out
+            # What the page its quarters come from says now isn't known, so neither is what it leaves out.
+            unread = calendar_unread or (page_unread and not calendar_url)
             if page_unread:
                 job.log(f"  {name}: page not read ({outcome.status}), so this is from the saved copy. {outcome.detail}".rstrip(), "error")
             if calendar_unread:

@@ -33,12 +33,22 @@ Activation period closed
 October – December
 Coming Soon"""
 
-# Discover's calendar data, 2026-11-03, as fetch.data_text saves it: one sentence says a quarter's names and dates.
-DISCOVER = """You activated to earn 5% Cashback Bonus at Grocery Stores, Wholesale Clubs, and Select Streaming Services, PARENT_ENROLLMENT_DATE to March 31, 2026, on up to $1,500 in purchases.
+# Discover's calendar data, as fetch.data_text saved it from the real reply on 2026-11-03, leaving out its paragraphs of
+# terms: one sentence says a quarter's names and dates. "Activate to earn ... through 6/30/26" says the same quarter again
+# another way, and only the sentences that start "Earn" are read.
+DISCOVER = """You’re earning 5% cash back
+You activated to earn 5% cash back
+You activated to earn 5% Cashback Bonus at Grocery Stores, Wholesale Clubs, and Select Streaming Services, PARENT_ENROLLMENT_DATE to March 31, 2026, on up to $1,500 in purchases.
 Earn 5% Cashback Bonus at Grocery Stores, Wholesale Clubs, and Select Streaming Services, January 1 to March 31, 2026, on up to $1,500 in purchases.
 Grocery Stores, Wholesale Clubs, and Select Streaming Services
+Activate to earn 5% Cashback Bonus at Restaurants and Home Improvement Stores from 4/1/26 (or the date on which you activate 5%, whichever is later) through 6/30/26, on up to $1,500 in purchases.
+You activated to earn 5% Cashback Bonus at Restaurants and Home Improvement Stores, PARENT_ENROLLMENT_DATE to June 30, 2026, on up to $1,500 in purchases.
 Earn 5% Cashback Bonus at Restaurants and Home Improvement Stores, April 1 to June 30, 2026, on up to $1,500 in purchases.
 Restaurants and Home Improvement Stores
+You activated to earn 5% Cashback Bonus at Gas Stations, Transportation and Drug Stores, PARENT_ENROLLMENT_DATE to September 30, 2026, on up to $1,500 in purchases.
+Earn 5% Cashback Bonus at Gas Stations, Transportation and Drug Stores, July 1 to September 30, 2026, on up to $1,500 in purchases.
+September 30, 2026
+Gas Stations, Transportation and Drug Stores
 FIRST TIME EVER: Earn 5% on Entertainment
 You activated to earn 5% Cashback Bonus at Restaurants, Entertainment and Utilities, PARENT_ENROLLMENT_DATE to December 31, 2026, on up to $1,500 in purchases.
 Earn 5% Cashback Bonus at Restaurants, Entertainment and Utilities, now to December 31, 2026, on up to $1,500 in purchases when you activate.
@@ -76,6 +86,7 @@ class ReadCalendarTests(unittest.TestCase):
         self.assertEqual(found, [
             ("2026-01-01", "2026-03-31", ("Grocery Stores", "Wholesale Clubs", "Select Streaming Services")),
             ("2026-04-01", "2026-06-30", ("Restaurants", "Home Improvement Stores")),
+            ("2026-07-01", "2026-09-30", ("Gas Stations", "Transportation", "Drug Stores")),
             ("2026-10-01", "2026-12-31", ("Restaurants", "Entertainment", "Utilities")),  # "now to": its end says which quarter
         ])
 
