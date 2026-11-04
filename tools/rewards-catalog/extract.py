@@ -1139,6 +1139,27 @@ def calendar_rules(rules: list[dict], text: str, today: str, url: str | None = N
     return made
 
 
+def add_calendar_rules(candidate: dict, text: str, today: str, url: str | None = None) -> int:
+    """Give a candidate the dated rules its saved page's calendar has for it and it lacks, and say how many. The
+    calendar is read, not asked about, so a card extracted before its calendar could be read gets its quarters
+    without a model run, and the rules a person has already decided on stay exactly as they are. `url` is the
+    calendar's page, as for calendar_rules."""
+    rules = {_merge_key(rule): rule for rule in candidate["rules"]}
+    before = len(rules)
+    for rule in calendar_rules(candidate["rules"], text, today, url):
+        rules.setdefault(_merge_key(rule), rule)
+    added = len(rules) - before
+    if added:
+        candidate["rules"] = _in_order(rules.values())
+        candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
+        candidate["warnings"] += [w for w in card_warnings(candidate["rules"]) if w not in candidate["warnings"]]
+    return added
+
+
+def _in_order(rules) -> list[dict]:
+    return sorted(rules, key=lambda r: (r["categories"][0] if r["categories"] else "~", -r["rate"]))  # "~" sorts rotating rules last
+
+
 MAX_FOLLOW_UPS = 6
 _REWARD_SENTENCE = re.compile(r"\b(earn|earns|earning|cash back|points|miles)\b", re.I)
 
@@ -1316,7 +1337,7 @@ def extract_card(
         accepted.setdefault(_merge_key(rule), rule)  # two calendars naming a quarter the same way are one rule
     still_missing = [s for s in this_cards if not _covered(s, list(accepted.values()))]
 
-    candidate["rules"] = sorted(accepted.values(), key=lambda r: (r["categories"][0] if r["categories"] else "~", -r["rate"]))  # "~" sorts rotating rules last
+    candidate["rules"] = _in_order(accepted.values())
     candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
     candidate["warnings"] = card_warnings(candidate["rules"])
     if still_missing:
@@ -1411,6 +1432,12 @@ def has_page(card: dict, state: dict, cache: Path) -> bool:
     return bool(entry.get("hash")) and fetch.text_saved(card["id"], entry, cache)
 
 
+def saved_calendar(card: dict, cache: Path) -> str | None:
+    """The saved text of the card's calendar page, or None if it has no calendar page, or none saved yet."""
+    saved = cache / card["id"] / fetch.CALENDAR_FILE
+    return saved.read_text(encoding="utf-8") if card.get("calendarUrl") and saved.exists() else None
+
+
 def summarize_calls(calls: list[dict]) -> dict:
     """Totals for the model calls made for one card: how many, how long, and how many tokens went where."""
     def total(get) -> int:
@@ -1444,8 +1471,7 @@ def process_cards(
         base = {"index": number, "total": len(chosen), "id": card["id"], "name": card["name"]}
         page_hash = fetch.pages_hash(state.get(card["id"], {}))
         text = (cache / card["id"] / "latest.txt").read_text(encoding="utf-8") if has_page(card, state, cache) else None
-        calendar_file = cache / card["id"] / fetch.CALENDAR_FILE
-        calendar = calendar_file.read_text(encoding="utf-8") if card.get("calendarUrl") and calendar_file.exists() else None
+        calendar = saved_calendar(card, cache)
         path = candidates / f"{card['id']}.json"
         if card["id"] in manual:
             emit({"event": "card-start", **base, "kind": "hand-entered"})

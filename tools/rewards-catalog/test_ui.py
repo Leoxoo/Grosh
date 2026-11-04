@@ -449,6 +449,223 @@ class JobTests(AppCase):
         self.assertEqual(job.snapshot(job.snapshot(0)["logNext"])["log"], [])
 
 
+ROTATING_QUOTE = "Earn 5% cash back on up to $1,500 in rotating bonus categories each quarter you activate."
+ROTATING_RULE = {**RULE, "categories": [], "selection": "rotating", "rate": 5, "capAmount": 1500, "capPeriod": "quarter",
+                 "requires": ["activation"], "quote": ROTATING_QUOTE}
+ROTATING_PAGE = f"Savor Rewards\n{ROTATING_QUOTE}\n" + "".join(f"Filler line number {n}.\n" for n in range(30))
+NEXT_QUARTER = "JAN-MAR\n2099\nGrocery Stores\nActivate starting December 15, 2098\n"
+COMING_SOON = "APR-JUN\n2099\nComing Soon\nActivate starting March 15, 2099\n"
+CALENDAR_SENTENCE = "Earn 5% Cashback Bonus at Grocery Stores, now to December 31, 2099, on up to $1,500 in purchases when you activate.\n"
+CALENDAR_FILLER = "".join(f"Filler line number {n}.\n" for n in range(30))
+
+
+class RefreshTests(AppCase):
+    """Quarters are in 2099 so that none has ended, whatever day the tests run."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.app.save_settings({"model": "good-model"})
+
+    def give_candidate(self, card_id: str, text: str, *rules: dict) -> None:
+        text = text.strip()  # as fetch saves it, so serving the same page counts as unchanged
+        self.give_page(card_id, text)
+        made = [extract.candidate_rule(r, f"https://x.test/{card_id}", fetch.text_hash(text), "page") for r in rules]
+        fetch.write_json(self.paths.candidates / f"{card_id}.json", {
+            "cardId": card_id, "status": "ok", "model": self.app.settings()["model"], "promptVersion": extract.PROMPT_VERSION,
+            "pageHash": fetch.text_hash(text), "rules": made, "rejected": [], "warnings": [], "needs": [], "cardConditions": [],
+        })
+
+    def serve(self, pages: dict) -> list[str]:
+        """Answers each URL with the page text given for it, and returns the list of pages asked for."""
+        asked: list[str] = []
+
+        def get(url: str, headers: dict) -> fetch.Response:
+            if url.endswith("robots.txt"):
+                return fetch.Response(404, {}, b"", url)
+            asked.append(url)
+            if url not in pages:
+                return fetch.Response(404, {}, b"", url)
+            body = "".join(f"<p>{line}</p>" for line in pages[url].splitlines())
+            return fetch.Response(200, {"content-type": "text/html"}, f"<html><body>{body}</body></html>".encode(), url)
+
+        self.app.http_get = get
+        return asked
+
+    def refresh(self) -> tuple[dict, str]:
+        status, job = self.app.handle("POST", "/api/job", {}, {"kind": "refresh", "which": "rotating"})
+        self.assertEqual(status, 200, job)
+        finished = self.wait()
+        return finished, "\n".join(line["text"] for line in finished["log"])
+
+    def test_only_cards_with_a_rotating_rule_are_fetched_and_a_new_quarter_is_said_to_wait(self):
+        self.give_candidate("bank-a", ROTATING_PAGE, ROTATING_RULE)
+        self.give_candidate("bank-b", PAGE_TEXT, RULE)
+        asked = self.serve({"https://x.test/bank-a": ROTATING_PAGE + NEXT_QUARTER, "https://x.test/bank-b": PAGE_TEXT})
+        lm = self.use(replies=(json.dumps({"cardConditions": [], "rules": [ROTATING_RULE]}),))
+        job, log = self.refresh()
+        self.assertEqual(job["state"], "done")
+        self.assertEqual(asked, ["https://x.test/bank-a"])
+        self.assertTrue(lm.asked)  # its page changed, so it is extracted again
+        self.assertIn("waiting for review: 5% in rotating bonus categories from 2099-01-01 to 2099-03-31: groceries", log)
+        self.assertIn("Quarter rules waiting for review on: Savor Rewards.", log)
+
+    def test_an_unchanged_page_asks_no_model_and_a_decided_quarter_no_longer_waits(self):
+        page = ROTATING_PAGE + NEXT_QUARTER
+        self.give_candidate("bank-a", page, ROTATING_RULE)
+        self.serve({"https://x.test/bank-a": page})
+        lm = self.use()
+        self.refresh()
+        candidate = self.app.candidate("bank-a")
+        quarter = next(r for r in candidate["rules"] if r["validFrom"])
+        review.decide(candidate, review.rule_key("bank-a", quarter), "accept", self.paths.decisions, "2098-12-20")
+        job, log = self.refresh()
+        self.assertEqual(lm.asked, [])
+        self.assertEqual(job["counts"].get("up-to-date"), 1)
+        self.assertIn("nothing waiting, 1 quarter rule(s) decided", log)
+        self.assertIn("No quarter rules are waiting for review.", log)
+
+    def test_an_undated_rotating_rule_gets_its_quarters_from_the_unchanged_page_without_a_model(self):
+        page = ROTATING_PAGE + NEXT_QUARTER
+        self.give_candidate("bank-a", page, ROTATING_RULE)  # extracted before its calendar could be read
+        self.serve({"https://x.test/bank-a": page})
+        lm = self.use()
+        _, log = self.refresh()
+        self.assertEqual(lm.asked, [])
+        self.assertEqual([r["validFrom"] for r in self.app.candidate("bank-a")["rules"]], ["2099-01-01", None])
+        self.assertIn("waiting for review", log)
+
+    def test_a_rotating_rule_on_a_page_with_no_calendar_is_said_without_a_model_run(self):
+        self.give_candidate("bank-a", ROTATING_PAGE, ROTATING_RULE)
+        self.serve({"https://x.test/bank-a": ROTATING_PAGE})
+        lm = self.use()
+        job, log = self.refresh()
+        self.assertEqual((job["state"], lm.asked), ("done", []))
+        self.assertIn("Savor Rewards: no quarter rules: its page names no quarter ahead", log)
+
+    def give_calendar(self, card_id: str, text: str) -> str:
+        """Give a card a calendar page, already fetched and extracted, as Discover It has. Returns its URL."""
+        url, text = "https://x.test/calendar", text.strip()
+        self.paths.seed.write_text(json.dumps({"cards": [{**c, "calendarUrl": url} if c["id"] == card_id else c for c in self.cards]}))
+        (self.paths.cache / card_id / "calendar.txt").write_text(text)
+        self.state[card_id].update(calendarUrl=url, calendarHash=fetch.text_hash(text), calendarStatus="ok")
+        self.paths.state.write_text(json.dumps(self.state))
+        path = self.paths.candidates / f"{card_id}.json"
+        fetch.write_json(path, {**fetch.read_json(path, {}), "pageHash": fetch.pages_hash(self.state[card_id])})
+        return url
+
+    def test_a_card_with_a_calendar_page_gets_its_quarters_from_that_page(self):
+        calendar = CALENDAR_SENTENCE + CALENDAR_FILLER
+        self.give_candidate("bank-a", ROTATING_PAGE, ROTATING_RULE)  # its own page names no quarter
+        url = self.give_calendar("bank-a", calendar)
+        self.serve({"https://x.test/bank-a": ROTATING_PAGE, url: calendar})
+        lm = self.use()
+        _, log = self.refresh()
+        self.assertEqual(lm.asked, [])
+        (quarter,) = [r for r in self.app.candidate("bank-a")["rules"] if r["validFrom"]]
+        self.assertEqual((quarter["validFrom"], quarter["evidence"]["url"]), ("2099-10-01", url))
+        self.assertIn(quarter["evidence"]["quote"], calendar.splitlines())
+        self.assertIn("waiting for review: 5% in rotating bonus categories from 2099-10-01 to 2099-12-31: groceries", log)
+        self.assertNotIn("no quarter ahead", log)
+
+    def test_coming_soon_on_a_calendar_page_is_reported(self):
+        calendar = COMING_SOON + "Earn 5% cash back.\n" + CALENDAR_FILLER
+        self.give_candidate("bank-a", ROTATING_PAGE, ROTATING_RULE)
+        url = self.give_calendar("bank-a", calendar)
+        self.serve({"https://x.test/bank-a": ROTATING_PAGE, url: calendar})
+        self.use()
+        _, log = self.refresh()
+        self.assertIn("2099-04-01 to 2099-06-30 is Coming Soon on its page", log)
+        self.assertNotIn("no quarter ahead", log)
+
+    def test_coming_soon_is_reported_and_is_no_failure(self):
+        page = ROTATING_PAGE + COMING_SOON
+        self.give_candidate("bank-a", page, ROTATING_RULE)
+        self.serve({"https://x.test/bank-a": page})
+        self.use()
+        job, log = self.refresh()
+        self.assertEqual((job["state"], job["error"]), ("done", None))
+        self.assertIn("Savor Rewards: 2099-04-01 to 2099-06-30 is Coming Soon", log)
+        self.assertEqual([line["text"] for line in job["log"] if line["level"] == "error"], [])
+        self.assertNotIn("no quarter rules", log)
+
+    def test_a_page_that_cannot_be_read_is_an_error_and_its_saved_copy_still_counts(self):
+        page = ROTATING_PAGE + NEXT_QUARTER
+        self.give_candidate("bank-a", page, ROTATING_RULE)
+        self.serve({})  # every page fails
+        lm = self.use()
+        job, log = self.refresh()
+        self.assertEqual((job["state"], lm.asked), ("done", []))
+        self.assertTrue(any("page not read (gone)" in line["text"] for line in job["log"] if line["level"] == "error"))
+        self.assertIn("waiting for review", log)
+
+    def test_a_failed_extraction_is_an_error(self):
+        self.give_candidate("bank-a", ROTATING_PAGE, ROTATING_RULE)
+        self.serve({"https://x.test/bank-a": ROTATING_PAGE + NEXT_QUARTER})
+        self.use(replies=("not json",))
+        job, _ = self.refresh()
+        self.assertTrue(any("extraction says failed" in line["text"] for line in job["log"] if line["level"] == "error"))
+
+    def test_a_model_server_that_is_down_fails_the_job_when_a_page_changed(self):
+        self.give_candidate("bank-a", ROTATING_PAGE, ROTATING_RULE)
+        self.serve({"https://x.test/bank-a": ROTATING_PAGE + NEXT_QUARTER})
+        self.use(models=())
+        job, _ = self.refresh()
+        self.assertEqual(job["state"], "failed")
+
+    def test_a_rotating_rule_gone_after_a_page_change_is_said(self):
+        self.give_candidate("bank-a", ROTATING_PAGE, ROTATING_RULE)
+        self.serve({"https://x.test/bank-a": ROTATING_PAGE.replace(ROTATING_QUOTE, RULE["quote"])})
+        self.use()
+        job, log = self.refresh()
+        self.assertEqual(job["state"], "done")
+        self.assertIn("Savor Rewards: its rotating rule is no longer in the candidate", log)
+
+    def test_with_no_rotating_rule_anywhere_nothing_is_fetched(self):
+        self.give_candidate("bank-b", PAGE_TEXT, RULE)
+        asked = self.serve({"https://x.test/bank-b": PAGE_TEXT})
+        status, reply = self.app.handle("POST", "/api/job", {}, {"kind": "refresh", "which": "rotating"})
+        self.assertEqual(status, 400)
+        self.assertIn("No card has a rotating rule", reply["error"])
+        self.assertEqual(asked, [])
+
+    def test_the_count_starts_again_for_the_extract_stage(self):
+        self.give_candidate("bank-a", ROTATING_PAGE, ROTATING_RULE)
+        self.serve({"https://x.test/bank-a": ROTATING_PAGE})
+        self.use()
+        job, _ = self.refresh()
+        self.assertEqual((job["done"], job["total"]), (1, 1))
+
+    def test_stopping_during_the_fetch_stage_extracts_nothing_and_reports_nothing(self):
+        self.give_candidate("bank-a", ROTATING_PAGE, ROTATING_RULE)
+        self.give_candidate("bank-b", ROTATING_PAGE.replace("Savor Rewards", "Other Card"), ROTATING_RULE)
+        served = self.serve({"https://x.test/bank-a": ROTATING_PAGE + NEXT_QUARTER})
+        serve = self.app.http_get
+
+        def stop_after_the_page(url: str, headers: dict) -> fetch.Response:
+            reply = serve(url, headers)
+            if served:
+                self.app.job.stop.set()
+            return reply
+
+        self.app.http_get = stop_after_the_page
+        lm = self.use()
+        job, log = self.refresh()
+        self.assertEqual((job["state"], lm.asked), ("stopped", []))
+        self.assertEqual(served, ["https://x.test/bank-a"])
+        self.assertNotIn("Quarters:", log)
+
+    def test_asking_to_force_a_refresh_still_runs_no_model_on_an_unchanged_page(self):
+        self.give_candidate("bank-a", ROTATING_PAGE, ROTATING_RULE)
+        self.serve({"https://x.test/bank-a": ROTATING_PAGE})
+        lm = self.use()
+        self.app.handle("POST", "/api/job", {}, {"kind": "refresh", "which": "rotating", "force": True})
+        self.wait()
+        self.assertEqual(lm.asked, [])
+
+    def test_the_page_has_the_button(self):
+        self.assertIn('data-job="refresh:rotating"', ui.PAGE.read_text(encoding="utf-8"))
+
+
 class AskAndStatsTests(AppCase):
     def test_ask_sends_a_plain_request_with_extras_for_that_try_only(self):
         lm = self.use(replies=["Three."])

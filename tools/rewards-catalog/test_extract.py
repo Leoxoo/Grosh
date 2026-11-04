@@ -628,6 +628,31 @@ class WhatCountsAsWhatTests(unittest.TestCase):
         result = extract_card(CARD, page, "h", FakeModel([rule(quote="Earn 3% on dining.")]), "m", follow_up=False, today="2026-11-02")
         self.assertEqual([r["selection"] for r in result["rules"]], ["fixed"])
 
+    def test_a_candidate_with_an_undated_rotating_rule_gains_the_quarters_its_saved_page_names(self):
+        base = extract.candidate_rule(rule(categories=[], selection="rotating", rate=5, requires=["activation"], quote=FREEDOM), "u", "h", "page")
+        base_rate = extract.candidate_rule(rule(categories=["everything-else"], rate=1, quote=BASE), "u", "h", "page")
+        candidate = {"rules": [base, base_rate], "needs": [], "warnings": ["1 rate sentence(s) on the page aren't in the result"]}
+        added = extract.add_calendar_rules(candidate, "JAN-MAR\n2027\nGrocery Stores\nActivate", "2026-12-24")
+        self.assertEqual(added, 1)
+        self.assertEqual([(r["validFrom"], r["categories"], r["verified"]) for r in candidate["rules"]],
+                         [(None, ["everything-else"], "page"), ("2027-01-01", ["groceries"], "calendar"), (None, [], "page")])
+        self.assertEqual(candidate["warnings"], ["1 rate sentence(s) on the page aren't in the result"])  # what the extraction found stays
+
+    def test_a_quarter_the_candidate_already_has_is_not_added_again(self):
+        base = extract.candidate_rule(rule(categories=[], selection="rotating", rate=5, quote=FREEDOM), "u", "h", "page")
+        candidate = {"rules": [base], "needs": [], "warnings": []}
+        text = "JAN-MAR\n2027\nGrocery Stores\nActivate"
+        extract.add_calendar_rules(candidate, text, "2026-12-24")
+        kept = list(candidate["rules"])
+        self.assertEqual(extract.add_calendar_rules(candidate, text, "2026-12-24"), 0)
+        self.assertEqual(candidate["rules"], kept)
+
+    def test_no_rotating_rule_or_no_calendar_adds_nothing(self):
+        fixed = {"rules": [extract.candidate_rule(rule(quote="Earn 3% on dining."), "u", "h", "page")], "needs": [], "warnings": []}
+        self.assertEqual(extract.add_calendar_rules(fixed, "JAN-MAR\n2027\nGrocery Stores", "2026-12-24"), 0)
+        rotating = extract.candidate_rule(rule(categories=[], selection="rotating", rate=5, quote=FREEDOM), "u", "h", "page")
+        self.assertEqual(extract.add_calendar_rules({"rules": [rotating], "needs": [], "warnings": []}, "No calendar here.", "2026-12-24"), 0)
+
     def test_two_calendars_that_disagree_on_a_quarter_are_a_warning(self):
         base = rule(categories=[], selection="rotating", rate=5, quote="5% in rotating categories each quarter.")
         text = "OCT-DEC\n2026\nDining\nActivate\nYour 2026 calendar\nOctober – December\nGas Stations"
