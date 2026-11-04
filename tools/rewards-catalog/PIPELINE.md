@@ -392,8 +392,17 @@ Rule   categories[], selection (fixed | choose | top-spend | rotating), picks, h
 |---|---|
 | Monthly, on the maintainer's Mac (LM Studio running) | Full run: fetch every card, extract the changed ones, open a PR with `report.md`. |
 | Monthly, in CI (optional) | Fetch and change detection only, no extraction. Opens an issue listing pages that changed, as a reminder to do the local run. |
-| Quarterly, a week before it starts | Re-run only cards with rotating rules, so the new quarter's categories are in before the quarter begins. |
+| Quarterly, a week before it starts | Re-run only cards with rotating rules, so the new quarter's categories are in before the quarter begins: `python3 tools/rewards-catalog/ui.py`, then **Refresh rotating cards** in the Run panel. |
 | On demand | A command-line flag to run a single issuer or card. |
+
+**Refresh rotating cards** fetches the cards whose Candidate has a rotating rule, through the normal fetch, then extracts those whose page, model or prompt changed. LM Studio is only needed if one did: an unchanged page asks no model, because a new run could only reword rules a person has already decided on. A card with an undated rotating rule and no quarter rules gets them from its saved page (`extract.add_calendar_rules`), since a calendar is read, not asked about. A card with no Candidate yet isn't known to rotate, so extract it first.
+
+The job's log ends with where each card stands, for the quarters that haven't ended:
+
+- **Waiting for review**: each quarter rule with no Decision, and a last line naming those cards. Accept them in the card's view, then publish; nothing reaches the catalog before that.
+- **Coming Soon**: the page marks the quarter that way and no calendar on it names the quarter (`quarters.coming_soon`). The issuer hasn't said yet, so this is not a failure: run the refresh again nearer the quarter.
+- **No quarter rules**: the page names no quarter ahead. Discover It says this until its calendar is fetched.
+- **Errors**, in red: a page that couldn't be read (what's shown is from the saved copy) or a failed extraction. A rotating rule that a new extraction lost is a warning, to check on the card.
 
 ## Build order
 

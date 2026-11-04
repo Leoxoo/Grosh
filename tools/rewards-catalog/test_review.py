@@ -213,5 +213,35 @@ class CardOptionTests(ReviewCase):
         self.assertFalse(path.exists())
 
 
+class QuarterStatusTests(ReviewCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self.next_quarter = rule(categories=["groceries"], selection="rotating", rate=5, validFrom="2027-01-01", validTo="2027-03-31")
+
+    def test_a_quarter_rule_nobody_has_decided_on_is_waiting(self):
+        status = review.quarter_status(candidate(self.dining, self.next_quarter), "", {}, "2026-12-24")
+        self.assertEqual(status["waiting"], ["5% in rotating bonus categories from 2027-01-01 to 2027-03-31: groceries"])
+
+    def test_a_decided_quarter_is_not_waiting_and_an_undated_rotating_rule_is_no_quarter(self):
+        undated = rule(categories=[], selection="rotating", rate=5)
+        cand = candidate(undated, self.next_quarter)
+        self.decide(cand, 1, "accept")
+        status = review.quarter_status(cand, "", review.load_decisions(self.path), "2026-12-24")
+        self.assertEqual((status["waiting"], status["decided"], status["rotating"]), ([], 1, True))
+
+    def test_a_quarter_that_has_ended_no_longer_waits(self):
+        status = review.quarter_status(candidate(self.next_quarter), "", {}, "2027-04-01")
+        self.assertEqual((status["waiting"], status["decided"]), ([], 0))
+
+    def test_a_quarter_marked_coming_soon_on_the_page_is_said_unless_it_has_ended(self):
+        page = "JAN-MAR\n2027\nComing Soon\nAPR-JUN\n2027\nComing Soon"
+        status = review.quarter_status(candidate(self.dining), page, {}, "2027-04-01")
+        self.assertEqual(status["comingSoon"], [{"start": "2027-04-01", "end": "2027-06-30"}])
+
+    def test_a_candidate_that_lost_its_rotating_rule_says_so(self):
+        self.assertFalse(review.quarter_status(candidate(self.dining), "", {}, "2026-12-24")["rotating"])
+
+
+
 if __name__ == "__main__":
     unittest.main()

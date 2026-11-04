@@ -1138,6 +1138,26 @@ def calendar_rules(rules: list[dict], text: str, today: str) -> list[dict]:
     return made
 
 
+def add_calendar_rules(candidate: dict, text: str, today: str) -> int:
+    """Give a candidate the dated rules its saved page's calendar has for it and it lacks, and say how many. The
+    calendar is read, not asked about, so a card extracted before its calendar could be read gets its quarters
+    without a model run, and the rules a person has already decided on stay exactly as they are."""
+    rules = {_merge_key(rule): rule for rule in candidate["rules"]}
+    before = len(rules)
+    for rule in calendar_rules(candidate["rules"], text, today):
+        rules.setdefault(_merge_key(rule), rule)
+    added = len(rules) - before
+    if added:
+        candidate["rules"] = _in_order(rules.values())
+        candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
+        candidate["warnings"] += [w for w in card_warnings(candidate["rules"]) if w not in candidate["warnings"]]
+    return added
+
+
+def _in_order(rules) -> list[dict]:
+    return sorted(rules, key=lambda r: (r["categories"][0] if r["categories"] else "~", -r["rate"]))  # "~" sorts rotating rules last
+
+
 MAX_FOLLOW_UPS = 6
 _REWARD_SENTENCE = re.compile(r"\b(earn|earns|earning|cash back|points|miles)\b", re.I)
 
@@ -1313,7 +1333,7 @@ def extract_card(
         accepted.setdefault(_merge_key(rule), rule)  # two calendars naming a quarter the same way are one rule
     still_missing = [s for s in this_cards if not _covered(s, list(accepted.values()))]
 
-    candidate["rules"] = sorted(accepted.values(), key=lambda r: (r["categories"][0] if r["categories"] else "~", -r["rate"]))  # "~" sorts rotating rules last
+    candidate["rules"] = _in_order(accepted.values())
     candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
     candidate["warnings"] = card_warnings(candidate["rules"])
     if still_missing:

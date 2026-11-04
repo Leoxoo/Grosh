@@ -183,6 +183,9 @@
         <button data-job="extract:ids:force" title="Asks the model again about the ticked cards, even those already extracted">Redo ticked</button>
         <button data-job="extract:all:force">Redo all</button>
       </div>
+      <div class="group"><span class="name">Quarter</span>
+        <button data-job="refresh:rotating" title="Fetches only the cards with a rotating rule, extracts the ones that changed, and says which quarters wait for review">Refresh rotating cards</button>
+      </div>
       <div class="group"><span class="name">Catalog</span>
         <button id="publish" type="button" title="Write the accepted rules to rewards-catalog.json, the file the app reads">Publish catalog</button>
         <span class="small muted" id="publishResult"></span>

@@ -30,6 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import extract  # noqa: E402
 import fetch  # noqa: E402
+import quarters  # noqa: E402
 
 DECISIONS = Path(__file__).with_name("review-decisions.json")
 OPTIONS = Path(__file__).with_name("card-options.json")
@@ -204,6 +205,23 @@ def card_review(candidate: dict, decisions: dict) -> dict:
         counts[row["decision"] or "waiting"] += 1
     return {"cardId": candidate["cardId"], "status": candidate.get("status"), "warnings": list(candidate.get("warnings", [])),
             "cardConditions": list(candidate.get("cardConditions", [])), "rules": rules, "counts": counts}
+
+
+def quarter_status(candidate: dict, page_text: str, decisions: dict, today: str) -> dict:
+    """Where a card with a rotating rule stands for the quarters that haven't ended by `today`. "waiting": each
+    quarter rule (a rotating rule with dates) no person has decided on yet, in a few words: it isn't published until
+    accepted. "decided": how many have a decision. "comingSoon": the {start, end} of each quarter its page marks
+    "Coming Soon", which names nothing yet: the issuer hasn't said, so nothing has gone wrong. "rotating": whether the
+    candidate still has a rotating rule at all."""
+    rows = card_review(candidate, decisions)["rules"]
+    ahead = [row for row in rows if row["rule"]["selection"] == "rotating" and row["rule"]["validFrom"]
+             and (row["rule"]["validTo"] or today) >= today]
+    return {
+        "waiting": [row["summary"] for row in ahead if row["decision"] is None],
+        "decided": sum(row["decision"] is not None for row in ahead),
+        "comingSoon": [{"start": q.start, "end": q.end} for q in quarters.coming_soon(page_text) if q.end >= today],
+        "rotating": any(row["rule"]["selection"] == "rotating" for row in rows),
+    }
 
 
 def accepted_rules(candidate: dict, decisions: dict | None = None) -> list[dict]:

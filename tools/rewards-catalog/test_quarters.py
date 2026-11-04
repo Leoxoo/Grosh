@@ -60,5 +60,24 @@ class ReadCalendarTests(unittest.TestCase):
         self.assertEqual(quarters.read_calendar("2026 calendar\nJan - Dec\nDining\nFeb - Apr\nGas"), [])
 
 
+class ComingSoonTests(unittest.TestCase):
+    def test_a_quarter_marked_coming_soon_is_listed_with_its_dates(self):
+        found = [(q.start, q.end, q.names) for q in quarters.coming_soon(CHASE)]
+        self.assertEqual(found, [("2027-04-01", "2027-06-30", ())])  # the second calendar's October is named by the first
+
+    def test_two_calendars_marking_a_quarter_coming_soon_list_it_once(self):
+        text = "APR-JUN\n2027\nComing Soon\nYour 2027 calendar\nApril – June\nComing Soon"
+        self.assertEqual([q.start for q in quarters.coming_soon(text)], ["2027-04-01"])
+
+    def test_a_quarter_that_says_nothing_is_not_coming_soon(self):
+        self.assertEqual(quarters.coming_soon("APR-JUN\n2027\nActivate starting March 15, 2027"), [])
+
+    def test_a_status_line_before_coming_soon_is_not_a_name(self):
+        self.assertEqual(len(quarters.coming_soon("JAN-MAR\n2027\nNEXT Quarter\nComing Soon")), 1)
+
+    def test_no_year_no_quarter(self):
+        self.assertEqual(quarters.coming_soon("April – June\nComing Soon"), [])
+
+
 if __name__ == "__main__":
     unittest.main()
