@@ -266,6 +266,16 @@ class QuarterStatusTests(ReviewCase):
         status = review.quarter_status(candidate(self.dining), page, {}, "2027-04-01")
         self.assertEqual(status["comingSoon"], [{"start": "2027-04-01", "end": "2027-06-30"}])
 
+    def test_a_calendar_with_no_quarter_after_the_running_one_has_not_announced_the_next(self):
+        page = "Earn 5% Cashback Bonus at Utilities, now to December 31, 2026, on up to $1,500 in purchases when you activate."
+        self.assertTrue(review.quarter_status(candidate(self.dining), page, {}, "2026-11-03")["notAnnounced"])
+        self.assertFalse(review.quarter_status(candidate(self.dining), page, {}, "2026-09-03")["notAnnounced"])
+
+    def test_coming_soon_already_says_the_next_quarter_is_not_announced(self):
+        page = "OCT-DEC\n2026\nDining\nActivate now\nJAN-MAR\n2027\nComing Soon"
+        status = review.quarter_status(candidate(self.dining), page, {}, "2026-11-03")
+        self.assertEqual((status["notAnnounced"], len(status["comingSoon"])), (False, 1))
+
     def test_a_candidate_that_lost_its_rotating_rule_says_so(self):
         self.assertFalse(review.quarter_status(candidate(self.dining), "", {}, "2026-12-24")["rotating"])
 

@@ -712,6 +712,12 @@ def text_saved(card_id: str, entry: dict, cache: Path) -> bool:
     )
 
 
+def saved_calendar(card: dict, cache: Path) -> str | None:
+    """The saved text of the card's calendar page, or None if it has no calendar page, or none saved yet."""
+    saved = cache / card["id"] / CALENDAR_FILE
+    return saved.read_text(encoding="utf-8") if card.get("calendarUrl") and saved.exists() else None
+
+
 def select(
     cards: list[dict],
     only: list[str],

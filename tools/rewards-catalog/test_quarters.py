@@ -110,5 +110,19 @@ class ComingSoonTests(unittest.TestCase):
         self.assertEqual(quarters.coming_soon("April – June\nComing Soon"), [])
 
 
+class NextNotAnnouncedTests(unittest.TestCase):
+    def test_a_calendar_that_stops_at_the_running_quarter_has_not_announced_the_next(self):
+        self.assertTrue(quarters.next_not_announced(DISCOVER, "2026-11-03"))
+
+    def test_a_quarter_still_to_start_is_announced(self):
+        self.assertFalse(quarters.next_not_announced(DISCOVER, "2026-09-30"))
+
+    def test_a_calendar_whose_quarters_have_all_ended_has_not_announced_the_next(self):
+        self.assertTrue(quarters.next_not_announced(DISCOVER, "2027-01-02"))
+
+    def test_a_page_with_no_calendar_on_it_says_nothing_about_the_next_quarter(self):
+        self.assertFalse(quarters.next_not_announced("Earn 5% in rotating categories each quarter.", "2026-11-03"))
+
+
 if __name__ == "__main__":
     unittest.main()

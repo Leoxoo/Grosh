@@ -139,7 +139,7 @@ def edit(candidate: dict, key: str, changes: dict, page_text: str | None, path: 
     confirm is checked without it, as it was entered. ValueError, and nothing saved, if the fix doesn't hold."""
     rule = _find(candidate, key)
     if rule.get("verified") == "calendar":
-        raise ValueError("A rule read from the quarterly calendar can't be fixed: reject it, and fix the rotating rule its rate comes from")
+        raise ValueError("A rule read from the quarterly calendar can't be fixed: reject it, and fix the rotating bonus its rate comes from")
     if not changes or set(changes) - set(EDITABLE):
         raise ValueError(f"Only these can be changed: {', '.join(EDITABLE)}")
     proposal = {field: rule.get(field) for field in extract.RULE_SCHEMA["required"] if field != "quote"}
@@ -182,7 +182,7 @@ def rule_warnings(rule: dict) -> list[str]:
     if rule.get("verified") == "manual":
         warnings.append("hand-entered, and the saved page doesn't confirm the quote: check it on the page")
     if rule.get("verified") == "calendar":
-        warnings.append("read from the page's quarterly calendar: its rate, cap and activation are the rotating rule's")
+        warnings.append("read from the page's quarterly calendar: its rate, cap and activation are the rotating bonus's")
     if rule.get("capUnknown"):
         warnings.append("the page says there is a cap but doesn't state the amount")
     return warnings
@@ -210,19 +210,23 @@ def card_review(candidate: dict, decisions: dict) -> dict:
             "cardConditions": list(candidate.get("cardConditions", [])), "rules": rules, "counts": counts}
 
 
-def quarter_status(candidate: dict, page_text: str, decisions: dict, today: str) -> dict:
+def quarter_status(candidate: dict, calendar_text: str, decisions: dict, today: str) -> dict:
     """Where a card with a rotating rule stands for the quarters that haven't ended by `today`. "waiting": each
     quarter rule (a rotating rule with dates) no person has decided on yet, in a few words: it isn't published until
-    accepted. "decided": how many have a decision. "comingSoon": the {start, end} of each quarter its page marks
-    "Coming Soon", which names nothing yet: the issuer hasn't said, so nothing has gone wrong. "rotating": whether the
-    candidate still has a rotating rule at all."""
+    accepted. "decided": how many have a decision. "comingSoon": the {start, end} of each quarter `calendar_text` (the
+    page its quarters are read from) marks "Coming Soon", which names nothing yet: the issuer hasn't said, so nothing
+    has gone wrong. "notAnnounced": whether the calendar reads fine and has no quarter after the running one, which is
+    the same news from a calendar that can't say "Coming Soon". "rotating": whether the candidate still has a rotating
+    rule at all."""
     rows = card_review(candidate, decisions)["rules"]
+    coming_soon = [{"start": q.start, "end": q.end} for q in quarters.coming_soon(calendar_text) if q.end >= today]
     ahead = [row for row in rows if row["rule"]["selection"] == "rotating" and row["rule"]["validFrom"]
              and (row["rule"]["validTo"] or today) >= today]
     return {
         "waiting": [row["summary"] for row in ahead if row["decision"] is None],
         "decided": sum(row["decision"] is not None for row in ahead),
-        "comingSoon": [{"start": q.start, "end": q.end} for q in quarters.coming_soon(page_text) if q.end >= today],
+        "comingSoon": coming_soon,
+        "notAnnounced": not coming_soon and quarters.next_not_announced(calendar_text, today),
         "rotating": any(row["rule"]["selection"] == "rotating" for row in rows),
     }
 

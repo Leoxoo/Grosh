@@ -441,7 +441,7 @@ def validate_rule(rule, page_norm: str | None = None, rows: dict[str, str] | Non
         return "hasOtherChoices must be true or false"
     if selection == "rotating":
         if "everything-else" in categories or picks is not None or other:
-            return "a rotating rule has no everything-else, no picks and no other choices"
+            return "a rotating bonus has no everything-else, no picks and no other choices"
     elif selection == "fixed":
         if len(categories) != 1 or picks is not None or other:
             return "a fixed rule has one category, no picks and no other choices"
@@ -1110,7 +1110,7 @@ def calendar_rules(rules: list[dict], text: str, today: str, url: str | None = N
     categories its names stand for. A name that is no category (a charity, Amazon: brands aren't category words)
     is kept in "merchants", so the bonus still says where it applies. No calendar rule without a rotating rule:
     the calendar names no rate. Each is marked verified "calendar": its quote is the calendar's lines, which
-    name no rate, so the quote checks (and fixing it in the review) don't apply. `url` is the calendar's page,
+    usually name no rate, so the quote checks (and fixing it in the review) don't apply. `url` is the calendar's page,
     when that isn't the page the rotating rule came from."""
     rotating = [r for r in rules if r["selection"] == "rotating" and not r["categories"] and r["validFrom"] is None]
     if not rotating:
@@ -1139,6 +1139,19 @@ def calendar_rules(rules: list[dict], text: str, today: str, url: str | None = N
     return made
 
 
+def rotates(candidate: dict | None) -> bool:
+    """Whether a candidate has a Rotating bonus, or an earlier extraction of the card did (its `rotated`, which
+    process_cards keeps). One bad extraction can lose the rule, and that must not drop the card from the refresh."""
+    candidate = candidate or {}
+    return bool(candidate.get("rotated")) or any(rule["selection"] == "rotating" for rule in candidate.get("rules", []))
+
+
+def quarters_page(card: dict, page_text: str, calendar: str | None) -> tuple[str, str | None]:
+    """The text a card's quarters are read from and, for calendar_rules, that page's URL when it isn't the card's own:
+    its calendar page's if one is saved (`calendar`), else its own page's."""
+    return (calendar, card.get("calendarUrl")) if calendar else (page_text, None)
+
+
 def add_calendar_rules(candidate: dict, text: str, today: str, url: str | None = None) -> int:
     """Give a candidate the dated rules its saved page's calendar has for it and it lacks, and say how many. The
     calendar is read, not asked about, so a card extracted before its calendar could be read gets its quarters
@@ -1151,9 +1164,13 @@ def add_calendar_rules(candidate: dict, text: str, today: str, url: str | None =
     added = len(rules) - before
     if added:
         candidate["rules"] = _in_order(rules.values())
-        candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
+        candidate["needs"] = _needs(candidate["rules"])
         candidate["warnings"] += [w for w in card_warnings(candidate["rules"]) if w not in candidate["warnings"]]
     return added
+
+
+def _needs(rules: list[dict]) -> list[str]:
+    return sorted({need for rule in rules for need in rule["needs"]})
 
 
 def _in_order(rules) -> list[dict]:
@@ -1332,13 +1349,13 @@ def extract_card(
         reply = ask(sentence)  # a miss here is not a failure of the card: the chunks already covered the rest
         if reply is not None:
             take(reply)
-    calendar_url = card.get("calendarUrl") if calendar else None
-    for rule in calendar_rules(list(accepted.values()), calendar or text, today or date.today().isoformat(), calendar_url):
+    quarters_text, quarters_url = quarters_page(card, text, calendar)
+    for rule in calendar_rules(list(accepted.values()), quarters_text, today or date.today().isoformat(), quarters_url):
         accepted.setdefault(_merge_key(rule), rule)  # two calendars naming a quarter the same way are one rule
     still_missing = [s for s in this_cards if not _covered(s, list(accepted.values()))]
 
     candidate["rules"] = _in_order(accepted.values())
-    candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
+    candidate["needs"] = _needs(candidate["rules"])
     candidate["warnings"] = card_warnings(candidate["rules"])
     if still_missing:
         # The page states these rates and the result doesn't have them: an "ok" that isn't complete must say so.
@@ -1375,7 +1392,7 @@ def manual_candidate(card: dict, entry: dict, text: str | None, page_hash: str |
     candidate["cardConditionsOnPage"] = page_norm is not None and all(
         normalize(c) in page_norm for c in candidate["cardConditions"]
     )
-    candidate["needs"] = sorted({need for r in candidate["rules"] for need in r["needs"]})
+    candidate["needs"] = _needs(candidate["rules"])
     candidate["warnings"] = card_warnings(candidate["rules"])
     if not candidate["rules"]:
         candidate["status"] = "no-rules"
@@ -1432,12 +1449,6 @@ def has_page(card: dict, state: dict, cache: Path) -> bool:
     return bool(entry.get("hash")) and fetch.text_saved(card["id"], entry, cache)
 
 
-def saved_calendar(card: dict, cache: Path) -> str | None:
-    """The saved text of the card's calendar page, or None if it has no calendar page, or none saved yet."""
-    saved = cache / card["id"] / fetch.CALENDAR_FILE
-    return saved.read_text(encoding="utf-8") if card.get("calendarUrl") and saved.exists() else None
-
-
 def summarize_calls(calls: list[dict]) -> dict:
     """Totals for the model calls made for one card: how many, how long, and how many tokens went where."""
     def total(get) -> int:
@@ -1471,7 +1482,7 @@ def process_cards(
         base = {"index": number, "total": len(chosen), "id": card["id"], "name": card["name"]}
         page_hash = fetch.pages_hash(state.get(card["id"], {}))
         text = (cache / card["id"] / "latest.txt").read_text(encoding="utf-8") if has_page(card, state, cache) else None
-        calendar = saved_calendar(card, cache)
+        calendar = fetch.saved_calendar(card, cache)
         path = candidates / f"{card['id']}.json"
         if card["id"] in manual:
             emit({"event": "card-start", **base, "kind": "hand-entered"})
@@ -1501,6 +1512,8 @@ def process_cards(
                 follow_up=follow_up, calendar=calendar,
             )
             candidate["stats"] = summarize_calls(calls)
+        if rotates(fetch.read_json(path, None)):
+            candidate["rotated"] = True
         fetch.write_json(path, candidate)
         counts[candidate["status"]] = counts.get(candidate["status"], 0) + 1
         emit({
