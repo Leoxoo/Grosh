@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Fetch each catalog card's issuer page and report which pages changed.
 
-    python3 tools/rewards-catalog/fetch.py
-    python3 tools/rewards-catalog/fetch.py --issuer chase --limit 5
-    python3 tools/rewards-catalog/fetch.py --only chase-sapphire-preferred
-    python3 tools/rewards-catalog/fetch.py --retry      # just the ones that failed or came back thin last time
-    python3 tools/rewards-catalog/fetch.py --missing    # pick up where an interrupted run stopped
+    python3 tools/rewards-catalog/pipeline/fetch.py
+    python3 tools/rewards-catalog/pipeline/fetch.py --issuer chase --limit 5
+    python3 tools/rewards-catalog/pipeline/fetch.py --only chase-sapphire-preferred
+    python3 tools/rewards-catalog/pipeline/fetch.py --retry      # just the ones that failed or came back thin last time
+    python3 tools/rewards-catalog/pipeline/fetch.py --missing    # pick up where an interrupted run stopped
 
 reads catalog-seed.json and fetches each chosen card's sourceUrl, one page at a time
 (once per distinct URL). It prints each card's result as it finishes and saves
@@ -27,7 +27,7 @@ A card whose fetch did not succeed keeps its last hash. Failure never erases.
 A card can name a second page, `calendarUrl`, for its quarterly calendar. It is read after the
 card's page, saved as cache/<id>/calendar.txt, and hashed on its own (`calendarHash`).
 
-Only the standard library is used, so it runs anywhere python3 does (PIPELINE.md).
+Only the standard library is used, apart from Playwright for pages that need a browser (requirements.txt).
 """
 
 import argparse
@@ -50,10 +50,12 @@ from pathlib import Path
 from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
 
-HERE = Path(__file__).parent
-SEED = HERE / "catalog-seed.json"
-STATE = HERE / "fetch-state.json"
-CACHE = HERE / "cache"
+ROOT = Path(__file__).parent.parent
+INPUTS = ROOT / "inputs"  # what a person writes by hand
+DATA = ROOT / "data"  # what the scripts and the page write, committed
+SEED = DATA / "catalog-seed.json"
+STATE = DATA / "fetch-state.json"
+CACHE = ROOT / "cache"
 
 USER_AGENT = "GroshRewardsCatalog/0.1 (personal finance app; github.com/Leoxoo)"
 TIMEOUT_SECONDS = 20

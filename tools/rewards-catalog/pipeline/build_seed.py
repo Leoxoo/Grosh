@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Build the rewards catalog's seed from CardPin's raw_import.csv.
 
-    python3 tools/rewards-catalog/build_seed.py raw_import.csv
+    python3 tools/rewards-catalog/pipeline/build_seed.py raw_import.csv
 
 reads CardPin's CSV (MIT, https://github.com/strike007-3000/cardpin) and writes
-tools/rewards-catalog/catalog-seed.json beside this script.
+tools/rewards-catalog/data/catalog-seed.json.
 
 The seed keeps only facts about each card: who issues it, its fee, its flat
 earn rate and the issuer page to re-check. It drops everything we have no right
@@ -21,25 +21,25 @@ import csv
 import json
 import re
 import sys
-from pathlib import Path
 from urllib.parse import urlparse
 
-OUT = Path(__file__).with_name("catalog-seed.json")
+from fetch import INPUTS, SEED as OUT
+
 # Hand-fixed issuer pages, {card id: url}, for cards whose CardPin url has moved. Kept apart
 # from the seed so that rebuilding the seed from a fresh CSV doesn't undo the fixes.
-URL_OVERRIDES = Path(__file__).with_name("url-overrides.json")
+URL_OVERRIDES = INPUTS / "url-overrides.json"
 # Cards CardPin doesn't have (Apple Card, for one), added by hand: a list of objects with
 # EXTRA_REQUIRED's keys. They join the seed like any other card.
-EXTRA_CARDS = Path(__file__).with_name("extra-cards.json")
+EXTRA_CARDS = INPUTS / "extra-cards.json"
 # Cards left out of the seed on purpose, {card id: why}: brokerage co-brands of a card already in
 # it, for one. Kept apart for the same reason as the overrides, so a fresh CSV doesn't bring them back.
-REMOVED_CARDS = Path(__file__).with_name("removed-cards.json")
+REMOVED_CARDS = INPUTS / "removed-cards.json"
 # Cards waiting on a person's decision, {card id: what is needed}: a card that no longer exists, or one whose
 # rates no page states. Each gets a "needsInfo" field with that text, which the web page (ui.py) shows.
-NEEDS_INFO = Path(__file__).with_name("needs-info.json")
+NEEDS_INFO = INPUTS / "needs-info.json"
 # Cards whose quarterly calendar is on a page of its own, {card id: url}. Each gets a "calendarUrl" field, which
 # fetch.py reads and saves with the card's page.
-CALENDAR_PAGES = Path(__file__).with_name("calendar-pages.json")
+CALENDAR_PAGES = INPUTS / "calendar-pages.json"
 
 # CardPin's issuer codes, as people would write them.
 ISSUER_NAMES = {

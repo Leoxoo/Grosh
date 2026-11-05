@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The publish step: write the rules a person accepted into rewards-catalog.json, the one file the app reads.
 
-    python3 tools/rewards-catalog/publish.py
+    python3 tools/rewards-catalog/pipeline/publish.py
 
 reads catalog-seed.json (the cards), cache/candidates/ (each card's rules), review-decisions.json (what
 a person accepted) and card-options.json (whether a card's bonuses add up), and writes rewards-catalog.json
@@ -19,8 +19,8 @@ import extract  # noqa: E402
 import fetch  # noqa: E402
 import review  # noqa: E402
 
-OUT = Path(__file__).with_name("rewards-catalog.json")
-SEED = Path(__file__).with_name("catalog-seed.json")
+OUT = fetch.DATA / "rewards-catalog.json"
+SEED = fetch.SEED
 # Raised when the file's shape changes in a way an older app can't read (a field renamed or retyped).
 # Adding a field doesn't need it: the app's reader ignores fields it doesn't know.
 FORMAT_VERSION = 1

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Propose each card's reward rules by asking a local model to read its cached page.
 
-    python3 tools/rewards-catalog/extract.py --only capital-one-savor
-    python3 tools/rewards-catalog/extract.py --issuer "capital one" --limit 5
-    python3 tools/rewards-catalog/extract.py            # every card with a fetched page
+    python3 tools/rewards-catalog/pipeline/extract.py --only capital-one-savor
+    python3 tools/rewards-catalog/pipeline/extract.py --issuer "capital one" --limit 5
+    python3 tools/rewards-catalog/pipeline/extract.py            # every card with a fetched page
 
 Needs a server that speaks the OpenAI chat completions API: LM Studio (Developer tab, Start
 Server), OpenAI itself, vLLM, or any other. Settings come from what the web page (ui.py) last
@@ -50,7 +50,7 @@ import quarters  # noqa: E402
 
 CANDIDATES = fetch.CACHE / "candidates"
 SAVED_SETTINGS = fetch.CACHE / "ui-settings.json"
-MANUAL_RULES = Path(__file__).with_name("manual-rules.json")
+MANUAL_RULES = fetch.INPUTS / "manual-rules.json"
 PROMPT_VERSION = "11"
 DEFAULT_URL = "http://localhost:1234/v1"
 DEFAULT_MODEL = "k2-horizon-7b-uno-uncensored"

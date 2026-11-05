@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """A local web page for the rewards catalog pipeline: see every card, pick the model, run and watch jobs.
 
-    python3 tools/rewards-catalog/ui.py            # then open http://127.0.0.1:8765
-    python3 tools/rewards-catalog/ui.py --port 9000
+    python3 tools/rewards-catalog/pipeline/ui.py            # then open http://127.0.0.1:8765
+    python3 tools/rewards-catalog/pipeline/ui.py --port 9000
 
 It runs the same code as fetch.py and extract.py, on the same files, so the command line and the
-page stay in step. Standard library only. It listens on 127.0.0.1 only, and refuses requests whose
+page stay in step. Standard library only, apart from fetch.py's browser. It listens on 127.0.0.1 only, and refuses requests whose
 Host isn't local or whose POSTs lack the X-Requested-With header, so a web page you visit can't
 drive it.
 

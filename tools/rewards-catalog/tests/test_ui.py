@@ -929,7 +929,7 @@ class ReviewTests(AppCase):
         self.assertEqual((status, payload["cards"], payload["rules"]), (200, 1, 1))
         (published,) = json.loads(self.paths.catalog.read_text())["cards"]
         self.assertEqual([r["evidence"]["quote"] for r in published["rules"]], [RULE["quote"]])
-        self.assertEqual(ui.Paths().catalog.parent, Path(ui.__file__).parent)  # committed beside the scripts, not in cache/
+        self.assertEqual(ui.Paths().catalog.parent, fetch.DATA)  # committed, not in cache/
 
     def test_a_card_option_is_saved_shown_in_the_card_and_published(self):
         facts = {"isBusiness": False, "rewardProgram": None, "baseEarnRate": 1, "discontinued": False}

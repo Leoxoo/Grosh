@@ -32,8 +32,8 @@ import extract  # noqa: E402
 import fetch  # noqa: E402
 import quarters  # noqa: E402
 
-DECISIONS = Path(__file__).with_name("review-decisions.json")
-OPTIONS = Path(__file__).with_name("card-options.json")
+DECISIONS = fetch.DATA / "review-decisions.json"
+OPTIONS = fetch.DATA / "card-options.json"
 # What a person can turn on for a card, and what it means. Every option is off until someone turns it on.
 CARD_OPTIONS = {
     "bonusesStack": "Bonuses add up: a purchase earns the base rate plus what every bonus covering it adds over the base",

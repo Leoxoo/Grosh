@@ -10,6 +10,19 @@ The app ships a **rewards catalog**: for each known card, its fee, its flat earn
 - Nothing reaches the app unreviewed. A script *proposes*; a person *accepts* each rule on the review page, and the decisions are committed and merged in a pull request.
 - We ship facts we re-verified ourselves. We never ship card art or another site's compiled data.
 
+## Where things are
+
+```
+pipeline/   the code: build_seed, fetch, extract, quarters, review, publish, and the page (ui.py, ui.html)
+inputs/     what a person writes by hand: extra cards, removed cards, url overrides, calendar pages, needs-info, manual rules
+data/       what the scripts and the page write, committed: the seed, fetch state, review decisions, card options, the catalog
+tests/      the offline tests
+bench/      the accuracy benchmark
+cache/      saved pages, candidates and settings, not committed
+```
+
+File names below are in these folders. To set up: Python 3, and only for pages built in the browser, `python3 -m pip install -r tools/rewards-catalog/requirements.txt` and `python3 -m playwright install chromium`.
+
 ## The shape of a run
 
 ```
@@ -31,11 +44,11 @@ Each stage reads files and writes files, so any stage can be rerun alone and a f
 ## The fetch stage (`fetch.py`)
 
 ```
-python3 tools/rewards-catalog/fetch.py [--issuer chase] [--only ID ...] [--limit N]
+python3 tools/rewards-catalog/pipeline/fetch.py [--issuer chase] [--only ID ...] [--limit N]
 python3 -m unittest discover -s tools/rewards-catalog      # offline tests
 ```
 
-- **Standard library only.** One page per distinct URL (cards that share a page, like the two Expedia cards, fetch once).
+- **Standard library only, apart from the browser.** One page per distinct URL (cards that share a page, like the two Expedia cards, fetch once).
 - **Hashes the visible text**, not the HTML, so a changed script bundle or tracking id isn't a change. `fetch-state.json` holds each card's hash and is committed, so a run on any machine knows what changed; the page text lives in `cache/`, which isn't.
 - **A card can have a calendar page.** `calendar-pages.json` (`{card id: url}`) names a page of its own for a card's quarterly calendar; `build_seed.py` copies it to the card as `calendarUrl`. It is read right after the card's page (once per distinct URL, with no conditional request), saved as `cache/<id>/calendar.txt`, and hashed apart: `hash` stays the card page's and `calendarHash` is the calendar's, with `calendarUrl` and `calendarStatus` beside them. `fetch.pages_hash` joins the two, and that is what extraction compares, so a changed calendar makes the card `changed` and it extracts again, even when its own page is the same. A card with no calendar page has none of these fields and its `pages_hash` is its `hash`. A calendar that wasn't read keeps its last text and hash, and the card's own status doesn't change, since that is about its own page: the outcome's `calendar_error` says why, and `report.md` lists it under "calendar page not read".
 - **A calendar page may be JSON.** Discover's page (`www.discover.com/credit-cards/cash-back/cashback-calendar.html`) has no calendar in its HTML, only a "not working" message that a script hides. The script builds the calendar from `card.discover.com/cardissuer/public/rewards/offer/v1/offer-categories`, so that is its `calendarUrl`. A calendar fetch (`accepts_json`) goes by the reply's body, not its content type, and saves a JSON reply's sentences (`data_text`, one a line; a `<br>` or `&nbsp;` inside a sentence is a space). The 400-character check doesn't apply to JSON, as one quarter is about 180 characters, but a JSON reply that says nothing about earning is `failed`, and the last copy stays. HTML is judged like any page, so a bot wall comes back `needs-browser` and isn't saved. A card page that answers JSON is still "not a web page". The `offers.json` the page also names is old (2020–2021).
@@ -54,7 +67,7 @@ python3 -m unittest discover -s tools/rewards-catalog      # offline tests
 - **Validators belong to a URL.** The saved ETag / Last-Modified are sent only back to the page they came from. When a card's `sourceUrl` changes, the new page is read in full (an earlier version asked the new URL "has it changed since the old page?" and got a false "not modified").
 - **Failure never erases:** a card that didn't fetch keeps its last hash.
 - **Exit code 1 only if more than 25% of cards are `failed` or `gone`.** `refused`, `robots` and `needs-browser` are expected outcomes to report, not signs that the run broke.
-- Not built yet: a headless browser for `needs-browser` pages.
+- **A headless browser for `needs-browser` pages is optional.** It needs Playwright (`requirements.txt`) and its Chromium; without them the page stays `needs-browser` and says what to install.
 
 ### One page at a time
 
@@ -121,9 +134,9 @@ Limits to know before the extract stage:
 ## The extract stage (`extract.py`)
 
 ```
-python3 tools/rewards-catalog/extract.py --only capital-one-savor     # one card
-python3 tools/rewards-catalog/extract.py --issuer "capital one"       # one issuer
-python3 tools/rewards-catalog/extract.py                              # every fetched page
+python3 tools/rewards-catalog/pipeline/extract.py --only capital-one-savor     # one card
+python3 tools/rewards-catalog/pipeline/extract.py --issuer "capital one"       # one issuer
+python3 tools/rewards-catalog/pipeline/extract.py                              # every fetched page
 ```
 
 Start the model server first (for LM Studio: Developer tab, Start Server, model loaded). Settings come from what the web page last saved, and flags override them: `--base-url`, `--model`, `--max-tokens`, `--timeout`, `--extra-body`, `--prompt-suffix`, `--response-mode`, `--token-field`, `--temperature`; the key comes from `LLM_API_KEY` or the saved settings. The script checks the server answers, accepts the key, and lists the model before it starts (only when a card needs the model).
@@ -243,7 +256,7 @@ Passing the checks means a rule is supported by its page, not that it is right, 
 
 - **Warnings.** A rule's own: hand-entered and not confirmed by the saved page (`verified: "manual"`), read from the quarterly calendar (`verified: "calendar"`), or a cap the page mentions without an amount (`capUnknown`). The card's warnings from the extract stage (two rates for one thing, no base rate, rate sentences the result missed) are about its rules taken together, so they are shown above the card's rules.
 - **Hand-entered rules are reviewed too.** `manual-rules.json` is a person's reading of a page, which is not the same as a second person checking it.
-- **Where decisions live.** `review-decisions.json`, next to this file and committed (`cache/` isn't): `{card id: {rule key: {decision, decidedAt, rule, quote, edited?}}}`. `rule` and `quote` are there so a pull request's diff reads as "accepted 3% on dining", not a hash.
+- **Where decisions live.** `data/review-decisions.json`, committed (`cache/` isn't): `{card id: {rule key: {decision, decidedAt, rule, quote, edited?}}}`. `rule` and `quote` are there so a pull request's diff reads as "accepted 3% on dining", not a hash.
 - **The key is the exact rule.** It is a hash of the card id and everything the rule says: rate, unit, categories, selection, cap, dates, `firstMonths`, tier, requirements, conditions, the quote, the source URL, and whether the page confirmed it. A re-extraction that changes any of that makes a new rule, which waits for review; it never inherits the old accept. Left out: the page's hash (a page whose menus churned but whose rule is the same keeps its decision), the derived `needs`, the order of lists, and 3 vs 3.0. A quarter rule (`verified: "calendar"`) leaves out its quote too: a calendar rewords a quarter as it comes round ("January 1 to March 31", then "now to March 31 ... when you activate"), and an accepted quarter must not go back to waiting for that. A change of its dates, rate, categories or merchants still makes a new rule. The same rule on two cards that share a page is reviewed once per card.
 - **Old decisions stay.** A decision whose rule is gone from the candidate is kept and does nothing; if a later extraction brings back that exact rule, its decision applies again.
 - **What moves on.** `review.accepted_rules(candidate)` returns only the candidate's rules a person accepted, in the candidate's order. Rejected rules and rules still waiting are left out. The publish step (#162) builds the catalog from this and nothing else.
@@ -252,10 +265,10 @@ Passing the checks means a rule is supported by its page, not that it is right, 
 ## The publish stage (`publish.py`)
 
 ```
-python3 tools/rewards-catalog/publish.py        # or Publish catalog in the page's Run panel
+python3 tools/rewards-catalog/pipeline/publish.py        # or Publish catalog in the page's Run panel
 ```
 
-Reads `catalog-seed.json`, `cache/candidates/`, `review-decisions.json` and `card-options.json`, and writes `rewards-catalog.json` beside this file: the one file the app bundles (#163). It is committed, so a pull request shows exactly which rules ship.
+Reads `catalog-seed.json`, `cache/candidates/`, `review-decisions.json` and `card-options.json`, and writes `data/rewards-catalog.json`: the one file the app bundles (#163). It is committed, so a pull request shows exactly which rules ship.
 
 - **Only accepted rules** (`review.accepted_rules`). Rejected rules and rules still waiting are left out.
 - **A card with no accepted rule is left out**, not listed with an empty rule list. Its facts are CardPin's and nobody has checked them, and we ship only what we re-verified. So every card in the file is verified, `verified` isn't written, and `verifiedAt` is the latest day one of its rules was accepted. No decisions exist yet, so the file would hold no cards; it isn't committed until it has some.
@@ -296,10 +309,10 @@ Reads `catalog-seed.json`, `cache/candidates/`, `review-decisions.json` and `car
 ## The web page (`ui.py`)
 
 ```
-python3 tools/rewards-catalog/ui.py        # then open http://127.0.0.1:8765
+python3 tools/rewards-catalog/pipeline/ui.py        # then open http://127.0.0.1:8765
 ```
 
-A small local page, standard library only, that drives the same code as `fetch.py` and `extract.py` on the same files. In the app's Browser pane, the `rewards-catalog` entry in `.claude/launch.json` starts it.
+A small local page, standard library only (Playwright only for the browser setting), that drives the same code as `fetch.py` and `extract.py` on the same files. In the app's Browser pane, the `rewards-catalog` entry in `.claude/launch.json` starts it.
 
 - **Model panel:** the server's address, its API key (a password field), and a model box that lists what the server has (or take any id); **Test model** asks it a trivial question using the real output schema and reports the time, tokens, and how many were spent reasoning; **More settings** holds the page size sent per request, the reply limit, the time limit, extra request fields (JSON, such as `{"reasoning_effort": "none"}`), and text added to every prompt. Settings are saved in `cache/ui-settings.json`, and `extract.py` on the command line uses them as its defaults (flags override).
 - **Run:** fetch (never fetched, retry failed, ticked, all) or extract (what needs it, ticked, redo all), one job at a time, with a progress bar, the card and the part of its page being sent, a live log, and **Stop** (it stops between cards, or between parts of a card). A card is "needs extracting" when it has no result for the chosen model and the current prompt version, so switching models marks every card again.
@@ -395,7 +408,7 @@ Rule   categories[], selection (fixed | choose | top-spend | rotating), picks, h
 |---|---|
 | Monthly, on the maintainer's Mac (LM Studio running) | Full run: fetch every card, extract the changed ones, open a PR with `report.md`. |
 | Monthly, in CI (optional) | Fetch and change detection only, no extraction. Opens an issue listing pages that changed, as a reminder to do the local run. |
-| Quarterly, a week before it starts | Re-run only cards with rotating rules, so the new quarter's categories are in before the quarter begins: `python3 tools/rewards-catalog/ui.py`, then **Refresh rotating cards** in the Run panel. |
+| Quarterly, a week before it starts | Re-run only cards with rotating rules, so the new quarter's categories are in before the quarter begins: `python3 tools/rewards-catalog/pipeline/ui.py`, then **Refresh rotating cards** in the Run panel. |
 | On demand | A command-line flag to run a single issuer or card. |
 
 **Refresh rotating cards** fetches the cards with a Rotating bonus, through the normal fetch, then extracts those whose page, model or prompt changed. Those cards are the ones with a calendar page, and the ones whose Candidate has a rotating rule or had one at an earlier extraction (`extract.rotates`: `process_cards` carries a `rotated` mark from one Candidate to the next), so one bad extraction that loses the rule can't silently drop a card from later refreshes. LM Studio is only needed if a card changed: an unchanged page asks no model, because a new run could only reword rules a person has already decided on. A card with an undated rotating rule and no quarter rules gets them from its saved page, or its saved calendar page if it has one (`extract.add_calendar_rules`), since a calendar is read, not asked about. A changed calendar page is a changed card, so it is extracted again like a changed page. A card with no Candidate and no calendar page isn't known to rotate, so extract it first.
