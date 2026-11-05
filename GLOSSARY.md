@@ -251,6 +251,52 @@ A period's total divided by the days it covers: through today in the current per
 On the Income and Spent details the same line reads "Expected by week end", "quarter end" or "year end".
 Today's total on a Month graph tab plus what the Recurring transactions still have due through the period's last day: what the month ends at if nothing unscheduled is spent or earned. The graph's projection is not a Scheduled row: it takes every Occurrence left in the month, and changes no balance, report or transaction.
 
+### Rewards catalog
+
+**Rewards catalog**:
+The file of known credit cards and what each earns (`rewards-catalog.json`), built outside the app from issuers' pages and shipped with it. A Card can be linked to a **Catalog card**, one entry in it; the Card stays the user's label.
+_Avoid_: Card database, rewards data
+
+**Rule**:
+One rate a Catalog card earns and where: a rate, the catalog categories it covers, and any cap, requirement, dates or tier. Every Rule carries its **Quote**, the issuer's sentence that states it, word for word from the page.
+_Avoid_: Offer, benefit, reward
+
+**Catalog category**:
+One of the catalog's fixed spending categories (dining, groceries, gas, ...), the words issuers use. It is not a Grosh Category: the app maps the user's Categories to catalog categories.
+_Avoid_: Category (that is the user's)
+
+**Base rate**:
+The rate a Catalog card earns on everything no other Rule covers (the catalog category Everything else).
+_Avoid_: Flat rate, default rate
+
+**Bonus**:
+A Rule that earns more than the Base rate on some purchases. A **Rotating bonus** covers categories the issuer changes each **Quarter** (a calendar quarter), usually after the cardholder activates it; a **Tier boost** is extra earned only by members of a relationship tier (Bank of America's Preferred Rewards).
+
+**Bonuses add up**:
+A Catalog card whose Bonuses are each on top of its Base rate, so a purchase two Bonuses cover earns the Base rate plus what each adds over it (Freedom Flex dining in a dining quarter: 1% + 4% + 2% = 7%). Off by default; a person turns it on for each card. Otherwise a purchase earns the best single rate.
+_Avoid_: Stacking (fine in conversation, but not the switch's name)
+
+**Paid with**:
+The wallet, app or payment service a Rule's rate needs, such as Apple Pay or PayPal. A Rule with no category earns on any purchase paid that way; it is never the Base rate.
+_Avoid_: Wallet rate
+
+**Merchants**:
+The named stores or brands a Rule applies at. With no category the Rule applies only there; a Quarter rule's Merchants are as well as its categories. A brand is never filed under a category.
+
+**Calendar page**:
+A page of its own that gives a Catalog card's quarterly calendar, named by the card and fetched with its page. Discover's is a JSON reply rather than a web page.
+
+**Quarter rule**:
+A Rotating bonus dated to one Quarter, with the categories and merchants the calendar names for it. It is read from the calendar, not asked of a model, so it takes its rate, cap and activation from the card's undated Rotating bonus, and it can be accepted or rejected but not fixed.
+_Avoid_: Calendar rule, dated rule
+
+**Candidate**:
+The Rules read from one card's pages (its own, and its Calendar page if it has one) and not yet reviewed, with the proposals the checks rejected.
+
+**Decision**:
+A person's accept or reject on one Rule, or an accepted fix to it. Only accepted Rules reach the Rewards catalog.
+_Avoid_: Approval, verification
+
 ### Feedback
 
 **Keypad**:

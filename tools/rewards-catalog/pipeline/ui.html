@@ -1,0 +1,813 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rewards catalog</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --panel: #ffffff; --fg: #1d1d1b; --muted: #6b6b66; --line: #e2e1dc;
+    --accent: #1a6b5a; --accent-fg: #ffffff; --ok: #1e7a46; --ok-bg: #e3f3ea; --warn: #8a5a00; --warn-bg: #fbf0d6;
+    --bad: #b3261e; --bad-bg: #fbe4e1; --info: #2f5f9e; --info-bg: #e4edf8; --neutral-bg: #ececE8;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --panel: #1f1f1d; --fg: #ecebe6; --muted: #9a9993; --line: #34332f;
+      --accent: #4fb89e; --accent-fg: #0e1a17; --ok: #6fd09a; --ok-bg: #1d3327; --warn: #e5b85a; --warn-bg: #3a2f14;
+      --bad: #f08d85; --bad-bg: #3d1f1c; --info: #8db4ec; --info-bg: #1d2b40; --neutral-bg: #2a2a27;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 system-ui, -apple-system, sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between;
+           padding: 16px 20px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 5; }
+  h1 { font-size: 18px; margin: 0; }
+  h1 small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 10px; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px 20px 60px; display: grid; gap: 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; }
+  label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+  input, select, button { font: inherit; color: inherit; }
+  input[type=text], input[type=number], input[type=password], select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; min-width: 0; }
+  input:focus-visible, select:focus-visible, button:focus-visible, tr:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  button.danger { color: var(--bad); border-color: var(--bad); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; background: var(--neutral-bg); white-space: nowrap; }
+  .chip.ok { background: var(--ok-bg); color: var(--ok); } .chip.warn { background: var(--warn-bg); color: var(--warn); }
+  .chip.bad { background: var(--bad-bg); color: var(--bad); } .chip.info { background: var(--info-bg); color: var(--info); }
+  .muted { color: var(--muted); } .small { font-size: 12px; } .mono { font-family: var(--mono); font-size: 12px; }
+  .pill { display: inline-flex; gap: 6px; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 13px; background: var(--neutral-bg); }
+  .pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .pill.ok::before { background: var(--ok); } .pill.bad::before { background: var(--bad); }
+  .groups { display: flex; flex-wrap: wrap; gap: 16px 28px; align-items: center; }
+  .group { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .group > .name { font-size: 12px; color: var(--muted); margin-right: 2px; }
+  .bar { height: 10px; background: var(--neutral-bg); border-radius: 999px; overflow: hidden; margin: 8px 0; }
+  .bar > span { display: block; height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+  .bar.sub { height: 5px; margin-top: 0; } .bar.sub > span { background: var(--info); }
+  #log { font: 12px/1.5 var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
+         height: 240px; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+  #log .error { color: var(--bad); } #log .warn { color: var(--warn); } #log .t { color: var(--muted); }
+  .result { margin-top: 10px; padding: 8px 10px; border-radius: 6px; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+  .result.ok { background: var(--ok-bg); color: var(--ok); } .result.bad { background: var(--bad-bg); color: var(--bad); }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+  tbody tr { cursor: pointer; } tbody tr:hover { background: var(--bg); } tbody tr.open { background: var(--info-bg); }
+  td.check { width: 28px; } .stack { display: grid; gap: 3px; justify-items: start; }
+  #drawer { position: fixed; inset: 0 0 0 auto; width: min(780px, 100%); background: var(--panel); border-left: 1px solid var(--line);
+            box-shadow: -8px 0 30px rgba(0,0,0,.18); overflow-y: auto; padding: 18px 20px 40px; z-index: 10; }
+  #drawer[hidden] { display: none; }
+  #drawer h3 { margin: 18px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .rule { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+  .rule .what { font-weight: 600; } .rule .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+  .rule .head .rate { font-size: 22px; font-weight: 700; } .rule .head .kind { font-weight: 600; }
+  .fields { display: grid; grid-template-columns: max-content 1fr; gap: 5px 14px; margin: 10px 0 0; font-size: 13px; }
+  .fields dt { color: var(--muted); } .fields dd { margin: 0; }
+  .said { margin: 10px 0 0; font-size: 12px; color: var(--muted); } .rule .said + blockquote { margin-top: 3px; }
+  .rule blockquote { margin: 8px 0 0; padding-left: 10px; border-left: 3px solid var(--line); color: var(--muted); font-size: 13px; }
+  .rule ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
+  .rule.rejected { border-color: var(--bad); }
+  .rule.accepted { border-color: var(--ok); }
+  .rule .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  .earn { width: 100%; border: 1px solid var(--line); border-radius: 8px; }
+  .earn td, .earn th { padding: 8px 10px; } .earn tr.waiting td { opacity: .55; } .earn .rate { font-size: 18px; font-weight: 700; white-space: nowrap; }
+  .fix { display: grid; gap: 10px; margin-top: 10px; padding: 10px 12px; background: var(--bg); border-radius: 8px; }
+  .fix .cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 10px; font-size: 13px; }
+  .fix .cats label, .fix .reqs label { display: flex; gap: 6px; align-items: center; font-weight: 400; }
+  .fix .reqs { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
+  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; overflow: auto; font: 12px/1.5 var(--mono); white-space: pre-wrap; word-break: break-word; margin: 6px 0; }
+  details > summary { cursor: pointer; color: var(--muted); }
+  a { color: var(--info); }
+  @media (max-width: 640px) { header, main { padding-left: 14px; padding-right: 14px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Rewards catalog<small>Fetch issuer pages, extract reward rules with a model, then review them</small></h1>
+  <span id="server" class="pill">checking the model server…</span>
+</header>
+
+<main>
+  <section class="panel" aria-labelledby="model-h">
+    <h2 id="model-h">Model</h2>
+    <div class="row" style="margin-bottom: 12px">
+      <label>Saved profile
+        <select id="profile"><option value="">(none)</option></select></label>
+      <button id="saveProfile" type="button">Save current settings as…</button>
+      <button id="deleteProfile" type="button">Delete profile</button>
+      <span class="small muted">A profile keeps a server's address, key and model together, so switching servers is one click.</span>
+    </div>
+    <div class="row">
+      <label style="flex: 1 1 260px">Server address (any OpenAI-compatible API, ending in /v1)
+        <input type="text" id="baseUrl" spellcheck="false" autocomplete="off">
+      </label>
+      <label style="flex: 1 1 220px">API key (bearer token, if the server needs one)
+        <input type="password" id="apiKey" spellcheck="false" autocomplete="off" placeholder="none">
+      </label>
+      <button id="clearKey" type="button" hidden>Remove saved key</button>
+      <label style="flex: 1 1 280px">Model (pick one or type its id)
+        <input type="text" id="model" list="models" spellcheck="false" autocomplete="off">
+        <datalist id="models"></datalist>
+      </label>
+      <button id="refresh" type="button">Refresh models</button>
+      <button id="save" class="primary" type="button">Save</button>
+      <button id="test" type="button">Test model</button>
+    </div>
+    <details style="margin-top: 10px">
+      <summary>More settings</summary>
+      <div class="row" style="margin-top: 8px">
+        <label>Page text per request (characters)<input type="number" id="chunkChars" min="1000" max="60000" step="500"></label>
+        <label>Reply limit (tokens)<input type="number" id="maxTokens" min="200" max="32000" step="100"></label>
+        <label>Time limit per request (seconds)<input type="number" id="timeoutSeconds" min="10" max="3600" step="10"></label>
+      </div>
+      <div class="row" style="margin-top: 8px">
+        <label>Ask for the reply's shape by
+          <select id="responseMode">
+            <option value="json_schema">sending the schema (LM Studio, OpenAI…)</option>
+            <option value="tool">calling a function (rec/flint, and servers without json_schema)</option>
+            <option value="json_object">asking for a JSON object</option>
+            <option value="prompt">describing it in the prompt only</option>
+          </select></label>
+        <label>Reply-limit field
+          <select id="tokenField"><option value="max_tokens">max_tokens</option><option value="max_completion_tokens">max_completion_tokens (newer OpenAI models)</option></select></label>
+        <label>Temperature (empty to leave out)<input type="number" id="temperature" min="0" max="2" step="0.1" style="width: 8em"></label>
+      </div>
+      <div class="row" style="margin-top: 8px">
+        <label><span>Sentence-by-sentence follow-up</span>
+          <select id="followUps"><option value="true">on (asks again about rate sentences the chunks missed)</option><option value="false">off (faster, one pass per chunk)</option></select></label>
+      </div>
+      <div class="row" style="margin-top: 8px">
+        <label style="flex: 1 1 280px"><span><input type="checkbox" id="browser" style="min-width: 0"> When a page is only a shell, load it in a browser (headless Chromium)</span></label>
+        <span class="small muted">Needs Playwright: <span class="mono">python3 -m pip install playwright && python3 -m playwright install chromium</span></span>
+      </div>
+      <div class="row" style="margin-top: 8px">
+        <label style="flex: 1 1 280px">Extra request fields (JSON, optional)
+          <input type="text" id="extraBody" spellcheck="false" autocomplete="off" placeholder='{"reasoning_effort": "low"}'></label>
+        <label style="flex: 1 1 220px">Added to the end of every prompt (optional)
+          <input type="text" id="promptSuffix" spellcheck="false" autocomplete="off" placeholder="/no_think"></label>
+      </div>
+      <p class="small muted">For a model that reasons before answering, a small reply limit runs out before the answer starts. Raise the limit, or try these to shorten or switch off the reasoning. What works depends on the model: use "Test model" and "Try the model on this page" to see.</p>
+      <p class="small muted">Settings are saved in <span class="mono">cache/ui-settings.json</span>, which is not committed and is readable only by you; that includes the API key, which is never sent back to this page. Changing the model makes every card "need extracting" again, since candidates are kept per model.</p>
+    </details>
+    <div id="testResult" class="result" hidden></div>
+    <details style="margin-top: 10px">
+      <summary>Ask the model anything (to find out what a server accepts)</summary>
+      <div class="row" style="margin-top: 8px">
+        <label style="flex: 1 1 360px">Prompt
+          <input type="text" id="askPrompt" value="How many times does the letter r appear in the word strawberry? Think it through, then answer.">
+        </label>
+        <label style="flex: 1 1 280px">Extra fields for this try only (JSON)
+          <input type="text" id="askExtra" spellcheck="false" autocomplete="off" placeholder='{"thinking_budget_tokens": 64}'>
+        </label>
+        <button id="ask" type="button">Ask</button>
+      </div>
+      <p class="small muted">Sends a plain chat request with your saved settings (key, reply limit, extra fields) plus these fields. It reports the time, tokens used, and how much the model reasoned, so you can see whether a field changes anything.</p>
+      <div id="askResult" class="result" hidden></div>
+    </details>
+  </section>
+
+  <section class="panel" aria-labelledby="run-h">
+    <h2 id="run-h">Run</h2>
+    <div class="groups">
+      <div class="group"><span class="name">Fetch pages</span>
+        <button data-job="fetch:missing">Never fetched or not saved</button>
+        <button data-job="fetch:retry">Retry failed</button>
+        <button data-job="fetch:ids">Ticked</button>
+        <button data-job="fetch:all">All</button>
+      </div>
+      <div class="group"><span class="name">Extract rules</span>
+        <button data-job="extract:pending" class="primary" id="extractPending">What needs it</button>
+        <button data-job="extract:ids">Ticked</button>
+        <button data-job="extract:ids:force" title="Asks the model again about the ticked cards, even those already extracted">Redo ticked</button>
+        <button data-job="extract:all:force">Redo all</button>
+      </div>
+      <div class="group"><span class="name">Quarter</span>
+        <button data-job="refresh:rotating" title="Fetches only the cards with a rotating bonus, extracts the ones that changed, and says which quarters wait for review">Refresh rotating cards</button>
+      </div>
+      <div class="group"><span class="name">Catalog</span>
+        <button id="publish" type="button" title="Write the accepted rules to rewards-catalog.json, the file the app reads">Publish catalog</button>
+        <span class="small muted" id="publishResult"></span>
+      </div>
+      <button id="stop" class="danger" type="button" hidden>Stop</button>
+    </div>
+    <div id="summary" class="small muted" style="margin-top: 10px"></div>
+    <div id="reviewSummary" class="small muted" style="margin-top: 4px"></div>
+  </section>
+
+  <section class="panel" id="jobPanel" hidden aria-live="polite">
+    <h2>Job</h2>
+    <div class="row" style="justify-content: space-between"><strong id="jobLabel"></strong><span id="jobState" class="chip"></span></div>
+    <div class="bar" role="progressbar" aria-label="Cards done"><span id="jobBar"></span></div>
+    <div class="small" id="jobText"></div>
+    <div class="bar sub" id="chunkBar" hidden><span id="chunkFill"></span></div>
+    <div class="small muted" id="jobCounts" style="margin: 6px 0 10px"></div>
+    <div id="log" tabindex="0" aria-label="Job log"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="cards-h">
+    <h2 id="cards-h">Cards</h2>
+    <div class="row" style="margin-bottom: 10px">
+      <label style="flex: 1 1 200px">Search<input type="text" id="search" placeholder="name or issuer" autocomplete="off"></label>
+      <label>Issuer<select id="issuer"><option value="">All issuers</option></select></label>
+      <label>Show
+        <select id="show">
+          <option value="">All cards</option>
+          <option value="nofetch">Not fetched / fetch problems</option>
+          <option value="pending">Needs extracting</option>
+          <option value="failed">Extraction failed</option>
+          <option value="rules">Has rules</option>
+          <option value="norules">Fetched, no rules</option>
+          <option value="review">Rules waiting for review</option>
+        </select>
+      </label>
+      <button id="tickShown" type="button">Tick shown</button>
+      <button id="untick" type="button">Untick all</button>
+      <span class="small muted" id="shownCount"></span>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th class="check"></th><th>Card</th><th>Page</th><th>Rules</th><th>Asks the user</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<aside id="drawer" hidden aria-label="Card details"></aside>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const state = { overview: null, ticked: new Set(), job: null, logNext: 0, poll: null, open: null, models: [], lastDone: -1 };
+
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === false || v == null) continue;
+    if (k === "class") el.className = v; else if (k === "text") el.textContent = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v); else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat(Infinity)) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  return el;
+}
+// Like el.replaceChildren, but accepts nested lists and skips null/false, which replaceChildren would print as text.
+const fill = (el, ...kids) => el.replaceChildren(...kids.flat(Infinity).filter((k) => k != null && k !== false));
+const chip = (text, kind) => h("span", { class: "chip" + (kind ? " " + kind : ""), text });
+
+async function api(method, path, body) {
+  const res = await fetch(path, {
+    method, headers: { "X-Requested-With": "rewards-ui", "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({ error: "The server sent something that isn't JSON." }));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+const fetchKind = { "not-saved": "warn", ok: "ok", new: "ok", unchanged: "ok", changed: "ok", never: "", "needs-browser": "warn", refused: "warn", robots: "warn", gone: "bad", failed: "bad" };
+const extractKind = { ok: "ok", manual: "info", "no-rules": "", "wrong-page": "warn", failed: "bad" };
+const NEEDS = { "choice-categories": "picks a category", "account-opened": "date opened", "preferred-rewards-tier": "Preferred Rewards tier" };
+
+// ---------- profiles ----------
+async function loadProfiles() {
+  const data = await api("GET", "/api/profiles");
+  $("profile").replaceChildren(h("option", { value: "", text: data.profiles.length ? "(current settings)" : "(none saved)" }),
+    ...data.profiles.map((p) => h("option", { value: p.name, text: `${p.name} · ${p.model}${p.apiKeySet ? " · key saved" : ""}` })));
+  $("profile").value = data.active || "";
+  $("deleteProfile").disabled = !data.active;
+}
+async function applyProfile(data) {
+  fillSettings(data.settings); await loadEverything();
+}
+$("profile").onchange = async () => {
+  const name = $("profile").value; if (!name) return;
+  try { await applyProfile(await api("POST", "/api/profiles", { action: "use", name })); showResult($("testResult"), true, `Using "${name}".`); }
+  catch (e) { showResult($("testResult"), false, e.message); await loadProfiles(); }
+};
+$("saveProfile").onclick = async () => {
+  if (!(await saveSettings())) return;
+  const name = prompt("Name this profile (for example: LM Studio, or flint on rec):", $("profile").value || "");
+  if (!name) return;
+  try { await applyProfile(await api("POST", "/api/profiles", { action: "save", name })); showResult($("testResult"), true, `Saved "${name}".`); }
+  catch (e) { showResult($("testResult"), false, e.message); }
+};
+$("deleteProfile").onclick = async () => {
+  const name = $("profile").value; if (!name || !confirm(`Delete the profile "${name}"? Its saved key goes with it.`)) return;
+  try { await applyProfile(await api("POST", "/api/profiles", { action: "delete", name })); } catch (e) { showResult($("testResult"), false, e.message); }
+};
+
+// ---------- model panel ----------
+function fillSettings(s) {
+  $("browser").checked = !!s.browser;
+  for (const key of ["baseUrl", "model", "chunkChars", "maxTokens", "timeoutSeconds", "extraBody", "promptSuffix", "responseMode", "tokenField"]) $(key).value = s[key];
+  $("followUps").value = String(s.followUps !== false);
+  $("temperature").value = s.temperature ?? "";
+  $("apiKey").value = ""; $("apiKey").placeholder = s.apiKeySet ? "saved: type to replace" : "none";
+  $("clearKey").hidden = !s.apiKeySet;
+}
+function readSettings() {
+  return {
+    baseUrl: $("baseUrl").value, model: $("model").value, chunkChars: Number($("chunkChars").value),
+    maxTokens: Number($("maxTokens").value), timeoutSeconds: Number($("timeoutSeconds").value),
+    extraBody: $("extraBody").value, promptSuffix: $("promptSuffix").value,
+    responseMode: $("responseMode").value, tokenField: $("tokenField").value, browser: $("browser").checked, followUps: $("followUps").value === "true",
+    temperature: $("temperature").value === "" ? null : Number($("temperature").value),
+    apiKey: $("apiKey").value,  // blank keeps the saved key
+  };
+}
+function showResult(el, ok, text) { el.hidden = false; el.className = "result " + (ok ? "ok" : "bad"); el.textContent = text; }
+
+// All at once, so the cards don't wait for the model server to answer.
+const loadEverything = () => Promise.all([loadProfiles(), loadModels(), loadOverview()]);
+async function loadModels() {
+  const pill = $("server");
+  try {
+    const data = await api("GET", "/api/models");
+    state.models = data.models;
+    $("models").replaceChildren(...data.models.map((m) => h("option", { value: m })));
+    if (data.ok) {
+      const has = data.models.includes($("model").value);
+      const listed = data.models.length > 0, name = $("model").value;
+      pill.className = "pill " + (has || !listed ? "ok" : "bad");
+      pill.textContent = !listed ? "Server reachable (it doesn't list models)" : has ? `Server connected · ${data.models.length} models` : `Server connected, but "${name}" isn't listed`;
+      pill.title = data.note || "";
+    } else { pill.className = "pill bad"; pill.textContent = "Model server not usable"; pill.title = data.error; showResult($("testResult"), false, data.error); }
+  } catch (e) { pill.className = "pill bad"; pill.textContent = "Can't ask the server: " + e.message; }
+}
+async function storeSettings() {
+  try { fillSettings(await api("POST", "/api/settings", readSettings())); return true; }
+  catch (e) { showResult($("testResult"), false, e.message); return false; }
+}
+async function saveSettings() {
+  if (!(await storeSettings())) return false;
+  try { await loadEverything(); return true; }
+  catch (e) { showResult($("testResult"), false, e.message); return false; }
+}
+$("clearKey").onclick = async () => {
+  try { fillSettings(await api("POST", "/api/settings", { clearApiKey: true })); await loadModels(); showResult($("testResult"), true, "The saved key was removed."); }
+  catch (e) { showResult($("testResult"), false, e.message); }
+};
+$("save").onclick = async () => { if (await saveSettings()) showResult($("testResult"), true, "Saved."); };
+$("refresh").onclick = async () => { await saveSettings(); };
+$("test").onclick = async () => {
+  if (!(await saveSettings())) return;
+  const box = $("testResult"); showResult(box, true, "Asking the model… (the first request can take a while if the server must load the model)");
+  try {
+    const r = await api("POST", "/api/test-model", {});
+    const m = r.meta || {}, used = (m.usage || {}).completion_tokens;
+    const how = m.finishReason === undefined ? "" : `\n\nEnded with "${m.finishReason}" · ${used ?? "?"} reply tokens used${m.reasoningChars ? " · " + m.reasoningChars + " characters of reasoning text before the answer" : " · no reasoning text"}`;
+    showResult(box, r.ok, (r.ok ? `The model answered in ${r.seconds}s with a reply we can read:\n${r.reply}` : `Failed after ${r.seconds}s:\n${r.error}${r.reply ? "\n\nIt said:\n" + r.reply : ""}`) + how);
+  } catch (e) { showResult(box, false, e.message); }
+};
+
+$("ask").onclick = async () => {
+  const box = $("askResult"); showResult(box, true, "Asking…");
+  $("ask").disabled = true;
+  try {
+    const r = await api("POST", "/api/ask", { prompt: $("askPrompt").value, extraBody: $("askExtra").value });
+    const m = r.meta || {}, used = (m.usage || {}).completion_tokens;
+    const how = m.finishReason === undefined ? "" : `Ended with "${m.finishReason}" · ${used ?? "?"} tokens used · ${m.reasoningChars ? m.reasoningChars + " characters of reasoning" : "no reasoning text"}`;
+    showResult(box, r.ok, `${r.ok ? "Answered" : "Failed"} in ${r.seconds}s. ${how}\n\n${r.ok ? r.reply : r.error}`);
+  } catch (e) { showResult(box, false, e.message); }
+  $("ask").disabled = false;
+};
+
+// ---------- overview and table ----------
+async function loadOverview() {
+  const data = await api("GET", "/api/overview");
+  state.overview = data;
+  const s = data.summary;
+  $("summary").textContent = `${s.cards} cards · ${s.fetched} with a fetched page · ${s.extracted} with rules extracted · ${s.pending} need extracting with ${data.settings.model} · ${s.failed} failed`;
+  $("reviewSummary").textContent = `Review: ${s.waiting} rule${s.waiting === 1 ? "" : "s"} waiting · ${s.accept} accepted · ${s.reject} rejected. Open a card to review it; only accepted rules are published.`;
+  const issuers = [...new Set(data.cards.map((c) => c.issuer))].sort();
+  const current = $("issuer").value;
+  $("issuer").replaceChildren(h("option", { value: "", text: "All issuers" }), ...issuers.map((i) => h("option", { value: i, text: i })));
+  $("issuer").value = issuers.includes(current) ? current : "";
+  renderRows();
+}
+
+function visibleCards() {
+  const q = $("search").value.trim().toLowerCase(), issuer = $("issuer").value, show = $("show").value;
+  return state.overview.cards.filter((c) => {
+    if (issuer && c.issuer !== issuer) return false;
+    if (q && !(c.name + " " + c.issuer).toLowerCase().includes(q)) return false;
+    const ex = c.extract;
+    switch (show) {
+      case "nofetch": return !c.fetch.hasPage;
+      case "pending": return c.pending;
+      case "failed": return ex && ex.status === "failed";
+      case "rules": return ex && ex.rules > 0;
+      case "norules": return c.fetch.hasPage && ex && ex.rules === 0;
+      case "review": return c.review && c.review.waiting > 0;
+      default: return true;
+    }
+  });
+}
+
+function renderRows() {
+  if (!state.overview) return;
+  const cards = visibleCards(), busy = state.job && state.job.state === "running";
+  $("shownCount").textContent = `${cards.length} shown · ${state.ticked.size} ticked`;
+  $("rows").replaceChildren(...cards.map((c) => {
+    const f = c.fetch, ex = c.extract;
+    const box = h("input", { type: "checkbox", "aria-label": "Tick " + c.name, onclick: (e) => e.stopPropagation(),
+      onchange: (e) => { e.target.checked ? state.ticked.add(c.id) : state.ticked.delete(c.id); $("shownCount").textContent = `${visibleCards().length} shown · ${state.ticked.size} ticked`; } });
+    box.checked = state.ticked.has(c.id);
+    return h("tr", { tabindex: "0", class: state.open === c.id ? "open" : "", onclick: () => openCard(c.id),
+                     onkeydown: (e) => { if (e.key === "Enter") openCard(c.id); } },
+      h("td", { class: "check" }, box),
+      h("td", {}, h("div", { class: "stack" }, h("strong", { text: c.name }),
+        h("span", { class: "small muted" }, c.issuer + " · " + c.kind, c.handEntered ? " · " : "", c.handEntered ? chip("hand-entered", "info") : null),
+        c.needsInfo ? h("span", { title: c.needsInfo }, chip("needs info: a decision from you", "warn")) : null)),
+      h("td", {}, h("div", { class: "stack" },
+        chip(f.status, fetchKind[f.status] ?? "warn"),
+        h("span", { class: "small muted", text: f.status === "not-saved" ? "fetched before, but the text isn't in this checkout: fetch it again" : f.chars ? `${f.chars.toLocaleString()} characters${f.embedded ? " · from page data" : ""}` : "" }))),
+      h("td", {}, ex ? h("div", { class: "stack" },
+        h("span", {}, chip(ex.status, extractKind[ex.status] ?? ""), " ", ex.rules ? `${ex.rules} rule${ex.rules === 1 ? "" : "s"}` : "", ex.rejected ? ` · ${ex.rejected} rejected` : ""),
+        h("span", { class: "small muted", text: ex.model ? `${ex.model} · prompt ${ex.promptVersion ?? "-"}` : "" }),
+        ex.statsText ? h("span", { class: "small muted", text: ex.statsText }) : null,
+        c.pending ? chip("needs extracting with the chosen model", "warn") : null,
+        c.review ? (c.review.waiting ? chip(`${c.review.waiting} to review`, "info") : chip(`reviewed: ${c.review.accept} accepted`, "ok")) : null,
+        ex.warnings && ex.warnings.length ? chip(`check: ${ex.warnings.length} thing${ex.warnings.length === 1 ? "" : "s"} to look at`, "warn") : null,
+        ex.errors.length ? h("span", { class: "small", style: "color: var(--bad)", text: ex.errors[0].slice(0, 140) }) : null)
+        : h("div", { class: "stack" }, h("span", { class: "muted", text: "not extracted" }), c.pending ? chip("needs extracting", "warn") : null)),
+      h("td", {}, (ex ? ex.needs : []).map((n) => [chip(NEEDS[n] || n, "info"), " "])));
+  }));
+  document.querySelectorAll("[data-job]").forEach((b) => { b.disabled = !!busy; });
+  $("test").disabled = $("save").disabled = !!busy;
+}
+
+["search", "issuer", "show"].forEach((id) => $(id).addEventListener("input", renderRows));
+$("tickShown").onclick = () => { visibleCards().forEach((c) => state.ticked.add(c.id)); renderRows(); };
+$("untick").onclick = () => { state.ticked.clear(); renderRows(); };
+
+// ---------- jobs ----------
+document.querySelectorAll("[data-job]").forEach((b) => {
+  b.onclick = async () => {
+    const [kind, which, force] = b.dataset.job.split(":");
+    const asking = which === "ids" ? `the ${state.ticked.size} ticked card${state.ticked.size === 1 ? "" : "s"}` : "every card with a page";
+    if (force && !confirm(`Redo extraction for ${asking}? This asks the model about ${which === "ids" ? "them" : "all of them"} again, even where nothing changed.`)) return;
+    if (!(await storeSettings())) return;
+    try {
+      state.logNext = 0; $("log").replaceChildren();
+      const job = await api("POST", "/api/job", { kind, which, force: !!force, ids: [...state.ticked] });
+      applyJob(job); startPolling();
+    } catch (e) { alert(e.message); }
+  };
+});
+$("stop").onclick = async () => {
+  $("stop").disabled = true;
+  try { await api("POST", "/api/job/stop", {}); await pollJob(); } catch (e) { alert(e.message); }
+};
+
+function startPolling() { if (!state.poll) state.poll = setInterval(pollJob, 1000); }
+async function pollJob() {
+  try {
+    const { job } = await api("GET", "/api/job?since=" + state.logNext);
+    if (!job) return;
+    applyJob(job);
+    if (job.state !== "running") { clearInterval(state.poll); state.poll = null; await loadOverview(); await loadModels(); if (state.open) openCard(state.open, true); }
+    else if (job.done !== state.lastDone) { state.lastDone = job.done; loadOverview().catch(() => {}); }
+  } catch (e) { /* the server may be busy; the next tick tries again */ }
+}
+// The running job, inside the open card's view: the card view covers the Job panel, so a job started from a card
+// (or any job, while a card is open) shows its progress there too.
+function renderCardJob() {
+  const box = $("cardJob"), job = state.job;
+  if (!box) return;
+  if (!job || (job.state !== "running" && !box.dataset.shown)) { fill(box); return; }
+  box.dataset.shown = "1";
+  const running = job.state === "running", kind = { running: "info", done: "ok", stopped: "warn", failed: "bad" }[job.state];
+  const mins = Math.floor(job.seconds / 60), secs = Math.round(job.seconds % 60);
+  fill(box, h("div", { class: "result", style: "margin: 10px 0" },
+    h("div", { class: "row", style: "justify-content: space-between" }, h("strong", { text: job.label }), chip(running ? "running" : job.state === "done" ? "finished" : job.state, kind)),
+    h("div", { class: "bar", role: "progressbar", "aria-label": "Cards done" }, h("span", { style: `width: ${job.total ? 100 * job.done / job.total : 0}%` })),
+    job.chunk ? h("div", { class: "bar sub" }, h("span", { style: `width: ${100 * job.chunk.done / job.chunk.total}%` })) : null,
+    h("div", { class: "small", text: `${job.done} of ${job.total} card${job.total === 1 ? "" : "s"} · ${mins}m ${secs}s` + (job.current ? ` · ${job.current}` : "") + (job.chunk ? ` · part ${job.chunk.done} of ${job.chunk.total} sent to the model` : "") + (job.error ? ` · ${job.error}` : "") }),
+    running ? h("div", { class: "small muted", text: "The model can take a minute or more per card. The rules below update when it finishes." }) : null,
+    running ? h("button", { type: "button", class: "danger", style: "margin-top: 8px", text: "Stop", onclick: () => $("stop").click() }) : null));
+}
+function applyJob(job) {
+  const previous = state.job; state.job = job;
+  $("jobPanel").hidden = false;
+  $("jobLabel").textContent = job.label;
+  const label = { running: "running", done: "finished", stopped: "stopped", failed: "failed" }[job.state];
+  $("jobState").textContent = label; $("jobState").className = "chip " + ({ running: "info", done: "ok", stopped: "warn", failed: "bad" }[job.state]);
+  $("jobBar").style.width = job.total ? (100 * job.done / job.total) + "%" : "0";
+  const mins = Math.floor(job.seconds / 60), secs = Math.round(job.seconds % 60);
+  $("jobText").textContent = `${job.done} of ${job.total} cards · ${mins}m ${secs}s` + (job.current ? ` · working on ${job.current}` : "") + (job.error ? ` · ${job.error}` : "");
+  $("chunkBar").hidden = !job.chunk; if (job.chunk) { $("chunkFill").style.width = (100 * job.chunk.done / job.chunk.total) + "%"; $("jobText").textContent += ` · part ${job.chunk.done} of ${job.chunk.total} sent to the model`; }
+  $("jobCounts").textContent = Object.entries(job.counts).map(([k, v]) => `${v} ${k}`).join(" · ");
+  $("stop").hidden = job.state !== "running"; $("stop").disabled = false;
+  const log = $("log"), stick = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+  for (const line of job.log) {
+    log.append(h("div", { class: line.level }, h("span", { class: "t", text: String(line.t).padStart(6) + "s  " }), line.text));
+  }
+  state.logNext = job.logNext;
+  if (stick) log.scrollTop = log.scrollHeight;
+  renderRows(); renderCardJob();
+}
+
+// ---------- card detail ----------
+const term = (id) => state.overview.catalog.categories.find((c) => c.id === id) || { id, label: id, app: [] };
+const labels = (ids) => ids.map((id) => term(id).label).join(", ");
+const num = (n) => `${+(+n).toFixed(2)}`;
+const unitText = (r) => (r.unit === "percent" ? "%" : "x");
+const rateText = (r) => `${num(r.rate)}${unitText(r)}`;
+const day = (iso) => new Date(iso + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+const span = (r) => `${r.validFrom ? day(r.validFrom) : "…"} – ${r.validTo ? day(r.validTo) : "…"}`;
+// What a rate requires, as the app would say it to the cardholder.
+const REQUIRE_TEXT = { activation: "after you activate it", "issuer-booking": "when booked through the issuer", "preferred-rewards-tier": "for Preferred Rewards members" };
+// The decisions a person can make (review.DECISION_VALUES): how each shows, and the button that makes it.
+const DECISION = {
+  accept: { chip: "accepted", kind: "ok", button: "Accept" },
+  reject: { chip: "rejected", kind: "bad", button: "Reject" },
+};
+
+// What a rule requires and when it applies, as chips.
+// Which purchases a rule covers, as the app would name them.
+function ruleWhere(r) {
+  const list = labels(r.categories) + (r.hasOtherChoices ? " and more" : "");
+  if (r.selection === "choose") return `Your choice${r.picks > 1 ? " of " + r.picks : ""}: ${list}`;
+  if (r.selection === "top-spend") return `Your top category each cycle: ${list}`;
+  if (r.selection === "rotating") {
+    const named = [labels(r.categories), ...(r.merchants || [])].filter(Boolean).join(", ");
+    if (r.validFrom) return `Quarterly bonus, ${span(r)}: ${named || "nothing named"}`;
+    return named ? `Rotating: ${named}` : "Rotating bonus categories";
+  }
+  const at = (r.merchants || []).join(", ");
+  if (at) return list ? `${list}, also at ${at}` : `At ${at}`;
+  return list || "Any purchase";
+}
+// The small print under a rate: cap, requirements, tier, dates.
+function ruleTerms(r) {
+  const t = [];
+  if (r.paysWith) t.push(`when you pay with ${r.paysWith}`);
+  if (r.capAmount != null) t.push(`on up to $${(+r.capAmount).toLocaleString()} per ${r.capPeriod === "cycle" ? "billing cycle" : r.capPeriod}, then the base rate`);
+  else if (r.capUnknown) t.push("capped (the page doesn't say how much)");
+  r.requires.forEach((q) => t.push(REQUIRE_TEXT[q] || q));
+  if (r.tier) t.push(`${r.tier.replace("-", " ")} tier`);
+  if ((r.validFrom || r.validTo) && r.selection !== "rotating") t.push(span(r));  // a quarter's dates are in its name
+  if (r.firstMonths) t.push(`for the first ${r.firstMonths} months`);
+  return t.join("; ");
+}
+
+// The Grosh categories a rule reaches. A rule the person chooses, or a rotating one with no dates, reaches none yet.
+const appCategories = (r) => (r.selection === "fixed" || r.validFrom ? r.categories.flatMap((id) => term(id).app) : []);
+const REQUIRE_LABEL = { activation: "Activation", "issuer-booking": "Booking through the issuer", "preferred-rewards-tier": "Preferred Rewards membership" };
+function ruleKind(r) {
+  if (r.selection === "choose") return `You choose ${r.picks > 1 ? r.picks : "1"}`;
+  if (r.selection === "top-spend") return "Your top category each cycle";
+  if (r.selection === "rotating") return r.validFrom ? "Quarterly bonus" : "Rotating bonus, no dates";
+  if (r.categories.includes("everything-else")) return "Base rate";
+  if (r.categories.length) return "Fixed rate";
+  return r.paysWith ? `Paid with ${r.paysWith}` : "At named merchants";
+}
+function ruleCap(r) {
+  if (r.capAmount != null) return `$${(+r.capAmount).toLocaleString()} per ${r.capPeriod === "cycle" ? "billing cycle" : r.capPeriod}, then the base rate`;
+  return r.capUnknown ? "Capped, but the page doesn't say how much" : "No cap";
+}
+// A rule's values as the catalog will hold them, one per line. An empty value is shown too ("No cap", "None named"):
+// it's what the app will use, so it's as much to check as a filled one.
+function ruleFields(r) {
+  const row = (name, ...value) => [h("dt", { text: name }), h("dd", {}, value)];
+  const app = r.categories.includes("everything-else") ? "Everything not listed above" : appCategories(r).join(", ");
+  const merchants = r.merchants || [];
+  const noCategories = r.selection === "rotating" ? "None named" : merchants.length ? "None" : "Any purchase";
+  return h("dl", { class: "fields" },
+    row("Categories", r.categories.length ? r.categories.map((id) => [chip(term(id).label), " "]) : noCategories),
+    r.hasOtherChoices ? row("Also", "More choices than the page lists") : null,
+    merchants.length ? row(r.categories.length ? "Also at" : "Only at", merchants.map((m) => [chip(m), " "])) : null,
+    app ? row("Your categories", app) : null,
+    row("Cap", ruleCap(r)),
+    row("Dates", r.validFrom || r.validTo ? span(r) : "Always"),
+    row("Requires", [r.paysWith, ...r.requires.map((q) => REQUIRE_LABEL[q] || q)].filter(Boolean).join(", ") || "Nothing"),
+    r.tier ? row("Tier", r.tier.replace("-", " ")) : null,
+    r.firstMonths ? row("Lasts", `The first ${r.firstMonths} months`) : null,
+    r.needs.length ? row("App asks", r.needs.map((n) => state.overview.catalog.needs[n] || n).join(" ")) : null);
+}
+
+// The card as the app will use it: one line per rate, best first and the base rate last. Accepted rules are what
+// gets published; waiting ones are faded; rejected ones are left out, as they will be in the app.
+function appPreview(rv) {
+  const rows = rv.rules.filter((x) => x.decision !== "reject")
+    .sort((a, b) => (a.rule.categories[0] === "everything-else") - (b.rule.categories[0] === "everything-else") || b.rule.rate - a.rule.rate);
+  if (!rows.length) return h("p", { class: "muted small", text: "Every rule is rejected: the app would know nothing about this card." });
+  const asks = [...new Set(rows.flatMap((x) => x.rule.needs))];
+  const base = rows.some((x) => x.rule.categories.includes("everything-else"));
+  return [
+    h("table", { class: "earn" },
+      h("thead", {}, h("tr", {}, h("th", { text: "Earns" }), h("th", { text: "On" }), h("th", { text: "Your categories" }), h("th", { text: "" }))),
+      h("tbody", {}, rows.map((x) => {
+        const r = x.rule, app = appCategories(r);
+        return h("tr", { class: x.decision ? "" : "waiting" },
+          h("td", { class: "rate", text: rateText(r) }),
+          h("td", {}, h("div", { text: ruleWhere(r) }), ruleTerms(r) ? h("div", { class: "small muted", text: ruleTerms(r) }) : null),
+          h("td", { class: "small muted", text: r.categories.includes("everything-else") ? "everything not listed above" : app.join(", ") || "—" }),
+          h("td", {}, x.decision ? chip(x.edited ? "accepted, fixed" : "accepted", "ok") : chip("waiting", "info")));
+      }))),
+    base ? null : h("p", { class: "small", style: "color: var(--warn)", text: "No base rate: the app won't know what everything else earns." }),
+    asks.length ? h("p", { class: "small" }, "The app asks: ", asks.map((n) => state.overview.catalog.needs[n] || n).join(" ")) : null,
+  ];
+}
+
+// Whether the card's bonuses add up (review.CARD_OPTIONS, saved in card-options.json), with what the page says about it.
+function stackingBox(id, d, rv) {
+  const on = !!d.options.bonusesStack, quotes = (d.page && d.page.stackingQuotes) || [];
+  const box = h("input", { type: "checkbox", checked: on, onchange: async (e) => {
+    e.target.disabled = true;
+    try { await api("POST", "/api/card-options", { cardId: id, name: "bonusesStack", value: e.target.checked }); await openCard(id, true); }
+    catch (err) { alert(err.message); e.target.checked = on; e.target.disabled = false; } } });
+  return h("div", { class: "fix" },
+    h("label", {}, box, " Bonuses add up on this card"),
+    h("p", { class: "small muted", text: "Turn on only when the card's terms say each bonus is on top of the base rate. The app then gives a purchase the base rate plus what every bonus covering it adds; off, it takes the best single rate. Saved in card-options.json." }),
+    quotes.length ? [h("p", { class: "small", text: "The page says:" }), quotes.map((q) => h("blockquote", { text: q }))]
+                  : h("p", { class: "small muted", text: "Nothing on the saved page says a bonus is on top of the base rate." }),
+    on ? stackedLines(rv) : null);
+}
+// With bonuses adding up: what a purchase earns where a quarter's bonus and a category's bonus both cover it (a 5%
+// quarter on dining and 3% dining: 1% + 4% + 2% = 7%). Only rules that aren't rejected, in the base rate's unit.
+function stackedLines(rv) {
+  const live = rv.rules.filter((x) => x.decision !== "reject").map((x) => x.rule);
+  const base = live.find((r) => r.selection === "fixed" && r.categories[0] === "everything-else" && !r.requires.length);
+  if (!base) return h("p", { class: "small", style: "color: var(--warn)", text: "Adding bonuses up needs the base rate, and this card has none." });
+  const extra = (r) => r.rate - base.rate, u = unitText(base);
+  const lines = [];
+  for (const q of live.filter((r) => r.selection === "rotating" && r.validFrom && r.unit === base.unit)) {
+    for (const id of q.categories) {
+      const also = live.filter((r) => r.selection === "fixed" && r.categories[0] === id && r.unit === base.unit && extra(r) > 0);
+      if (!also.length) continue;
+      const total = base.rate + extra(q) + also.reduce((sum, r) => sum + extra(r), 0);
+      lines.push(h("li", {}, `${term(id).label}, ${span(q)}: `, h("strong", { text: num(total) + u }),
+        ` (${num(base.rate)}${u} base + ${num(extra(q))}${u} quarterly bonus + ${also.map((r) => `${num(extra(r))}${u} ${term(id).label.toLowerCase()} bonus`).join(" + ")})`,
+        q.capAmount != null ? `; the quarterly bonus on up to $${(+q.capAmount).toLocaleString()} per ${q.capPeriod}` : ""));
+    }
+  }
+  return lines.length ? [h("p", { class: "small", text: "Where bonuses meet:" }), h("ul", { class: "small" }, lines)]
+                      : h("p", { class: "small muted", text: "No quarter's bonus covers a category with its own bonus yet, so nothing adds up beyond each rate." });
+}
+
+// One rule to review: the values the app will use, the quote they came from, and accept / reject / fix.
+function reviewRule(cardId, x) {
+  const r = x.rule, decided = DECISION[x.decision], fixArea = h("div", {});
+  const send = async (body) => {
+    await api("POST", "/api/review", { cardId, key: x.key, ...body });
+    await openCard(cardId, true); loadOverview();
+  };
+  const press = (decision) => async (e) => { e.target.disabled = true; try { await send({ decision }); } catch (err) { alert(err.message); e.target.disabled = false; } };
+  const fix = () => fill(fixArea, fixArea.childNodes.length ? null : fixForm(r, (changes) => send({ decision: "edit", changes }), () => fill(fixArea)));
+  return h("div", { class: "rule" + (x.decision === "accept" ? " accepted" : x.decision === "reject" ? " rejected" : "") },
+    h("div", { class: "head" }, h("span", { class: "rate", text: rateText(r) }), h("span", { class: "kind", text: ruleKind(r) })),
+    h("div", { class: "small", style: "margin-top: 4px" },
+      decided ? chip(decided.chip, decided.kind) : chip("waiting for review", "info"), " ",
+      x.edited ? [h("span", { title: "Extracted as: " + JSON.stringify({ categories: x.original.categories, rate: x.original.rate, unit: x.original.unit, capAmount: x.original.capAmount, requires: x.original.requires }) }, chip("fixed by you", "info")), " "] : null,
+      x.warnings.map((w) => [chip(w, "warn"), " "])),
+    ruleFields(r),
+    r.conditions.length ? h("ul", {}, r.conditions.map((t) => h("li", { text: t }))) : null,
+    h("p", { class: "said", text: "The page says" }),
+    h("blockquote", { text: x.quote }),
+    h("p", { class: "small", style: "margin: 6px 0 0" }, "Source: ",
+      /^https?:\/\//.test(x.url) ? h("a", { href: x.url, target: "_blank", rel: "noopener noreferrer", text: x.url }) : x.url),
+    h("div", { class: "actions" },
+      Object.entries(DECISION).map(([value, d]) => h("button", { type: "button", class: value === "accept" && !x.decision ? "primary" : value === "reject" ? "danger" : "",
+        disabled: x.decision === value && !x.edited, text: d.button, onclick: press(value) })),
+      r.verified === "calendar" ? null : h("button", { type: "button", text: "Fix…", title: "Change its category, rate, cap or requirements; the quote must still back it", onclick: fix }),
+      x.decision ? h("button", { type: "button", text: "Undo", onclick: press("undo") }) : null),
+    fixArea);
+}
+
+// The fields a person may fix on a rule (review.EDITABLE). The server checks the result against the quote.
+function fixForm(r, save, cancel) {
+  const cat = state.overview.catalog, error = h("div", {});
+  const cats = cat.categories.map((c) => h("input", { type: "checkbox", value: c.id, checked: r.categories.includes(c.id) }));
+  const reqs = cat.requires.map((q) => h("input", { type: "checkbox", value: q, checked: r.requires.includes(q) }));
+  const rate = h("input", { type: "number", step: "0.01", min: "0", value: r.rate, style: "width: 90px" });
+  const unit = h("select", {}, h("option", { value: "percent", text: "% cash back" }), h("option", { value: "per-dollar", text: "points or miles per $1" }));
+  const capAmount = h("input", { type: "number", step: "1", min: "0", value: r.capAmount ?? "", placeholder: "no cap", style: "width: 110px" });
+  const capPeriod = h("select", {}, h("option", { value: "", text: "—" }), cat.periods.map((p) => h("option", { value: p, text: p === "cycle" ? "billing cycle" : p })));
+  const tier = h("select", {}, h("option", { value: "", text: "no tier" }), cat.tiers.map((t) => h("option", { value: t, text: t.replace("-", " ") })));
+  const paysWith = h("input", { type: "text", value: r.paysWith || "", placeholder: "PayPal, Apple Pay", style: "width: 160px" });
+  const merchants = h("input", { type: "text", value: (r.merchants || []).join(", "), placeholder: "Amazon, Costco", style: "width: 240px" });
+  unit.value = r.unit; capPeriod.value = r.capPeriod || ""; tier.value = r.tier || "";
+  const submit = async (e) => {
+    e.target.disabled = true; fill(error);
+    const cap = capAmount.value === "" ? null : +capAmount.value;
+    try {
+      await save({
+        categories: cats.filter((b) => b.checked).map((b) => b.value), rate: +rate.value, unit: unit.value,
+        capAmount: cap, capPeriod: cap == null ? null : capPeriod.value || null,
+        requires: reqs.filter((b) => b.checked).map((b) => b.value), tier: tier.value || null,
+        paysWith: paysWith.value.trim() || null, merchants: merchants.value.split(",").map((m) => m.trim()).filter(Boolean),
+      });
+    } catch (err) { fill(error, h("div", { class: "result bad", text: err.message })); e.target.disabled = false; }
+  };
+  return h("div", { class: "fix" },
+    h("div", { class: "small muted", text: r.selection === "fixed" ? "A fixed rate has one category, or none if it's for a way of paying or named merchants." : `This rule is "${r.selection}": tick every category it offers.` }),
+    h("div", { class: "cats" }, cat.categories.map((c, i) => h("label", { title: c.help }, cats[i], c.label))),
+    h("div", { class: "row" }, h("label", {}, "Rate ", rate), h("label", {}, "Unit ", unit), h("label", {}, "Cap $ ", capAmount), h("label", {}, "per ", capPeriod), h("label", {}, "Tier ", tier)),
+    h("div", { class: "reqs" }, "Requires: ", cat.requires.map((q, i) => h("label", {}, reqs[i], q)), h("label", {}, "paying with ", paysWith)),
+    h("div", { class: "row" }, h("label", {}, "Only at ", merchants)),
+    error,
+    h("div", { class: "row" }, h("button", { type: "button", class: "primary", text: "Save and accept", onclick: submit }), h("button", { type: "button", text: "Cancel", onclick: cancel })));
+}
+
+async function openCard(id, quiet) {
+  state.open = id; renderRows();
+  const drawer = $("drawer"); drawer.hidden = false;
+  if (!quiet) drawer.replaceChildren(h("p", { class: "muted", text: "Loading…" }));
+  let d;
+  try { d = await api("GET", "/api/card/" + encodeURIComponent(id)); } catch (e) { drawer.replaceChildren(h("p", { text: e.message })); return; }
+  const c = d.card, cand = d.candidate, rv = d.review, busy = state.job && state.job.state === "running";
+  const scroll = drawer.scrollTop;
+  const tryOut = h("div", {});
+  const tryBtn = h("button", { type: "button", disabled: !d.page, text: "Try the model on this page", onclick: async () => {
+    tryBtn.disabled = true; tryOut.replaceChildren(h("p", { class: "muted", text: "Asking the model about the first part of the page… nothing is saved." }));
+    try { renderTry(tryOut, await api("POST", `/api/card/${encodeURIComponent(id)}/try`, {})); } catch (e) { tryOut.replaceChildren(h("div", { class: "result bad", text: e.message })); }
+    tryBtn.disabled = false; } });
+  fill(drawer,
+    h("div", { class: "row", style: "justify-content: space-between; align-items: start" },
+      h("div", {}, h("strong", { style: "font-size: 17px", text: c.name }), h("div", { class: "small muted", text: `${c.issuer} · ${c.network} · ${c.rewardKind}${c.annualFee ? " · $" + c.annualFee + " annual fee" : " · no annual fee"}` })),
+      h("button", { type: "button", text: "Close", onclick: () => { state.open = null; drawer.hidden = true; renderRows(); } })),
+    c.needsInfo ? h("div", { class: "result", style: "background: var(--warn-bg); color: var(--warn)", text: "Needs info (needs-info.json): " + c.needsInfo }) : null,
+    h("p", { class: "small" }, /^https?:\/\//.test(c.sourceUrl) ? h("a", { href: c.sourceUrl, target: "_blank", rel: "noopener noreferrer", text: c.sourceUrl }) : c.sourceUrl),
+    h("div", { class: "row" },
+      h("button", { type: "button", disabled: busy, text: "Fetch this page", onclick: () => jobFor("fetch", id) }),
+      d.manual
+        ? h("button", { type: "button", disabled: busy, text: "Re-check hand-entered rules", title: "Checks the rules in manual-rules.json against the saved page. The model isn't asked.", onclick: () => jobFor("extract", id, true) })
+        : h("button", { type: "button", disabled: busy || !d.page, text: "Extract rules again", title: "Asks the model about this page again, even if nothing changed", onclick: () => jobFor("extract", id, true) }),
+      tryBtn),
+    h("div", { id: "cardJob" }),
+    d.manual ? h("p", { class: "small muted", text: "This card's rules are typed in by hand (manual-rules.json), so extracting never asks the model: it only re-checks them against the page. Fix a rule below, or take the card out of manual-rules.json to have the model read the page." }) : null,
+    tryOut,
+    h("h3", { text: "In the app" }),
+    rv && rv.rules.length ? appPreview(rv) : h("p", { class: "muted small", text: cand ? "No rules found on this page." : "Not extracted yet: fetch the page, then extract its rules." }),
+    rv && rv.rules.length ? stackingBox(id, d, rv) : null,
+    rv && rv.cardConditions.length ? [h("h3", { text: "Applies to the whole card" }), h("ul", { class: "small" }, rv.cardConditions.map((t) => h("li", { text: t })))] : null,
+    rv && rv.rules.length ? [
+      h("h3", { text: `Review · ${rv.counts.waiting} waiting · ${rv.counts.accept} accepted · ${rv.counts.reject} rejected` }),
+      h("p", { class: "small muted", style: "margin-top: 0", text: "Passing the checks means a rule's quote is on the page, not that the rule is right. Read each quote, then accept, reject, or fix what the rule says. Decisions are saved in review-decisions.json (committed); if a new extraction changes a rule, it waits again." }),
+      rv.warnings.length ? h("div", { class: "result", style: "background: var(--warn-bg); color: var(--warn)", text: "Worth a look (every rate is on the page, but they can't all be right):\n" + rv.warnings.join("\n") }) : null,
+      rv.rules.map((x) => reviewRule(id, x)),
+    ] : null,
+    cand ? h("details", {}, h("summary", { text: "Extraction details" }),
+      h("p", { class: "small" }, chip(cand.status, extractKind[cand.status] ?? ""), ` ${cand.model || ""}${cand.promptVersion ? " · prompt " + cand.promptVersion : ""}`),
+      cand.stats && cand.stats.calls ? h("p", { class: "small muted", text: `Cost: ${cand.stats.calls} model call${cand.stats.calls === 1 ? "" : "s"}, ${cand.stats.seconds}s, ${cand.stats.promptTokens.toLocaleString()} prompt tokens${cand.stats.cachedTokens ? " (" + cand.stats.cachedTokens.toLocaleString() + " cached)" : ""}, ${cand.stats.replyTokens.toLocaleString()} reply tokens${cand.stats.reasoningTokens ? " (" + cand.stats.reasoningTokens.toLocaleString() + " reasoning)" : ""}` }) : null,
+      cand.errors && cand.errors.length ? h("div", { class: "result bad", text: "The model call failed:\n\n" + cand.errors.join("\n\n") }) : null,
+      cand.rejected.length ? [h("p", { class: "small", text: `Proposals the checks rejected (${cand.rejected.length}):` }), cand.rejected.map((x) =>
+        h("div", { class: "rule rejected" }, h("div", { class: "what", text: x.reason }),
+          h("blockquote", { text: x.rule ? (x.rule.quote || JSON.stringify(x.rule)) : x.cardCondition })))] : h("p", { class: "small muted", text: "The checks rejected nothing." })) : null,
+    h("details", {}, h("summary", { text: "Page" }),
+      d.fetch ? h("p", { class: "small" }, chip(d.fetch.lastStatus, fetchKind[d.fetch.lastStatus] ?? "warn"), ` ${(d.fetch.textChars || 0).toLocaleString()} characters · changed ${d.fetch.changedAt || "-"}${d.fetch.embedded ? " · text comes from the page's embedded data" : ""}`)
+              : h("p", { class: "muted small", text: "Not fetched yet." }),
+      d.page ? [h("details", {}, h("summary", { text: `Lines that look like rates (${d.page.rateLineCount})` }), h("pre", { text: d.page.rateLines.join("\n") || "none" })),
+                h("details", {}, h("summary", { text: "Start of the page" }), h("pre", { text: d.page.head }))] : null));
+  if (quiet) drawer.scrollTop = scroll;
+  renderCardJob();
+}
+function renderTry(el, r) {
+  const parts = [h("p", { class: "small muted", text: `${r.chunks} part(s) of the page could state a rate; this used the first. Prompt ${(r.promptChars || 0).toLocaleString()} characters.${r.seconds != null ? " Answered in " + r.seconds + "s." : ""}` })];
+  if (r.meta && r.meta.finishReason !== undefined) parts.push(h("p", { class: "small muted", text: `Ended with "${r.meta.finishReason}" · ${((r.meta.usage || {}).completion_tokens ?? "?")} of ${r.meta.maxTokens} reply tokens used${r.meta.reasoningChars ? " · " + r.meta.reasoningChars + " characters of reasoning text" : ""}` }));
+  if (r.message) parts.push(h("div", { class: "result ok", text: r.message }));
+  if (r.error) parts.push(h("div", { class: "result bad", text: r.error }));
+  if (r.reply != null) parts.push(h("details", { open: !r.rules }, h("summary", { text: `The model's raw reply (${r.replyChars} characters)` }), h("pre", { text: r.reply })));
+  for (const x of r.rules || []) parts.push(h("div", { class: "rule" + (x.problem ? " rejected" : "") },
+    h("div", { class: "what", text: x.problem ? "Would be rejected: " + x.problem : "Would be kept" }), h("blockquote", { text: x.rule.quote || JSON.stringify(x.rule) })));
+  for (const x of r.cardConditions || []) parts.push(h("div", { class: "rule" + (x.problem ? " rejected" : "") }, h("div", { class: "what", text: (x.problem ? "Card-wide sentence would be dropped: " + x.problem : "Card-wide sentence would be kept") }), h("blockquote", { text: x.text })));
+  fill(el, parts);
+}
+async function jobFor(kind, id, force) {
+  if (!(await saveSettings())) return;
+  try { state.logNext = 0; $("log").replaceChildren(); applyJob(await api("POST", "/api/job", { kind, which: "ids", ids: [id], force: !!force })); startPolling(); }
+  catch (e) { alert(e.message); }
+}
+
+// ---------- catalog ----------
+$("publish").onclick = async (e) => {
+  e.target.disabled = true;
+  try {
+    const p = await api("POST", "/api/publish");
+    $("publishResult").textContent = `Wrote ${p.rules} accepted rule${p.rules === 1 ? "" : "s"} on ${p.cards} card${p.cards === 1 ? "" : "s"} to ${p.file} (${p.publishedAt})`;
+  } catch (err) { alert(err.message); }
+  e.target.disabled = false;
+};
+
+// ---------- start ----------
+(async function start() {
+  try {
+    fillSettings(await api("GET", "/api/settings"));
+    await loadEverything();
+    const { job } = await api("GET", "/api/job?since=0");
+    if (job) { applyJob(job); if (job.state === "running") startPolling(); }
+  } catch (e) { $("server").className = "pill bad"; $("server").textContent = "Can't reach the page's server: " + e.message; }
+})();
+</script>
+</body>
+</html>
