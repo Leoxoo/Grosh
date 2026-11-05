@@ -105,12 +105,17 @@ def public_settings(settings: dict) -> dict:
 
 
 def write_private(path: Path, data: str) -> None:
-    """Write a file only its owner can read: it may hold an API key."""
+    """Write a file only its owner can read: it may hold an API key. The new file takes the old one's place in one
+    step, so nobody reads it half written and a write that fails leaves the old one whole."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(descriptor, "w", encoding="utf-8") as file:
-        os.fchmod(file.fileno(), 0o600)  # also for a file that existed with looser permissions
-        file.write(data)
+    temporary = path.with_name(f"{path.name}.{threading.get_ident()}.tmp")
+    try:
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as file:
+            file.write(data)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def clean_settings(raw: dict, current: dict) -> dict:
@@ -246,6 +251,7 @@ class App:
         self.throttle_delay = throttle_delay
         self.job: Job | None = None
         self._job_lock = threading.Lock()
+        self._saved_file: tuple = (None, {})
         self._thread: threading.Thread | None = None
 
     # --- reading the files -------------------------------------------------------------
@@ -259,16 +265,28 @@ class App:
                 return card
         raise Problem(f"No card {card_id!r}", 404)
 
+    def _saved(self) -> dict:
+        """What cache/ui-settings.json holds, kept until the file changes. Nearly every request needs the settings,
+        so one slow open of that file would otherwise hold up the whole page."""
+        try:
+            info = self.paths.settings.stat()
+        except FileNotFoundError:
+            return {}
+        stamp = (info.st_mtime_ns, info.st_size)
+        if self._saved_file[0] != stamp:
+            self._saved_file = (stamp, fetch.read_json(self.paths.settings, {}))
+        return self._saved_file[1]
+
     def settings(self) -> dict:
-        saved = {k: v for k, v in fetch.read_json(self.paths.settings, {}).items() if k != "profiles"}
+        saved = {k: v for k, v in self._saved().items() if k != "profiles"}
         try:
             return clean_settings(saved, default_settings())
         except ValueError:
             return default_settings()
 
     def _profiles(self) -> dict:
-        profiles = fetch.read_json(self.paths.settings, {}).get("profiles", {})
-        return profiles if isinstance(profiles, dict) else {}
+        profiles = self._saved().get("profiles", {})
+        return dict(profiles) if isinstance(profiles, dict) else {}
 
     def _write_settings(self, active: dict, profiles: dict) -> None:
         # One private file holds the active settings, the saved profiles, and every key in them.
@@ -322,7 +340,8 @@ class App:
             merged = clean_settings(raw, current)
         except ValueError as problem:
             raise Problem(str(problem)) from problem
-        self._write_settings(merged, self._profiles())
+        if merged != current:  # every job saves first, nearly always with nothing new
+            self._write_settings(merged, self._profiles())
         return public_settings(merged)
 
     def client(self, settings: dict | None = None) -> extract.ChatServer:

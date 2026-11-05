@@ -5,6 +5,7 @@ import json
 import tempfile
 import threading
 import unittest
+from unittest import mock
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -123,6 +124,29 @@ class SettingsTests(AppCase):
         self.assertEqual(self.app.settings()["apiKey"], "secret-token-123")
         public = self.app.save_settings({"clearApiKey": True})
         self.assertEqual((self.app.settings()["apiKey"], public["apiKeySet"]), ("", False))
+
+    def test_settings_are_read_from_the_file_only_when_it_changes(self):
+        self.app.handle("POST", "/api/settings", {}, {"model": "first-model"})
+        self.app.settings()
+        with mock.patch.object(ui.fetch, "read_json", side_effect=AssertionError("read the settings file again")):
+            self.assertEqual(self.app.settings()["model"], "first-model")
+            self.assertEqual(self.app.profile_list()["profiles"], [])
+        self.paths.settings.write_text(json.dumps({"model": "a-changed-model"}))
+        self.assertEqual(self.app.settings()["model"], "a-changed-model")
+
+    def test_saving_settings_that_havent_changed_doesnt_touch_the_file(self):
+        self.app.handle("POST", "/api/settings", {}, {"model": "first-model"})
+        with mock.patch.object(ui, "write_private", side_effect=AssertionError("wrote the settings file")):
+            status, saved = self.app.handle("POST", "/api/settings", {}, {"model": "first-model"})
+        self.assertEqual((status, saved["model"]), (200, "first-model"))
+
+    def test_a_save_that_fails_leaves_the_old_settings_whole(self):
+        self.app.handle("POST", "/api/settings", {}, {"model": "first-model"})
+        before = self.paths.settings.read_text()
+        with mock.patch.object(ui.os, "replace", side_effect=OSError("disk full")), self.assertRaises(OSError):
+            ui.write_private(self.paths.settings, "{}")
+        self.assertEqual(self.paths.settings.read_text(), before)
+        self.assertEqual([p.name for p in self.paths.settings.parent.iterdir()], [self.paths.settings.name])
 
     def test_the_settings_file_stays_private_when_it_already_existed(self):
         self.paths.cache.mkdir(parents=True)

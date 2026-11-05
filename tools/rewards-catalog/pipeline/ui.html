@@ -285,7 +285,7 @@ async function loadProfiles() {
   $("deleteProfile").disabled = !data.active;
 }
 async function applyProfile(data) {
-  fillSettings(data.settings); await loadProfiles(); await loadModels(); await loadOverview();
+  fillSettings(data.settings); await loadEverything();
 }
 $("profile").onchange = async () => {
   const name = $("profile").value; if (!name) return;
@@ -325,6 +325,8 @@ function readSettings() {
 }
 function showResult(el, ok, text) { el.hidden = false; el.className = "result " + (ok ? "ok" : "bad"); el.textContent = text; }
 
+// All at once, so the cards don't wait for the model server to answer.
+const loadEverything = () => Promise.all([loadProfiles(), loadModels(), loadOverview()]);
 async function loadModels() {
   const pill = $("server");
   try {
@@ -340,8 +342,13 @@ async function loadModels() {
     } else { pill.className = "pill bad"; pill.textContent = "Model server not usable"; pill.title = data.error; showResult($("testResult"), false, data.error); }
   } catch (e) { pill.className = "pill bad"; pill.textContent = "Can't ask the server: " + e.message; }
 }
+async function storeSettings() {
+  try { fillSettings(await api("POST", "/api/settings", readSettings())); return true; }
+  catch (e) { showResult($("testResult"), false, e.message); return false; }
+}
 async function saveSettings() {
-  try { fillSettings(await api("POST", "/api/settings", readSettings())); await loadProfiles(); await loadModels(); await loadOverview(); return true; }
+  if (!(await storeSettings())) return false;
+  try { await loadEverything(); return true; }
   catch (e) { showResult($("testResult"), false, e.message); return false; }
 }
 $("clearKey").onclick = async () => {
@@ -448,7 +455,7 @@ document.querySelectorAll("[data-job]").forEach((b) => {
     const [kind, which, force] = b.dataset.job.split(":");
     const asking = which === "ids" ? `the ${state.ticked.size} ticked card${state.ticked.size === 1 ? "" : "s"}` : "every card with a page";
     if (force && !confirm(`Redo extraction for ${asking}? This asks the model about ${which === "ids" ? "them" : "all of them"} again, even where nothing changed.`)) return;
-    if (!(await saveSettings())) return;
+    if (!(await storeSettings())) return;
     try {
       state.logNext = 0; $("log").replaceChildren();
       const job = await api("POST", "/api/job", { kind, which, force: !!force, ids: [...state.ticked] });
@@ -796,7 +803,7 @@ $("publish").onclick = async (e) => {
 (async function start() {
   try {
     fillSettings(await api("GET", "/api/settings"));
-    await loadProfiles(); await loadModels(); await loadOverview();
+    await loadEverything();
     const { job } = await api("GET", "/api/job?since=0");
     if (job) { applyJob(job); if (job.state === "running") startPolling(); }
   } catch (e) { $("server").className = "pill bad"; $("server").textContent = "Can't reach the page's server: " + e.message; }
