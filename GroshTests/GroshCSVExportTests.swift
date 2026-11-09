@@ -23,14 +23,18 @@ struct GroshCSVExportTests {
             .joined(separator: "\r\n") + "\r\n"
     }
 
+    /// A Grosh export's header, written out so a renamed, moved or dropped column shows.
+    private static let groshHeader = "Id,Date,Category,Amount,Currency,Wallet,Note,With,Event,Exclude from report,Members,"
+        + "Card,Linked,Forgiven,Forgiven date,Forgiven category,Forgiven note,Split from,Reimbursement"
+
     /// A Grosh export holding `rows` after its header.
     private func groshExport(_ rows: String...) -> String {
-        ([GroshCSVExport.header.joined(separator: ",")] + rows).map { $0 + "\r\n" }.joined()
+        ([Self.groshHeader] + rows).map { $0 + "\r\n" }.joined()
     }
 
     @discardableResult
     private func importing(_ csv: String) throws -> MoneyLoverImportSummary {
-        try MoneyLoverImport.replaceAllData(with: MoneyLoverCSV.rows(in: csv), in: context)
+        try MoneyLoverImport.replaceAllData(with: MoneyLoverCSV.read(csv), in: context)
     }
 
     private func exported() throws -> String {
@@ -39,7 +43,7 @@ struct GroshCSVExportTests {
 
     /// The export's rows, each as its fields by column name.
     private func exportedRows() throws -> [[String: String]] {
-        let records = MoneyLoverCSV.records(in: try exported())
+        let records = GroshCSVFormat.records(in: try exported())
         let names = records[0].fields
         return records.dropFirst().map { Dictionary(uniqueKeysWithValues: zip(names, $0.fields)) }
     }
@@ -83,7 +87,7 @@ struct GroshCSVExportTests {
             "4,10/05/2026,Loan,-50,USD,Cash,,Sam,,,"
         ))
 
-        let links = try MoneyLoverCSV.rows(in: exported()).map(\.link)
+        let links = try MoneyLoverCSV.read(exported()).rows.map(\.link)
         // Debt Collection, the transfer's halves, two Starting balances, the Loan, and Cash's Starting balance.
         #expect(links == ["1", "2", "2", "", "", "1", ""])
     }

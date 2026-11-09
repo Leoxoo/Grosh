@@ -4,8 +4,8 @@ import SwiftData
 /// Import from MoneyLover ("Replace all data"): a MoneyLover CSV export replaces every wallet, Card, Person and
 /// transaction. The categories are kept.
 enum MoneyLoverImport {
-    /// Replaces the wallets, Cards, people and transactions in `context` with `rows`, a MoneyLover export as
-    /// ``MoneyLoverCSV/rows(in:)`` reads it, entered at `now`:
+    /// Replaces the wallets, Cards, people and transactions in `context` with the rows of `export`, a MoneyLover export
+    /// as ``MoneyLoverCSV/read(_:)`` reads it, entered at `now`:
     ///
     /// - Each wallet is created once by name, with a $0 Starting balance on its first day.
     /// - Each row is filed under the category of its name; a name no category has becomes a new top-level category.
@@ -28,10 +28,10 @@ enum MoneyLoverImport {
     /// Once saved, the old data can't be brought back.
     @discardableResult
     static func replaceAllData(
-        with rows: [MoneyLoverRow], in context: ModelContext, now: Date = .now
+        with export: MoneyLoverExport, in context: ModelContext, now: Date = .now
     ) throws -> MoneyLoverImportSummary {
-        guard !rows.isEmpty else { throw MoneyLoverImportError.noTransactions }
-        var importer = try Importer(rows: rows, context: context, now: now)
+        guard !export.rows.isEmpty else { throw MoneyLoverImportError.noTransactions }
+        var importer = try Importer(export: export, context: context, now: now)
         do {
             return try Signpost.interval("Import CSV") {
                 try removeAllData(in: context)
@@ -78,6 +78,8 @@ enum MoneyLoverImport {
 /// One run of ``MoneyLoverImport/replaceAllData(with:in:now:)``, after the old data is deleted.
 private struct Importer {
     let rows: [MoneyLoverRow]
+    /// Whether the file is a Grosh export, restored as it was exported.
+    let isGroshExport: Bool
     let context: ModelContext
     let now: Date
     /// What a transfer row with no partner is filed under as a balance adjustment, by the adjustment's reason type.
@@ -88,8 +90,9 @@ private struct Importer {
     private var cards: [MoneyLoverCardTag: Card] = [:]
     private var people = PeopleByName()
 
-    init(rows: [MoneyLoverRow], context: ModelContext, now: Date) throws {
-        self.rows = rows
+    init(export: MoneyLoverExport, context: ModelContext, now: Date) throws {
+        self.rows = export.rows
+        self.isGroshExport = export.isGroshExport
         self.context = context
         self.now = now
         adjustmentReasons = try [CategoryType.income, .expense].reduce(into: [:]) { reasons, type in
@@ -100,8 +103,10 @@ private struct Importer {
     /// Records every row, links the transfers and the payments, and says what was done. Doesn't save.
     mutating func run() throws -> MoneyLoverImportSummary {
         var categories = try CategoryFiler(context: context)
-        let filed = try rows.map { try categories.findOrAdd(named: $0.categoryName, for: $0.amount) }
-        let isGroshExport = rows.allSatisfy(\.isFromGroshExport)
+        // A row's sign says which type of category it is filed under when an Expense and an Income share its name.
+        let filed = try rows.map { row in
+            try categories.findOrAdd(named: row.categoryName, as: row.amount.cents < 0 ? .expense : .income)
+        }
         for row in rows where wallets[row.walletName] == nil {
             let hasStartingBalance = isGroshExport && rows.indices.contains { index in
                 rows[index].walletName == row.walletName && filed[index].lockedRole == .startingBalance
@@ -221,9 +226,8 @@ private struct Importer {
         _ transaction: Transaction, as forgiven: MoneyLoverRow.Forgiven, kind: LoanOrDebtKind,
         categories filer: inout CategoryFiler
     ) throws {
-        let sign = kind.forgivenType == .expense ? -1 : 1
         let named = try forgiven.categoryName.isEmpty
-            ? nil : filer.findOrAdd(named: forgiven.categoryName, for: Money(cents: sign))
+            ? nil : filer.findOrAdd(named: forgiven.categoryName, as: kind.forgivenType)
         let category = try named.flatMap { $0.type == kind.forgivenType ? $0 : nil }
             ?? context.otherCategory(kind.forgivenType)
         transaction.forgivenCents = forgiven.amount.cents
@@ -376,10 +380,9 @@ private struct CategoryFiler {
 
     private static func key(_ name: String) -> String { name.lowercased() }
 
-    /// The category named `name` for a row of `amount`, added if there is none: when an Expense and an Income
-    /// category share the name, the one of the type the amount's sign gives. Doesn't save.
-    mutating func findOrAdd(named name: String, for amount: Money) throws -> Category {
-        let type: CategoryType = amount.cents < 0 ? .expense : .income
+    /// The category named `name`, added as a `type` category if there is none: when categories of several types share
+    /// the name, the one of `type`. Doesn't save.
+    mutating func findOrAdd(named name: String, as type: CategoryType) throws -> Category {
         let named = byName[Self.key(name), default: []]
         if let match = named.first(where: { $0.type == type }) ?? named.first {
             return match

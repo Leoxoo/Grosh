@@ -45,7 +45,7 @@ struct ImportFromMoneyLoverView: View {
             }
             Button(Strings.Common.cancel, role: .cancel) {}
         } message: { export in
-            Text(Strings.ImportExport.replaceConfirmation(export.rows.count, export.fileName))
+            Text(Strings.ImportExport.replaceConfirmation(export.export.rows.count, export.fileName))
         }
         .disabled(isImporting)
         .overlay {
@@ -68,7 +68,7 @@ struct ImportFromMoneyLoverView: View {
                 if isAccessing { url.stopAccessingSecurityScopedResource() }
             }
             let text = try String(contentsOf: url, encoding: .utf8)
-            picked = PickedExport(fileName: url.lastPathComponent, rows: try MoneyLoverCSV.rows(in: text))
+            picked = PickedExport(fileName: url.lastPathComponent, export: try MoneyLoverCSV.read(text))
         } catch {
             Log.importing.failed("Reading the picked file", error, expected: true)
             errorMessage = error.localizedDescription
@@ -83,7 +83,7 @@ struct ImportFromMoneyLoverView: View {
             isImporting = true
         } completion: {
             do {
-                summary = try MoneyLoverImport.replaceAllData(with: export.rows, in: context)
+                summary = try MoneyLoverImport.replaceAllData(with: export.export, in: context)
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -95,7 +95,7 @@ struct ImportFromMoneyLoverView: View {
 /// A MoneyLover export read from a file the user picked.
 private struct PickedExport {
     let fileName: String
-    let rows: [MoneyLoverRow]
+    let export: MoneyLoverExport
 }
 
 #Preview {
