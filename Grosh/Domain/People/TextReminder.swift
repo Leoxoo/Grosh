@@ -80,15 +80,15 @@ extension TextReminder {
         let name = personName
         switch (Self.list(owesYou), Self.list(youOwe)) {
         case let (theirs?, mine?):
-            return String(localized: "Hi \(name), you owe me \(theirs), and I owe you \(mine).")
+            return String(localized: Strings.People.bothOwe(name, theirs, mine))
         case let (theirs?, nil):
-            guard let expense else { return String(localized: "Hi \(name), a reminder that you owe me \(theirs).") }
-            return String(localized: "Hi \(name), a reminder that you owe me \(theirs) for \(expense).")
+            guard let expense else { return String(localized: Strings.People.youOweMe(name, theirs)) }
+            return String(localized: Strings.People.youOweMeFor(name, theirs, expense))
         case (nil, let mine?):
-            return String(localized: "Hi \(name), I owe you \(mine).")
+            return String(localized: Strings.People.iOweYou(name, mine))
         case (nil, nil):
-            guard let expense else { return String(localized: "Hi \(name),") }
-            return String(localized: "Hi \(name), a reminder that you owe me for \(expense).")
+            guard let expense else { return String(localized: Strings.People.hi(name)) }
+            return String(localized: Strings.People.youOweMeForExpense(name, expense))
         }
     }
 

@@ -31,22 +31,22 @@ struct PersonDebtsRow: View {
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
                 if entry.isSettled {
-                    Text("Settled")
+                    Text(Strings.Common.settled)
                         .font(.caption)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(.settled)
                 } else {
                     ForEach(entry.owesYou, id: \.currencyCode) { amount in
-                        Text("Owes you \(amount.formatted())")
+                        Text(Strings.People.owesYou(amount.formatted()))
                             .monospacedDigit()
-                            .foregroundStyle(.green)
+                            .foregroundStyle(.moneyIn)
                     }
                     ForEach(entry.youOwe, id: \.currencyCode) { amount in
-                        Text("You owe \(amount.formatted())")
+                        Text(Strings.People.youOwe(amount.formatted()))
                             .monospacedDigit()
-                            .foregroundStyle(.red)
+                            .foregroundStyle(.moneyOut)
                     }
                     if entry.hasOpenAmounts {
-                        Text("+\(entry.openAmountCount) open")
+                        Text(Strings.OwesMe.openCount(entry.openAmountCount))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -56,11 +56,11 @@ struct PersonDebtsRow: View {
                 Button {
                     onText(TextReminder(entry))
                 } label: {
-                    Label("Text", systemImage: "message")
+                    Label(Strings.People.text, systemImage: "message")
                         .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
-                .accessibilityLabel("Text \(entry.person.name)")
+                .accessibilityLabel(Strings.People.textName(entry.person.name))
             }
         }
     }
@@ -81,21 +81,21 @@ struct PersonDebtsLoansDetailView: View {
                 PersonDebtsRow(entry: entry) { texting = $0 }
             }
             if !entry.loans.isEmpty {
-                Section("Loans") {
+                Section(Strings.DebtsLoans.loans) {
                     ForEach(entry.loans) { loan in
                         LoanOrDebtLink(loanOrDebt: loan)
                     }
                 }
             }
             if !entry.debts.isEmpty {
-                Section("Debts") {
+                Section(Strings.DebtsLoans.debts) {
                     ForEach(entry.debts) { debt in
                         LoanOrDebtLink(loanOrDebt: debt)
                     }
                 }
             }
             if !entry.expectations.isEmpty {
-                Section("Owes Me") {
+                Section(Strings.OwesMe.owesMe) {
                     ForEach(entry.expectations) { expectation in
                         ExpectedReimbursementLink(expectation: expectation)
                     }

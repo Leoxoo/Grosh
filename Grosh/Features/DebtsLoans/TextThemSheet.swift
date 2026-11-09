@@ -81,7 +81,7 @@ private struct CopyOrShare: View {
                     Text(text)
                         .textSelection(.enabled)
                 } footer: {
-                    Text("This device can't text \(personName) from here. Copy the message or share it instead.")
+                    Text(Strings.People.cantTextFromHere(personName))
                 }
                 Section {
                     Button {
@@ -97,13 +97,13 @@ private struct CopyOrShare: View {
                     ShareLink(item: text)
                 }
             }
-            .navigationTitle("Text \(personName)")
+            .navigationTitle(Strings.People.textName(personName))
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done", action: onDone)
+                    Button(Strings.Common.done, action: onDone)
                 }
             }
         }

@@ -17,9 +17,9 @@ struct ExpectedReimbursementRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 if let due = expectation.openReminderDay {
-                    Text("\(Image(systemName: "bell")) Due \(due.date().formatted(date: .abbreviated, time: .omitted))")
+                    Text("\(Image(systemName: "bell")) \(Text(Strings.DebtsLoans.due(due.date().formatted(date: .abbreviated, time: .omitted))))")
                         .font(.caption)
-                        .foregroundStyle(expectation.isReminderDue(on: today) ? .red : .secondary)
+                        .foregroundStyle(expectation.isReminderDue(on: today) ? .urgent : .secondary)
                 }
             }
             Spacer(minLength: 8)
@@ -31,7 +31,7 @@ struct ExpectedReimbursementRow: View {
     /// "Owes me · Dinner · May 27, 2026".
     private var summary: String {
         let day = expectation.expense?.day.date().formatted(date: .abbreviated, time: .omitted) ?? ""
-        return String(localized: "Owes me · \(expectation.expenseTitle) · \(day)")
+        return String(localized: Strings.OwesMe.rowSummary(expectation.expenseTitle, day))
     }
 
     @ViewBuilder
@@ -42,15 +42,15 @@ struct ExpectedReimbursementRow: View {
                 if let outstanding = expectation.outstanding, let expected = expectation.expected {
                     Text(outstanding.formatted())
                         .monospacedDigit()
-                        .foregroundStyle(.green)
-                    Text("of \(expected.formatted())")
+                        .foregroundStyle(.moneyIn)
+                    Text(Strings.DebtsLoans.ofOwed(expected.formatted()))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
-                    Text("?")
+                    Text(verbatim: "?")
                         .monospacedDigit()
-                        .foregroundStyle(.green)
-                    Text("Open amount")
+                        .foregroundStyle(.moneyIn)
+                    Text(Strings.OwesMe.openAmount)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -58,14 +58,14 @@ struct ExpectedReimbursementRow: View {
                 Text(expectation.expected?.formatted() ?? "")
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
-                Text("Settled")
+                Text(Strings.Common.settled)
                     .font(.caption)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(.settled)
             case .closed:
                 Text(expectation.paid.formatted())
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
-                Text("Closed")
+                Text(Strings.OwesMe.closed)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             case .forgiven:
@@ -84,7 +84,7 @@ extension ExpectationTotals {
     var summary: String {
         var parts = outstanding.map { $0.formatted() }
         if openAmountCount > 0 {
-            parts.append(String(localized: "+\(openAmountCount) open"))
+            parts.append(String(localized: Strings.OwesMe.openCount(openAmountCount)))
         }
         return parts.joined(separator: " · ")
     }

@@ -30,7 +30,7 @@ struct OwesMeSections: View {
 
     var body: some View {
         ForEach($draft.owes, id: \.person.persistentModelID) { $entry in
-            Section("\(entry.person.name) owes me") {
+            Section(String(localized: Strings.OwesMe.personOwesMe(entry.person.name))) {
                 OwesMeRow(
                     entry: $entry, currencyCode: currencyCode, expenseDay: draft.day,
                     remove: entry.hasPayments ? nil : { draft.removeOwes(entry.person) }

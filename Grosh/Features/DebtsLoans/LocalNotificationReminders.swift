@@ -63,7 +63,7 @@ extension LocalNotificationReminders {
     /// nothing is sent without it. Done once at launch, before any notification can arrive.
     static func registerActions(on center: UNUserNotificationCenter = .current()) {
         let textThem = UNNotificationAction(
-            identifier: textThemAction, title: String(localized: "Text them"), options: [.foreground]
+            identifier: textThemAction, title: String(localized: Strings.People.textThem), options: [.foreground]
         )
         let categories = [ExpectedReimbursementReminder.categoryIdentifier, DebtReminder.categoryIdentifier]
             .compactMap { $0 }

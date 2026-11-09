@@ -32,30 +32,18 @@ nonisolated enum ExpectedReimbursementRuleError: Error, Equatable {
 extension ExpectedReimbursementRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .notAnExpense:
-            String(localized: "Only an Expense can have Owes me.")
-        case .personNotInWith(let name):
-            String(localized: "\(name) still owes you for this Expense. Put \(name) back in With, or remove Owes me first.")
-        case .invalidAmount:
-            String(localized: "Enter an amount above zero, or leave it blank if you don't know it yet.")
-        case .amountAboveExpense:
-            String(localized: "People can't owe you more than the Expense cost.")
-        case .hasPayments(let name):
-            String(localized: "\(name) has paid some of this back, so it can't be removed.")
-        case .notOpen:
-            String(localized: "Nothing is expected any more.")
-        case .hasAnAmount:
-            String(localized: "Only an expectation with no amount is closed by hand. One with an amount closes itself once it is paid.")
-        case .notClosed:
-            String(localized: "It isn't closed.")
-        case .notForgiven:
-            String(localized: "It isn't forgiven.")
-        case .walletLockedByPaybacks:
-            String(localized: "Money was paid back into another wallet against this Expense, so it stays in its wallet.")
-        case .splitPart:
-            String(localized: "A part of a Split can't be paid back into another wallet.")
-        case .otherCurrency:
-            String(localized: "That wallet is in another currency than the expense. Choose a wallet in the same currency.")
+        case .notAnExpense: String(localized: Strings.OwesMe.notAnExpense)
+        case .personNotInWith(let name): String(localized: Strings.OwesMe.personNotInWith(name))
+        case .invalidAmount: String(localized: Strings.OwesMe.invalidAmount)
+        case .amountAboveExpense: String(localized: Strings.OwesMe.amountAboveExpense)
+        case .hasPayments(let name): String(localized: Strings.OwesMe.hasPayments(name))
+        case .notOpen: String(localized: Strings.OwesMe.notOpen)
+        case .hasAnAmount: String(localized: Strings.OwesMe.notAnOpenAmount)
+        case .notClosed: String(localized: Strings.OwesMe.notClosed)
+        case .notForgiven: String(localized: Strings.OwesMe.notForgiven)
+        case .walletLockedByPaybacks: String(localized: Strings.OwesMe.walletLockedByPaybacks)
+        case .splitPart: String(localized: Strings.OwesMe.splitPart)
+        case .otherCurrency: String(localized: Strings.OwesMe.otherCurrency)
         }
     }
 }

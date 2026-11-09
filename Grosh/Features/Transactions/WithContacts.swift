@@ -72,7 +72,7 @@ struct WithContactsSection: View {
     var body: some View {
         let showsAccessButton = contacts.access.offersToShareMore && !typed.isEmpty
         if contacts.access.showsContacts, showsAccessButton || !contacts.results.isEmpty {
-            Section("Contacts") {
+            Section(Strings.People.contacts) {
                 ForEach(contacts.results) { contact in
                     Button {
                         if contact.needsPhoneChoice {
@@ -104,7 +104,7 @@ struct WithContactsSection: View {
                 #endif
             }
             .confirmationDialog(
-                "Which number?",
+                Strings.People.whichNumber,
                 isPresented: Binding(get: { choosingNumberFor != nil }, set: { if !$0 { choosingNumberFor = nil } }),
                 presenting: choosingNumberFor
             ) { contact in
@@ -112,7 +112,7 @@ struct WithContactsSection: View {
                     Button(number) { pick(contact, number) }
                 }
             } message: { contact in
-                Text("\(contact.name) has several numbers.")
+                Text(Strings.People.severalNumbers(contact.name))
             }
         }
     }

@@ -10,7 +10,7 @@ nonisolated enum PersonRuleError: Error, Equatable {
 extension PersonRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .missingName: String(localized: "Enter a name.")
+        case .missingName: String(localized: Strings.People.missingName)
         }
     }
 }

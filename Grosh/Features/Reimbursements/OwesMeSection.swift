@@ -20,9 +20,9 @@ struct OwesMeSection: View {
                     }
                 }
             } header: {
-                Text("Owes Me")
+                Text(Strings.OwesMe.owesMe)
             } footer: {
-                Text("Owes me never changes a balance or a report. The expense stays at its full amount until money comes back.")
+                Text(Strings.OwesMe.sectionFooter)
             }
         }
         let paybacks = transaction.paybacksElsewhere
@@ -45,9 +45,9 @@ struct OwesMeSection: View {
                     }
                 }
             } header: {
-                Text("Paid Back Into Other Wallets")
+                Text(Strings.OwesMe.paidBackIntoOtherWallets)
             } footer: {
-                Text("Its own wallet keeps the full amount. The Total shows the expense net of these.")
+                Text(Strings.OwesMe.otherWalletsFooter)
             }
         }
     }

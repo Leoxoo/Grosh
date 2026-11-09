@@ -76,10 +76,10 @@ private struct WithFilterPicker: View {
     @Query(Person.everyone) private var everyone: [Person]
 
     var body: some View {
-        Picker("With", selection: $selection) {
-            Text("Anyone").tag(Person?.none)
+        Picker(Strings.Common.with, selection: $selection) {
+            Text(Strings.People.anyone).tag(Person?.none)
             ForEach(everyone) { person in
-                Text(person.isHidden ? "\(person.name) (Hidden)" : person.name)
+                Text(person.isHidden ? String(localized: Strings.People.hiddenName(person.name)) : person.name)
                     .tag(Optional(person))
             }
         }
