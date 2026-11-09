@@ -324,5 +324,5 @@ private struct DaysLeftText: View {
     NavigationStack {
         RecentlyDeletedView()
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+    .modelContainer(try! StoreOpening.open(inMemory: true))
 }

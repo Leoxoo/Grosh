@@ -100,30 +100,3 @@ extension Period {
         "Q\(quarter) \(year)"
     }
 }
-
-extension CalendarMonth {
-    /// The month as the strip and the Trend write it, `08/2026`, whatever the locale.
-    nonisolated var numericTitle: String {
-        String(format: "%02d/%d", month, year)
-    }
-}
-
-extension CalendarDay {
-    /// The days from this one through `last` as the strip writes a span: `09/21 – 09/27/2026`, naming the first
-    /// day's year too only when the two differ, as in `12/29/2025 – 01/04/2026`.
-    nonisolated func numericTitle(through last: CalendarDay, locale: Locale) -> String {
-        let start = year == last.year ? numericTitle(locale, withYear: false) : numericTitle(locale)
-        return "\(start) – \(last.numericTitle(locale))"
-    }
-}
-
-extension CalendarDay {
-    /// The day as the strip writes it: two-digit day and month in `locale`'s order and with its separators, then the
-    /// year unless `withYear` is false. `10/06/2026` in the US, `06/10/2026` in the UK.
-    nonisolated func numericTitle(_ locale: Locale, withYear: Bool = true) -> String {
-        let calendar = Calendar.utcGregorian
-        let style = Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone)
-            .month(.twoDigits).day(.twoDigits)
-        return date(in: calendar).formatted(withYear ? style.year() : style)
-    }
-}

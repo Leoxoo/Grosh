@@ -163,9 +163,6 @@ extension RecentlyDeletedError: LocalizedError {
 }
 
 extension Wallet {
-    /// Whether the wallet is in Recently Deleted.
-    var isInRecentlyDeleted: Bool { deletedAt != nil }
-
     /// Deletes the wallet: moves it, every transaction in it and its Recurring transactions to Recently Deleted as one
     /// item. Due Recurring transactions are made first, so no due day is lost. It leaves the Total, every list and every
     /// picker. A transfer's other half in another wallet stays where it is. Saves.
@@ -266,9 +263,6 @@ extension Transaction {
     static var notDeleted: FetchDescriptor<Transaction> {
         FetchDescriptor(predicate: #Predicate { $0.deletedAt == nil })
     }
-
-    /// Whether the transaction is in Recently Deleted.
-    var isInRecentlyDeleted: Bool { deletedAt != nil }
 
     /// Why this transaction in Recently Deleted can't be restored on its own, or `nil` when it can.
     var restoreBlocker: RecentlyDeletedError? {

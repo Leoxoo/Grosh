@@ -106,5 +106,5 @@ struct CardListView: View {
     NavigationStack {
         CardListView()
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+    .modelContainer(try! StoreOpening.open(inMemory: true))
 }

@@ -35,15 +35,13 @@ struct PerformanceBenchmarks {
         try BenchmarkStore.prepare(at: Self.storeURL, years: Self.years)
         try time("launch: open store + startup work") {
             let container = try BenchmarkStore.open(at: Self.storeURL)
-            try CategorySeeder.seedIfNeeded(in: container.mainContext)
-            try CategorySeeder.restoreMissingDefaults(in: container.mainContext)
+            try StoreOpening.prepare(container.mainContext)
             try RecentlyDeleted.purgeExpired(in: container.mainContext)
             try RecurringTransaction.catchUp(through: .today, in: container.mainContext)
         }
         try time("launch: open store + startup work + first frame of Home") {
             let container = try BenchmarkStore.open(at: Self.storeURL)
-            try CategorySeeder.seedIfNeeded(in: container.mainContext)
-            try CategorySeeder.restoreMissingDefaults(in: container.mainContext)
+            try StoreOpening.prepare(container.mainContext)
             try RecentlyDeleted.purgeExpired(in: container.mainContext)
             try RecurringTransaction.catchUp(through: .today, in: container.mainContext)
             _ = Hosted(RootView(), container: container)

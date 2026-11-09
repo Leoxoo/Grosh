@@ -38,7 +38,6 @@ nonisolated struct CalendarMonth: Hashable, Sendable {
     }
 }
 
-/// Months compare in calendar order.
 nonisolated extension CalendarMonth: Comparable {
     static func < (lhs: CalendarMonth, rhs: CalendarMonth) -> Bool {
         (lhs.year, lhs.month) < (rhs.year, rhs.month)
@@ -54,5 +53,12 @@ private extension Int {
     /// The remainder that is never negative.
     nonisolated func floorMod(_ divisor: Int) -> Int {
         ((self % divisor) + divisor) % divisor
+    }
+}
+
+extension CalendarMonth {
+    /// The month as the strip and the Trend write it, `08/2026`, whatever the locale.
+    nonisolated var numericTitle: String {
+        String(format: "%02d/%d", month, year)
     }
 }

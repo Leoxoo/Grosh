@@ -55,7 +55,7 @@ struct CategorySeedingTests {
     }
 
     @Test func aSeededStoreHasEveryCategoryTheAppDependsOn() throws {
-        let seeded = try GroshStore.makeSeededContainer(inMemory: true)
+        let seeded = try StoreOpening.open(inMemory: true)
 
         for role in LockedRole.allCases {
             #expect(try seeded.mainContext.lockedCategory(role).lockedRole == role)

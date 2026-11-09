@@ -1,10 +1,5 @@
 import Foundation
 
-/// The unit a repeat counts in.
-nonisolated enum RepeatUnit: String, CaseIterable, Sendable {
-    case day, week, month, year
-}
-
 /// How often a schedule repeats: every `every` units of `unit`. A week is seven days.
 nonisolated struct RepeatRule: Hashable, Sendable {
     var unit: RepeatUnit
@@ -51,22 +46,7 @@ nonisolated enum RepeatEnd: Hashable, Sendable {
     }
 }
 
-/// The kind of end the form offers. The end's date or count completes it.
-nonisolated enum RepeatEndKind: String, CaseIterable, Sendable {
-    case forever, until, afterCount
-}
-
-/// Which day of the month a monthly repeat falls on. The start day decides what each choice names: "on the 29th",
-/// "on the last Thursday", "on the last day".
-nonisolated enum MonthlyDay: String, CaseIterable, Sendable {
-    /// The start day's number. A shorter month falls back to its last day.
-    case sameDay
-    /// The start day's weekday in its week of the month: the second Tuesday. A fifth one is the last such weekday of
-    /// the month, since not every month has a fifth.
-    case nthWeekday
-    /// The last day of the month. Offered only from the 28th on.
-    case lastDay
-
+nonisolated extension MonthlyDay {
     /// The days a monthly repeat starting on `start` offers, in the order the form lists them. The last day is offered
     /// only from the 28th on, so a start near the end of its month.
     static func offered(startingOn start: CalendarDay) -> [MonthlyDay] {
@@ -173,6 +153,51 @@ nonisolated struct RepeatSchedule: Hashable, Sendable {
         case .forever: true
         case .until(let last): day <= last
         case .afterCount(let count): index < count
+        }
+    }
+}
+
+extension RecurringTransaction {
+    /// When the schedule repeats and ends. Changing it reshapes only the occurrences still to come.
+    var schedule: RepeatSchedule {
+        get {
+            RepeatSchedule(
+                start: CalendarDay(rawValue: startDayRaw),
+                rule: RepeatRule(unit: repeatUnit, every: repeatEvery),
+                end: end,
+                monthlyDay: monthlyDay
+            )
+        }
+        set {
+            startDayRaw = newValue.start.rawValue
+            repeatUnit = newValue.rule.unit
+            repeatEvery = newValue.rule.every
+            monthlyDay = newValue.monthlyDay
+            end = newValue.end
+        }
+    }
+
+    /// When the schedule stops making occurrences.
+    var end: RepeatEnd {
+        get {
+            switch endKind {
+            case .forever: .forever
+            case .until: .until(CalendarDay(rawValue: untilDayRaw ?? startDayRaw))
+            case .afterCount: .afterCount(occurrenceLimit ?? 1)
+            }
+        }
+        set {
+            endKind = newValue.kind
+            if case .until(let last) = newValue {
+                untilDayRaw = last.rawValue
+            } else {
+                untilDayRaw = nil
+            }
+            if case .afterCount(let count) = newValue {
+                occurrenceLimit = count
+            } else {
+                occurrenceLimit = nil
+            }
         }
     }
 }
