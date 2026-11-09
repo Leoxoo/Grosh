@@ -87,7 +87,7 @@ nonisolated struct ExpectationPayment: Identifiable {
 
 extension ExpectedReimbursement {
     /// The currency of the Expense's wallet.
-    var currencyCode: String { expense?.amount.currencyCode ?? Money.defaultCurrencyCode }
+    var currencyCode: String { (expense?.wallet).currencyCodeOrDefault }
 
     /// What is expected, or `nil` for an open amount.
     var expected: Money? { amountCents.map { Money(cents: $0, currencyCode: currencyCode) } }

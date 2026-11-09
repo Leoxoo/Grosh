@@ -52,7 +52,7 @@ struct TransactionFilterTests {
     }
 
     private func notes(_ filter: TransactionFilter, in all: [Transaction], on days: DayRange = DayRange()) -> Set<String> {
-        Set(filter.listed(from: all, selection: .total, on: days).map(\.note))
+        Set(TransactionListing(all, showing: .total, on: days, filter: filter).transactions.map(\.note))
     }
 
     @Test func aCardFilterListsThatCardsTransactionsInTheSelectedPeriodAndTheirTotal() {
@@ -67,11 +67,10 @@ struct TransactionFilterTests {
             record(-1_00, "cash tip", on: day(9, 6)),
         ]
 
-        let filter = TransactionFilter(card: amex)
-        let listed = filter.listed(from: all, selection: .total, on: month(9))
+        let listing = TransactionListing(all, showing: .total, on: month(9), filter: TransactionFilter(card: amex))
 
-        #expect(Set(listed.map(\.note)) == ["groceries", "lunch", "cashback"])
-        #expect(filter.total(of: listed) == Money(cents: -47_50))
+        #expect(Set(listing.transactions.map(\.note)) == ["groceries", "lunch", "cashback"])
+        #expect(listing.total == Money(cents: -47_50))
     }
 
     @Test func aParentCategoryFilterIncludesItsSubcategories() throws {
@@ -99,7 +98,7 @@ struct TransactionFilterTests {
             record(-1_00, "cash fee", in: cash),
             record(-9_00, "closing fee", in: oldBank),
         ]
-        try oldBank.archive()
+        try oldBank.archive(today: today)
 
         #expect(notes(TransactionFilter(wallet: cash), in: all) == ["bus fare", "cash fee"])
         #expect(notes(TransactionFilter(searchText: "fee", wallet: oldBank), in: all) == ["closing fee"])
@@ -117,12 +116,12 @@ struct TransactionFilterTests {
             record(-8_00, "older fee", on: day(8, 4), in: oldBank),
             record(50_00, "interest", on: day(9, 30), in: savings),
         ]
-        try oldBank.archive()
+        try oldBank.archive(today: today)
 
-        #expect(TransactionFilter(wallet: oldBank).listed(from: all, selection: .total, on: month(9)).map(\.note)
+        #expect(TransactionListing(all, showing: .total, on: month(9), filter: TransactionFilter(wallet: oldBank)).transactions.map(\.note)
             == ["closing fee"])
-        #expect(TransactionFilter(wallet: savings).listed(from: all, selection: .wallet(checking), on: month(9))
-            .map(\.note) == ["interest"])
+        #expect(TransactionListing(all, showing: .wallet(checking), on: month(9), filter: TransactionFilter(wallet: savings))
+            .transactions.map(\.note) == ["interest"])
     }
 
     @Test func theStripReachesBackToTheFilteredWalletsFirstTransaction() throws {
@@ -132,7 +131,7 @@ struct TransactionFilterTests {
             record(-3_00, "atm fee", on: day(9, 2)),
             record(-9_00, "closing fee", on: CalendarDay(year: 2025, month: 11, day: 4), in: oldBank),
         ]
-        try oldBank.archive()
+        try oldBank.archive(today: today)
 
         let filtered = TransactionFilter(wallet: oldBank).transactions(in: .total, from: all)
         let strip = TimeRange.month.periods(from: filtered.firstDay, today: today)
@@ -205,7 +204,7 @@ struct TransactionFilterTests {
         ]
         let filter = TransactionFilter(category: restaurants, card: amex, maximumAmount: Money(cents: 100_00))
 
-        let listed = filter.listed(from: all, selection: .wallet(checking), on: month(9))
+        let listed = TransactionListing(all, showing: .wallet(checking), on: month(9), filter: filter).transactions
 
         #expect(listed.map(\.note) == ["dinner"])
     }

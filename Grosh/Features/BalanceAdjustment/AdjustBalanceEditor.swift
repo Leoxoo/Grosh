@@ -11,6 +11,8 @@ struct AdjustBalanceEditor: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Environment(\.today) private var today
+    /// What the recorded balance adds up.
+    @NotDeletedTransactions private var transactions: [Transaction]
 
     var body: some View {
         if let draft = startingDraft {
@@ -33,7 +35,9 @@ struct AdjustBalanceEditor: View {
 
     private var startingDraft: BalanceAdjustmentDraft? {
         Log.store.attempt("Suggesting a balance adjustment") {
-            try TransactionDefaults.suggestBalanceAdjustment(on: today, viewing: viewedWallet, in: context)
+            try TransactionDefaults.suggestBalanceAdjustment(
+                on: today, viewing: viewedWallet, balances: WalletBalances($transactions, asOf: today), in: context
+            )
         }
     }
 }
@@ -42,6 +46,7 @@ struct AdjustBalanceEditor: View {
 private struct AdjustBalanceForm: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @NotDeletedTransactions private var transactions: [Transaction]
 
     @State private var draft: BalanceAdjustmentDraft
     @State private var errorMessage: String?
@@ -61,6 +66,8 @@ private struct AdjustBalanceForm: View {
             balanceSection(fields)
             reasonSection(fields)
         }
+        .onChange(of: draft.wallet) { draft.readRecordedBalance(from: $transactions) }
+        .onChange(of: draft.day) { draft.readRecordedBalance(from: $transactions) }
         .errorAlert(Strings.BalanceAdjustment.couldntAdjust, message: $errorMessage)
     }
 

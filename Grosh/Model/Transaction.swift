@@ -117,7 +117,7 @@ final class Transaction {
         return transaction
     }
 
-    var amount: Money { Money(cents: amountCents, currencyCode: wallet?.currencyCode ?? Money.defaultCurrencyCode) }
+    var amount: Money { Money(cents: amountCents, currencyCode: wallet.currencyCodeOrDefault) }
 
     var day: CalendarDay {
         get { CalendarDay(rawValue: dayRaw) }

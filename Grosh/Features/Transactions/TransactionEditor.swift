@@ -79,7 +79,7 @@ private struct TransactionForm: View {
         if case .edit = mode { true } else { false }
     }
 
-    private var currencyCode: String { draft.wallet?.currencyCode ?? Money.defaultCurrencyCode }
+    private var currencyCode: String { draft.wallet.currencyCodeOrDefault }
 
     /// The draft with the amount the keypad comes to.
     private var draftToSave: TransactionDraft {

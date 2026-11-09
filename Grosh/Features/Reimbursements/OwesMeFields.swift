@@ -26,7 +26,7 @@ struct OwesMeAddButtons: View {
 struct OwesMeSections: View {
     @Binding var draft: TransactionDraft
 
-    private var currencyCode: String { draft.wallet?.currencyCode ?? Money.defaultCurrencyCode }
+    private var currencyCode: String { draft.wallet.currencyCodeOrDefault }
 
     var body: some View {
         ForEach($draft.owes, id: \.person.persistentModelID) { $entry in

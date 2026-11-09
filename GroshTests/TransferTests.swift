@@ -204,7 +204,7 @@ struct TransferTests {
 
         #expect(checking.balance(asOf: today) == Money(cents: 745_00))
         #expect(savings.balance(asOf: today) == Money(cents: 250_00))
-        #expect(Wallet.total(of: [checking, savings], asOf: today) == Money(cents: 995_00))
+        #expect(Wallet.total(of: [checking, savings], asOf: today) == [Money(cents: 995_00)])
     }
 
     @Test func updatingBothGivesTheOtherHalfTheNewAmount() throws {
@@ -289,7 +289,7 @@ struct TransferTests {
     @Test func aTransferLeavesTheTotalUnchanged() throws {
         try Transfer.create(draft(250_00), in: context)
 
-        #expect(Wallet.total(of: [checking, savings], asOf: today) == Money(cents: 1_000_00))
+        #expect(Wallet.total(of: [checking, savings], asOf: today) == [Money(cents: 1_000_00)])
     }
 
     @Test func neitherHalfOfATransferCountsAsIncomeOrSpending() throws {

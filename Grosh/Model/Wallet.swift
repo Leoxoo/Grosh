@@ -7,7 +7,7 @@ final class Wallet {
     var name: String = ""
     var symbolName: String = "wallet.bifold.fill"
     var colorName: String = PaletteColor.green.rawValue
-    var currencyCode: String = "USD"
+    var currencyCode: String = Money.defaultCurrencyCode
     var includeInTotal: Bool = true
     var isArchived: Bool = false
     var sortOrder: Int = 0
@@ -35,4 +35,10 @@ final class Wallet {
         get { PaletteColor(storedName: colorName) }
         set { colorName = newValue.rawValue }
     }
+}
+
+nonisolated extension Optional where Wrapped == Wallet {
+    /// The currency of the wallet, or the default one while there is no wallet: what an amount in it, or in a draft
+    /// that has no wallet yet, is in.
+    var currencyCodeOrDefault: String { self?.currencyCode ?? Money.defaultCurrencyCode }
 }

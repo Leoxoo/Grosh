@@ -43,11 +43,6 @@ nonisolated struct TransactionFilter: Equatable {
             && lhs.excludedOnly == rhs.excludedOnly
     }
 
-    /// Whether `transaction` passes the search and every filter that is set.
-    func matches(_ transaction: Transaction) -> Bool {
-        Search(self).matches(transaction)
-    }
-
     /// The search text trimmed and read as an amount once, for checking many transactions against the filter.
     fileprivate struct Search {
         let filter: TransactionFilter
@@ -89,54 +84,21 @@ nonisolated struct TransactionFilter: Equatable {
         return true
     }
 
-    /// The total a list of `transactions` shows: their net total, or with a Card filter on the Card's total, which counts
-    /// what the Card was charged (``Sequence/charged``) rather than the net.
-    func total(of transactions: [Transaction]) -> Money {
-        card == nil ? transactions.net : transactions.charged
-    }
-
-    /// Whether there is search text to look for.
     var isSearching: Bool {
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// Whether any filter is set, search text aside.
     var hasFilters: Bool {
         var filters = self
         filters.searchText = ""
         return filters != TransactionFilter()
     }
 
-    /// Whether the filter narrows anything: search text or any filter set.
+    /// Search text or any filter set.
     var isOn: Bool { isSearching || hasFilters }
 
-    /// Resets every filter, leaving the search text.
     mutating func clearFilters() {
         self = TransactionFilter(searchText: searchText)
-    }
-
-    /// The transactions the Transactions tab lists from `all`. Searching looks across all time and every wallet,
-    /// archived ones included; otherwise the list holds the matching ones among ``transactions(in:from:)`` on `days`
-    /// (the selected period).
-    func listed(from all: [Transaction], selection: WalletSelection, on days: DayRange) -> [Transaction] {
-        listed(
-            from: all, selected: transactions(in: selection, from: all.map(LedgerEntry.init)), on: days,
-            hidingPaybacksIn: self.selection(replacing: selection)
-        )
-    }
-
-    /// ``listed(from:selection:on:)`` with the selection's transactions at hand already: `selected`, as
-    /// ``transactions(in:from:)`` picks them from the ledger entries of `all`. In the Total (`hidingPaybacksIn`) the
-    /// money paid back into another wallet is left out, as its Expense shows it in its net (ADR-0010); searching still
-    /// finds it.
-    func listed(
-        from all: [Transaction], selected: [LedgerEntry], on days: DayRange,
-        hidingPaybacksIn selection: WalletSelection? = nil
-    ) -> [Transaction] {
-        if isSearching { return Signpost.interval("Search") { all.matching(self) } }
-        let inDays = selected.filter { days.contains(CalendarDay(rawValue: $0.dayRaw)) }.map(\.transaction)
-        let shown = selection == WalletSelection.total ? inDays.filter { !$0.isHiddenInTotal } : inDays
-        return shown.matching(self)
     }
 
     /// What the list shows: the wallet filter's wallet when one is set, otherwise `selection`.

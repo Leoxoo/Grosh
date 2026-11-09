@@ -5,13 +5,13 @@ import SwiftUI
 /// opens the Select Wallet sheet to choose the Total or one wallet.
 struct WalletSelector: View {
     @Binding var selection: WalletSelection
-    let today: CalendarDay
+    /// Every wallet's balance today, which the screen adds up once for all it shows.
+    let balances: WalletBalances
     /// Takes the width of the screen at the standard margin; off where it is placed from outside: in the bar, where it
     /// takes only its own, and in Transactions' header, which lines it up with the bar's (`linedUpWithTabRootTitle`).
     var fillsWidth = true
 
     @Query(Wallet.unarchived) private var wallets: [Wallet]
-    @NotDeletedTransactions private var transactions: [Transaction]
     @State private var isChoosing = false
 
     var body: some View {
@@ -39,10 +39,10 @@ struct WalletSelector: View {
             .accessibilityLabel(Strings.Common.wallet)
             .accessibilityValue(selection.name)
             .sheet(isPresented: $isChoosing) {
-                SelectWalletSheet(selection: $selection, today: today)
+                SelectWalletSheet(selection: $selection, balances: balances)
             }
 
-            Text(WalletBalances($transactions, asOf: today).balance(of: selection, wallets: wallets).formatted())
+            Text(balances.balance(of: selection, wallets: wallets).formatted())
                 .font(.title2.bold())
                 .monospacedDigit()
                 .contentTransition(.numericText())

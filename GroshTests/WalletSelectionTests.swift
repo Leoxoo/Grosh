@@ -42,7 +42,7 @@ struct WalletSelectionTests {
         let brokerage = wallet("Brokerage")
         brokerage.includeInTotal = false
         let oldBank = wallet("Old bank")
-        try oldBank.archive()
+        try oldBank.archive(today: today)
         let all = [
             record("rent", -900_00, in: checking),
             record("stock sold", 300_00, in: brokerage),
@@ -61,7 +61,7 @@ struct WalletSelectionTests {
         record("stock sold", 300_00, in: brokerage)
         let wallets = [checking, brokerage]
 
-        #expect(WalletSelection.total.balance(asOf: today, wallets: wallets) == Money(cents: 100_00))
-        #expect(WalletSelection.wallet(brokerage).balance(asOf: today, wallets: wallets) == Money(cents: 300_00))
+        #expect(Wallet.balances(of: wallets, asOf: today).balance(of: WalletSelection.total, wallets: wallets) == [Money(cents: 100_00)])
+        #expect(Wallet.balances(of: wallets, asOf: today).balance(of: WalletSelection.wallet(brokerage), wallets: wallets) == [Money(cents: 300_00)])
     }
 }

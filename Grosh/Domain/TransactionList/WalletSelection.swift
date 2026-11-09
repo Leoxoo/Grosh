@@ -16,12 +16,4 @@ nonisolated enum WalletSelection: Hashable {
         case .wallet(let selected): wallet == selected
         }
     }
-
-    /// The selection's balance on `today`: the Total of `wallets`, or the one wallet's balance.
-    func balance(asOf today: CalendarDay, wallets: [Wallet]) -> Money {
-        switch self {
-        case .total: Wallet.total(of: wallets, asOf: today)
-        case .wallet(let wallet): wallet.balance(asOf: today)
-        }
-    }
 }

@@ -29,6 +29,8 @@ struct ReportPeriodControls: ViewModifier {
     /// Whether the Wallet selector sits above the strip. A details screen follows the Report's selection without one.
     let showsWalletSelector: Bool
 
+    /// What the Wallet selector's balances add up.
+    @NotDeletedTransactions private var ledger: [Transaction]
     @Environment(\.today) private var today
     @State private var isPickingCustomRange = false
 
@@ -48,7 +50,7 @@ struct ReportPeriodControls: ViewModifier {
             .safeAreaInset(edge: .top, spacing: 0) {
                 VStack(spacing: 4) {
                     if showsWalletSelector {
-                        WalletSelector(selection: $walletSelection, today: today)
+                        WalletSelector(selection: $walletSelection, balances: WalletBalances($ledger, asOf: today))
                     }
                     PeriodStrip(
                         periods: strip(for: walletSelection), selection: $period, current: currentPeriod, today: today

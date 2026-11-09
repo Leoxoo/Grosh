@@ -75,7 +75,7 @@ private struct RecurringForm: View {
         if case .edit(let recurring) = mode { recurring } else { nil }
     }
 
-    private var currencyCode: String { draft.wallet?.currencyCode ?? Money.defaultCurrencyCode }
+    private var currencyCode: String { draft.wallet.currencyCodeOrDefault }
 
     /// The estimate a varying Bill starts at: the average of its category's history, or `nil` when there is none.
     private var estimateCents: Int? {

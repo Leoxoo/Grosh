@@ -70,7 +70,9 @@ struct BalanceAdjustmentTests {
         try record(500_00, "Salary", .income, on: today)
         let savings = addSavings()
 
-        let suggested = try TransactionDefaults.suggestBalanceAdjustment(on: today, viewing: savings, in: context)
+        let suggested = try TransactionDefaults.suggestBalanceAdjustment(
+            on: today, viewing: savings, balances: Wallet.balances(of: [checking, savings], asOf: today), in: context
+        )
 
         #expect(suggested.wallet == savings)
         #expect(suggested.day == today)
@@ -81,7 +83,9 @@ struct BalanceAdjustmentTests {
         try record(-4_50, "Café", on: today).createdAt = .distantPast
         try record(75_00, "Salary", .income, in: savings, on: today)
 
-        let suggested = try TransactionDefaults.suggestBalanceAdjustment(on: today, in: context)
+        let suggested = try TransactionDefaults.suggestBalanceAdjustment(
+            on: today, balances: Wallet.balances(of: [checking, savings], asOf: today), in: context
+        )
 
         #expect(suggested.wallet == savings)
     }
@@ -102,6 +106,7 @@ struct BalanceAdjustmentTests {
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
 
         draft.day = today.adding(days: -1)
+        draft.readRecordedBalance()
 
         #expect(draft.realBalance == Money(cents: 0))
         #expect(!draft.canSave)
@@ -113,6 +118,7 @@ struct BalanceAdjustmentTests {
         draft.realBalanceEntry.press(.digit(7))
 
         draft.day = today.adding(days: -1)
+        draft.readRecordedBalance()
 
         #expect(draft.realBalance == Money(cents: 7_00))
         #expect(draft.difference == Money(cents: 7_00))
@@ -126,8 +132,23 @@ struct BalanceAdjustmentTests {
         draft.realBalance = Money(cents: 450_00)
 
         draft.wallet = savings
+        draft.readRecordedBalance()
 
         #expect(draft.realBalance == Money(cents: 75_00))
+        #expect(!draft.canSave)
+    }
+
+    @Test func untilTheNewWalletsBalanceIsReadThereIsNothingToAdjust() throws {
+        try record(500_00, "Salary", .income, on: today)
+        let savings = addSavings()
+        var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
+        draft.realBalance = Money(cents: 450_00)
+
+        draft.wallet = savings
+        draft.realBalance = Money(cents: 10_00)
+
+        #expect(draft.recordedBalance == nil)
+        #expect(draft.difference == nil)
         #expect(!draft.canSave)
     }
 

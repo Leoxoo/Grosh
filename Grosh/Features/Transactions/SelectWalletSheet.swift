@@ -6,13 +6,13 @@ import SwiftUI
 /// selection as it was. Wallets are added, reordered and archived in Account → Wallets, not here.
 struct SelectWalletSheet: View {
     @Binding var selection: WalletSelection
-    let today: CalendarDay
+    let balances: WalletBalances
 
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        let choices = WalletSelectorChoices(wallets: wallets, asOf: today)
+        let choices = WalletSelectorChoices(wallets: wallets, balances: balances)
         NavigationStack {
             List {
                 Section {

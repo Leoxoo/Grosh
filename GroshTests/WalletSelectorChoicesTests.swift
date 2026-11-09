@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 import Testing
 @testable import Grosh
@@ -35,7 +36,7 @@ struct WalletSelectorChoicesTests {
         let cash = wallet("Cash")
         let pension = wallet("Pension", includeInTotal: false)
 
-        let choices = WalletSelectorChoices(wallets: [checking, brokerage, cash, pension], asOf: today)
+        let choices = WalletSelectorChoices(wallets: [checking, brokerage, cash, pension], balances: Wallet.balances(of: [checking, brokerage, cash, pension], asOf: today))
 
         #expect(choices.includedInTotal.map(\.selection) == [.wallet(checking), .wallet(cash)])
         #expect(choices.notInTotal.map(\.selection) == [.wallet(brokerage), .wallet(pension)])
@@ -48,7 +49,7 @@ struct WalletSelectorChoicesTests {
         let closed = wallet("Closed")
         try closed.delete()
 
-        let choices = WalletSelectorChoices(wallets: [checking, oldBank, closed], asOf: today)
+        let choices = WalletSelectorChoices(wallets: [checking, oldBank, closed], balances: Wallet.balances(of: [checking, oldBank, closed], asOf: today))
 
         #expect(choices.includedInTotal.map(\.selection) == [.wallet(checking)])
         // Every wallet still listed counts in the Total, so there is no "Not in total" section.
@@ -67,12 +68,35 @@ struct WalletSelectorChoicesTests {
         record(300_00, in: brokerage)
         record(40_00, in: euros)
 
-        let choices = WalletSelectorChoices(wallets: [checking, cash, brokerage, euros], asOf: today)
+        let choices = WalletSelectorChoices(wallets: [checking, cash, brokerage, euros], balances: Wallet.balances(of: [checking, cash, brokerage, euros], asOf: today))
 
         // The Total card: checking and cash, not the rent due next month nor the wallets left out.
         #expect(choices.total.selection == .total)
-        #expect(choices.total.balance == Money(cents: 125_00))
-        #expect(choices.includedInTotal.map(\.balance) == [Money(cents: 100_00), Money(cents: 25_00)])
-        #expect(choices.notInTotal.map(\.balance) == [Money(cents: 300_00), Money(cents: 40_00, currencyCode: "EUR")])
+        #expect(choices.total.balance == [Money(cents: 125_00)])
+        #expect(choices.includedInTotal.map(\.balance) == [[Money(cents: 100_00)], [Money(cents: 25_00)]])
+        #expect(choices.notInTotal.map(\.balance) == [[Money(cents: 300_00)], [Money(cents: 40_00, currencyCode: "EUR")]])
+    }
+
+    @Test func theTotalAddsEachCurrencyUpOnItsOwn() {
+        let checking = wallet("Checking")
+        let euros = wallet("Euros")
+        euros.currencyCode = "EUR"
+        record(100_00, in: checking)
+        record(40_00, in: euros)
+
+        let choices = WalletSelectorChoices(wallets: [checking, euros], balances: Wallet.balances(of: [checking, euros], asOf: today))
+
+        #expect(choices.total.balance == [Money(cents: 40_00, currencyCode: "EUR"), Money(cents: 100_00)])
+        #expect(choices.total.balance.formatted(locale: Locale(identifier: "en_US")) == "€40.00, $100.00")
+    }
+
+    @Test func aTotalOfNothingIsNothingInTheWalletsCurrency() {
+        let euros = wallet("Euros")
+        euros.currencyCode = "EUR"
+
+        let choices = WalletSelectorChoices(wallets: [euros], balances: Wallet.balances(of: [euros], asOf: today))
+
+        #expect(choices.total.balance == [Money(cents: 0, currencyCode: "EUR")])
+        #expect(choices.total.balance.formatted(locale: Locale(identifier: "en_US")) == "€0.00")
     }
 }

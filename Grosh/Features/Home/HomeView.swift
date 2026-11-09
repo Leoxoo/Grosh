@@ -44,7 +44,7 @@ private struct HomeContent: View {
                         NavigationLink(Strings.Home.addAWallet) { WalletListView() }
                     }
                     ForEach(wallets) { wallet in
-                        WalletRow(wallet: wallet, today: today, balances: balances)
+                        WalletRow(wallet: wallet, balances: balances)
                     }
                 } header: {
                     HStack {
@@ -77,7 +77,8 @@ private struct HomeContent: View {
 
 /// The Total, with an eye button that hides the amount.
 private struct TotalBalanceView: View {
-    let total: Money
+    /// Per currency.
+    let total: [Money]
     @Binding var isHidden: Bool
 
     var body: some View {
