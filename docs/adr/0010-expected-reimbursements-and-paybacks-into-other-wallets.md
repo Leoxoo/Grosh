@@ -1,3 +1,5 @@
+> Amended by [ADR 0012](0012-a-link-stores-what-it-joins.md): `hasPaybacksElsewhere` is cleared once the last payback is removed for good, and the link an Expense shares with its paybacks stores that it is a payback link.
+
 # Expected reimbursements are records beside the Expense; a payback into another wallet is a linked transaction
 
 Two decisions about money that people owe the user for an Expense.

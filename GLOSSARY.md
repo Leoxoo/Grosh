@@ -122,7 +122,7 @@ Money moved between two of the user's own wallets, shown as two linked transacti
 _Avoid_: Move, payment
 
 **Linked transactions**:
-Transactions that belong together and are shown to each other as "Related transactions", such as the two halves of a transfer. Editing one offers to update the other.
+Transactions that belong together and are shown to each other as "Related transactions": the two halves of a transfer, the parts of a Split, a Loan or Debt and what is recorded against it, or an Expense and its paybacks into other wallets. Which of the four a link is, its kind, is stored with it (ADR-0012). Editing one transfer half offers to update the other.
 _Avoid_: Connected, paired
 
 **Split**:
