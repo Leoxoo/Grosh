@@ -32,8 +32,10 @@ enum UITestStore {
         removeEarlierStores(keeping: url)
         try BenchmarkStore.prepare(at: url, years: years)
         if name == "make" {
-            // Kept running a moment, so the launch that asked for this sees the app running even when the store was made
-            // already and there was nothing to wait for.
+            // XCTest's `launch()` fails when the app has quit before XCTest sees it running, which it would with
+            // today's store already made, so the app stays up a moment before quitting. It quits rather than going on
+            // to a screen because `launch()` also gives up on an app whose launch takes minutes, as making the store
+            // does.
             Thread.sleep(forTimeInterval: 3)
             exit(0)
         }

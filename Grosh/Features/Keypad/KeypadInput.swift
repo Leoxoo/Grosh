@@ -16,7 +16,8 @@ struct KeypadInput: UIViewRepresentable {
 
     func updateUIView(_ input: KeypadInputField, context: Context) {
         if isShown, !input.isFirstResponder {
-            // Not while SwiftUI is still updating the screen that holds it.
+            // On the next turn of the main queue: becoming first responder brings the keyboard up at once, and the
+            // keyboard's notifications change SwiftUI state, which SwiftUI refuses while it is still updating views.
             DispatchQueue.main.async { input.becomeFirstResponder() }
         } else if !isShown, input.isFirstResponder {
             input.resignFirstResponder()
@@ -87,6 +88,8 @@ final class KeypadInputField: UITextField, UITextFieldDelegate {
     override func resignFirstResponder() -> Bool {
         let didResign = super.resignFirstResponder()
         if didResign, keypad.isShown {
+            // UIKit resigns the field from inside SwiftUI's own updates too, as when a text field on the screen takes
+            // focus, and SwiftUI refuses state changes made then; so the Keypad hears it on the next turn.
             DispatchQueue.main.async { self.keypad.hide() }
         }
         return didResign

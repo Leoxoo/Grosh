@@ -130,8 +130,17 @@ nonisolated struct AmountEntry: Hashable, Sendable {
     /// An entry showing `cents` unpadded (12, 12.5), such as a transaction's amount being edited. The first digit
     /// replaces it, backspace trims it, and an operation carries on from it. Zero is an empty entry.
     init(cents: Int, kind: Kind = .signedByCategory) {
+        guard cents != 0 else {
+            self.init(kind: kind)
+            return
+        }
+        self.init(showing: cents, kind: kind)
+    }
+
+    /// An entry showing `cents` as ``init(cents:kind:)`` does, except that zero shows as 0 rather than as an empty
+    /// entry: an amount the user set to zero on purpose, such as a filter's bound.
+    init(showing cents: Int, kind: Kind = .signedByCategory) {
         self.kind = kind
-        guard cents != 0 else { return }
         current = TypedNumber(cents: cents)
         isFinished = true
     }

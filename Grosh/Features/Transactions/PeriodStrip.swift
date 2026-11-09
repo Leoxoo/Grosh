@@ -31,9 +31,6 @@ struct PeriodStrip: View {
         .scrollPosition($position)
         // Hidden indicators still show on Mac while a mouse is connected or scroll bars are set to always show.
         .scrollIndicators(.never)
-        // The bottom room `addTransactionButton()` gives a list on Mac reaches every scroll view under it, this one
-        // included, and would add 88pt under the tabs.
-        .contentMargins(.vertical, 0, for: .scrollContent)
         // A lazy stack would otherwise take all the height it is offered.
         .fixedSize(horizontal: false, vertical: true)
         .defaultScrollAnchor(.trailing)
@@ -48,8 +45,9 @@ struct PeriodStrip: View {
             }
         }
         .onAppear { scrollToSelection() }
-        // A screen pushed onto a stack lays its strip out mid-transition, so the first scroll can land short of the trailing
-        // end. Scrolling again once the transition has settled puts the selected tab in view.
+        // SwiftUI lays out the strip of a screen pushed onto a stack mid-transition, so the first scroll can land short
+        // of the trailing end, and nothing reports when the push has settled. Scrolling again once it has puts the
+        // selected tab in view.
         .task {
             try? await Task.sleep(for: .milliseconds(400))
             scrollToSelection()
@@ -129,17 +127,6 @@ struct PeriodStrip: View {
             } else {
                 position.scrollTo(id: selection, anchor: .center)
             }
-        }
-    }
-}
-
-extension Period {
-    /// Stays the period shown while `strip` still offers it; otherwise becomes `current`, the Current period. A strip
-    /// of a wallet with a shorter history, or with the only transaction of its first period gone, may no longer offer
-    /// it.
-    mutating func showCurrentPeriod(_ current: Period, unlessOfferedBy strip: [Period]) {
-        if !strip.contains(self) {
-            self = current
         }
     }
 }
