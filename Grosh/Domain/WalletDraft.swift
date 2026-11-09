@@ -8,8 +8,13 @@ nonisolated struct WalletDraft {
     var symbolName = "wallet.bifold.fill"
     var color = PaletteColor.green
     var includeInTotal = true
+    /// The wallet's currency. A new wallet takes the one in Settings → Currency; an existing one keeps its own.
+    var currencyCode = Money.defaultCurrencyCode
 
-    init() {}
+    /// A new wallet in `currencyCode`.
+    init(currencyCode: String = Money.defaultCurrencyCode) {
+        self.currencyCode = currencyCode
+    }
 
     /// The wallet's current fields, ready to edit.
     @MainActor init(_ wallet: Wallet) {
@@ -17,6 +22,7 @@ nonisolated struct WalletDraft {
         symbolName = wallet.symbolName
         color = wallet.color
         includeInTotal = wallet.includeInTotal
+        currencyCode = wallet.currencyCode
     }
 
     fileprivate var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -86,6 +92,7 @@ extension Wallet {
         try draft.validate()
         let wallet = Wallet(name: draft.trimmedName, sortOrder: try context.nextSortOrder(\Wallet.sortOrder))
         context.insert(wallet)
+        wallet.currencyCode = draft.currencyCode
         wallet.apply(draft)
         return wallet
     }

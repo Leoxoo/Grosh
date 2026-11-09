@@ -15,9 +15,10 @@ struct WalletEditor: View {
     let mode: EditorMode<Wallet>
 
     @Environment(\.today) private var today
+    @AppStorage(AppSettings.currencyCodeKey) private var currencyCode = AppSettings.currencyCodeDefault
 
     var body: some View {
-        WalletForm(mode: mode, startingDay: today)
+        WalletForm(mode: mode, startingDay: today, currencyCode: currencyCode)
     }
 }
 
@@ -40,15 +41,16 @@ private struct WalletForm: View {
     /// The wallet waiting for the user to confirm deleting it.
     @State private var deleting: Wallet?
 
-    init(mode: EditorMode<Wallet>, startingDay: CalendarDay) {
+    /// `currencyCode` is the one a new wallet starts in.
+    init(mode: EditorMode<Wallet>, startingDay: CalendarDay, currencyCode: String) {
         self.mode = mode
-        _draft = State(initialValue: mode.editing.map { WalletDraft($0) } ?? WalletDraft())
+        _draft = State(initialValue: mode.editing.map { WalletDraft($0) } ?? WalletDraft(currencyCode: currencyCode))
         _startingDay = State(initialValue: startingDay)
     }
 
     /// The Starting balance typed so far, or `nil` while the Keypad can't work it out.
     private var startingBalance: Money? {
-        startingEntry.cents.map { Money(cents: $0) }
+        startingEntry.cents.map { Money(cents: $0, currencyCode: draft.currencyCode) }
     }
 
     private var canSave: Bool { (try? draft.validate()) != nil && (!mode.isAdding || startingBalance != nil) }
@@ -153,7 +155,8 @@ private struct WalletForm: View {
         perform {
             switch mode {
             case .add:
-                try Wallet.create(draft, startingBalance: startingBalance ?? Money(cents: 0), on: startingDay, in: context)
+                let balance = startingBalance ?? Money(cents: 0, currencyCode: draft.currencyCode)
+                try Wallet.create(draft, startingBalance: balance, on: startingDay, in: context)
             case .edit(let wallet):
                 try wallet.update(with: draft)
             }
