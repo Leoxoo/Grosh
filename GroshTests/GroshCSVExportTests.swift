@@ -34,7 +34,7 @@ struct GroshCSVExportTests {
 
     @discardableResult
     private func importing(_ csv: String) throws -> MoneyLoverImportSummary {
-        try MoneyLoverImport.replaceAllData(with: MoneyLoverCSV.read(csv), in: context)
+        try MoneyLoverImport.replaceAllData(with: MoneyLoverCSV.read(csv), cards: .ownersCards, in: context)
     }
 
     private func exported() throws -> String {

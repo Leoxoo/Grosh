@@ -5,7 +5,7 @@ import SwiftData
 /// transaction. The categories are kept.
 enum MoneyLoverImport {
     /// Replaces the wallets, Cards, people and transactions in `context` with the rows of `export`, a MoneyLover export
-    /// as ``MoneyLoverCSV/read(_:)`` reads it, entered at `now`:
+    /// as ``MoneyLoverCSV/read(_:)`` reads it, entered at `now`, its notes naming Cards by the hashtags of `cards`:
     ///
     /// - Each wallet is created once by name, with a $0 Starting balance on its first day.
     /// - Each row is filed under the category of its name; a name no category has becomes a new top-level category.
@@ -28,10 +28,10 @@ enum MoneyLoverImport {
     /// Once saved, the old data can't be brought back.
     @discardableResult
     static func replaceAllData(
-        with export: MoneyLoverExport, in context: ModelContext, now: Date = .now
+        with export: MoneyLoverExport, cards: MoneyLoverCardMapping, in context: ModelContext, now: Date = .now
     ) throws -> MoneyLoverImportSummary {
         guard !export.rows.isEmpty else { throw MoneyLoverImportError.noTransactions }
-        var importer = try Importer(export: export, context: context, now: now)
+        var importer = try Importer(export: export, cardMapping: cards, context: context, now: now)
         do {
             return try Signpost.interval("Import CSV") {
                 try removeAllData(in: context)
@@ -75,11 +75,12 @@ enum MoneyLoverImport {
     }
 }
 
-/// One run of ``MoneyLoverImport/replaceAllData(with:in:now:)``, after the old data is deleted.
+/// One run of ``MoneyLoverImport/replaceAllData(with:cards:in:now:)``, after the old data is deleted.
 private struct Importer {
     let rows: [MoneyLoverRow]
     /// Whether the file is a Grosh export, restored as it was exported.
     let isGroshExport: Bool
+    let cardMapping: MoneyLoverCardMapping
     let context: ModelContext
     let now: Date
     /// What a transfer row with no partner is filed under as a balance adjustment, by the adjustment's reason type.
@@ -90,9 +91,10 @@ private struct Importer {
     private var cards: [MoneyLoverCardTag: Card] = [:]
     private var people = PeopleByName()
 
-    init(export: MoneyLoverExport, context: ModelContext, now: Date) throws {
+    init(export: MoneyLoverExport, cardMapping: MoneyLoverCardMapping, context: ModelContext, now: Date) throws {
         self.rows = export.rows
         self.isGroshExport = export.isGroshExport
+        self.cardMapping = cardMapping
         self.context = context
         self.now = now
         adjustmentReasons = try BalanceAdjustmentDraft.defaultReasons(in: context)
@@ -238,7 +240,7 @@ private struct Importer {
 
     /// The Card each row of a Grosh export names in its `Card` column, `nil` for none, and how many Cards were added.
     /// Each Card is added the first time the file names it in a wallet, paid from that wallet. A Card that
-    /// ``MoneyLoverCardMapping`` names gets its kind and color; any other is a blue Credit card.
+    /// ``cardMapping`` names gets its kind and color; any other is a blue Credit card.
     private func addNamedCards() throws -> (cards: [Card?], created: Int) {
         struct Key: Hashable {
             let name: String
@@ -256,7 +258,7 @@ private struct Importer {
                 cards.append(card)
                 continue
             }
-            let tag = MoneyLoverCardMapping.tags.first { $0.cardName.lowercased() == name.lowercased() }
+            let tag = cardMapping.tags.first { $0.cardName.lowercased() == name.lowercased() }
             let card = try Card.insert(
                 CardDraft(
                     name: name, kind: tag?.kind ?? .credit, payingWallet: wallets[row.walletName],
@@ -271,7 +273,7 @@ private struct Importer {
     }
 
     /// Works out which rows are paid with a Card, from the card hashtags in their notes, and adds those Cards in the
-    /// order ``MoneyLoverCardMapping/tags`` lists them, so every Card has rows. A row only gets a Card where the app
+    /// order ``cardMapping`` lists them, so every Card has rows. A row only gets a Card where the app
     /// would offer one (``TransactionDraft/offersCard``, ``Card/pickerChoices(for:keeping:)``): never on a transfer
     /// row, linked or not, and only in the Card's paying wallet. That is ``MoneyLoverCardMapping/payingWalletName``,
     /// or when the file has no such wallet, the wallet of the first row the Card could be given on.
@@ -283,14 +285,16 @@ private struct Importer {
         let tagged = rows.indices.map { index -> (tag: MoneyLoverCardTag, noteWithoutTag: String)? in
             let row = rows[index]
             guard !categories[index].isTransferHalf, let wallet = wallets[row.walletName],
-                  let tagged = MoneyLoverCardTag.extractFirst(from: row.note)
+                  let tagged = MoneyLoverCardTag.extractFirst(from: row.note, among: cardMapping.tags)
             else { return nil }
-            let payingWallet = payingWallets[tagged.tag] ?? wallets[MoneyLoverCardMapping.payingWalletName] ?? wallet
+            let payingWallet = payingWallets[tagged.tag]
+                ?? cardMapping.payingWalletName.flatMap { wallets[$0] }
+                ?? wallet
             payingWallets[tagged.tag] = payingWallet
             return payingWallet == wallet ? tagged : nil
         }
         let used = Set(tagged.compactMap { $0?.tag })
-        for tag in MoneyLoverCardMapping.tags where used.contains(tag) {
+        for tag in cardMapping.tags where used.contains(tag) {
             cards[tag] = try Card.insert(
                 CardDraft(name: tag.cardName, kind: tag.kind, payingWallet: payingWallets[tag], color: tag.color),
                 in: context

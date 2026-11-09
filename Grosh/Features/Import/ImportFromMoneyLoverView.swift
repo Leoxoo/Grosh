@@ -83,7 +83,9 @@ struct ImportFromMoneyLoverView: View {
             isImporting = true
         } completion: {
             do {
-                summary = try MoneyLoverImport.replaceAllData(with: export.export, in: context)
+                summary = try MoneyLoverImport.replaceAllData(
+                    with: export.export, cards: .ownersCards, in: context
+                )
             } catch {
                 errorMessage = error.localizedDescription
             }
