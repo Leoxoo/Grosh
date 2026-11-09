@@ -151,6 +151,7 @@ struct WithMenu: View {
         do {
             finishAdding(try Person.add(named: name, phone: phone, in: context))
         } catch {
+            Log.store.failed("Adding a person", error)
             errorMessage = error.localizedDescription
         }
     }
@@ -160,6 +161,7 @@ struct WithMenu: View {
         do {
             finishAdding(try Person.add(contact, phone: phone, in: context))
         } catch {
+            Log.store.failed("Adding a person from Contacts", error)
             errorMessage = error.localizedDescription
         }
     }
@@ -178,6 +180,7 @@ struct WithMenu: View {
         do {
             try person.hide()
         } catch {
+            Log.store.failed("Hiding a person", error)
             errorMessage = error.localizedDescription
         }
     }
