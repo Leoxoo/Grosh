@@ -32,25 +32,14 @@ struct EstimatedAmounts: ReminderSource {
         open = transactions.filter { $0.isEstimated && $0.deletedAt == nil }
     }
 
-    /// The Estimated transactions whose reminder day is `today` or earlier, the earliest first: what the Home bell
-    /// lists.
-    func due(on today: CalendarDay) -> [Transaction] {
-        open.filter { $0.estimateReminderDay.map { $0 <= today } ?? false }
-            .sorted { $0.estimateReminderDay ?? today < $1.estimateReminderDay ?? today }
-    }
+    static func reminderDay(of transaction: Transaction) -> CalendarDay? { transaction.estimateReminderDay }
 
-    /// The notifications that should be pending: one for each Estimated transaction whose reminder day is `today` or
-    /// later, the soonest first. One whose day has passed is listed by the bell instead.
-    func reminders(from today: CalendarDay) -> [EstimateReminder] {
-        open.compactMap { transaction in
-            guard let day = transaction.estimateReminderDay, day >= today else { return nil }
-            return EstimateReminder(
-                original: transaction.persistentModelID, day: day,
-                name: transaction.recurring?.name ?? transaction.categoryName,
-                estimate: Money(cents: abs(transaction.amountCents), currencyCode: transaction.amount.currencyCode)
-            )
-        }
-        .sorted { $0.day < $1.day }
+    static func reminder(for transaction: Transaction, on day: CalendarDay) -> EstimateReminder {
+        EstimateReminder(
+            original: transaction.persistentModelID, day: day,
+            name: transaction.recurring?.name ?? transaction.categoryName,
+            estimate: Money(cents: abs(transaction.amountCents), currencyCode: transaction.amount.currencyCode)
+        )
     }
 }
 

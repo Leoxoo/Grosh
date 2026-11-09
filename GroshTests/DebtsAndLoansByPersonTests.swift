@@ -172,7 +172,7 @@ struct DebtsAndLoansByPersonTests {
         #expect(!entry.isSettled)
         #expect(everyone.open.map(\.person) == [alex])
 
-        try fixture.expectation(of: alex, on: dinner).close()
+        try fixture.expectation(of: alex, on: dinner).close(on: fixture.today)
 
         let closed = try #require(try listing().entry(for: alex))
         #expect(closed.openAmountCount == 0)
@@ -212,7 +212,7 @@ struct DebtsAndLoansByPersonTests {
         try settle(debt)
         #expect(try listing().open.map(\.person) == [alex])
 
-        try owed.forgive()
+        try owed.forgive(on: fixture.today)
 
         let everyone = try listing()
         #expect(everyone.open.isEmpty)

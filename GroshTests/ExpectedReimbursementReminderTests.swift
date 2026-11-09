@@ -103,9 +103,10 @@ struct ExpectedReimbursementReminderTests {
         let reminder = try #require(fixture.owesMe().reminders(from: dinnerDay).first)
 
         #expect(ExpectedReimbursementReminder.categoryIdentifier == "grosh.owes-me")
-        #expect(reminder.userInfo == [
-            "person": "Alex", "phone": "555 0100", "expense": "Dinner", "amountCents": "3000", "currencyCode": "USD",
-        ])
+        #expect(reminder.textThem == TextThemPayload(
+            person: alex.persistentModelID, personName: "Alex", phone: "555 0100", expense: "Dinner",
+            outstanding: Money(cents: 30_00)
+        ))
         #expect(reminder.original == (try fixture.expectation(of: alex, on: dinner)).persistentModelID)
     }
 

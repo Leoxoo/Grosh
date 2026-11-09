@@ -35,16 +35,24 @@ final class ReminderActionHandler: NSObject, UNUserNotificationCenterDelegate {
         _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
     ) async {
         guard response.actionIdentifier == LocalNotificationReminders.textThemAction else { return }
-        let info = response.notification.request.content.userInfo as? [String: String] ?? [:]
-        await openTextThem(info)
+        do {
+            guard let payload = try TextThemPayload(userInfo: response.notification.request.content.userInfo) else {
+                return
+            }
+            await openTextThem(payload)
+        } catch {
+            Log.reminders.failed("Reading a reminder's Text them details", error)
+        }
     }
 
-    /// Fills the inbox with the message for the Person `info` (a notification's user info) names, using their number and
-    /// Contacts link as they are in the store now.
-    private func openTextThem(_ info: [String: String]) {
-        let name = info[TextReminder.InfoKey.person] ?? ""
-        let people = (try? context.fetch(Person.everyone)) ?? []
-        inbox.reminder = TextReminder(userInfo: info, person: PeopleByName(people).person(named: name))
+    /// Fills the inbox with the message for the Person `payload` names, using their number and Contacts link as they
+    /// are in the store now.
+    private func openTextThem(_ payload: TextThemPayload) {
+        do {
+            inbox.reminder = try TextReminder(payload, in: context)
+        } catch {
+            Log.reminders.failed("Finding the Person a reminder names", error)
+        }
     }
 }
 
