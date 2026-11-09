@@ -96,7 +96,7 @@ These need no Xcode and take about 30 seconds. `tools/check-tools` runs all thre
 bash tools/check-tools                       # all three
 tools/tests/check/run.sh                     # tools/check, against stand-ins for xcodebuild, xcrun and tools/check-logs
 tools/tests/run-checks/run.sh                # the Stop hook, .claude/hooks/run-checks.sh
-python3 -B -m unittest discover -s tools     # tools/check-logs
+python3 -B -m unittest discover -s tools     # tools/check-logs and tools/check_helper.py
 ```
 
 `tools/tests/run-checks/run.sh` runs the hook on a throwaway repository whose `tools/check` fails while a Swift file holds `BROKEN`, with stand-ins for xcodebuild, curl (LM Studio) and claude (the local model). It covers when the hook runs the unit tests and when the tools' tests (a stand-in `tools/check-tools` that fails while a file under `tools/` or `.claude/hooks/` holds `TOOLBUG`), what it hands back, the three-failure limit, and the local fix: that a failed attempt leaves the worktree, the index and the stash list as they were. A change to the hook comes with a case there.
