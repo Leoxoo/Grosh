@@ -233,8 +233,7 @@ private struct Importer {
         let category = try named.flatMap { $0.type == kind.forgivenType ? $0 : nil }
             ?? context.otherCategory(kind.forgivenType)
         transaction.forgivenCents = forgiven.amount.cents
-        transaction.forgivenDay = forgiven.day
-        transaction.forgivenNote = forgiven.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        transaction.markForgiven(on: forgiven.day, note: forgiven.note)
         transaction.forgivenCategory = category
     }
 
@@ -359,7 +358,7 @@ private struct Importer {
                 unlinked.append(payment)
                 continue
             }
-            try open.remove(at: index).linkPaymentWithoutSaving(payment)
+            try open.remove(at: index).linkPayment(payment)
         }
         return unlinked
     }

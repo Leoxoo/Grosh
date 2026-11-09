@@ -49,7 +49,7 @@ extension Transaction {
     func confirmAmount(cents: Int) throws {
         amountCents = cents * (amountCents < 0 ? -1 : 1)
         clearEstimate()
-        try modelContext?.save()
+        try saveToStore()
     }
 
     /// Clears the Estimated mark and its reminder, once the amount has been confirmed or edited.

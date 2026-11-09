@@ -98,7 +98,7 @@ extension Wallet {
     func update(with draft: WalletDraft) throws {
         try draft.validate()
         apply(draft)
-        try modelContext?.save()
+        try saveToStore()
     }
 
     private func apply(_ draft: WalletDraft) {

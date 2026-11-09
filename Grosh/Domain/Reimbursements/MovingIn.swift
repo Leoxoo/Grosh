@@ -56,9 +56,9 @@ extension Reimbursement {
 extension Transaction {
     /// Undoes moving this deposit into an Expense, as it is restored from Recently Deleted: the Reimbursement it became
     /// comes off the Expense, edited since or not, so the money counts once. Doesn't save.
-    func takeBackMovedInReimbursements() {
+    func takeBackMovedInReimbursements() throws {
         for reimbursement in movedIntoReimbursements ?? [] {
-            reimbursement.removeFromExpense()
+            try reimbursement.removeFromExpense()
         }
     }
 }

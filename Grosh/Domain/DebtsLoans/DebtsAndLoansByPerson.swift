@@ -100,14 +100,4 @@ struct DebtsAndLoansByPerson {
         open = listed.filter { !$0.isSettled }
         settled = listed.filter(\.isSettled)
     }
-
-    /// Everything Show by people lists, in `context`.
-    init(in context: ModelContext) throws {
-        self.init(try DebtsAndLoans(in: context), try ExpectedReimbursements(in: context))
-    }
-
-    /// `person`'s entry, or `nil` when they are not listed.
-    func entry(for person: Person) -> PersonDebtsAndLoans? {
-        (open + settled).first { $0.person === person }
-    }
 }

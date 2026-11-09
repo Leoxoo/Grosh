@@ -123,19 +123,19 @@ extension Reimbursement {
         try draft.validate()
         apply(draft)
         expense?.recountReimbursements()
-        try modelContext?.save()
+        try saveToStore()
     }
 
     /// Removes the entry from its Expense, whose net falls back by its amount. Saves.
     func delete() throws {
-        guard let context = modelContext else { return }
-        removeFromExpense()
+        let context = try storeContext()
+        try removeFromExpense()
         try context.save()
     }
 
     /// ``delete()`` without the save, for a caller that saves once after more changes.
-    func removeFromExpense() {
-        guard let context = modelContext else { return }
+    func removeFromExpense() throws {
+        let context = try storeContext()
         let expense = expense
         expense?.reimbursements?.removeAll { $0 === self }
         expectation?.reimbursements?.removeAll { $0 === self }

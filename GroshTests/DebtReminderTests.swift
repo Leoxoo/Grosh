@@ -55,7 +55,7 @@ struct DebtReminderTests {
         try record(.loan, 20_00, with: "Ivan", remindOn: today.adding(days: 1))
         try record(.loan, 30_00, with: "Olga", remindOn: nil)
 
-        let due = try DebtsAndLoans(in: context).due(on: today)
+        let due = DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions)).due(on: today)
 
         #expect(due.map(\.original) == [anna, pasha])
     }
@@ -65,7 +65,7 @@ struct DebtReminderTests {
 
         try pay(100_00, on: loan)
 
-        #expect(try DebtsAndLoans(in: context).due(on: today).isEmpty)
+        #expect(DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions)).due(on: today).isEmpty)
     }
 
     // MARK: Notifications
@@ -77,7 +77,7 @@ struct DebtReminderTests {
         try record(.loan, 20_00, with: "Ivan", remindOn: today.adding(days: -1))
         try record(.loan, 30_00, with: "Olga", remindOn: nil)
 
-        let reminders = try DebtsAndLoans(in: context).reminders(from: today)
+        let reminders = DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions)).reminders(from: today)
 
         #expect(reminders == [
             DebtReminder(
@@ -99,7 +99,7 @@ struct DebtReminderTests {
         forgive.category = try context.lockedCategory(.otherExpense)
         try Forgiveness.record(forgive, in: context)
 
-        #expect(try DebtsAndLoans(in: context).reminders(from: today).isEmpty)
+        #expect(DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions)).reminders(from: today).isEmpty)
     }
 
     /// `hour`:00 on `today`, in UTC.
@@ -111,7 +111,7 @@ struct DebtReminderTests {
         let loan = try record(.loan, 100_00, with: "Pasha", remindOn: today.adding(days: 5))
         let scheduler = RecordingReminderScheduler<DebtReminder>()
 
-        try await DebtsAndLoans(in: context).reschedule(
+        try await DebtsAndLoans(context.fetch(DebtsAndLoans.transactions)).reschedule(
             at: now(at: 8), calendar: .utcGregorian, after: [], using: scheduler
         )
 
@@ -131,7 +131,7 @@ struct DebtReminderTests {
         try record(.loan, 100_00, with: "Pasha", remindOn: nil)
         let scheduler = RecordingReminderScheduler<DebtReminder>()
 
-        try await DebtsAndLoans(in: context).reschedule(
+        try await DebtsAndLoans(context.fetch(DebtsAndLoans.transactions)).reschedule(
             at: now(at: 8), calendar: .utcGregorian, after: [], using: scheduler
         )
 
@@ -140,7 +140,7 @@ struct DebtReminderTests {
 
     @Test func aReminderForTodayArrivesAtNineOrRightAwayWhenSetAfterNine() throws {
         let loan = try record(.loan, 100_00, with: "Pasha", remindOn: today)
-        let list = try DebtsAndLoans(in: context)
+        let list = DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions))
 
         let setBeforeNine = list.reminders(at: now(at: 8), calendar: .utcGregorian, after: [])
         let setAfterNine = list.reminders(at: now(at: 14), calendar: .utcGregorian, after: [])
@@ -152,7 +152,7 @@ struct DebtReminderTests {
 
     @Test func aReminderForTodayThatHasArrivedIsNotSentAgain() throws {
         try record(.loan, 100_00, with: "Pasha", remindOn: today)
-        let list = try DebtsAndLoans(in: context)
+        let list = DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions))
         let sentAtNine = list.reminders(from: today)
 
         #expect(list.reminders(at: now(at: 14), calendar: .utcGregorian, after: sentAtNine).isEmpty)
@@ -162,11 +162,11 @@ struct DebtReminderTests {
 
     @Test func movingAReminderToTodayAfterNineSendsItRightAway() throws {
         let loan = try record(.loan, 100_00, with: "Pasha", remindOn: today.adding(days: 7))
-        let beforeTheMove = try DebtsAndLoans(in: context).reminders(from: today)
+        let beforeTheMove = DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions)).reminders(from: today)
 
         try loan.setReminder(today)
 
-        let handed = try DebtsAndLoans(in: context).reminders(at: now(at: 14), calendar: .utcGregorian, after: beforeTheMove)
+        let handed = DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions)).reminders(at: now(at: 14), calendar: .utcGregorian, after: beforeTheMove)
         #expect(handed.map(\.arrival) == [.rightAway])
     }
 
@@ -198,7 +198,7 @@ struct DebtReminderTests {
         let newer = try record(.debt, 10_00, with: "Newer", remindOn: nil, on: today.adding(days: -5))
         let older = try record(.debt, 10_00, with: "Older", remindOn: nil, on: today.adding(days: -50))
 
-        #expect(try DebtsAndLoans(in: context).open.map(\.original) == [soon, late, older, newer])
+        #expect(DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions)).open.map(\.original) == [soon, late, older, newer])
     }
 
     // MARK: People
@@ -208,7 +208,7 @@ struct DebtReminderTests {
         let pasha = try #require(loan.orderedPeople.first)
         pasha.rename(to: "Pavel")
 
-        let reminders = try DebtsAndLoans(in: context).reminders(from: today)
+        let reminders = DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions)).reminders(from: today)
 
         #expect(reminders.map(\.withName) == ["Pavel"])
         #expect(reminders.first?.body.contains("Pavel") == true)

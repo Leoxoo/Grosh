@@ -35,6 +35,9 @@ final class Wallet {
         get { PaletteColor(storedName: colorName) }
         set { colorName = newValue.rawValue }
     }
+
+    /// Whether the wallet is in Recently Deleted.
+    var isInRecentlyDeleted: Bool { deletedAt != nil }
 }
 
 nonisolated extension Optional where Wrapped == Wallet {

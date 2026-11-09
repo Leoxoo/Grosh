@@ -199,7 +199,7 @@ extension SpentOrIncome {
 
 #Preview {
     HomeMonthGraphPreview()
-        .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+        .modelContainer(try! StoreOpening.open(inMemory: true))
 }
 
 /// Home's Month graph on the month of the day the preview shows.

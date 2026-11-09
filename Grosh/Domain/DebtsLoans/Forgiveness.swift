@@ -98,6 +98,6 @@ extension Transaction {
         forgivenCents = nil
         forgivenCategory = nil
         clearForgivenMark()
-        try modelContext?.save()
+        try saveToStore()
     }
 }

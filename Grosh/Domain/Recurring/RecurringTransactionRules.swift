@@ -234,13 +234,12 @@ extension RecurringTransaction {
     @MainActor
     func update(with draft: RecurringDraft, today: CalendarDay) throws {
         try draft.validate()
+        let context = try storeContext()
         // What fell due under the old schedule is made under it first, before the edit reshapes what is still to come.
-        if let context = modelContext {
-            makeDueTransactions(through: today, in: context)
-        }
+        makeDueTransactions(through: today, in: context)
         apply(draft)
         skipOccurrences(through: today)
-        try modelContext?.save()
+        try context.save()
     }
 
     /// Moves the schedule to Recently Deleted, after making what has fallen due by `today` so no due day is lost. The

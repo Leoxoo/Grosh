@@ -40,9 +40,7 @@ enum UITestStore {
             exit(0)
         }
         let container = try BenchmarkStore.open(at: url)
-        // Seeded as the app's own store is (GroshStore.makeSeededContainer).
-        try CategorySeeder.seedIfNeeded(in: container.mainContext)
-        try CategorySeeder.restoreMissingDefaults(in: container.mainContext)
+        try StoreOpening.prepare(container.mainContext)
         return container
     }
 

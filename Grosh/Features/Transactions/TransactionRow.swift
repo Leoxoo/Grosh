@@ -135,15 +135,3 @@ struct ForgivenBadge: View {
             .capsuleBadge(.settled, on: .settled)
     }
 }
-
-extension Transaction {
-    /// The category's name, or "Uncategorized" for a transaction filed under none.
-    var categoryName: String { Category.name(of: category) }
-}
-
-extension Category {
-    /// `category`'s name, or "Uncategorized" for none.
-    static func name(of category: Category?) -> String {
-        category?.name ?? String(localized: Strings.Common.uncategorized)
-    }
-}

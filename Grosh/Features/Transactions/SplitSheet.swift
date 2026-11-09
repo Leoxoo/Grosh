@@ -120,7 +120,7 @@ struct SplitSheet: View {
                     Text(Strings.Transactions.chooseAPart).tag(SplitPartRef?.none)
                     Text(Strings.Transactions.thisTransaction).tag(SplitPartRef?.some(.original))
                     ForEach(draft.parts.indices, id: \.self) { part in
-                        Text("\(draft.parts[part].categoryName), \(draft.parts[part].amount.formatted())")
+                        Text("\(Category.name(of: draft.parts[part].category)), \(draft.parts[part].amount.formatted())")
                             .tag(SplitPartRef?.some(.part(part)))
                     }
                 } label: {
@@ -175,11 +175,6 @@ extension SplitPartRef: Identifiable {
     var id: Self { self }
 }
 
-private extension SplitPart {
-    /// The category's name, or "Uncategorized" before one is chosen, as a transaction's row names it.
-    var categoryName: String { Category.name(of: category) }
-}
-
 /// A part with its category, date, note and amount. The amount is red while it is not above zero.
 private struct SplitPartRow: View {
     let part: SplitPart
@@ -188,7 +183,7 @@ private struct SplitPartRow: View {
         HStack(spacing: 12) {
             CategoryIcon(category: part.category)
             VStack(alignment: .leading, spacing: 2) {
-                Text(part.categoryName)
+                Text(Category.name(of: part.category))
                     .lineLimit(1)
                 Text(part.day.date().formatted(date: .abbreviated, time: .omitted))
                     .font(.caption)

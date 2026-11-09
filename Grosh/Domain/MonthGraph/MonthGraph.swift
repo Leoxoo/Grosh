@@ -104,8 +104,8 @@ struct MonthGraph {
         projection?.dailyTotals.map { Point(position: position(of: $0.day), total: $0.total) }
     }
 
-    /// Expected by month end: where the dotted line ends, or `nil` without one.
-    var expectedByMonthEnd: Money? { projection?.dailyTotals.last?.total }
+    /// Expected by the period's end: where the dotted line ends, or `nil` without one.
+    var expectedByPeriodEnd: Money? { projection?.dailyTotals.last?.total }
 
     /// The period's total so far, the tab's headline: where the line ends.
     var headline: Money { dailyTotals.last?.total ?? Money(cents: 0) }

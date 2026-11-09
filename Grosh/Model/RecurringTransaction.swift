@@ -1,6 +1,33 @@
 import Foundation
 import SwiftData
 
+/// What sort of Recurring transaction it is, kept apart from its category. The Recurring tab lists them in this order.
+nonisolated enum RecurringKind: String, CaseIterable, Sendable {
+    case bill, subscription, purchase, regular
+}
+
+/// The unit a repeat counts in.
+nonisolated enum RepeatUnit: String, CaseIterable, Sendable {
+    case day, week, month, year
+}
+
+/// The kind of end the form offers. The end's date or count completes it.
+nonisolated enum RepeatEndKind: String, CaseIterable, Sendable {
+    case forever, until, afterCount
+}
+
+/// Which day of the month a monthly repeat falls on. The start day decides what each choice names: "on the 29th",
+/// "on the last Thursday", "on the last day".
+nonisolated enum MonthlyDay: String, CaseIterable, Sendable {
+    /// The start day's number. A shorter month falls back to its last day.
+    case sameDay
+    /// The start day's weekday in its week of the month: the second Tuesday. A fifth one is the last such weekday of
+    /// the month, since not every month has a fifth.
+    case nthWeekday
+    /// The last day of the month. Offered only from the 28th on.
+    case lastDay
+}
+
 /// A schedule that makes a transaction on each of its due days: a name, an amount, a wallet, a category, how often it
 /// repeats and when it ends. It is not a transaction and counts in no balance or report (ADR-0005).
 @Model
@@ -58,47 +85,19 @@ final class RecurringTransaction {
 
     init() {}
 
-    /// When the schedule repeats and ends. Changing it reshapes only the occurrences still to come.
-    var schedule: RepeatSchedule {
-        get {
-            RepeatSchedule(
-                start: CalendarDay(rawValue: startDayRaw),
-                rule: RepeatRule(unit: RepeatUnit(rawValue: repeatUnitRaw) ?? .month, every: repeatEvery),
-                end: end,
-                monthlyDay: MonthlyDay(rawValue: monthlyDayRaw) ?? .sameDay
-            )
-        }
-        set {
-            startDayRaw = newValue.start.rawValue
-            repeatUnitRaw = newValue.rule.unit.rawValue
-            repeatEvery = newValue.rule.every
-            monthlyDayRaw = newValue.monthlyDay.rawValue
-            end = newValue.end
-        }
+    var repeatUnit: RepeatUnit {
+        get { RepeatUnit(rawValue: repeatUnitRaw) ?? .month }
+        set { repeatUnitRaw = newValue.rawValue }
     }
 
-    /// When the schedule stops making occurrences.
-    var end: RepeatEnd {
-        get {
-            switch RepeatEndKind(rawValue: endKindRaw) ?? .forever {
-            case .forever: .forever
-            case .until: .until(CalendarDay(rawValue: untilDayRaw ?? startDayRaw))
-            case .afterCount: .afterCount(occurrenceLimit ?? 1)
-            }
-        }
-        set {
-            endKindRaw = newValue.kind.rawValue
-            if case .until(let last) = newValue {
-                untilDayRaw = last.rawValue
-            } else {
-                untilDayRaw = nil
-            }
-            if case .afterCount(let count) = newValue {
-                occurrenceLimit = count
-            } else {
-                occurrenceLimit = nil
-            }
-        }
+    var monthlyDay: MonthlyDay {
+        get { MonthlyDay(rawValue: monthlyDayRaw) ?? .sameDay }
+        set { monthlyDayRaw = newValue.rawValue }
+    }
+
+    var endKind: RepeatEndKind {
+        get { RepeatEndKind(rawValue: endKindRaw) ?? .forever }
+        set { endKindRaw = newValue.rawValue }
     }
 
     /// What sort of Recurring transaction it is, which the Recurring tab groups it by.
@@ -112,9 +111,6 @@ final class RecurringTransaction {
     var subscriptionIcon: Data? {
         kind == .subscription ? iconData : nil
     }
-
-    /// Whether each transaction it makes starts Estimated: a Bill whose amount varies.
-    var estimatesAmount: Bool { kind.estimates(amountVaries: amountVaries) }
 
     /// The currency its amounts are in: its wallet's, or the default while it has no wallet.
     var currencyCode: String { wallet.currencyCodeOrDefault }

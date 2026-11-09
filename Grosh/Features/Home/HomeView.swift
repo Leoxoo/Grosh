@@ -107,5 +107,5 @@ private struct TotalBalanceView: View {
 
 #Preview {
     HomeView()
-        .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+        .modelContainer(try! StoreOpening.open(inMemory: true))
 }
