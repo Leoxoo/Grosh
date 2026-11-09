@@ -15,7 +15,7 @@ struct SideDetailsView: View {
     /// Whether the Breakdown or the Trend is shown, chosen with the segmented control.
     @State private var shows = Shows.breakdown
     /// Whether the comparison card compares with Last year, which Home's Month graph shares.
-    @AppStorage(AppSettings.comparesWithLastYearKey) private var comparesWithLastYear = false
+    @AppStorage(AppSettings.comparesWithLastYearKey) private var comparesWithLastYear = AppSettings.comparesWithLastYearDefault
 
     @Query private var recurringTransactions: [RecurringTransaction]
     @Environment(\.today) private var today

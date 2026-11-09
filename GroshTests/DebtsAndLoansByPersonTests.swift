@@ -272,7 +272,7 @@ struct DebtsAndLoansByPersonTests {
     // MARK: The remembered choice
 
     @Test func showByLoanOrDebtIsTodaysListAndTheChoiceIsKeptByItsRawValue() {
-        #expect(DebtsLoansGrouping.default == .loanOrDebt)
+        #expect(AppSettings.debtsLoansGroupingDefault == .loanOrDebt)
         #expect(DebtsLoansGrouping(rawValue: DebtsLoansGrouping.people.rawValue) == .people)
         #expect(DebtsLoansGrouping(rawValue: DebtsLoansGrouping.loanOrDebt.rawValue) == .loanOrDebt)
         #expect(DebtsLoansGrouping(rawValue: "something else") == nil)
