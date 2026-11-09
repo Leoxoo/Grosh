@@ -31,12 +31,11 @@ struct EstimatedAmountEditor: View {
     }
 
     private func save() {
-        do {
+        let succeeded = Log.recurring.perform("Confirming an estimated amount", errorMessage: &errorMessage) {
             try transaction.confirmAmount(cents: entry.cents ?? 0)
+        }
+        if succeeded {
             dismiss()
-        } catch {
-            Log.recurring.failed("Confirming an estimated amount", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

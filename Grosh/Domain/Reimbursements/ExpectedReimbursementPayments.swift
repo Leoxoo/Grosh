@@ -48,18 +48,37 @@ extension ExpectedReimbursement {
         try validate(draft)
         guard let expense else { throw ReimbursementRuleError.notAnExpense }
         let entry = ReimbursementDraft(amount: draft.amount, day: draft.day, note: draft.note)
-        guard expense.isElsewhere(draft.wallet), let wallet = draft.wallet else {
-            return .onExpense(try Reimbursement.add(entry, to: expense, for: self, in: context))
-        }
-        return .inOtherWallet(
-            try expense.recordPaybackElsewhere(entry, into: wallet, from: person, for: self, in: context)
-        )
+        return try expense.recordPayback(entry, into: draft.wallet, from: person, for: self, in: context)
     }
 }
 
 // MARK: Paid back into another wallet
 
 extension Transaction {
+    /// Checks money paid back on this Expense before anything is recorded: the amount above zero, and the Expense able
+    /// to take it in `wallet` (``checkPayback(into:)``).
+    func validatePayback(_ draft: ReimbursementDraft, into wallet: Wallet?) throws {
+        try draft.validate()
+        try checkPayback(into: wallet)
+    }
+
+    /// Someone paid this Expense back `draft`, into `wallet`: into its own wallet (or none chosen) it is a
+    /// Reimbursement on the Expense (ADR-0008); into another wallet it is a transaction there, linked to the Expense
+    /// (``recordPaybackElsewhere(_:into:from:for:in:)``, ADR-0010). `person` paid it, against `expectation`, when
+    /// someone owed it. Saves.
+    @discardableResult
+    func recordPayback(
+        _ draft: ReimbursementDraft, into wallet: Wallet?, from person: Person? = nil,
+        for expectation: ExpectedReimbursement? = nil, in context: ModelContext
+    ) throws -> RecordedPayment {
+        guard isElsewhere(wallet), let wallet else {
+            return .onExpense(try Reimbursement.add(draft, to: self, for: expectation, in: context))
+        }
+        return .inOtherWallet(
+            try recordPaybackElsewhere(draft, into: wallet, from: person, for: expectation, in: context)
+        )
+    }
+
     /// Whether money received into `wallet` is paid back elsewhere: a transaction in that wallet (ADR-0010) rather than
     /// a Reimbursement on this Expense (ADR-0008).
     func isElsewhere(_ wallet: Wallet?) -> Bool {
@@ -155,7 +174,7 @@ extension Transaction {
         paybacksElsewhere.map { payback in
             let amount = Self.paidBackText(payback.amountCents, locale: locale)
             let wallet = payback.wallet?.name ?? ""
-            return String(localized: "\(amount) to \(wallet)")
+            return String(localized: Strings.OwesMe.paidTo(amount, wallet))
         }
         .joined(separator: ", ")
     }

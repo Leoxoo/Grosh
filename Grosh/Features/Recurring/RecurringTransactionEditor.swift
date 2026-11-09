@@ -25,10 +25,12 @@ struct RecurringTransactionEditor: View {
     @Environment(\.today) private var today
 
     var body: some View {
-        RecurringForm(mode: mode, startingDraft: startingDraft)
+        MadeOnce(make: makeStartingDraft) { draft in
+            RecurringForm(mode: mode, startingDraft: draft)
+        }
     }
 
-    private var startingDraft: RecurringDraft {
+    private func makeStartingDraft() -> RecurringDraft {
         switch mode {
         case .add:
             var draft = RecurringDraft(startDay: today)
@@ -70,35 +72,21 @@ private struct RecurringForm: View {
         if case .edit = mode { false } else { true }
     }
 
-    /// The Recurring transaction being edited, or `nil` when it is new.
     private var editing: RecurringTransaction? {
         if case .edit(let recurring) = mode { recurring } else { nil }
     }
 
     private var currencyCode: String { draft.wallet.currencyCodeOrDefault }
 
-    /// The estimate a varying Bill starts at: the average of its category's history, or `nil` when there is none.
-    private var estimateCents: Int? {
-        guard draft.estimatesAmount, let category = draft.category else { return nil }
-        return AmountEstimate.cents(for: category, currencyCode: currencyCode)
-    }
-
     /// The draft with the amounts the keypad comes to. A total of zero is no total.
     private var draftToSave: RecurringDraft {
-        var result = draft
-        result.amount = Money(cents: entry.cents ?? 0, currencyCode: currencyCode)
-        result.estimateCents = estimateCents
+        var result = draft.withAmount(of: entry, in: currencyCode)
         if let cents = totalEntry.cents, cents > 0 {
             result.total = Money(cents: cents, currencyCode: currencyCode)
         } else {
             result.total = nil
         }
         return result
-    }
-
-    /// The amount is tinted like the transactions it makes: red for an expense, green for income.
-    private var amountTint: Color {
-        draft.category.map { Money(cents: $0.sign).tint } ?? .primary
     }
 
     var body: some View {
@@ -148,7 +136,8 @@ private struct RecurringForm: View {
     private func detailsSection(_ fields: KeypadSheetFields) -> some View {
         Section {
             TextField(Strings.Common.name, text: $draft.name)
-            fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: amountTint)
+            // Tinted like the transactions it makes: red for an expense, green for income.
+            fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: MoneyDirection(category: draft.category).tint)
             WalletPicker(title: Strings.Common.wallet, selection: $draft.wallet)
             CategoryPicker(title: Strings.Common.category, type: draft.type, selection: $draft.category)
             Picker(Strings.Common.kind, selection: $draft.kind) {
@@ -184,7 +173,7 @@ private struct RecurringForm: View {
     }
 
     private var estimateText: String {
-        guard let cents = estimateCents else { return String(localized: Strings.Recurring.noneYet) }
+        guard let cents = draft.estimateCents else { return String(localized: Strings.Recurring.noneYet) }
         return Money(cents: cents, currencyCode: currencyCode).formatted()
     }
 
@@ -256,10 +245,10 @@ private struct RecurringForm: View {
     }
 
     private func save() {
-        do {
-            // A new schedule, or one whose start day has been moved, offers the occurrences that have already come due.
-            let startChanged = editing.map { $0.schedule.start != draftToSave.startDay } ?? true
-            let saved: RecurringTransaction
+        // A new schedule, or one whose start day has been moved, offers the occurrences that have already come due.
+        let startChanged = editing.map { $0.schedule.start != draftToSave.startDay } ?? true
+        var saved: RecurringTransaction?
+        Log.recurring.perform("Saving a Recurring transaction", errorMessage: &errorMessage) {
             switch mode {
             case .add, .duplicate:
                 saved = try RecurringTransaction.create(draftToSave, today: today, in: context)
@@ -267,15 +256,13 @@ private struct RecurringForm: View {
                 try recurring.update(with: draftToSave, today: today)
                 saved = recurring
             }
-            let unentered = saved.unenteredOccurrences(through: today)
-            if startChanged && !unentered.isEmpty {
-                pastPrompt = PastPrompt(recurring: saved, days: unentered)
-            } else {
-                dismiss()
-            }
-        } catch {
-            Log.recurring.failed("Saving a Recurring transaction", error)
-            errorMessage = error.localizedDescription
+        }
+        guard let saved else { return }
+        let unentered = saved.unenteredOccurrences(through: today)
+        if startChanged && !unentered.isEmpty {
+            pastPrompt = PastPrompt(recurring: saved, days: unentered)
+        } else {
+            dismiss()
         }
     }
 }

@@ -52,13 +52,10 @@ struct RelatedTransactionsSection: View {
     /// Merges the split back, then leaves this transaction's detail if it was one of the parts merged away.
     private func undoSplit() {
         let id = transaction.persistentModelID
-        do {
+        Log.store.perform("Undoing a split", errorMessage: &errorMessage) {
             if try transaction.undoSplit(in: context).persistentModelID != id {
                 dismiss()
             }
-        } catch {
-            Log.store.failed("Undoing a split", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

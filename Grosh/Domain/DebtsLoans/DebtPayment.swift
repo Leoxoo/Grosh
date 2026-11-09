@@ -29,6 +29,11 @@ struct DebtPaymentDraft {
     /// The part of the amount above what is outstanding.
     var overpaid: Money { loanOrDebt.split(amount).overpaid }
 
+    /// The overpayment as it moves the wallet: money in above a Loan, money out above a Debt.
+    var signedOverpaid: Money {
+        Money(cents: overpaid.cents * loanOrDebt.kind.paymentSign, currencyCode: overpaid.currencyCode)
+    }
+
     /// Checks the payment against `standing`, the Loan or Debt as it is now, before anything is recorded: it must
     /// still be open, the amount above zero, and an overpayment filed under a category of ``overpaymentType``.
     func validate(against standing: LoanOrDebt) throws {

@@ -27,60 +27,56 @@ struct ExpectationPaymentEditor: View {
 
     private var currencyCode: String { expectation.currencyCode }
 
-    /// The draft with the amount the keypad comes to.
-    private var draftToSave: ExpectationPaymentDraft {
-        var result = draft
-        result.amount = Money(cents: entry.cents ?? 0, currencyCode: currencyCode)
-        return result
-    }
-
-    /// Why the payment can't be recorded as it is, or `nil` when it can.
-    private var problem: Error? {
-        do {
-            try expectation.validate(draftToSave)
-            return nil
-        } catch {
-            return error
-        }
-    }
+    private var draftToSave: ExpectationPaymentDraft { draft.withAmount(of: entry, in: currencyCode) }
 
     var body: some View {
-        let problem = self.problem
+        let check = RuleCheck { try expectation.validate(draftToSave) }
         KeypadSheet(
-            title: Text("Record Payment"),
+            title: Text(Strings.DebtsLoans.recordPayment),
             entry: $entry,
-            canSave: problem == nil,
+            canSave: check.passes,
             save: save
         ) { fields in
             Section {
-                LabeledContent("From", value: expectation.personName)
-                LabeledContent("Outstanding") {
+                LabeledContent(Strings.Common.from, value: expectation.personName)
+                LabeledContent(Strings.DebtsLoans.outstanding) {
                     Text(expectation.outstanding?.formatted() ?? "?")
                         .monospacedDigit()
                 }
-                fields.amountRow("Amount", currencyCode: currencyCode, tint: Money(cents: 1).tint)
-                WalletPicker(title: "Received In", selection: $draft.wallet)
-                DayStepper(title: "Date", day: $draft.day)
+                fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: MoneyDirection.moneyIn.tint)
+                WalletPicker(title: Strings.Reimbursements.receivedIn, selection: $draft.wallet)
+                DayStepper(title: Strings.Common.date, day: $draft.day)
                 fields.noteField($draft.note)
             } footer: {
-                if let problem = problem as? ExpectedReimbursementRuleError, problem == .otherCurrency {
-                    Text(problem.localizedDescription)
-                } else if expectation.expense?.isElsewhere(draft.wallet) == true {
-                    Text("Recorded as money in that wallet, on the day you received it, linked to the expense. The expense shows its net in the Total.")
-                } else {
-                    Text("Kept on the expense, which then counts what is left of it. No transaction is made.")
-                }
+                PaybackFooter(problem: check.shownProblem, isElsewhere: expectation.expense?.isElsewhere(draft.wallet) == true)
             }
         }
-        .errorAlert("Couldn't Record Payment", message: $errorMessage)
+        .errorAlert(Strings.DebtsLoans.couldntRecordPayment, message: $errorMessage)
     }
 
     private func save() {
-        do {
+        let saved = Log.store.perform("Recording a payment on Owes me", errorMessage: &errorMessage) {
             try expectation.recordPayment(draftToSave, in: context)
+        }
+        if saved {
             dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+/// The footer of a sheet that records money paid back on an Expense: why it can't be saved yet, or else where the money
+/// goes: kept on the Expense in its own wallet, or a transaction in another one (ADR-0010).
+struct PaybackFooter: View {
+    let problem: Error?
+    let isElsewhere: Bool
+
+    var body: some View {
+        if let problem {
+            Text(problem.localizedDescription)
+        } else if isElsewhere {
+            Text(Strings.Reimbursements.elsewhereFooter)
+        } else {
+            Text(Strings.Reimbursements.editorFooter)
         }
     }
 }

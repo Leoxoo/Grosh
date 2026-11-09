@@ -74,6 +74,7 @@ struct PhotoField: View {
             }
             pickedPhoto = PickedPhoto(image: image)
         } catch {
+            Log.store.failed("Loading the chosen photo", error, expected: true)
             errorMessage = error.localizedDescription
         }
     }

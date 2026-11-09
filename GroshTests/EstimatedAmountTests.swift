@@ -60,15 +60,6 @@ struct EstimatedAmountTests {
         return try #require(recurring.attachedTransactions.first)
     }
 
-    /// The average the editor shows for `category`, which it sets on the draft as the estimate.
-    private func estimate(for category: Grosh.Category) throws -> Int? {
-        try context.save()
-        return AmountEstimate.cents(
-            among: try context.fetch(FetchDescriptor<Transaction>()), for: category,
-            currencyCode: store.wallet.currencyCode
-        )
-    }
-
     @Test func aVaryingBillMakesAnEstimatedTransactionAtTheAverageOfItsCategory() throws {
         let utilities = category("Utilities")
         try record(1_000, under: utilities)
@@ -97,9 +88,8 @@ struct EstimatedAmountTests {
         var draft = electricity(under: water)
         draft.name = "Water"
         draft.amount = Money(cents: 0)
-        #expect(!draft.canSave)
 
-        draft.estimateCents = try estimate(for: water)
+        #expect(draft.estimateCents == 5_000)
         #expect(draft.canSave)
 
         let recurring = try RecurringTransaction.create(draft, today: today, in: context)
@@ -116,11 +106,33 @@ struct EstimatedAmountTests {
         #expect(!draft.canSave)
     }
 
-    @Test func aFixedBillNeedsItsAmountEvenWhenThereIsAnEstimate() {
-        var draft = electricity(under: category("Water"), varies: false)
+    @Test func aFixedBillNeedsItsAmountEvenWhenItsCategoryHasHistory() throws {
+        let water = category("Water")
+        try record(5_000, under: water)
+        var draft = electricity(under: water, varies: false)
         draft.amount = Money(cents: 0)
-        draft.estimateCents = 5_000
+
+        #expect(draft.estimateCents == nil)
         #expect(!draft.canSave)
+    }
+
+    @Test func theEstimateFollowsTheCategoryAndWhetherTheAmountVaries() throws {
+        let water = category("Water")
+        let gas = category("Gas")
+        try record(5_000, under: water)
+        try record(1_000, under: gas)
+        var draft = electricity(under: water)
+        #expect(draft.estimateCents == 5_000)
+
+        draft.category = gas
+        #expect(draft.estimateCents == 1_000)
+
+        draft.amountVaries = false
+        #expect(draft.estimateCents == nil)
+
+        draft.amountVaries = true
+        draft.kind = .regular
+        #expect(draft.estimateCents == nil)
     }
 
     @Test func aRowShowsTheEstimateOnceThereIsHistoryAndTheTypedAmountUntilThen() throws {

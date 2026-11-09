@@ -183,7 +183,7 @@ private extension KeypadKey {
         case .digit(let digit): Text(verbatim: "\(digit)")
         case .decimalSeparator: Text(Strings.Keypad.decimalPoint)
         case .backspace: Text(Strings.Common.delete)
-        case .allClear: Text(Strings.Keypad.clear)
+        case .allClear: Text(Strings.Common.clear)
         case .operation(.add): Text(Strings.Keypad.plus)
         case .operation(.subtract): Text(Strings.Keypad.minus)
         case .operation(.multiply): Text(Strings.Keypad.times)

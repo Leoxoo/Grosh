@@ -21,43 +21,43 @@ struct ExpectationForgiveSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    LabeledContent("From", value: expectation.personName)
-                    LabeledContent("Outstanding") {
+                    LabeledContent(Strings.Common.from, value: expectation.personName)
+                    LabeledContent(Strings.DebtsLoans.outstanding) {
                         Text(expectation.outstanding?.formatted() ?? "?")
                             .monospacedDigit()
                     }
-                    DayStepper(title: "Date", day: $day)
-                    TextField("Note", text: $note, axis: .vertical)
+                    DayStepper(title: Strings.Common.date, day: $day)
+                    TextField(Strings.Common.note, text: $note, axis: .vertical)
                 } footer: {
-                    Text("Marks it forgiven without adding any transaction. Nothing in your balances or reports changes, because it never counted in either.")
+                    Text(Strings.OwesMe.forgiveFooter)
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("Forgive")
+            .navigationTitle(Strings.DebtsLoans.forgive)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Forgive", action: forgive)
+                    Button(Strings.DebtsLoans.forgive, action: forgive)
                 }
             }
         }
         #if os(macOS)
         .frame(minWidth: 420, idealWidth: 460, minHeight: 320, idealHeight: 380)
         #endif
-        .errorAlert("Couldn't Forgive", message: $errorMessage)
+        .errorAlert(Strings.DebtsLoans.couldntForgive, message: $errorMessage)
     }
 
     private func forgive() {
-        do {
+        let forgiven = Log.store.perform("Forgiving Owes me", errorMessage: &errorMessage) {
             try expectation.forgive(on: day, note: note)
+        }
+        if forgiven {
             dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 }

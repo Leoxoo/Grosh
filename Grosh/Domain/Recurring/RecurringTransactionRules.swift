@@ -67,10 +67,17 @@ nonisolated struct RecurringDraft {
         didSet {
             if wallet !== oldValue {
                 card = nil
+                readEstimate()
             }
         }
     }
-    var category: Category?
+    var category: Category? {
+        didSet {
+            if category !== oldValue {
+                readEstimate()
+            }
+        }
+    }
     var card: Card?
     /// The sort of Recurring transaction it is. A new one starts with its category's default Kind.
     var kind: RecurringKind = .regular {
@@ -80,16 +87,27 @@ nonisolated struct RecurringDraft {
             if kind == .purchase, oldValue != .purchase {
                 endKind = .afterCount
             }
+            if kind != oldValue {
+                readEstimate()
+            }
         }
     }
     /// Only a Bill's amount can vary: each transaction it makes then starts as an estimate, until the real amount is
     /// entered.
-    var amountVaries = false
+    var amountVaries = false {
+        didSet {
+            if amountVaries != oldValue {
+                readEstimate()
+            }
+        }
+    }
     /// For a varying Bill, how many days after an occurrence the user is reminded to enter its real amount.
     var remindAfterDays = 2
-    /// The average a varying Bill's transactions would start at, from its category's history. It stands in for an
-    /// amount left empty. The form sets it, and it is never saved.
-    var estimateCents: Int?
+    /// The average a varying Bill's transactions would start at, from its category's history in its wallet's currency
+    /// (``AmountEstimate``), or `nil` when there is none or the amount doesn't vary. It stands in for an amount left
+    /// empty, and is never saved. It is read again whenever the category, wallet, Kind or "amount varies" changes, so
+    /// the category's history is walked once per change rather than each time the draft is checked.
+    private(set) var estimateCents: Int?
     /// Whether each transaction it makes would start Estimated: a Bill whose amount varies, as on the model.
     var estimatesAmount: Bool { kind.estimates(amountVaries: amountVaries) }
     var note = ""
@@ -146,6 +164,15 @@ nonisolated struct RecurringDraft {
         customRule = schedule.rule
         monthlyDay = schedule.monthlyDay
         end = schedule.end
+        readEstimate()
+    }
+
+    private mutating func readEstimate() {
+        guard estimatesAmount, let category else {
+            estimateCents = nil
+            return
+        }
+        estimateCents = AmountEstimate.cents(for: category, currencyCode: wallet.currencyCodeOrDefault)
     }
 
     /// A new Recurring transaction like `recurring`, starting `today` ("Duplicate"). It copies every field and the Kind's
@@ -207,9 +234,6 @@ nonisolated struct RecurringDraft {
             guard count >= 1 else { throw RecurringRuleError.noOccurrences }
         }
     }
-
-    /// Whether every required field is filled, so Save can be enabled.
-    var canSave: Bool { (try? validate()) != nil }
 }
 
 extension RecurringTransaction {

@@ -188,7 +188,7 @@ nonisolated enum TransactionRuleError: Error, Equatable {
 extension TransactionRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .missingWallet: String(localized: Strings.Common.chooseAWallet)
+        case .missingWallet: String(localized: Strings.Common.addWalletFirst)
         case .missingAmount: String(localized: Strings.Common.enterAmountAboveZero)
         case .missingCategory: String(localized: Strings.Common.chooseACategory)
         case .missingCard: String(localized: Strings.Transactions.missingCard)
@@ -287,7 +287,4 @@ nonisolated extension TransactionDraft {
     var sign: Int {
         category?.sign ?? (type == .expense ? -1 : type == .income ? 1 : 0)
     }
-
-    /// Whether every required field is filled, so Save can be enabled.
-    var canSave: Bool { (try? validate()) != nil }
 }

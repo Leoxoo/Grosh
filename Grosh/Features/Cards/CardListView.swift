@@ -4,8 +4,8 @@ import SwiftUI
 /// Account → Cards: every Card in the order it was added. Tap to see its transactions by statement period or month,
 /// swipe to archive.
 struct CardListView: View {
-    @Query(filter: #Predicate<Card> { !$0.isArchived }, sort: Card.userOrder) private var unarchivedCards: [Card]
-    @Query(filter: #Predicate<Card> { $0.isArchived }, sort: Card.userOrder) private var allArchivedCards: [Card]
+    @Query(Card.unarchived) private var unarchivedCards: [Card]
+    @Query(Card.archived) private var allArchivedCards: [Card]
     @State private var editorMode: EditorMode<Card>?
     @State private var mergeSource: Card?
     @State private var errorMessage: String?
@@ -93,11 +93,8 @@ struct CardListView: View {
 
     /// Runs a change, or shows why it was refused.
     private func perform(_ change: () throws -> Void) {
-        do {
+        Log.store.perform("Changing a card", errorMessage: &errorMessage) {
             try change()
-        } catch {
-            Log.store.failed("Changing a card", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

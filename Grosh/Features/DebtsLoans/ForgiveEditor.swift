@@ -74,12 +74,11 @@ private struct ForgiveForm: View {
     }
 
     private func forgive() {
-        do {
+        let succeeded = Log.store.perform("Forgiving a Loan or Debt", errorMessage: &errorMessage) {
             try Forgiveness.record(draft, in: context)
+        }
+        if succeeded {
             dismiss()
-        } catch {
-            Log.store.failed("Forgiving a Loan or Debt", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

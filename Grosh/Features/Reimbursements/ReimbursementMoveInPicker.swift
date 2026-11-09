@@ -64,12 +64,11 @@ struct ReimbursementMoveInPicker: View {
     }
 
     private func moveIn(_ deposit: Transaction) {
-        do {
+        let succeeded = Log.store.perform("Moving a transaction in", errorMessage: &errorMessage) {
             try Reimbursement.moveIn(deposit, to: expense, in: context)
+        }
+        if succeeded {
             dismiss()
-        } catch {
-            Log.store.failed("Moving a transaction in", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

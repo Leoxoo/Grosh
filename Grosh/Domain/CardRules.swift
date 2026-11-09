@@ -68,6 +68,33 @@ nonisolated extension CardDraft {
         )
     }
 
+    /// A new Card, as Add Card starts it: a Credit card with no name yet.
+    static var new: CardDraft { CardDraft(name: "", kind: .credit, payingWallet: nil) }
+
+    /// Whether the Card can have a statement date: only a Credit card has a statement; a Debit card spends straight
+    /// from its wallet.
+    var offersStatementDate: Bool { kind == .credit }
+
+    /// The draft with `day` as its statement date, or none when `day` is `nil`. Only a Credit card keeps one, so the
+    /// form can remember a day while the Kind is flipped back and forth.
+    func withStatementDay(_ day: Int?) -> CardDraft {
+        var result = self
+        result.statementDay = offersStatementDate ? day : nil
+        return result
+    }
+
+    /// Starts a Card with no paying wallet in the first of `wallets`, the user's wallets in their order.
+    mutating func startPaying(from wallets: [Wallet]) {
+        if payingWallet == nil {
+            payingWallet = wallets.first
+        }
+    }
+
+    /// Sets the last 4 digits from what was typed, keeping only the first four digits 0–9.
+    mutating func setLastFourDigits(typed: String) {
+        lastFourDigits = String(typed.filter { ("0"..."9").contains($0) }.prefix(4))
+    }
+
     /// Sets or removes the Card's image. A Card with an image takes its color from the image's average color, and
     /// removing the image keeps that color.
     mutating func setImage(_ data: Data?) {
@@ -143,6 +170,16 @@ extension Card {
 
     /// The order Cards are listed in everywhere: the order they were added.
     static let userOrder: [SortDescriptor<Card>] = [SortDescriptor(\.sortOrder), SortDescriptor(\.name)]
+
+    /// The unarchived Cards in the user's order, as Account → Cards lists them first.
+    static var unarchived: FetchDescriptor<Card> {
+        FetchDescriptor(predicate: #Predicate { !$0.isArchived }, sortBy: userOrder)
+    }
+
+    /// The archived Cards in the user's order, as Account → Cards lists them below the others.
+    static var archived: FetchDescriptor<Card> {
+        FetchDescriptor(predicate: #Predicate { $0.isArchived }, sortBy: userOrder)
+    }
 
     /// The Cards a transaction in `wallet` can be paid with: the unarchived Cards whose paying wallet it is.
     /// `current` (the Card the transaction already has) is kept at the end when it isn't one of them, for

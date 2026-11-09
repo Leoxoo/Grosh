@@ -24,12 +24,7 @@ struct TransferHalfEditor: View {
 
     private var currencyCode: String { transaction.amount.currencyCode }
 
-    /// The draft with the amount the keypad comes to.
-    private var draftToSave: TransferHalfDraft {
-        var result = draft
-        result.amount = Money(cents: entry.cents ?? 0, currencyCode: currencyCode)
-        return result
-    }
+    private var draftToSave: TransferHalfDraft { draft.withAmount(of: entry, in: currencyCode) }
 
     var body: some View {
         KeypadSheet(
@@ -38,7 +33,8 @@ struct TransferHalfEditor: View {
             Section {
                 wallets
                 fields.amountRow(
-                    Strings.Common.amount, currencyCode: currencyCode, tint: Money(cents: transaction.category?.sign ?? 0).tint
+                    Strings.Common.amount, currencyCode: currencyCode,
+                    tint: MoneyDirection(category: transaction.category).tint
                 )
                 DayStepper(title: Strings.Common.date, day: $draft.day)
                 fields.noteField($draft.note)
@@ -60,35 +56,37 @@ struct TransferHalfEditor: View {
         .errorAlert(Strings.Transfers.couldntSave, message: $errorMessage)
     }
 
-    /// Where the money left and where it went: this half's wallet and, while it is there, the other half's.
-    @ViewBuilder
+    /// Where the money left and where it went: this half's wallet and, while it is there, the other half's, read once
+    /// when the sheet opens.
     private var wallets: some View {
-        let wallets = Log.store.attempt("Reading the wallets of a transfer") { try transaction.transferWallets(in: context) }
-        WalletLabel(title: Strings.Common.from, wallet: wallets?.from)
-        WalletLabel(title: Strings.Common.to, wallet: wallets?.to)
+        MadeOnce {
+            Log.store.attempt("Reading the wallets of a transfer") { try transaction.transferWallets(in: context) }
+        } content: { wallets in
+            WalletLabel(title: Strings.Common.from, wallet: wallets?.from)
+            WalletLabel(title: Strings.Common.to, wallet: wallets?.to)
+        }
     }
 
     /// Saves straight away, or first asks whether to update both halves when the amount or date changed.
     private func confirmSave() {
-        do {
-            if try transaction.offersToUpdateOtherHalf(with: draftToSave, in: context) {
-                isAskingScope = true
-            } else {
-                save(.onlyThisOne)
-            }
-        } catch {
-            Log.store.failed("Checking the other half of a transfer", error)
-            errorMessage = error.localizedDescription
+        var asksScope = false
+        let checked = Log.store.perform("Checking the other half of a transfer", errorMessage: &errorMessage) {
+            asksScope = try transaction.offersToUpdateOtherHalf(with: draftToSave, in: context)
+        }
+        guard checked else { return }
+        if asksScope {
+            isAskingScope = true
+        } else {
+            save(.onlyThisOne)
         }
     }
 
     private func save(_ scope: TransferUpdateScope) {
-        do {
+        let saved = Log.store.perform("Saving a transfer", errorMessage: &errorMessage) {
             try transaction.update(with: draftToSave, scope: scope, in: context)
+        }
+        if saved {
             dismiss()
-        } catch {
-            Log.store.failed("Saving a transfer", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

@@ -53,7 +53,7 @@ private struct WalletForm: View {
         startingEntry.cents.map { Money(cents: $0, currencyCode: draft.currencyCode) }
     }
 
-    private var canSave: Bool { (try? draft.validate()) != nil && (!mode.isAdding || startingBalance != nil) }
+    private var canSave: Bool { draft.canSave && (!mode.isAdding || startingBalance != nil) }
 
     var body: some View {
         NavigationStack {
@@ -141,7 +141,7 @@ private struct WalletForm: View {
         Section {
             AmountRow(
                 Strings.Wallets.currentBalance, field: "currentBalance", entry: $startingEntry,
-                tint: Money(cents: startingEntry.cents ?? 0).tint, font: .body
+                tint: (startingBalance?.direction ?? .neither).tint, font: .body
             )
             DayStepper(title: Strings.Common.date, day: $startingDay)
         } header: {
@@ -165,12 +165,11 @@ private struct WalletForm: View {
 
     /// Runs a change and closes the sheet, or shows why the change was refused.
     private func perform(_ change: () throws -> Void) {
-        do {
+        let succeeded = Log.store.perform("Changing a wallet", errorMessage: &errorMessage) {
             try change()
+        }
+        if succeeded {
             dismiss()
-        } catch {
-            Log.store.failed("Changing a wallet", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

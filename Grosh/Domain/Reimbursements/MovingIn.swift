@@ -29,6 +29,26 @@ extension Transaction {
     static func paidBackText(_ cents: Int, locale: Locale = .current) -> String {
         "+" + Money(cents: cents).plainNumber(locale: locale)
     }
+
+    /// What a paid-back Expense comes to in a list showing `listed`, as its row shows it after the amount: its net, or
+    /// in the Total its net less what was paid back into other wallets (ADR-0010). `nil` when nothing was paid back or
+    /// it comes to the amount itself. The stored figures are read first, so a row never paid back reads nothing else.
+    func paidBackNet(_ listed: ListedAmount) -> Money? {
+        let isInTotal = listed == .netInTotal
+        guard reimbursedCents > 0 || (isInTotal && hasPaybacksElsewhere) else { return nil }
+        let net = isInTotal ? totalViewNet : self.net
+        return net.cents == amountCents ? nil : net
+    }
+
+    /// What was paid back on an Expense as its row lists it under the title in a list showing `listed`: its
+    /// Reimbursements, "+20, +10, +3", then in a wallet's own list (not the Total) what was paid back into other wallets,
+    /// "+20 to Cash" (ADR-0010). Empty when nothing was. The stored figures are read first, so a row without
+    /// Reimbursements never reads them.
+    func paidBackSummary(_ listed: ListedAmount, locale: Locale = .current) -> String {
+        let summary = reimbursedCents > 0 ? reimbursementSummary(locale: locale) : ""
+        let elsewhere = listed == .net && hasPaybacksElsewhere ? elsewhereSummary(locale: locale) : ""
+        return [summary, elsewhere].filter { !$0.isEmpty }.joined(separator: ", ")
+    }
 }
 
 nonisolated extension ReimbursementDraft {

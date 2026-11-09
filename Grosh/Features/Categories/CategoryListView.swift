@@ -76,7 +76,7 @@ struct CategoryListView: View {
                 perform { try catalog.delete(category) }
             }
         } message: { category in
-            Text(CategoryEditor.deleteMessage(for: category))
+            Text(category.deleteMessage)
         }
         .errorAlert(Strings.Categories.couldntChange, message: $errorMessage)
     }
@@ -86,16 +86,18 @@ struct CategoryListView: View {
     private var categorySections: some View {
         Section {
             ForEach(rows) { category in
+                // Counted in the store once per row, for both the swipe actions and the menu.
+                let canDelete = catalog.canDelete(category)
                 Button {
                     editorMode = .edit(category)
                 } label: {
                     row(for: category)
                 }
                 .buttonStyle(.plain)
-                .swipeActions { actions(for: category) }
+                .swipeActions { actions(for: category, canDelete: canDelete) }
                 .contextMenu {
                     Button(Strings.Common.edit, systemImage: "pencil") { editorMode = .edit(category) }
-                    actions(for: category)
+                    actions(for: category, canDelete: canDelete)
                 }
             }
         } footer: {
@@ -176,9 +178,9 @@ struct CategoryListView: View {
     }
 
     @ViewBuilder
-    private func actions(for category: Category) -> some View {
+    private func actions(for category: Category, canDelete: Bool) -> some View {
         if !category.isLocked {
-            if catalog.canDelete(category) {
+            if canDelete {
                 Button(Strings.Common.delete, systemImage: "trash", role: .destructive) { deleting = category }
             }
             Button(Strings.Common.merge, systemImage: "arrow.triangle.merge") { merging = category }
@@ -194,11 +196,8 @@ struct CategoryListView: View {
     }
 
     private func perform(_ change: () throws -> Void) {
-        do {
+        Log.store.perform("Changing a category", errorMessage: &errorMessage) {
             try change()
-        } catch {
-            Log.store.failed("Changing a category", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

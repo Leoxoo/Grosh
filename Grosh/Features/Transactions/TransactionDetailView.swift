@@ -21,7 +21,7 @@ struct TransactionDetailView: View {
 
     var body: some View {
         Group {
-            if transaction.isDeleted || transaction.modelContext == nil || transaction.isInRecentlyDeleted {
+            if transaction.isGone || transaction.isInRecentlyDeleted {
                 ContentUnavailableView(Strings.Transactions.transactionDeleted, systemImage: "trash")
             } else {
                 details

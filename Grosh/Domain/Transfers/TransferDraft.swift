@@ -18,6 +18,7 @@ nonisolated struct TransferDraft {
 
 /// Why a transfer can't be saved yet.
 nonisolated enum TransferRuleError: Error, Equatable {
+    /// A wallet is only missing when there is no second one to pick, so both say to add another.
     case missingSourceWallet
     case missingDestinationWallet
     /// A transfer moves money between two different wallets.
@@ -31,8 +32,7 @@ nonisolated enum TransferRuleError: Error, Equatable {
 extension TransferRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .missingSourceWallet: String(localized: Strings.Transfers.missingSourceWallet)
-        case .missingDestinationWallet: String(localized: Strings.Transfers.missingDestinationWallet)
+        case .missingSourceWallet, .missingDestinationWallet: String(localized: Strings.Transfers.twoWalletsNeeded)
         case .sameWallet: String(localized: Strings.Common.chooseTwoDifferentWallets)
         case .missingAmount: String(localized: Strings.Common.enterAmountAboveZero)
         case .notATransferHalf: String(localized: Strings.Transfers.notATransferHalf)
@@ -48,7 +48,4 @@ nonisolated extension TransferDraft {
         guard from != to else { throw TransferRuleError.sameWallet }
         guard amount.cents > 0 else { throw TransferRuleError.missingAmount }
     }
-
-    /// Whether every required field is filled, so Save can be enabled.
-    var canSave: Bool { (try? validate()) != nil }
 }

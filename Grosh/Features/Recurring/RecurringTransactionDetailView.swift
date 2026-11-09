@@ -23,7 +23,7 @@ struct RecurringTransactionDetailView: View {
 
     /// Whether the schedule was deleted from this screen. Nothing is read from it then, since a deleted model still on
     /// screen can't be read.
-    private var isRemoved: Bool { recurring.isDeleted || recurring.modelContext == nil }
+    private var isRemoved: Bool { recurring.isGone }
 
     var body: some View {
         if isRemoved {
@@ -175,30 +175,23 @@ struct RecurringTransactionDetailView: View {
     }
 
     private func addTransactionNow() {
-        do {
+        Log.recurring.perform("Adding a transaction now", errorMessage: &errorMessage) {
             try recurring.addTransactionNow(today: today, in: context)
-        } catch {
-            Log.recurring.failed("Adding a transaction now", error)
-            errorMessage = error.localizedDescription
         }
     }
 
     private func delete() {
-        do {
+        let succeeded = Log.recurring.perform("Deleting a Recurring transaction", errorMessage: &errorMessage) {
             try recurring.delete(today: today, in: context)
+        }
+        if succeeded {
             dismiss()
-        } catch {
-            Log.recurring.failed("Deleting a Recurring transaction", error)
-            errorMessage = error.localizedDescription
         }
     }
 
     private func unlink(_ transaction: Transaction) {
-        do {
+        Log.recurring.perform("Unlinking a transaction", errorMessage: &errorMessage) {
             try recurring.unlink(transaction, in: context)
-        } catch {
-            Log.recurring.failed("Unlinking a transaction", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

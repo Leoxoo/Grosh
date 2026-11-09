@@ -61,7 +61,7 @@ struct ImportFromMoneyLoverView: View {
 
     /// Reads the picked file and checks it is a MoneyLover export before asking to replace anything.
     private func read(_ result: Result<URL, Error>) {
-        do {
+        Log.importing.perform("Reading the picked file", errorMessage: &errorMessage, expected: true) {
             let url = try result.get()
             let isAccessing = url.startAccessingSecurityScopedResource()
             defer {
@@ -69,9 +69,6 @@ struct ImportFromMoneyLoverView: View {
             }
             let text = try String(contentsOf: url, encoding: .utf8)
             picked = PickedExport(fileName: url.lastPathComponent, export: try MoneyLoverCSV.read(text))
-        } catch {
-            Log.importing.failed("Reading the picked file", error, expected: true)
-            errorMessage = error.localizedDescription
         }
     }
 
@@ -82,6 +79,7 @@ struct ImportFromMoneyLoverView: View {
         withAnimation {
             isImporting = true
         } completion: {
+            // The import logs its own failure, so this only shows it.
             do {
                 summary = try MoneyLoverImport.replaceAllData(with: export.export, in: context)
             } catch {

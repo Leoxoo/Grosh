@@ -19,7 +19,7 @@ struct CardEditor: View {
 
     init(mode: EditorMode<Card>) {
         self.mode = mode
-        let draft = mode.editing.map { CardDraft($0) } ?? CardDraft(name: "", kind: .credit, payingWallet: nil)
+        let draft = mode.editing.map { CardDraft($0) } ?? CardDraft.new
         _draft = State(initialValue: draft)
         _hasStatementDate = State(initialValue: draft.statementDay != nil)
         _statementDay = State(initialValue: draft.statementDay ?? 1)
@@ -27,30 +27,17 @@ struct CardEditor: View {
 
     /// The Card being edited, until it is merged away or deleted (the sheet may draw once more while closing).
     private var editedCard: Card? {
-        guard let card = mode.editing, card.modelContext != nil, !card.isDeleted else { return nil }
+        guard let card = mode.editing, !card.isGone else { return nil }
         return card
     }
 
     /// A Card that paid for transactions keeps its paying wallet.
     private var isPayingWalletFixed: Bool { editedCard?.hasTransactions == true }
 
-    /// What will be saved: the statement date only counts for a Credit card.
-    private var draftToSave: CardDraft {
-        var result = draft
-        result.statementDay = draft.kind == .credit && hasStatementDate ? statementDay : nil
-        return result
-    }
-
-    private var validationError: CardRuleError? {
-        do {
-            try draftToSave.validate()
-            return nil
-        } catch {
-            return error as? CardRuleError
-        }
-    }
+    private var draftToSave: CardDraft { draft.withStatementDay(hasStatementDate ? statementDay : nil) }
 
     var body: some View {
+        let check = draftToSave.check
         NavigationStack {
             Form {
                 Section {
@@ -78,15 +65,15 @@ struct CardEditor: View {
                         Text(Strings.Cards.addWalletFirstFooter)
                     } else if isPayingWalletFixed {
                         Text(CardRuleError.payingWalletHasTransactions.localizedDescription)
-                    } else if let validationError, validationError != .missingName {
-                        Text(validationError.localizedDescription)
+                    } else if let problem = check.shownProblem {
+                        Text(problem.localizedDescription)
                             .foregroundStyle(.invalid)
                     } else {
                         Text(Strings.Cards.onlyALabelFooter)
                     }
                 }
 
-                if draft.kind == .credit {
+                if draft.offersStatementDate {
                     statementSection
                 }
 
@@ -113,13 +100,11 @@ struct CardEditor: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(mode.isAdding ? Strings.Common.add : Strings.Common.save, action: save)
-                        .disabled(validationError != nil)
+                        .disabled(!check.passes)
                 }
             }
             .onAppear {
-                if draft.payingWallet == nil {
-                    draft.payingWallet = wallets.first
-                }
+                draft.startPaying(from: wallets)
             }
             .sheet(isPresented: $isMerging) {
                 if let card = editedCard {
@@ -142,7 +127,7 @@ struct CardEditor: View {
     private var lastFourDigits: Binding<String> {
         Binding(
             get: { draft.lastFourDigits ?? "" },
-            set: { draft.lastFourDigits = String($0.filter { ("0"..."9").contains($0) }.prefix(4)) }
+            set: { draft.setLastFourDigits(typed: $0) }
         )
     }
 
@@ -210,12 +195,11 @@ struct CardEditor: View {
 
     /// Runs a change and closes the sheet, or shows why the change was refused.
     private func perform(_ change: () throws -> Void) {
-        do {
+        let succeeded = Log.store.perform("Changing a card", errorMessage: &errorMessage) {
             try change()
+        }
+        if succeeded {
             dismiss()
-        } catch {
-            Log.store.failed("Changing a card", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

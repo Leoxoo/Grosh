@@ -19,9 +19,6 @@ nonisolated struct TransferHalfDraft {
     func validate() throws {
         guard amount.cents > 0 else { throw TransferRuleError.missingAmount }
     }
-
-    /// Whether the amount is filled in, so Save can be enabled.
-    var canSave: Bool { (try? validate()) != nil }
 }
 
 /// Which halves of a transfer an edit to one of them changes.

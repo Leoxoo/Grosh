@@ -84,13 +84,13 @@ private struct CategoryChoiceList: View {
         self.noneTitle = noneTitle
         self.today = today
         _selection = selection
-        let firstDay = today.adding(days: -(CategoryCatalog.recentUseDays - 1)).rawValue
-        _recentTransactions = Query(filter: #Predicate<Transaction> { $0.dayRaw >= firstDay && $0.deletedAt == nil })
+        _recentTransactions = Query(CategoryCatalog.recentTransactions(through: today))
     }
 
     private var isSearching: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
+        let sections = self.sections
         List {
             if noneTitle != nil && !isSearching {
                 Section {

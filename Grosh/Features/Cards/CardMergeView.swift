@@ -11,24 +11,21 @@ struct CardMergeView: View {
     @Environment(\.modelContext) private var context
 
     var body: some View {
+        let transactionCount = (source.transactions ?? []).notDeleted.count
         MergeSheet(
             sourceName: source.name,
             targets: source.mergeTargets,
             targetName: \.name,
-            consequences: consequences(into:),
+            consequences: { target in
+                MergeConsequences.text(
+                    sourceName: source.name, transactionCount: transactionCount, targetName: target?.name,
+                    unchosen: String(localized: Strings.Cards.theCardYouPick)
+                )
+            },
             emptyDescription: String(localized: Strings.Cards.mergeEmpty),
             row: { CardRow(card: $0) },
             merge: { try source.merge(into: $0, in: context) },
             onMerged: onMerged
         )
-    }
-
-    private func consequences(into target: Card?) -> String {
-        let destination = target.map { "“\($0.name)”" } ?? String(localized: Strings.Cards.theCardYouPick)
-        let transactions = (source.transactions ?? []).notDeleted.count
-        let text = transactions == 1
-            ? String(localized: Strings.Merge.itsTransactionMovesTo(destination))
-            : String(localized: Strings.Merge.itsTransactionsMoveTo(transactions, destination))
-        return text + String(localized: Strings.Merge.thenRemoved(source.name))
     }
 }

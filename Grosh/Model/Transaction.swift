@@ -182,11 +182,21 @@ extension Transaction {
 
     /// The people in With, by name.
     var orderedPeople: [Person] {
-        (people ?? []).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        Self.ordered(people ?? [])
+    }
+
+    /// `people` in the order With lists them: by name.
+    static func ordered(_ people: [Person]) -> [Person] {
+        people.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    /// How With names `people`, as ``withName`` keeps it: by name, joined with ``withSeparator``.
+    static func withName(of people: [Person]) -> String {
+        ordered(people).map(\.name).joined(separator: withSeparator)
     }
 
     /// Makes ``withName`` the names of the people in With again, after a name changed (ADR-0009). Doesn't save.
     func refreshWithName() {
-        withName = orderedPeople.map(\.name).joined(separator: Self.withSeparator)
+        withName = Self.withName(of: people ?? [])
     }
 }

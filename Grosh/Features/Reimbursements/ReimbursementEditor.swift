@@ -6,9 +6,7 @@ import SwiftUI
 /// (ADR-0008); into another wallet it is a transaction there, linked to the Expense (ADR-0010). With `editing`, the same
 /// sheet changes an existing Reimbursement, which stays on the Expense.
 struct ReimbursementEditor: View {
-    /// The Expense that was paid back.
     let expense: Transaction
-    /// The entry being edited, or `nil` when adding one.
     var editing: Reimbursement?
 
     @Environment(\.today) private var today
@@ -43,65 +41,40 @@ private struct ReimbursementForm: View {
 
     private var currencyCode: String { expense.amount.currencyCode }
 
-    /// The draft with the amount the keypad comes to.
-    private var draftToSave: ReimbursementDraft {
-        var result = draft
-        result.amount = Money(cents: entry.cents ?? 0, currencyCode: currencyCode)
-        return result
-    }
-
-    /// Why it can't be saved as it is, or `nil` when it can.
-    private var problem: Error? {
-        do {
-            try draftToSave.validate()
-            try expense.checkPayback(into: wallet)
-            return nil
-        } catch {
-            return error
-        }
-    }
+    private var draftToSave: ReimbursementDraft { draft.withAmount(of: entry, in: currencyCode) }
 
     var body: some View {
-        let problem = self.problem
+        let check = RuleCheck { try expense.validatePayback(draftToSave, into: wallet) }
         KeypadSheet(
             title: editing == nil ? Text(Strings.Reimbursements.someonePaidMeBackTitle) : Text(Strings.Reimbursements.editReimbursement),
             entry: $entry,
-            canSave: problem == nil,
+            canSave: check.passes,
             save: save
         ) { fields in
             Section {
-                fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: Money(cents: 1).tint)
+                fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: MoneyDirection.moneyIn.tint)
                 if editing == nil {
                     WalletPicker(title: Strings.Reimbursements.receivedIn, selection: $wallet)
                 }
                 DayStepper(title: Strings.Common.date, day: $draft.day)
                 fields.noteField($draft.note)
             } footer: {
-                if let problem = problem as? ExpectedReimbursementRuleError {
-                    Text(problem.localizedDescription)
-                } else if expense.isElsewhere(wallet) {
-                    Text(Strings.Reimbursements.elsewhereFooter)
-                } else {
-                    Text(Strings.Reimbursements.editorFooter)
-                }
+                PaybackFooter(problem: check.shownProblem, isElsewhere: expense.isElsewhere(wallet))
             }
         }
         .errorAlert(Strings.Reimbursements.couldntSave, message: $errorMessage)
     }
 
     private func save() {
-        do {
+        let saved = Log.store.perform("Saving a Reimbursement", errorMessage: &errorMessage) {
             if let editing {
                 try editing.update(with: draftToSave)
-            } else if expense.isElsewhere(wallet), let wallet {
-                try expense.recordPaybackElsewhere(draftToSave, into: wallet, in: context)
             } else {
-                try Reimbursement.add(draftToSave, to: expense, in: context)
+                try expense.recordPayback(draftToSave, into: wallet, in: context)
             }
+        }
+        if saved {
             dismiss()
-        } catch {
-            Log.store.failed("Saving a Reimbursement", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

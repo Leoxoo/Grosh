@@ -66,12 +66,11 @@ struct LinkExistingTransactionView: View {
     }
 
     private func attach(_ transaction: Transaction) {
-        do {
+        let succeeded = Log.recurring.perform("Linking a transaction to a Recurring transaction", errorMessage: &errorMessage) {
             try recurring.attach(transaction, in: context)
+        }
+        if succeeded {
             dismiss()
-        } catch {
-            Log.recurring.failed("Linking a transaction to a Recurring transaction", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

@@ -60,11 +60,8 @@ struct LoanOrDebtSection: View {
     }
 
     private func unforgive() {
-        do {
+        Log.store.perform("Un-forgiving a Loan or Debt", errorMessage: &errorMessage) {
             try transaction.unforgive()
-        } catch {
-            Log.store.failed("Un-forgiving a Loan or Debt", error)
-            errorMessage = error.localizedDescription
         }
     }
 
@@ -73,11 +70,8 @@ struct LoanOrDebtSection: View {
         Binding {
             transaction.reminderDay
         } set: { day in
-            do {
+            Log.reminders.perform("Setting a Loan or Debt reminder", errorMessage: &errorMessage) {
                 try transaction.setReminder(day)
-            } catch {
-                Log.reminders.failed("Setting a Loan or Debt reminder", error)
-                errorMessage = error.localizedDescription
             }
         }
     }

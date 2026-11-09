@@ -49,11 +49,8 @@ private struct TransactionSelectionMode: ViewModifier {
     }
 
     private func confirmDeletingChosen() {
-        do {
+        Log.store.perform("Reading what deleting transactions takes", errorMessage: &errorMessage) {
             deletePrompt = try TransactionDeletePrompt(for: Array(chosen).inListOrder(), in: context)
-        } catch {
-            Log.store.failed("Reading what deleting transactions takes", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

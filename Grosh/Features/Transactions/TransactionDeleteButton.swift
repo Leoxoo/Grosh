@@ -14,11 +14,8 @@ struct TransactionDeleteButton: View {
 
     var body: some View {
         Button(Strings.Transactions.deleteTransaction, systemImage: "trash", role: .destructive) {
-            do {
+            Log.store.perform("Reading what deleting a transaction takes", errorMessage: &errorMessage) {
                 prompt = try TransactionDeletePrompt(for: [transaction], in: context)
-            } catch {
-                Log.store.failed("Reading what deleting a transaction takes", error)
-                errorMessage = error.localizedDescription
             }
         }
         .foregroundStyle(.destructive)
@@ -102,12 +99,11 @@ private struct TransactionDeleteDialog: ViewModifier {
     }
 
     private func delete(_ transactions: [Transaction], _ scope: TransactionDeleteScope) {
-        do {
+        let succeeded = Log.store.perform("Deleting a transaction", errorMessage: &errorMessage) {
             try transactions.delete(scope, in: context)
+        }
+        if succeeded {
             didDelete()
-        } catch {
-            Log.store.failed("Deleting a transaction", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

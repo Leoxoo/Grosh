@@ -11,7 +11,11 @@ struct TransferEditor: View {
     @Environment(\.today) private var today
 
     var body: some View {
-        TransferForm(startingDraft: TransactionDefaults.suggestTransfer(on: today, viewing: viewedWallet, in: context))
+        MadeOnce {
+            TransactionDefaults.suggestTransfer(on: today, viewing: viewedWallet, in: context)
+        } content: { draft in
+            TransferForm(startingDraft: draft)
+        }
     }
 }
 
@@ -33,16 +37,12 @@ private struct TransferForm: View {
 
     private var currencyCode: String { draft.from.currencyCodeOrDefault }
 
-    /// The draft with the amount the keypad comes to.
-    private var draftToSave: TransferDraft {
-        var result = draft
-        result.amount = Money(cents: entry.cents ?? 0, currencyCode: currencyCode)
-        return result
-    }
+    private var draftToSave: TransferDraft { draft.withAmount(of: entry, in: currencyCode) }
 
     var body: some View {
         // Always today's balances, whatever the Date: a transfer dated later doesn't move them today.
         let balances = WalletBalances($transactions, asOf: today)
+        let draftToSave = self.draftToSave
         KeypadSheet(title: Text(Strings.Transfers.transfer), entry: $entry, canSave: draftToSave.canSave, save: save) { fields in
             Section {
                 WalletPicker(title: Strings.Common.from, selection: $draft.from, balances: balances)
@@ -51,10 +51,8 @@ private struct TransferForm: View {
                 DayStepper(title: Strings.Common.date, day: $draft.day)
                 fields.noteField($draft.note)
             } footer: {
-                if draft.from == nil || draft.to == nil {
-                    Text(Strings.Transfers.twoWalletsNeeded)
-                } else if draft.from == draft.to {
-                    Text(Strings.Common.chooseTwoDifferentWallets)
+                if let problem = draftToSave.shownProblem {
+                    Text(problem.localizedDescription)
                 } else {
                     Text(Strings.Transfers.footer)
                 }
@@ -64,12 +62,8 @@ private struct TransferForm: View {
     }
 
     private func save() {
-        do {
-            try Transfer.create(draftToSave, in: context)
+        if Log.store.perform("Saving a transfer", errorMessage: &errorMessage, { try Transfer.create(draftToSave, in: context) }) {
             dismiss()
-        } catch {
-            Log.store.failed("Saving a transfer", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

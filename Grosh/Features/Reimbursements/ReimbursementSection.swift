@@ -49,11 +49,8 @@ struct ReimbursementSection: View {
     }
 
     private func delete(_ entry: Reimbursement) {
-        do {
+        Log.store.perform("Deleting a Reimbursement", errorMessage: &errorMessage) {
             try entry.delete()
-        } catch {
-            Log.store.failed("Deleting a Reimbursement", error)
-            errorMessage = error.localizedDescription
         }
     }
 }
@@ -101,16 +98,12 @@ struct ReimbursementNetText: View {
     var listed = ListedAmount.net
 
     var body: some View {
-        // Read from the stored figures first, so a row that was never paid back reads nothing else.
-        if transaction.reimbursedCents > 0 || (listed == .netInTotal && transaction.hasPaybacksElsewhere) {
-            let net = listed == .netInTotal ? transaction.totalViewNet : transaction.net
-            if net.cents != transaction.amountCents {
-                Text(verbatim: "= " + net.signedFormatted())
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .foregroundStyle(net.cents > 0 ? net.tint : .secondary)
-            }
+        if let net = transaction.paidBackNet(listed) {
+            Text(verbatim: "= " + net.signedFormatted())
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .foregroundStyle(net.direction == .moneyIn ? net.tint : .secondary)
         }
     }
 }
@@ -123,10 +116,7 @@ struct ReimbursementEntriesText: View {
     var listed = ListedAmount.net
 
     var body: some View {
-        // Read from the stored figures first, so a row without Reimbursements never reads them.
-        let summary = transaction.reimbursedCents > 0 ? transaction.reimbursementSummary() : ""
-        let elsewhere = listed == .net && transaction.hasPaybacksElsewhere ? transaction.elsewhereSummary() : ""
-        let text = [summary, elsewhere].filter { !$0.isEmpty }.joined(separator: ", ")
+        let text = transaction.paidBackSummary(listed)
         if !text.isEmpty {
             Text(text)
                 .font(.caption)

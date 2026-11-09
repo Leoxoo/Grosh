@@ -80,12 +80,11 @@ struct PastOccurrencesView: View {
     }
 
     private func save() {
-        do {
+        let succeeded = Log.recurring.perform("Making transactions for past days", errorMessage: &errorMessage) {
             try recurring.makeTransactions(on: days.filter { selected.contains($0) }, in: context)
+        }
+        if succeeded {
             dismiss()
-        } catch {
-            Log.recurring.failed("Making transactions for past days", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

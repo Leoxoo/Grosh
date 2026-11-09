@@ -108,11 +108,8 @@ struct WalletListView: View {
 
     /// Runs a change, or shows why it was refused.
     private func perform(_ change: () throws -> Void) {
-        do {
+        Log.store.perform("Changing a wallet", errorMessage: &errorMessage) {
             try change()
-        } catch {
-            Log.store.failed("Changing a wallet", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

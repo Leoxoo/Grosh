@@ -151,7 +151,6 @@ struct ScheduledOccurrenceTests {
         draft.category = water
         draft.kind = .bill
         draft.amountVaries = true
-        draft.estimateCents = AmountEstimate.cents(for: water, currencyCode: store.wallet.currencyCode)
         let bill = try RecurringTransaction.create(draft, today: today, in: context)
 
         let rows = [bill].scheduledOccurrences(selection: .total, today: today)

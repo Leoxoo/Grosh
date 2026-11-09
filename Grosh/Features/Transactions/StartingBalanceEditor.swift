@@ -23,12 +23,10 @@ struct StartingBalanceEditor: View {
 
     private var currencyCode: String { transaction.amount.currencyCode }
 
-    /// The draft with the amount the keypad comes to, or `nil` while the keypad shows an error.
+    /// The draft with the amount the keypad comes to, or `nil` while the keypad shows an error. Zero is a Starting
+    /// balance too.
     private var draftToSave: StartingBalanceDraft? {
-        guard let cents = entry.cents else { return nil }
-        var result = draft
-        result.amount = Money(cents: cents, currencyCode: currencyCode)
-        return result
+        entry.cents == nil ? nil : draft.withAmount(of: entry, in: currencyCode)
     }
 
     var body: some View {
@@ -39,7 +37,7 @@ struct StartingBalanceEditor: View {
                 if let wallet = transaction.wallet {
                     WalletLabel(title: Strings.Common.wallet, wallet: wallet)
                 }
-                fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: Money(cents: entry.cents ?? 0).tint)
+                fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: (draftToSave?.amount.direction ?? .neither).tint)
                 DayStepper(title: Strings.Common.date, day: $draft.day)
                 fields.noteField($draft.note)
             } footer: {
@@ -51,12 +49,11 @@ struct StartingBalanceEditor: View {
 
     private func save() {
         guard let draftToSave else { return }
-        do {
+        let succeeded = Log.store.perform("Saving a starting balance", errorMessage: &errorMessage) {
             try transaction.update(with: draftToSave)
+        }
+        if succeeded {
             dismiss()
-        } catch {
-            Log.store.failed("Saving a starting balance", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

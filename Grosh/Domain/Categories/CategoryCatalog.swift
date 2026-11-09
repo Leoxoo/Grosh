@@ -233,12 +233,29 @@ struct CategoryCatalog {
 
     /// Whether the category or any of its subcategories has transactions, or an amount forgiven on a Loan or Debt
     /// counts under it, or a Recurring transaction is set to use it. Transactions in Recently Deleted count too, so
-    /// they still have their category when restored.
+    /// they still have their category when restored. Each is counted in the store rather than by loading the
+    /// category's transactions; when the store can't be read, it counts as having some, so nothing is deleted or
+    /// retyped on a guess.
     func hasTransactions(_ category: Category) -> Bool {
-        ([category] + (category.children ?? [])).contains {
-            !($0.transactions ?? []).isEmpty || !($0.forgivenTransactions ?? []).isEmpty
-                || !($0.recurringTransactions ?? []).isEmpty
-        }
+        Log.store.attempt("Counting a category's transactions") {
+            try ([category] + (category.children ?? [])).contains { try isInUse($0) }
+        } ?? true
+    }
+
+    private func isInUse(_ category: Category) throws -> Bool {
+        let id = category.persistentModelID
+        var filed = FetchDescriptor<Transaction>(predicate: #Predicate { $0.category?.persistentModelID == id })
+        filed.fetchLimit = 1
+        var forgiven = FetchDescriptor<Transaction>(
+            predicate: #Predicate { $0.forgivenCategory?.persistentModelID == id }
+        )
+        forgiven.fetchLimit = 1
+        var recurring = FetchDescriptor<RecurringTransaction>(
+            predicate: #Predicate { $0.category?.persistentModelID == id }
+        )
+        recurring.fetchLimit = 1
+        return try context.fetchCount(filed) > 0 || context.fetchCount(forgiven) > 0
+            || context.fetchCount(recurring) > 0
     }
 
     // MARK: Helpers

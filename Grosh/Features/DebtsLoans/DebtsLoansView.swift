@@ -24,7 +24,7 @@ struct DebtsLoansView: View {
             ?? (list.open.isEmpty && list.settled.isEmpty && owesMe.open.isEmpty && owesMe.settled.isEmpty)
         List {
             Section {
-                Picker(Strings.DebtsLoans.show, selection: $grouping) {
+                Picker(Strings.Common.show, selection: $grouping) {
                     Text(Strings.DebtsLoans.showByPeople).tag(DebtsLoansGrouping.people)
                     Text(Strings.DebtsLoans.showByLoanOrDebt).tag(DebtsLoansGrouping.loanOrDebt)
                 }
@@ -54,14 +54,14 @@ struct DebtsLoansView: View {
     @ViewBuilder
     private func byPeople(_ people: DebtsAndLoansByPerson) -> some View {
         if !people.open.isEmpty {
-            Section("Open") {
+            Section(Strings.DebtsLoans.open) {
                 ForEach(people.open) { entry in
                     PersonDebtsLink(entry: entry) { texting = $0 }
                 }
             }
         }
         if !people.settled.isEmpty {
-            Section("Settled") {
+            Section(Strings.Common.settled) {
                 ForEach(people.settled) { entry in
                     PersonDebtsLink(entry: entry) { texting = $0 }
                 }
@@ -73,7 +73,7 @@ struct DebtsLoansView: View {
     @ViewBuilder
     private func byLoanOrDebt(_ list: DebtsAndLoans, _ owesMe: ExpectedReimbursements) -> some View {
         if !list.open.isEmpty {
-            Section("Open") {
+            Section(Strings.DebtsLoans.open) {
                 ForEach(list.open) { loanOrDebt in
                     LoanOrDebtLink(loanOrDebt: loanOrDebt)
                 }
@@ -86,7 +86,7 @@ struct DebtsLoansView: View {
                 }
             } header: {
                 HStack {
-                    Text("Owes Me")
+                    Text(Strings.OwesMe.owesMe)
                     Spacer()
                     Text(owesMe.totals.summary)
                         .monospacedDigit()
@@ -94,14 +94,14 @@ struct DebtsLoansView: View {
             }
         }
         if !list.settled.isEmpty {
-            Section("Settled") {
+            Section(Strings.Common.settled) {
                 ForEach(list.settled) { loanOrDebt in
                     LoanOrDebtLink(loanOrDebt: loanOrDebt)
                 }
             }
         }
         if !owesMe.settled.isEmpty {
-            Section("Owes Me · Settled") {
+            Section(Strings.OwesMe.settledSection) {
                 ForEach(owesMe.settled) { expectation in
                     ExpectedReimbursementLink(expectation: expectation)
                 }

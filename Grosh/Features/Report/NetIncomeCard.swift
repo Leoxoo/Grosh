@@ -33,10 +33,9 @@ struct NetIncomeCard: View {
                 .font(.largeTitle.bold())
                 .contentTransition(.numericText())
 
-            let largest = max(totals.income.cents, totals.spent.cents)
             VStack(spacing: 12) {
-                AmountBar(side: .income, amount: totals.income, largest: largest)
-                AmountBar(side: .spent, amount: totals.spent, largest: largest)
+                AmountBar(side: .income, totals: totals)
+                AmountBar(side: .spent, totals: totals)
             }
 
             NavigationLink(value: ReportScreen.details(.netIncome)) {
@@ -54,14 +53,14 @@ struct NetIncomeCard: View {
     )
 }
 
-/// One side's amount as a bar in its color, labelled with the side's name and amount. `largest` is the bar that fills
-/// the width, the larger of the two sides' amounts.
+/// One side's amount as a bar in its color, labelled with the side's name and amount. The larger side's bar fills the
+/// width (``PeriodTotals/barFraction(of:)``).
 private struct AmountBar: View {
     let side: SpentOrIncome
-    let amount: Money
-    let largest: Int
+    let totals: PeriodTotals
 
     var body: some View {
+        let amount = totals.total(of: side)
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(side.title)
@@ -75,16 +74,10 @@ private struct AmountBar: View {
             GeometryReader { proxy in
                 Capsule()
                     .fill(side.color)
-                    .frame(width: proxy.size.width * fraction)
+                    .frame(width: proxy.size.width * totals.barFraction(of: side))
             }
             .frame(height: 8)
         }
         .accessibilityElement(children: .combine)
-    }
-
-    /// The share of the width the bar fills: the whole of it for the larger side, and in proportion for the other.
-    private var fraction: Double {
-        guard largest > 0 else { return 0 }
-        return min(max(Double(amount.cents) / Double(largest), 0), 1)
     }
 }

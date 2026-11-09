@@ -14,13 +14,13 @@ struct ExpectedReimbursementDetailView: View {
 
     var body: some View {
         Group {
-            if expectation.isDeleted || expectation.modelContext == nil || !expectation.isOfLiveExpense {
-                ContentUnavailableView("Expectation Deleted", systemImage: "trash")
+            if expectation.isGone || !expectation.isOfLiveExpense {
+                ContentUnavailableView(Strings.OwesMe.expectationDeleted, systemImage: "trash")
             } else {
                 details
             }
         }
-        .navigationTitle("Owes Me")
+        .navigationTitle(Strings.OwesMe.owesMe)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -30,18 +30,18 @@ struct ExpectedReimbursementDetailView: View {
         .sheet(isPresented: $isForgiving) {
             ExpectationForgiveSheet(expectation: expectation, today: today)
         }
-        .errorAlert("Couldn't Change Owes Me", message: $errorMessage)
+        .errorAlert(Strings.OwesMe.couldntChange, message: $errorMessage)
     }
 
     private var details: some View {
         List {
             Section {
-                LabeledContent("From", value: expectation.personName)
+                LabeledContent(Strings.Common.from, value: expectation.personName)
                 if let expense = expectation.expense {
                     NavigationLink {
                         TransactionDetailView(transaction: expense)
                     } label: {
-                        LabeledContent("Expense") {
+                        LabeledContent(Strings.Common.expense) {
                             VStack(alignment: .trailing, spacing: 2) {
                                 Text(expectation.expenseTitle)
                                 Text(expense.amount.formatted())
@@ -51,11 +51,11 @@ struct ExpectedReimbursementDetailView: View {
                         }
                     }
                 }
-                LabeledContent("Expected", value: expectation.expected?.formatted() ?? "?")
+                LabeledContent(Strings.OwesMe.expected, value: expectation.expected?.formatted() ?? "?")
                 if expectation.hasPayments {
-                    LabeledContent("Paid Back", value: expectation.paid.formatted())
+                    LabeledContent(Strings.OwesMe.paidBack, value: expectation.paid.formatted())
                 }
-                LabeledContent("Outstanding") {
+                LabeledContent(Strings.DebtsLoans.outstanding) {
                     Text(expectation.outstanding?.formatted() ?? "?")
                         .monospacedDigit()
                         .foregroundStyle(expectation.isOpen ? .primary : .secondary)
@@ -63,19 +63,19 @@ struct ExpectedReimbursementDetailView: View {
                 statusRows
             } footer: {
                 if expectation.isOpen && expectation.hasOpenAmount {
-                    Text("It has no amount yet, so it is left out of totals. Close it by hand once it is settled.")
+                    Text(Strings.OwesMe.openAmountFooter)
                 } else {
-                    Text("Owes me never changes a balance or a report. Money that comes back is a reimbursement of the expense.")
+                    Text(Strings.OwesMe.detailFooter)
                 }
             }
 
             if expectation.isOpen {
                 Section {
-                    Button("Record Payment", systemImage: "plus.circle") { isRecordingPayment = true }
+                    Button(Strings.DebtsLoans.recordPayment, systemImage: "plus.circle") { isRecordingPayment = true }
                     if expectation.hasOpenAmount {
-                        Button("Close", systemImage: "checkmark.circle") { perform { try expectation.close(on: today) } }
+                        Button(Strings.Common.close, systemImage: "checkmark.circle") { perform { try expectation.close(on: today) } }
                     }
-                    Button("Forgive", systemImage: "hand.raised") { isForgiving = true }
+                    Button(Strings.DebtsLoans.forgive, systemImage: "hand.raised") { isForgiving = true }
                     ReminderField(
                         day: reminderDay, turnsOnAt: ReminderDay.default(after: expectation.expense?.day ?? today)
                     )
@@ -84,7 +84,7 @@ struct ExpectedReimbursementDetailView: View {
 
             let payments = expectation.payments
             if !payments.isEmpty {
-                Section("Payments") {
+                Section(Strings.OwesMe.payments) {
                     ForEach(payments) { payment in
                         PaymentRow(payment: payment)
                     }
@@ -100,24 +100,24 @@ struct ExpectedReimbursementDetailView: View {
         case .open:
             EmptyView()
         case .paidBack:
-            Label("Settled", systemImage: "checkmark.seal.fill")
-                .foregroundStyle(.green)
+            Label(Strings.Common.settled, systemImage: "checkmark.seal.fill")
+                .foregroundStyle(.settled)
         case .closed:
             if let closed = expectation.closedDay {
-                LabeledContent("Closed", value: closed.date().formatted(date: .abbreviated, time: .omitted))
+                LabeledContent(Strings.OwesMe.closed, value: closed.date().formatted(date: .abbreviated, time: .omitted))
             }
-            Button("Reopen", systemImage: "arrow.uturn.backward") { perform { try expectation.reopen() } }
+            Button(Strings.OwesMe.reopen, systemImage: "arrow.uturn.backward") { perform { try expectation.reopen() } }
         case .forgiven:
             LabeledContent {
                 Text(expectation.forgivenDay?.date().formatted(date: .abbreviated, time: .omitted) ?? "")
             } label: {
-                Label("Forgiven", systemImage: "hand.raised.fill")
-                    .foregroundStyle(.green)
+                Label(Strings.Common.forgiven, systemImage: "hand.raised.fill")
+                    .foregroundStyle(.settled)
             }
             if !expectation.forgivenNote.isEmpty {
-                LabeledContent("Note", value: expectation.forgivenNote)
+                LabeledContent(Strings.Common.note, value: expectation.forgivenNote)
             }
-            Button("Un-forgive", systemImage: "arrow.uturn.backward") { perform { try expectation.unforgive() } }
+            Button(Strings.DebtsLoans.unforgive, systemImage: "arrow.uturn.backward") { perform { try expectation.unforgive() } }
         }
     }
 
@@ -131,11 +131,7 @@ struct ExpectedReimbursementDetailView: View {
     }
 
     private func perform(_ change: () throws -> Void) {
-        do {
-            try change()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        Log.store.perform("Changing Owes me", errorMessage: &errorMessage, change)
     }
 }
 
@@ -151,7 +147,7 @@ private struct PaymentRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(payment.day.date().formatted(date: .abbreviated, time: .omitted))
                 if payment.isElsewhere, let wallet = payment.wallet {
-                    Text("Into \(wallet.name)")
+                    Text(Strings.OwesMe.into(wallet.name))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

@@ -47,6 +47,23 @@ nonisolated extension Logger {
         }
     }
 
+    /// Makes a change the person asked for, such as a save, and says whether it was made. When `change` throws, the
+    /// failure is logged as `what` (see ``failed(_:_:expected:)``) and the error's message goes in `errorMessage`, for
+    /// the screen's `errorAlert` to show.
+    @discardableResult
+    func perform(
+        _ what: String, errorMessage: inout String?, expected: Bool = false, _ change: () throws -> Void
+    ) -> Bool {
+        do {
+            try change()
+            return true
+        } catch {
+            failed(what, error, expected: expected)
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     /// What `work` gives, or `nil` after logging why it failed: a `try?` with the failure on record.
     @discardableResult
     func attempt<Value>(_ what: String, _ work: () throws -> Value) -> Value? {

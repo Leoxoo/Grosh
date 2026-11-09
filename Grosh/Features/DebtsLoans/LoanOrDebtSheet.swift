@@ -15,7 +15,15 @@ struct LoanOrDebtSheet<Draft, Form: View>: View {
     @Environment(\.modelContext) private var context
 
     var body: some View {
-        let draft = Log.store.attempt("Making the draft for a Loan or Debt") { try makeDraft(context) }
+        MadeOnce {
+            Log.store.attempt("Making the draft for a Loan or Debt") { try makeDraft(context) }
+        } content: { draft in
+            content(draft)
+        }
+    }
+
+    @ViewBuilder
+    private func content(_ draft: Draft?) -> some View {
         if let draft {
             form(draft)
         } else {

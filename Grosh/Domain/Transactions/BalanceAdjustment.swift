@@ -114,9 +114,6 @@ nonisolated struct BalanceAdjustmentDraft {
         guard realBalance != nil else { throw BalanceAdjustmentRuleError.missingRealBalance }
         guard reasonType != nil else { throw BalanceAdjustmentRuleError.nothingToAdjust }
     }
-
-    /// Whether Save can be enabled.
-    var canSave: Bool { (try? validate()) != nil }
 }
 
 extension TransactionDefaults {

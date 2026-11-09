@@ -33,13 +33,6 @@ struct CategoryEditor: View {
         "star.fill", "questionmark.circle.fill", "ellipsis.circle.fill", "flag.fill",
     ]
 
-    /// What deleting `category` takes with it, for the confirmation.
-    static func deleteMessage(for category: Category) -> String {
-        let subcategories = category.children?.count ?? 0
-        return subcategories == 0
-            ? String(localized: Strings.Common.cantBeUndone)
-            : String(localized: Strings.Categories.subcategoriesDeletedToo(subcategories))
-    }
 
     let mode: Mode
 
@@ -86,7 +79,7 @@ struct CategoryEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                detailsSection
+                detailsSection(canChangeType: canChangeType, parentOptions: parentOptions)
                 if !isLocked {
                     kindSection
                 }
@@ -123,13 +116,14 @@ struct CategoryEditor: View {
                     }
                 }
             } message: {
-                if let editing { Text(Self.deleteMessage(for: editing)) }
+                if let editing { Text(editing.deleteMessage) }
             }
             .errorAlert(Strings.Categories.couldntSave, message: $errorMessage)
         }
     }
 
-    private var detailsSection: some View {
+    /// The name, type and parent. `canChangeType` and `parentOptions` are read from the store once per draw.
+    private func detailsSection(canChangeType: Bool, parentOptions: [Category]) -> some View {
         Section {
             HStack(spacing: 12) {
                 SymbolCircle(symbolName: draft.symbolName, color: draft.color, size: 40)
@@ -238,12 +232,11 @@ struct CategoryEditor: View {
 
     /// Runs a change and closes the sheet, or shows why the change was refused.
     private func perform(_ change: () throws -> Void) {
-        do {
+        let succeeded = Log.store.perform("Changing a category", errorMessage: &errorMessage) {
             try change()
+        }
+        if succeeded {
             dismiss()
-        } catch {
-            Log.store.failed("Changing a category", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

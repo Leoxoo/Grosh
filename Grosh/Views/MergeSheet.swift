@@ -86,13 +86,12 @@ struct MergeSheet<Target: Identifiable & Equatable, Row: View>: View {
 
     private func performMerge() {
         guard let target else { return }
-        do {
+        let succeeded = Log.store.perform("Merging", errorMessage: &errorMessage) {
             try merge(target)
+        }
+        if succeeded {
             dismiss()
             onMerged()
-        } catch {
-            Log.store.failed("Merging", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

@@ -35,4 +35,12 @@ struct PeriodTotals: Equatable {
         case .spent: spent
         }
     }
+
+    /// How much of the width the side's bar on the Net income card fills, 0 to 1: all of it for the larger side and
+    /// in proportion for the other. A side below zero (more refunded than spent) or a period with nothing fills none.
+    func barFraction(of side: SpentOrIncome) -> Double {
+        let largest = max(income.cents, spent.cents)
+        guard largest > 0 else { return 0 }
+        return min(max(Double(total(of: side).cents) / Double(largest), 0), 1)
+    }
 }

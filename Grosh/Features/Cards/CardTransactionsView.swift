@@ -19,7 +19,7 @@ struct CardTransactionsView: View {
     @State private var addedLeadIns = Set<Transaction>()
 
     /// Whether the Card was merged into another or deleted, from its editor, while this screen was open.
-    private var isRemoved: Bool { card.isDeleted || card.modelContext == nil }
+    private var isRemoved: Bool { card.isGone }
 
     var body: some View {
         Group {

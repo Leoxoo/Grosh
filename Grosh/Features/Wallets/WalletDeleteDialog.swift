@@ -32,12 +32,11 @@ private struct WalletDeleteDialog: ViewModifier {
     }
 
     private func delete(_ wallet: Wallet) {
-        do {
+        let succeeded = Log.store.perform("Deleting a wallet", errorMessage: &errorMessage) {
             try wallet.delete()
+        }
+        if succeeded {
             didDelete()
-        } catch {
-            Log.store.failed("Deleting a wallet", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

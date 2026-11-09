@@ -23,6 +23,16 @@ nonisolated struct SplitPart {
         eventName = transaction.eventName
     }
 
+    /// Whether the part can be kept: an amount above zero and a category, as every part of a split needs
+    /// (``SplitDraft/validate()``).
+    var isComplete: Bool { amount.cents > 0 && category != nil }
+
+    /// What is left on the transaction being split once this part takes its amount out of `capacity`
+    /// (``SplitDraft/capacity(of:)``).
+    func leftOver(from capacity: Money) -> Money {
+        Money(cents: capacity.cents - amount.cents, currencyCode: capacity.currencyCode)
+    }
+
     /// Sets what this part holds on `transaction`: its amount (signed by its category), category, day, note, With and
     /// Event.
     fileprivate func apply(to transaction: Transaction) {
@@ -60,12 +70,30 @@ nonisolated struct SplitDraft {
     private(set) var parts: [SplitPart] = []
     /// The transaction's Reimbursements, each with the part it goes to. Empty when it has none.
     var reimbursements: [SplitReimbursement]
+    /// The type every part's category is of: the transaction's own, Expense or Income.
+    let partType: CategoryType
 
     /// The transaction as it is, with no parts yet and its Reimbursements not yet assigned.
     init(splitting transaction: Transaction) {
         original = SplitPart(of: transaction)
         was = original.amount
         reimbursements = transaction.orderedReimbursements.map { SplitReimbursement(reimbursement: $0) }
+        partType = transaction.category?.type ?? .expense
+    }
+
+    /// Whether nothing is left on the transaction being split, which Split refuses: its part must stay above zero.
+    var leavesNothingOnOriginal: Bool { original.amount.cents <= 0 }
+
+    /// How much `part` could take before nothing is left on the transaction being split: what is left on it, plus
+    /// what the part takes already. A part about to be added (`nil`) can take what is left. `nil` for that transaction
+    /// itself, whose amount changes the total instead.
+    func capacity(of part: SplitPartRef?) -> Money? {
+        switch part {
+        case nil: original.amount
+        case .original: nil
+        case .part(let index):
+            Money(cents: original.amount.cents + parts[index].amount.cents, currencyCode: was.currencyCode)
+        }
     }
 
     /// What the parts add up to: the original's remainder and every other part. It moves the wallet's balance when it

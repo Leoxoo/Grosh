@@ -38,14 +38,10 @@ private struct RecordPaymentForm: View {
     private var loanOrDebt: LoanOrDebt { draft.loanOrDebt }
     private var currencyCode: String { loanOrDebt.owed.currencyCode }
 
-    /// The draft with the amount the keypad comes to.
-    private var draftToSave: DebtPaymentDraft {
-        var result = draft
-        result.amount = Money(cents: entry.cents ?? 0, currencyCode: currencyCode)
-        return result
-    }
+    private var draftToSave: DebtPaymentDraft { draft.withAmount(of: entry, in: currencyCode) }
 
     var body: some View {
+        let draftToSave = self.draftToSave
         KeypadSheet(
             title: Text(Strings.DebtsLoans.recordPayment),
             entry: $entry,
@@ -54,7 +50,7 @@ private struct RecordPaymentForm: View {
         ) { fields in
             paymentSection(fields)
             if draftToSave.overpaid.cents > 0 {
-                overpaymentSection
+                overpaymentSection(draftToSave.signedOverpaid)
             }
         }
         .errorAlert(Strings.DebtsLoans.couldntRecordPayment, message: $errorMessage)
@@ -67,7 +63,7 @@ private struct RecordPaymentForm: View {
                 Text(loanOrDebt.outstanding.formatted())
                     .monospacedDigit()
             }
-            fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: Money(cents: loanOrDebt.kind.paymentSign).tint)
+            fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: loanOrDebt.kind.paymentDirection.tint)
             DayStepper(title: Strings.Common.date, day: $draft.day)
             fields.noteField($draft.note)
         } footer: {
@@ -75,15 +71,10 @@ private struct RecordPaymentForm: View {
         }
     }
 
-    private var overpaymentSection: some View {
+    private func overpaymentSection(_ overpaid: Money) -> some View {
         Section {
             LabeledContent(Strings.DebtsLoans.aboveOutstanding) {
-                AmountText(
-                    amount: Money(
-                        cents: draftToSave.overpaid.cents * loanOrDebt.kind.paymentSign, currencyCode: currencyCode
-                    ),
-                    showsPlusSign: true
-                )
+                AmountText(amount: overpaid, showsPlusSign: true)
             }
             CategoryPicker(title: Strings.Common.category, type: draft.overpaymentType, selection: $draft.overpaymentCategory)
         } footer: {
@@ -92,12 +83,11 @@ private struct RecordPaymentForm: View {
     }
 
     private func save() {
-        do {
+        let succeeded = Log.store.perform("Recording a payment", errorMessage: &errorMessage) {
             try DebtPayment.record(draftToSave, in: context)
+        }
+        if succeeded {
             dismiss()
-        } catch {
-            Log.store.failed("Recording a payment", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

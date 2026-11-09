@@ -39,10 +39,12 @@ struct TransactionEditor: View {
     @Environment(\.today) private var today
 
     var body: some View {
-        TransactionForm(mode: mode, startingDraft: startingDraft)
+        MadeOnce(make: makeStartingDraft) { draft in
+            TransactionForm(mode: mode, startingDraft: draft)
+        }
     }
 
-    private var startingDraft: TransactionDraft {
+    private func makeStartingDraft() -> TransactionDraft {
         switch mode {
         case .add: TransactionDefaults.suggest(on: today, in: context)
         case .duplicate(let transaction): TransactionDraft(duplicating: transaction, on: today)
@@ -81,12 +83,7 @@ private struct TransactionForm: View {
 
     private var currencyCode: String { draft.wallet.currencyCodeOrDefault }
 
-    /// The draft with the amount the keypad comes to.
-    private var draftToSave: TransactionDraft {
-        var result = draft
-        result.amount = Money(cents: entry.cents ?? 0, currencyCode: currencyCode)
-        return result
-    }
+    private var draftToSave: TransactionDraft { draft.withAmount(of: entry, in: currencyCode) }
 
     var body: some View {
         KeypadSheet(
@@ -110,8 +107,9 @@ private struct TransactionForm: View {
             mainSection(fields)
             detailsSection
         }
-        .onChange(of: draft.type) {
-            if draft.type == .debtLoan {
+        .onChange(of: draft.offersReminder) {
+            // A Loan or Debt opens the details, where its reminder is.
+            if draft.offersReminder {
                 isShowingDetails = true
             }
         }
@@ -122,7 +120,7 @@ private struct TransactionForm: View {
         Section {
             WalletPicker(title: Strings.Common.wallet, selection: $draft.wallet)
                 .disabled(draft.isLockedByPayments)
-            fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: Money(cents: draft.sign).tint)
+            fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: draft.direction.tint)
             CategoryPicker(title: Strings.Common.category, type: draft.type, selection: $draft.category)
                 .disabled(draft.isLockedByPayments)
                 .accessibilityIdentifier("TransactionEditor.category")
@@ -134,14 +132,12 @@ private struct TransactionForm: View {
                 .accessibilityIdentifier("TransactionEditor.note")
             DayStepper(title: Strings.Common.date, day: $draft.day)
         } footer: {
-            if draft.wallet == nil {
-                Text(Strings.Common.addWalletFirst)
+            if let problem = draftToSave.shownProblem {
+                Text(problem.localizedDescription)
             } else if draft.paymentLock?.forgivenOwed != nil {
                 Text(Strings.Transactions.forgivenLockFooter)
             } else if let paymentLock = draft.paymentLock {
                 Text(Strings.Transactions.paymentsLockFooter(paymentLock.paid.formatted()))
-            } else if draftToSave.requiresCard && draft.card == nil {
-                Text(Strings.Transactions.cardRequiredFooter)
             }
         }
     }
@@ -157,7 +153,7 @@ private struct TransactionForm: View {
             }
         } footer: {
             if draft.isMissingWith {
-                Text(Strings.Transactions.withRequiredFooter)
+                Text(TransactionRuleError.missingWith.localizedDescription)
             }
         }
         if isShowingDetails {
@@ -168,29 +164,31 @@ private struct TransactionForm: View {
 
     private var otherDetailsSection: some View {
         Section {
-            Toggle("Exclude from report", isOn: $draft.isExcludedFromReport)
+            Toggle(Strings.Common.excludeFromReport, isOn: $draft.isExcludedFromReport)
             if draft.offersReminder {
                 ReminderField(day: $draft.reminderDay)
             }
+            // Location and Event are planned, so they show greyed out until a transaction can set them here. A part
+            // of a Split already sets its own Event.
             LabeledContent {
-                Text("Coming soon")
+                Text(Strings.Transactions.comingSoon)
             } label: {
-                Label("Location", systemImage: "mappin.and.ellipse")
+                Label(Strings.Transactions.location, systemImage: "mappin.and.ellipse")
             }
             .foregroundStyle(.tertiary)
             LabeledContent {
-                Text(draft.eventName.isEmpty ? String(localized: "None") : draft.eventName)
+                Text(draft.eventName.isEmpty ? String(localized: Strings.Common.none) : draft.eventName)
             } label: {
-                Label("Event", systemImage: "calendar")
+                Label(Strings.Common.event, systemImage: "calendar")
             }
             .foregroundStyle(.tertiary)
         } footer: {
-            Text("A transaction excluded from report still counts in balances, just not in income and spending.")
+            Text(Strings.Common.excludedFromReportFooter)
         }
     }
 
     private func save() {
-        do {
+        let saved = Log.store.perform("Saving a transaction", errorMessage: &errorMessage) {
             try Signpost.interval("Save transaction") {
                 switch mode {
                 case .add, .duplicate:
@@ -202,11 +200,10 @@ private struct TransactionForm: View {
                     try transaction.update(with: draftToSave)
                 }
             }
+        }
+        if saved {
             playSuccessCue()
             dismiss()
-        } catch {
-            Log.store.failed("Saving a transaction", error)
-            errorMessage = error.localizedDescription
         }
     }
 
@@ -226,7 +223,7 @@ private struct TransactionForm: View {
 private extension TransactionDraft {
     /// Whether any of the "more details" are filled in, so they open already showing.
     var hasDetails: Bool {
-        type == .debtLoan || !people.isEmpty || isExcludedFromReport || !eventName.isEmpty
+        offersReminder || !people.isEmpty || isExcludedFromReport || !eventName.isEmpty
     }
 }
 
