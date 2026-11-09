@@ -27,13 +27,15 @@ enum GroshStore {
 
     /// The store as the app opens it: ``makeContainer(inMemory:)`` with the default categories seeded into an empty
     /// one (``CategorySeeder``), and the With names typed before there were people turned into people
-    /// (``Person/migrateWithNames(in:)``), so no screen ever sees a With without its Person. Previews open theirs in
+    /// (``Person/migrateWithNames(in:)``), so no screen ever sees a With without its Person, and every link given its
+    /// kind (``Transaction/migrateLinkKinds(in:)``, ADR-0012). Previews open theirs in
     /// memory, so they start where a fresh install does, with the locked categories the app depends on.
     static func makeSeededContainer(inMemory: Bool = false) throws -> ModelContainer {
         let container = try makeContainer(inMemory: inMemory)
         try CategorySeeder.seedIfNeeded(in: container.mainContext)
         try CategorySeeder.restoreMissingDefaults(in: container.mainContext)
         try Person.migrateWithNames(in: container.mainContext)
+        try Transaction.migrateLinkKinds(in: container.mainContext)
         return container
     }
 }

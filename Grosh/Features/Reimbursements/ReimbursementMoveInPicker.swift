@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 /// Picks an existing deposit to move into an Expense as a Reimbursement: money that came into the Expense's own wallet,
-/// outside Recently Deleted, newest first (``Transaction/reimbursementMoveInBlocker(into:loanOrDebtLinks:)``). Tapping
+/// outside Recently Deleted, newest first (``Transaction/reimbursementMoveInBlocker(into:)``). Tapping
 /// one makes its amount, day and note an entry on the Expense, sends it to Recently Deleted, and closes the picker.
 struct ReimbursementMoveInPicker: View {
     /// The Expense that was paid back.
@@ -15,12 +15,8 @@ struct ReimbursementMoveInPicker: View {
     @State private var errorMessage: String?
 
     private var candidates: [Transaction] {
-        // Read once for the whole list, rather than once for each linked Income in it.
-        let loanOrDebtLinks = Log.store.attempt("Reading the Loan and Debt links") {
-            try Transaction.loanOrDebtLinks(in: context)
-        } ?? []
-        return transactions
-            .filter { $0.canBeMovedIntoReimbursement(of: expense, loanOrDebtLinks: loanOrDebtLinks) }
+        transactions
+            .filter { $0.canBeMovedIntoReimbursement(of: expense) }
             .matching(filter)
             .inListOrder()
     }

@@ -31,10 +31,9 @@ struct EstimatedAmountTests {
 
     /// Records a September expense of `cents` under `category`, so there is history for an estimate to average.
     private func record(_ cents: Int, under category: Grosh.Category) throws {
-        let transaction = Transaction(
-            amount: Money(cents: -cents), day: day(2026, 9, 1), wallet: store.wallet, category: category
+        let transaction = Transaction.insert(
+            Money(cents: -cents), on: day(2026, 9, 1), wallet: store.wallet, category: category, in: context
         )
-        context.insert(transaction)
         try context.save()
     }
 

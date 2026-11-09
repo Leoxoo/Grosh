@@ -130,8 +130,9 @@ struct CardManagementTests {
     }
 
     private func addExpense(_ cents: Int, paidWith card: Card?, on day: CalendarDay? = nil) throws -> Transaction {
-        let transaction = Transaction(amount: Money(cents: -cents), day: day ?? today, wallet: nil, category: nil)
-        context.insert(transaction)
+        let transaction = Transaction.insert(
+            Money(cents: -cents), on: day ?? today, wallet: nil, category: nil, in: context
+        )
         transaction.wallet = checking
         transaction.category = try context.lockedCategory(.otherExpense)
         transaction.card = card

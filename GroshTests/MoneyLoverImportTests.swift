@@ -345,11 +345,10 @@ struct MoneyLoverImportTests {
         let old = try Wallet.create(name: "Old wallet", startingBalance: Money(cents: 5_00), on: today, in: context)
         let card = try Card.create(CardDraft(name: "Old card", kind: .debit, payingWallet: old), in: context)
         try CategoryCatalog(context: context).add(CategoryDraft(name: "Hobbies", type: .expense))
-        let spent = Transaction(
-            amount: Money(cents: -2_00), day: today, wallet: old, category: try context.otherCategory(.expense)
+        let spent = Transaction.insert(
+            Money(cents: -2_00), on: today, wallet: old, category: try context.otherCategory(.expense), card: card,
+            in: context
         )
-        spent.card = card
-        context.insert(spent)
         try context.save()
     }
 

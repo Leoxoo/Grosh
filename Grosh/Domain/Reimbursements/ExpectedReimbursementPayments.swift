@@ -73,7 +73,8 @@ extension Transaction {
         guard canBeReimbursed else { throw ReimbursementRuleError.notAnExpense }
         guard isElsewhere(wallet), let wallet else { return }
         guard wallet.currencyCode == amount.currencyCode else { throw ExpectedReimbursementRuleError.otherCurrency }
-        guard linkID == nil || hasPaybacksElsewhere else { throw ExpectedReimbursementRuleError.splitPart }
+        // Only an Expense on no link, or already on its paybacks' (ADR-0012), takes one.
+        guard linkKind == nil || linkKind == .payback else { throw ExpectedReimbursementRuleError.splitPart }
     }
 
     /// Someone paid this Expense back into `wallet`, another wallet than its own: a transaction in that wallet, dated
@@ -89,16 +90,13 @@ extension Transaction {
         try draft.validate()
         try checkPayback(into: wallet)
         let category = try context.lockedCategory(.reimbursement)
-        let link = linkID ?? UUID()
-        linkID = link
         hasPaybacksElsewhere = true
-        let payback = Transaction(amount: draft.amount, day: draft.day, wallet: nil, category: nil)
-        context.insert(payback)
-        payback.wallet = wallet
-        payback.category = category
-        payback.note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let payback = Transaction.insert(
+            draft.amount, on: draft.day, wallet: wallet, category: category,
+            note: draft.note.trimmingCharacters(in: .whitespacesAndNewlines), in: context
+        )
         payback.setPeople(person.map { [$0] } ?? [])
-        payback.linkID = link
+        payback.join(self, as: .payback)
         payback.paidBackExpense = self
         payback.paidExpectation = expectation
         try context.save()
@@ -137,6 +135,19 @@ extension Transaction {
     var isHiddenInTotal: Bool {
         guard let expense = paidBackExpense, category?.lockedRole == .reimbursement else { return false }
         return !expense.isInRecentlyDeleted && expense.wallet?.countsInTotal == true
+    }
+
+    /// Called as `removed` leave the store for good: an Expense none of whose paybacks is left, not even in Recently
+    /// Deleted, is no longer paid back elsewhere. It leaves the link it shared with them, so it can be split and change
+    /// wallet again. Doesn't save.
+    func forgetPaybacks(removedForGood removed: Set<PersistentIdentifier>) {
+        guard hasPaybacksElsewhere,
+              (paybacks ?? []).allSatisfy({ removed.contains($0.persistentModelID) })
+        else { return }
+        hasPaybacksElsewhere = false
+        if linkKind == .payback {
+            leaveLink()
+        }
     }
 
     /// What was paid back into other wallets, as the Expense's own wallet's row notes it: "+20 to Cash, +5 to Bank".

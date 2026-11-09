@@ -169,11 +169,10 @@ extension Transaction {
         let category = try reason ?? BalanceAdjustmentDraft.defaultReason(for: type, in: context)
         guard category.type == type else { throw BalanceAdjustmentRuleError.reasonDoesNotMatchDifference }
 
-        let adjustment = Transaction(amount: difference, day: day, wallet: nil, category: nil)
-        context.insert(adjustment)
-        adjustment.wallet = wallet
-        adjustment.category = category
-        adjustment.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let adjustment = Transaction.insert(
+            difference, on: day, wallet: wallet, category: category,
+            note: note.trimmingCharacters(in: .whitespacesAndNewlines), in: context
+        )
         adjustment.isExcludedFromReport = isExcludedFromReport
         adjustment.isBalanceAdjustment = true
         try context.save()

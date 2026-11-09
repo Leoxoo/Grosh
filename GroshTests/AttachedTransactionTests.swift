@@ -31,17 +31,17 @@ struct AttachedTransactionTests {
 
     /// A transaction entered by hand on `day` in the fixture's wallet, with no category.
     private func entered(on day: CalendarDay, cents: Int) -> Transaction {
-        let transaction = Transaction(amount: Money(cents: cents), day: day, wallet: store.wallet, category: nil)
-        context.insert(transaction)
+        let transaction = Transaction.insert(
+            Money(cents: cents), on: day, wallet: store.wallet, category: nil, in: context
+        )
         return transaction
     }
 
     /// A 4.99 spend on October 1 in `wallet`, filed under `category` and paid with `card` when one is given.
     private func spent(on category: Grosh.Category?, in wallet: Wallet, card: Card? = nil) -> Transaction {
-        let transaction = Transaction(
-            amount: Money(cents: -499), day: day(2026, 10, 1), wallet: wallet, category: category, card: card
+        let transaction = Transaction.insert(
+            Money(cents: -499), on: day(2026, 10, 1), wallet: wallet, category: category, card: card, in: context
         )
-        context.insert(transaction)
         return transaction
     }
 

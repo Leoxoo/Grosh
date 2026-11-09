@@ -70,12 +70,9 @@ extension Wallet {
         let category = try context.lockedCategory(.startingBalance)
         let wallet = try insertWithoutStartingBalance(draft, in: context)
 
-        let starting = Transaction(amount: startingBalance, day: day, wallet: nil, category: nil)
+        let starting = Transaction.insert(startingBalance, on: day, wallet: wallet, category: category, in: context)
         starting.isExcludedFromReport = true
         starting.createdAt = enteredAt
-        context.insert(starting)
-        starting.wallet = wallet
-        starting.category = category
         return wallet
     }
 

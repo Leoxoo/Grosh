@@ -27,8 +27,7 @@ struct PeriodSummaryTests {
 
     @discardableResult
     private func record(_ cents: Int, on day: CalendarDay, excludedFromReport: Bool = false) -> Transaction {
-        let transaction = Transaction(amount: Money(cents: cents), day: day, wallet: nil, category: nil)
-        context.insert(transaction)
+        let transaction = Transaction.insert(Money(cents: cents), on: day, wallet: nil, category: nil, in: context)
         transaction.wallet = checking
         transaction.isExcludedFromReport = excludedFromReport
         return transaction

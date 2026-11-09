@@ -21,8 +21,7 @@ struct BalanceAdjustmentTests {
     private func record(
         _ cents: Int, _ categoryName: String, _ type: CategoryType = .expense, in wallet: Wallet? = nil, on day: CalendarDay
     ) throws -> Transaction {
-        let transaction = Transaction(amount: Money(cents: cents), day: day, wallet: nil, category: nil)
-        context.insert(transaction)
+        let transaction = Transaction.insert(Money(cents: cents), on: day, wallet: nil, category: nil, in: context)
         transaction.wallet = wallet ?? checking
         transaction.category = try store.category(categoryName, type)
         return transaction

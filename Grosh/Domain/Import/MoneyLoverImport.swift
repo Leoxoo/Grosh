@@ -188,7 +188,7 @@ private struct Importer {
         filedUnder categories: [Category], with withPeople: [[Person]], categories filer: inout CategoryFiler
     ) throws -> MoneyLoverImportSummary {
         let paid = try addNamedCards()
-        var links: [String: UUID] = [:]
+        var linked: [String: [Transaction]] = [:]
         for index in rows.indices {
             let row = rows[index]
             let transaction = record(
@@ -199,9 +199,11 @@ private struct Importer {
                 try markForgiven(transaction, as: forgiven, kind: kind, categories: &filer)
             }
             guard let link = row.link, !link.isEmpty else { continue }
-            let linkID = links[link] ?? UUID()
-            links[link] = linkID
-            transaction.linkID = linkID
+            linked[link, default: []].append(transaction)
+        }
+        // The file numbers each link but doesn't say what it joins: that is worked out from its rows (ADR-0012).
+        for members in linked.values {
+            Transaction.link(members, as: LinkKind(of: members))
         }
         return MoneyLoverImportSummary(
             wallets: walletOrder.map { name in
@@ -303,18 +305,14 @@ private struct Importer {
         _ row: MoneyLoverRow, at index: Int, filedUnder category: Category, paidWith card: Card?, note: String,
         with chosen: [Person]
     ) -> Transaction {
-        let transaction = Transaction(
-            amount: row.amount, day: row.day, wallet: nil, category: nil,
-            note: note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let transaction = Transaction.insert(
+            row.amount, on: row.day, wallet: wallets[row.walletName], category: category, card: card,
+            note: note.trimmingCharacters(in: .whitespacesAndNewlines), in: context
         )
         transaction.createdAt = now.addingTimeInterval(-Double(index))
         transaction.eventName = row.eventName
         transaction.isExcludedFromReport = row.isExcludedFromReport
-        context.insert(transaction)
         transaction.setPeople(chosen, usedAt: transaction.createdAt)
-        transaction.wallet = wallets[row.walletName]
-        transaction.category = category
-        transaction.card = card
         return transaction
     }
 
@@ -335,9 +333,7 @@ private struct Importer {
             guard let index = incoming[key]?.firstIndex(where: { $0.wallet != outgoing.wallet }),
                   let partner = incoming[key]?.remove(at: index)
             else { continue }
-            let link = UUID()
-            outgoing.linkID = link
-            partner.linkID = link
+            Transaction.link([outgoing, partner], as: .transfer)
         }
         return imported.filter { $0.category?.isTransferHalf == true && $0.linkID == nil }
     }

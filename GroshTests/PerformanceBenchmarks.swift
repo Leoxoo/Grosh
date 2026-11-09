@@ -108,8 +108,9 @@ struct PerformanceBenchmarks {
         var samples: [Double] = []
         for _ in 0..<6 {
             let start = ContinuousClock.now
-            let added = Grosh.Transaction(amount: Money(cents: -4_20), day: .today, wallet: wallet, category: category)
-            context.insert(added)
+            let added = Grosh.Transaction.insert(
+                Money(cents: -4_20), on: .today, wallet: wallet, category: category, in: context
+            )
             try context.save()
             home.settle()
             transactions.settle()

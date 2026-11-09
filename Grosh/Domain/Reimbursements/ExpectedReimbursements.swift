@@ -292,9 +292,10 @@ extension Transaction {
 }
 
 nonisolated extension TransactionDraft {
-    /// Whether the Add sheet offers + Owes me: only on an ordinary Expense.
+    /// Whether the Add sheet offers + Owes me: only on what can be paid back once saved
+    /// (``Transaction/isReimbursable(type:category:isBalanceAdjustment:sign:)``).
     var offersOwesMe: Bool {
-        type == .expense && offersCard && !isBalanceAdjustment
+        Transaction.isReimbursable(type: type, category: category, isBalanceAdjustment: isBalanceAdjustment, sign: sign)
     }
 
     /// The + Owes me for `person`, or `nil` when there is none.

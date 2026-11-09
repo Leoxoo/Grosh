@@ -19,8 +19,9 @@ struct RecentTransactionsTests {
     }
 
     private func record(_ note: String, on day: CalendarDay, enteredAt seconds: Double) {
-        let transaction = Transaction(amount: Money(cents: -1_00), day: day, wallet: nil, category: nil, note: note)
-        context.insert(transaction)
+        let transaction = Transaction.insert(
+            Money(cents: -1_00), on: day, wallet: nil, category: nil, note: note, in: context
+        )
         transaction.wallet = checking
         transaction.createdAt = Date(timeIntervalSinceReferenceDate: 800_000_000 + seconds)
     }

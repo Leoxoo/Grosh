@@ -26,11 +26,10 @@ struct PersonSearchTests {
         let ivan = try Person.add(named: "Ivan", in: context)
         let olga = try Person.add(named: "Olga", in: context)
         func record(_ note: String, with people: [Person]) -> Transaction {
-            let transaction = Transaction(
-                amount: Money(cents: -10_00), day: CalendarDay(year: 2026, month: 10, day: 1), wallet: nil,
-                category: nil, note: note
+            let transaction = Transaction.insert(
+                Money(cents: -10_00), on: CalendarDay(year: 2026, month: 10, day: 1), wallet: nil, category: nil,
+                note: note, in: context
             )
-            context.insert(transaction)
             transaction.wallet = wallet
             transaction.setPeople(people)
             return transaction

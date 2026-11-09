@@ -304,20 +304,15 @@ extension RecurringTransaction {
     @discardableResult
     func makeTransaction(on day: CalendarDay, history: [Transaction], in context: ModelContext) -> Transaction? {
         guard let wallet = self.wallet, let category = self.category else { return nil }
-        let transaction = Transaction(
-            amount: startingAmount(among: history),
-            day: day,
-            wallet: wallet,
-            category: category,
-            card: card,
-            note: note
+        let transaction = Transaction.insert(
+            startingAmount(among: history), on: day, wallet: wallet, category: category, card: card, note: note,
+            in: context
         )
         transaction.recurring = self
         if estimatesAmount {
             transaction.isEstimated = true
             transaction.estimateReminderDay = day.adding(days: remindAfterDays)
         }
-        context.insert(transaction)
         return transaction
     }
 

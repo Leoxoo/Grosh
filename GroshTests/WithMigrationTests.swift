@@ -20,11 +20,11 @@ struct WithMigrationTests {
     /// now.
     @discardableResult
     private func legacy(_ name: String, minutesAgo: Double = 0) throws -> Transaction {
-        let transaction = Transaction(amount: Money(cents: -30_00), day: day, wallet: nil, category: nil)
+        let transaction = Transaction.insert(
+            Money(cents: -30_00), on: day, wallet: store.wallet, category: nil, in: context
+        )
         transaction.createdAt = Date.now.addingTimeInterval(-minutesAgo * 60)
         transaction.withName = name
-        context.insert(transaction)
-        transaction.wallet = store.wallet
         try context.save()
         return transaction
     }

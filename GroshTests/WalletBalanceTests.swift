@@ -21,8 +21,7 @@ struct WalletBalanceTests {
     }
 
     private func record(_ cents: Int, on day: CalendarDay, in wallet: Wallet) {
-        let transaction = Transaction(amount: Money(cents: cents), day: day, wallet: nil, category: nil)
-        context.insert(transaction)
+        let transaction = Transaction.insert(Money(cents: cents), on: day, wallet: nil, category: nil, in: context)
         transaction.wallet = wallet
     }
 
@@ -107,8 +106,7 @@ struct WalletBalanceTests {
         record(-20_00, on: CalendarDay(year: 2026, month: 10, day: 10), in: checking)
         record(25_50, on: today, in: cash)
         record(5_000_00, on: today, in: brokerage)
-        let deleted = Transaction(amount: Money(cents: -9_00), day: today, wallet: nil, category: nil)
-        context.insert(deleted)
+        let deleted = Transaction.insert(Money(cents: -9_00), on: today, wallet: nil, category: nil, in: context)
         deleted.wallet = cash
         deleted.deletedAt = .now
         try context.save()

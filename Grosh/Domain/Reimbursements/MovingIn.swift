@@ -3,25 +3,21 @@ import SwiftData
 
 extension Transaction {
     /// Whether it can be moved into `expense` as a Reimbursement: when nothing blocks it
-    /// (``reimbursementMoveInBlocker(into:loanOrDebtLinks:)``).
-    func canBeMovedIntoReimbursement(of expense: Transaction, loanOrDebtLinks: Set<UUID>? = nil) -> Bool {
-        reimbursementMoveInBlocker(into: expense, loanOrDebtLinks: loanOrDebtLinks) == nil
+    /// (``reimbursementMoveInBlocker(into:)``).
+    func canBeMovedIntoReimbursement(of expense: Transaction) -> Bool {
+        reimbursementMoveInBlocker(into: expense) == nil
     }
 
     /// Why it can't be moved into `expense` as a Reimbursement, or `nil` when it can: it must be money that came in
     /// under an Income category, outside Recently Deleted, into the Expense's own wallet. A transfer's incoming half, a
     /// balance adjustment, a Loan or Debt and their payments, and what an overpaid Loan brought in can't; money paid
-    /// into another wallet is a transfer or income, never a Reimbursement (ADR 0008). A screen checking many reads
-    /// `loanOrDebtLinks` once (``Transaction/loanOrDebtLinks(in:)``); without them, a linked Income reads the store.
-    func reimbursementMoveInBlocker(
-        into expense: Transaction, loanOrDebtLinks: Set<UUID>? = nil
-    ) -> ReimbursementRuleError? {
+    /// into another wallet is a transfer or income, never a Reimbursement (ADR 0008).
+    func reimbursementMoveInBlocker(into expense: Transaction) -> ReimbursementRuleError? {
         guard deletedAt == nil, category?.type == .income, category?.isTransferHalf != true, !isBalanceAdjustment,
               amountCents > 0
         else { return .notADeposit }
         guard let wallet, wallet === expense.wallet else { return .otherWallet }
-        let isWriteOff = loanOrDebtLinks.map { isDebtWriteOff(loanOrDebtLinks: $0) } ?? isDebtWriteOff
-        return isWriteOff ? .notADeposit : nil
+        return isDebtWriteOff ? .notADeposit : nil
     }
 
     /// The Reimbursements as the row lists them, earliest first: "+20, +10, +3.50". A whole amount drops its cents.

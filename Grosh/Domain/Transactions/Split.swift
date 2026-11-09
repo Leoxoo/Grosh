@@ -153,60 +153,14 @@ extension Transaction {
     /// Whether the transaction can be split: an ordinary Expense or Income, which is not a transfer half, a Loan or
     /// Debt or one of their payments (or what they write off), a Starting balance, a Balance adjustment, an Expense
     /// paid back into another wallet (ADR-0010), or in Recently Deleted. A part of a split can be split again.
-    var canBeSplit: Bool { canBeSplit(editFlow: editFlow) }
-
-    /// ``canBeSplit``, for a screen that has already worked out ``editFlow``.
-    func canBeSplit(editFlow: TransactionEditFlow?) -> Bool {
+    var canBeSplit: Bool {
         editFlow == .addSheet && category?.type.isUserManaged == true && !isBalanceAdjustment && !isInRecentlyDeleted
-            && !hasPaybacksElsewhere
+            && linkKind != .payback
     }
 
-    /// Whether this is an Expense or Income, not a transfer half, that shares a link: a part of a Split, or what a Loan
-    /// or Debt writes off beside a payment. A payback into another wallet and the Expense it was paid against share a
-    /// link too, but they are neither (ADR-0010).
-    var isLinkedExpenseOrIncome: Bool {
-        guard linkID != nil, !hasPaybacksElsewhere, let category, !category.isTransferHalf,
-              category.lockedRole != .reimbursement
-        else { return false }
-        return category.type.isUserManaged
-    }
-
-    /// The links Loans and Debts hold, those in Recently Deleted included: what tells a part of a Split from what a Loan
-    /// or Debt writes off. There are only ever a few, so one fetch answers ``isSplitPart(loanOrDebtLinks:)`` and
-    /// ``isDebtWriteOff(loanOrDebtLinks:)`` for every transaction a screen or an export goes through.
-    static func loanOrDebtLinks(in context: ModelContext) throws -> Set<UUID> {
-        let loan: String? = LockedRole.loan.rawValue
-        let debt: String? = LockedRole.debt.rawValue
-        var descriptor = FetchDescriptor<Transaction>(predicate: #Predicate {
-            $0.linkID != nil && ($0.category?.lockedRoleRaw == loan || $0.category?.lockedRoleRaw == debt)
-        })
-        descriptor.propertiesToFetch = [\.linkID]
-        return Set(try context.fetch(descriptor).compactMap(\.linkID))
-    }
-
-    /// Whether a Loan or Debt (even one in Recently Deleted) shares this transaction's link. Counts them in the store,
-    /// once for each read: a screen or an export asking for many transactions reads ``loanOrDebtLinks(in:)`` instead.
-    var sharesLinkWithLoanOrDebt: Bool {
-        guard let link = linkID, let context = modelContext else { return false }
-        let loan: String? = LockedRole.loan.rawValue
-        let debt: String? = LockedRole.debt.rawValue
-        var descriptor = FetchDescriptor<Transaction>(predicate: #Predicate {
-            $0.linkID == link && ($0.category?.lockedRoleRaw == loan || $0.category?.lockedRoleRaw == debt)
-        })
-        descriptor.fetchLimit = 1
-        return (Log.store.attempt("Counting the Loan and Debt links") { try context.fetchCount(descriptor) } ?? 0) > 0
-    }
-
-    /// Whether this is a part of a Split: an Expense or Income sharing a link with no Loan or Debt on it. It is edited
-    /// like any ordinary transaction, and nothing it holds is ever shared with the other parts. Only a linked Expense or
-    /// Income reads the store.
-    var isSplitPart: Bool { isLinkedExpenseOrIncome && !sharesLinkWithLoanOrDebt }
-
-    /// ``isSplitPart``, with the links of every Loan and Debt read once beforehand (``loanOrDebtLinks(in:)``).
-    func isSplitPart(loanOrDebtLinks: Set<UUID>) -> Bool {
-        guard isLinkedExpenseOrIncome, let link = linkID else { return false }
-        return !loanOrDebtLinks.contains(link)
-    }
+    /// Whether this is a part of a Split (ADR-0012). It is edited like any ordinary transaction, and nothing it holds
+    /// is ever shared with the other parts.
+    var isSplitPart: Bool { linkKind == .split }
 
     /// Splits this transaction as `draft` has it, in `context`: it keeps its identity, creation time and Recurring
     /// attachment and takes the draft's remainder and fields, and each new part is made as a copy in its wallet and
@@ -217,31 +171,25 @@ extension Transaction {
     func split(_ draft: SplitDraft, in context: ModelContext) throws -> [Transaction] {
         guard canBeSplit else { throw SplitRuleError.notSplittable }
         try draft.validate()
-        let link = linkID ?? UUID()
         draft.original.apply(to: self)
-        linkID = link
         // Typing over the original so the total changes confirms an Estimated transaction, as editing it does. Only
         // moving parts of it elsewhere leaves the estimate as it was.
         if draft.total != draft.was {
             clearEstimate()
         }
         let created = draft.parts.map { part -> Transaction in
-            let transaction = Transaction(amount: Money(cents: 0), day: part.day, wallet: nil, category: nil)
-            context.insert(transaction)
+            let transaction = Transaction.insert(
+                Money(cents: 0), on: part.day, wallet: wallet, category: nil, card: card, in: context
+            )
             part.apply(to: transaction)
-            transaction.wallet = wallet
-            transaction.card = card
             transaction.isExcludedFromReport = isExcludedFromReport
-            transaction.linkID = link
+            transaction.join(self, as: .split)
             return transaction
         }
         for entry in draft.reimbursements {
             if case .part(let index)? = entry.part {
-                entry.reimbursement.expense = created[index]
+                entry.reimbursement.move(to: created[index])
             }
-        }
-        for part in [self] + created {
-            part.recountReimbursements()
         }
         try context.save()
         return created
@@ -256,15 +204,14 @@ extension Transaction {
         guard isSplitPart, parts.contains(self), let original = parts.splitOriginal, parts.count > 1
         else { throw SplitRuleError.notSplit }
         original.amountCents = parts.reduce(0) { $0 + $1.amountCents }
-        original.linkID = nil
+        original.leaveLink()
         for part in parts where part != original {
             // Moved off first, so deleting the part doesn't take its Reimbursements with it.
             for reimbursement in part.reimbursements ?? [] {
-                reimbursement.expense = original
+                reimbursement.move(to: original)
             }
             context.delete(part)
         }
-        original.recountReimbursements()
         try context.save()
         return original
     }

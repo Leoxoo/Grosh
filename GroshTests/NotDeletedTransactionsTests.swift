@@ -23,8 +23,9 @@ struct NotDeletedTransactionsTests {
 
     @discardableResult
     private func record(_ note: String, in wallet: Wallet? = nil) -> Transaction {
-        let transaction = Transaction(amount: Money(cents: -5_00), day: today, wallet: nil, category: nil, note: note)
-        context.insert(transaction)
+        let transaction = Transaction.insert(
+            Money(cents: -5_00), on: today, wallet: nil, category: nil, note: note, in: context
+        )
         transaction.wallet = wallet ?? checking
         return transaction
     }

@@ -23,8 +23,9 @@ struct TransactionCategoryGroupTests {
     private func record(
         _ note: String, _ cents: Int, under category: Grosh.Category?, on day: CalendarDay, enteredAt seconds: Double = 0
     ) -> Transaction {
-        let transaction = Transaction(amount: Money(cents: cents), day: day, wallet: nil, category: nil, note: note)
-        store.context.insert(transaction)
+        let transaction = Transaction.insert(
+            Money(cents: cents), on: day, wallet: nil, category: nil, note: note, in: store.context
+        )
         transaction.wallet = store.wallet
         transaction.category = category
         transaction.createdAt = Date(timeIntervalSinceReferenceDate: 800_000_000 + seconds)

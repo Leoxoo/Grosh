@@ -139,9 +139,9 @@ struct ScheduledOccurrenceTests {
         let water = Grosh.Category(name: "Water", type: .expense, symbolName: "bolt", color: .purple)
         context.insert(water)
         for _ in 0..<2 {
-            context.insert(Transaction(
-                amount: Money(cents: -50_00), day: day(2026, 9, 1), wallet: store.wallet, category: water
-            ))
+            Transaction.insert(
+                Money(cents: -50_00), on: day(2026, 9, 1), wallet: store.wallet, category: water, in: context
+            )
         }
         try context.save()
         var draft = RecurringDraft(startDay: day(2026, 10, 12))
@@ -190,10 +190,9 @@ struct ScheduledOccurrenceTests {
     @Test func aDayListsItsTransactionsThenItsScheduledRowsAndTotalsOnlyTheTransactions() throws {
         let netflix = try makeSchedule(starting: day(2026, 10, 20), end: .afterCount(3))
         let rows = [netflix].scheduledOccurrences(selection: .total, today: today)
-        let lunch = Transaction(
-            amount: Money(cents: -5_00), day: day(2026, 10, 20), wallet: store.wallet, category: nil
+        let lunch = Transaction.insert(
+            Money(cents: -5_00), on: day(2026, 10, 20), wallet: store.wallet, category: nil, in: context
         )
-        context.insert(lunch)
 
         let days = TransactionDay.days(of: [lunch], scheduled: rows)
 
@@ -209,10 +208,9 @@ struct ScheduledOccurrenceTests {
     @Test func futureListsTransactionsEnteredForAFutureDayAlongsideScheduledRows() throws {
         let netflix = try makeSchedule(starting: day(2026, 10, 20), end: .afterCount(3))
         let rows = [netflix].scheduledOccurrences(selection: .total, today: today)
-        let dinner = Transaction(
-            amount: Money(cents: -40_00), day: day(2026, 11, 3), wallet: store.wallet, category: nil
+        let dinner = Transaction.insert(
+            Money(cents: -40_00), on: day(2026, 11, 3), wallet: store.wallet, category: nil, in: context
         )
-        context.insert(dinner)
 
         let future = Period.future.days(today: today)
         let shown = TransactionFilter().listed(from: [dinner], selection: .total, on: future)

@@ -28,11 +28,10 @@ struct CategoryFixture {
     /// Records an expense of `cents` under `category`.
     @discardableResult
     func spend(_ cents: Int, on category: Grosh.Category) -> Transaction {
-        let transaction = Transaction(
-            amount: Money(cents: -cents), day: CalendarDay(year: 2026, month: 10, day: 1),
-            wallet: wallet, category: category
+        let transaction = Transaction.insert(
+            Money(cents: -cents), on: CalendarDay(year: 2026, month: 10, day: 1), wallet: wallet, category: category,
+            in: context
         )
-        context.insert(transaction)
         return transaction
     }
 }

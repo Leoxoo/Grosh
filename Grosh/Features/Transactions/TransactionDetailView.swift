@@ -52,11 +52,8 @@ struct TransactionDetailView: View {
     }
 
     private var details: some View {
-        // Worked out once for the whole screen: on a linked Expense or Income, whether it is a part of a Split reads the
-        // store.
-        let isSplitPart = transaction.isSplitPart
-        let editFlow = transaction.editFlow(isSplitPart: isSplitPart)
-        let canBeDuplicated = transaction.canBeDuplicated(editFlow: editFlow)
+        let editFlow = transaction.editFlow
+        let canBeDuplicated = transaction.canBeDuplicated
         return List {
             Section {
                 TransactionDetailHeader(transaction: transaction)
@@ -90,7 +87,7 @@ struct TransactionDetailView: View {
                 fields
             }
 
-            RelatedTransactionsSection(transaction: transaction, isSplitPart: isSplitPart)
+            RelatedTransactionsSection(transaction: transaction)
 
             Section {
                 if canBeDuplicated {
@@ -99,7 +96,7 @@ struct TransactionDetailView: View {
                     }
                     .fullWidthRowButton()
                 }
-                if transaction.canBeSplit(editFlow: editFlow) {
+                if transaction.canBeSplit {
                     Button(Strings.Transactions.split, systemImage: "square.split.2x1") {
                         isSplitting = true
                     }

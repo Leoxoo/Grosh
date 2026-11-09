@@ -96,8 +96,7 @@ struct WalletManagementTests {
 
     @Test func onlyAStartingBalanceTakesAStartingBalanceEdit() throws {
         let checking = try addWallet("Checking")
-        let salary = Transaction(amount: Money(cents: 2_000_00), day: today, wallet: nil, category: nil)
-        context.insert(salary)
+        let salary = Transaction.insert(Money(cents: 2_000_00), on: today, wallet: nil, category: nil, in: context)
         salary.wallet = checking
         salary.category = try context.lockedCategory(.otherIncome)
         var edit = StartingBalanceDraft(editing: salary)

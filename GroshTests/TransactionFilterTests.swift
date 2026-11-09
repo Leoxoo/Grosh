@@ -41,8 +41,9 @@ struct TransactionFilterTests {
         in wallet: Wallet? = nil,
         excludedFromReport: Bool = false
     ) -> Transaction {
-        let transaction = Transaction(amount: Money(cents: cents), day: day ?? self.day(10, 1), wallet: nil, category: nil, note: note)
-        context.insert(transaction)
+        let transaction = Transaction.insert(
+            Money(cents: cents), on: day ?? self.day(10, 1), wallet: nil, category: nil, note: note, in: context
+        )
         transaction.wallet = wallet ?? checking
         transaction.category = category
         transaction.card = card

@@ -562,8 +562,7 @@ struct DebtLoanTests {
 
     /// A Debt Collection that came in without a link, as an import brings them.
     private func unlinkedPayment(_ role: LockedRole, _ cents: Int) throws -> Transaction {
-        let payment = Transaction(amount: Money(cents: cents), day: paidOn, wallet: checking, category: nil)
-        context.insert(payment)
+        let payment = Transaction.insert(Money(cents: cents), on: paidOn, wallet: checking, category: nil, in: context)
         payment.category = try context.lockedCategory(role)
         payment.isExcludedFromReport = true
         return payment

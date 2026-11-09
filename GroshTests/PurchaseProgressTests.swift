@@ -40,8 +40,9 @@ struct PurchaseProgressTests {
     /// An earlier payment of `cents` from the fixture's wallet, attached to `recurring`.
     @discardableResult
     private func attachPayment(_ cents: Int, dated: CalendarDay, to recurring: RecurringTransaction) throws -> Transaction {
-        let payment = Transaction(amount: Money(cents: -cents), day: dated, wallet: store.wallet, category: nil)
-        context.insert(payment)
+        let payment = Transaction.insert(
+            Money(cents: -cents), on: dated, wallet: store.wallet, category: nil, in: context
+        )
         try recurring.attach(payment, in: context)
         return payment
     }

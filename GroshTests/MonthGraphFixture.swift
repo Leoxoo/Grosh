@@ -27,8 +27,7 @@ struct MonthGraphFixture {
         _ cents: Int, _ categoryName: String, _ type: CategoryType = .expense, on day: CalendarDay,
         in wallet: Wallet? = nil
     ) throws -> Transaction {
-        let transaction = Transaction(amount: Money(cents: cents), day: day, wallet: nil, category: nil)
-        context.insert(transaction)
+        let transaction = Transaction.insert(Money(cents: cents), on: day, wallet: nil, category: nil, in: context)
         transaction.wallet = wallet ?? checking
         transaction.category = try category(categoryName, type)
         return transaction

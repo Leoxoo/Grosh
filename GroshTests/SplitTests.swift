@@ -511,7 +511,7 @@ struct SplitTests {
         #expect(overpaid.editFlow == nil)
     }
 
-    @Test func theLinksOfEveryLoanAndDebtReadOnceTellPartsFromWriteOffs() throws {
+    @Test func theStoredLinkKindTellsPartsFromWriteOffs() throws {
         var draft = TransactionDraft(type: .debtLoan, day: today)
         draft.wallet = checking
         draft.amount = Money(cents: 100_00)
@@ -526,14 +526,11 @@ struct SplitTests {
         // A Debt in Recently Deleted still holds its link.
         try debt.delete(.onlySelected, in: context)
 
-        let links = try Transaction.loanOrDebtLinks(in: context)
-
-        #expect(links == Set([debt.linkID].compactMap { $0 }))
-        #expect(overpaid.isDebtWriteOff(loanOrDebtLinks: links) && overpaid.isDebtWriteOff)
-        #expect(!overpaid.isSplitPart(loanOrDebtLinks: links) && !overpaid.isSplitPart)
+        #expect(overpaid.linkKind == .loanOrDebt && debt.linkKind == .loanOrDebt)
+        #expect(overpaid.isDebtWriteOff && !overpaid.isSplitPart)
         for transaction in [coffee, part] {
-            #expect(transaction.isSplitPart(loanOrDebtLinks: links) && transaction.isSplitPart)
-            #expect(!transaction.isDebtWriteOff(loanOrDebtLinks: links) && !transaction.isDebtWriteOff)
+            #expect(transaction.linkKind == .split)
+            #expect(transaction.isSplitPart && !transaction.isDebtWriteOff)
         }
     }
 

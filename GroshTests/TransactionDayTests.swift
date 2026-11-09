@@ -25,8 +25,9 @@ struct TransactionDayTests {
     /// Records a transaction entered `enteredAt` seconds into the test's clock.
     @discardableResult
     private func record(_ note: String, _ cents: Int, on day: CalendarDay, enteredAt seconds: Double) -> Transaction {
-        let transaction = Transaction(amount: Money(cents: cents), day: day, wallet: nil, category: nil, note: note)
-        context.insert(transaction)
+        let transaction = Transaction.insert(
+            Money(cents: cents), on: day, wallet: nil, category: nil, note: note, in: context
+        )
         transaction.wallet = checking
         transaction.createdAt = Date(timeIntervalSinceReferenceDate: 800_000_000 + seconds)
         return transaction
@@ -101,11 +102,10 @@ struct TransactionOrderAcrossLaunchesTests {
             container.mainContext.insert(wallet)
             let sameMoment = Date(timeIntervalSinceReferenceDate: 800_000_000)
             for (index, note) in ["a", "b", "c", "d", "e", "f"].enumerated() {
-                let transaction = Transaction(
-                    amount: Money(cents: -100), day: CalendarDay(year: 2026, month: 10, day: 3),
-                    wallet: nil, category: nil, note: note
+                let transaction = Transaction.insert(
+                    Money(cents: -100), on: CalendarDay(year: 2026, month: 10, day: 3), wallet: nil, category: nil,
+                    note: note, in: container.mainContext
                 )
-                container.mainContext.insert(transaction)
                 transaction.wallet = wallet
                 // Two entered one after the other, four at the same moment (as an import does).
                 transaction.createdAt = index < 2 ? sameMoment.addingTimeInterval(Double(index + 1)) : sameMoment

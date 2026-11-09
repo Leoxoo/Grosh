@@ -28,11 +28,10 @@ struct AmountEstimateTests {
         _ cents: Int, under category: Grosh.Category, on day: CalendarDay = CalendarDay(year: 2026, month: 9, day: 1),
         from wallet: Wallet? = nil, configure: (Transaction) -> Void = { _ in }
     ) -> Transaction {
-        let transaction = Transaction(
-            amount: Money(cents: -cents), day: day, wallet: wallet ?? store.wallet, category: category
+        let transaction = Transaction.insert(
+            Money(cents: -cents), on: day, wallet: wallet ?? store.wallet, category: category, in: context
         )
         configure(transaction)
-        context.insert(transaction)
         return transaction
     }
 

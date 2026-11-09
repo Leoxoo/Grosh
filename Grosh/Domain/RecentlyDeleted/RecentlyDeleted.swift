@@ -95,18 +95,26 @@ nonisolated struct RecentlyDeleted {
         in context: ModelContext
     ) throws {
         var removed = Set<PersistentIdentifier>()
-        func remove<Model: PersistentModel>(_ model: Model) {
+        var paidBack: [Transaction] = []
+        func remove(model: some PersistentModel) {
             if removed.insert(model.persistentModelID).inserted {
                 context.delete(model)
             }
         }
+        // An Expense whose last payback is removed for good is no longer paid back elsewhere.
+        func removeTransaction(_ transaction: Transaction) {
+            if let expense = transaction.paidBackExpense {
+                paidBack.append(expense)
+            }
+            remove(model: transaction)
+        }
         for wallet in wallets {
             // A wallet's Recurring transactions go with it, as its transactions do, even if deleted on their own.
             for schedule in wallet.recurringTransactions ?? [] {
-                remove(schedule)
+                remove(model: schedule)
             }
             for transaction in wallet.transactions ?? [] {
-                remove(transaction)
+                removeTransaction(transaction)
             }
             // A Card is only offered on its paying wallet's transactions, so with the wallet gone it has no use left.
             for card in wallet.cards ?? []
@@ -116,10 +124,13 @@ nonisolated struct RecentlyDeleted {
             context.delete(wallet)
         }
         for schedule in recurring {
-            remove(schedule)
+            remove(model: schedule)
         }
         for transaction in transactions {
-            remove(transaction)
+            removeTransaction(transaction)
+        }
+        for expense in paidBack where !removed.contains(expense.persistentModelID) {
+            expense.forgetPaybacks(removedForGood: removed)
         }
         try context.save()
     }
@@ -270,13 +281,11 @@ extension Transaction {
 
     /// Whether this is a Debt Collection or Repayment linked to a Loan or Debt that is forgiven.
     private var paysForgivenLoanOrDebt: Bool {
-        let role = category?.lockedRole
-        guard role == .debtCollection || role == .repayment, let link = linkID, let context = modelContext else {
-            return false
-        }
-        let linked = FetchDescriptor<Transaction>(predicate: #Predicate { $0.linkID == link && $0.deletedAt == nil })
-        let linkedTransactions = Log.store.attempt("Reading the transactions linked to a payment") { try context.fetch(linked) } ?? []
-        return linkedTransactions.contains { $0.isForgiven && $0.loanOrDebtKind?.paymentRole == role }
+        guard let kind = paidLoanOrDebtKind, linkKind == .loanOrDebt, let context = modelContext else { return false }
+        let linkedTransactions = Log.store.attempt("Reading the transactions linked to a payment") {
+            try context.fetch(linkedTransactions)
+        } ?? []
+        return linkedTransactions.contains { $0.isForgiven && $0.loanOrDebtKind == kind }
     }
 
     /// Brings a transaction deleted on its own back from Recently Deleted, linked as before. One deleted with its
@@ -288,15 +297,6 @@ extension Transaction {
         deletedAt = nil
         takeBackMovedInReimbursements()
         try modelContext?.save()
-    }
-
-    /// The payments on this Loan or Debt waiting in Recently Deleted. Restoring one brings it back against this Loan
-    /// or Debt, so until then they still hold its wallet, category and lowest amount in place.
-    var paymentsInRecentlyDeleted: [Transaction] {
-        guard let kind = loanOrDebtKind, let link = linkID, let context = modelContext else { return [] }
-        let deleted = FetchDescriptor<Transaction>(predicate: #Predicate { $0.linkID == link && $0.deletedAt != nil })
-        let found = Log.store.attempt("Reading the payments in Recently Deleted") { try context.fetch(deleted) } ?? []
-        return found.filter { $0.category?.lockedRole == kind.paymentRole }
     }
 
     /// Delete Forever: removes a transaction deleted on its own for good. Saves.

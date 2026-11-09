@@ -319,7 +319,7 @@ struct ReimbursementIntoOtherWalletTests {
     @Test func aPartOfASplitCantBePaidBackIntoAnotherWallet() throws {
         let alex = try fixture.person("Alex")
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
-        dinner.linkID = UUID()
+        Transaction.link([dinner], as: .split)
         let owed = try fixture.expectation(of: alex, on: dinner)
 
         #expect(throws: ExpectedReimbursementRuleError.splitPart) {

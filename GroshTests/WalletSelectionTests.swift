@@ -22,8 +22,9 @@ struct WalletSelectionTests {
 
     @discardableResult
     private func record(_ note: String, _ cents: Int, in wallet: Wallet, on day: CalendarDay? = nil) -> Transaction {
-        let transaction = Transaction(amount: Money(cents: cents), day: day ?? today, wallet: nil, category: nil, note: note)
-        context.insert(transaction)
+        let transaction = Transaction.insert(
+            Money(cents: cents), on: day ?? today, wallet: nil, category: nil, note: note, in: context
+        )
         transaction.wallet = wallet
         return transaction
     }

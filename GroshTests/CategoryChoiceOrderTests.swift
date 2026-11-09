@@ -25,10 +25,9 @@ struct CategoryChoiceOrderTests {
     ) throws -> [Transaction] {
         let category = try fixture.category(name)
         return (0..<count).map { _ in
-            let transaction = Transaction(
-                amount: Money(cents: -10_00), day: day ?? today, wallet: fixture.wallet, category: category
+            let transaction = Transaction.insert(
+                Money(cents: -10_00), on: day ?? today, wallet: fixture.wallet, category: category, in: fixture.context
             )
-            fixture.context.insert(transaction)
             return transaction
         }
     }

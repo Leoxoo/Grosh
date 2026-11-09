@@ -114,18 +114,30 @@ nonisolated struct TransactionDraft {
         originalExpectations = transaction.orderedExpectations
         owes = originalExpectations.compactMap(OwesMeDraft.init(editing:))
         walletKeptByPaybacks = transaction.hasPaybacksElsewhere ? transaction.wallet : nil
-        let deletedPayments = transaction.paymentsInRecentlyDeleted
-        // A transaction that isn't a Loan or Debt gives nil, not an error: ?? nil flattens the two nils into one.
-        if let context = transaction.modelContext,
-           let loanOrDebt = Log.store.attempt("Reading a Loan or Debt", { try LoanOrDebt(transaction, in: context) }) ?? nil,
-           !loanOrDebt.payments.isEmpty || transaction.isForgiven || !deletedPayments.isEmpty {
-            let deletedCents = deletedPayments.reduce(0) { $0 + abs($1.amountCents) }
-            paymentLock = PaymentLock(
-                wallet: transaction.wallet, category: transaction.category,
-                paid: Money(cents: loanOrDebt.paid.cents + deletedCents, currencyCode: loanOrDebt.paid.currencyCode),
-                forgivenOwed: transaction.isForgiven ? loanOrDebt.owed : nil
+        paymentLock = Self.paymentLock(editing: transaction)
+    }
+
+    /// What holds a Loan or Debt in place while it is edited, or `nil` when nothing does. When its payments can't be
+    /// read, it is held as if paid in full: a lock lifted by a failed read would let it change under its payments.
+    @MainActor private static func paymentLock(editing transaction: Transaction) -> PaymentLock? {
+        guard transaction.isLoanOrDebt, let context = transaction.modelContext else { return nil }
+        let owed = Money(cents: abs(transaction.amountCents), currencyCode: transaction.amount.currencyCode)
+        let forgivenOwed = transaction.isForgiven ? owed : nil
+        let payments: [Transaction]
+        do {
+            payments = try transaction.paymentsWithRecentlyDeleted(in: context)
+        } catch {
+            Log.store.failed("Reading the payments of a Loan or Debt", error)
+            return PaymentLock(
+                wallet: transaction.wallet, category: transaction.category, paid: owed, forgivenOwed: forgivenOwed
             )
         }
+        guard !payments.isEmpty || transaction.isForgiven else { return nil }
+        return PaymentLock(
+            wallet: transaction.wallet, category: transaction.category,
+            paid: Money(cents: payments.reduce(0) { $0 + abs($1.amountCents) }, currencyCode: owed.currencyCode),
+            forgivenOwed: forgivenOwed
+        )
     }
 
     /// A new transaction like `transaction`, dated `today` ("Duplicate"). A Loan's or Debt's reminder belonged to

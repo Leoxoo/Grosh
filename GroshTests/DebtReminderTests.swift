@@ -200,7 +200,7 @@ struct DebtReminderTests {
     @Test func theReminderNamesThePersonTheLoanIsWith() throws {
         let loan = try record(.loan, 100_00, with: "Pasha", remindOn: today.adding(days: 5))
         let pasha = try #require(loan.orderedPeople.first)
-        pasha.name = "Pavel"
+        pasha.rename(to: "Pavel")
 
         let reminders = try DebtsAndLoans(in: context).reminders(from: today)
 

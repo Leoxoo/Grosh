@@ -22,8 +22,9 @@ struct TransactionSearchTests {
         in wallet: Wallet? = nil,
         on day: CalendarDay = CalendarDay(year: 2026, month: 10, day: 1)
     ) -> Transaction {
-        let transaction = Transaction(amount: Money(cents: cents), day: day, wallet: nil, category: nil, note: note)
-        context.insert(transaction)
+        let transaction = Transaction.insert(
+            Money(cents: cents), on: day, wallet: nil, category: nil, note: note, in: context
+        )
         transaction.wallet = wallet ?? checking
         transaction.category = category
         return transaction

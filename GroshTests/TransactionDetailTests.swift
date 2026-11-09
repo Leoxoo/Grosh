@@ -23,12 +23,14 @@ struct TransactionDetailTests {
 
     @discardableResult
     private func record(
-        _ note: String, _ cents: Int, in wallet: Wallet, link: UUID? = nil, enteredAt seconds: Double = 0
+        _ note: String, _ cents: Int, in wallet: Wallet, link: UUID? = nil, kind: LinkKind = .transfer,
+        enteredAt seconds: Double = 0
     ) -> Transaction {
-        let transaction = Transaction(amount: Money(cents: cents), day: today, wallet: nil, category: nil, note: note)
-        context.insert(transaction)
+        let transaction = Transaction.insert(
+            Money(cents: cents), on: today, wallet: nil, category: nil, note: note, in: context
+        )
         transaction.wallet = wallet
-        transaction.linkID = link
+        transaction.joinTestLink(link, as: kind)
         transaction.createdAt = Date(timeIntervalSinceReferenceDate: 800_000_000 + seconds)
         return transaction
     }
@@ -92,8 +94,9 @@ struct TransactionDetailTests {
     @Test func aLinkedTransactionIsNeitherEditedNorDuplicatedHere() throws {
         try CategorySeeder.seedIfNeeded(in: context)
         let link = UUID()
-        record("Pasha", -100_00, in: checking, link: link).category = try context.lockedCategory(.loan)
-        let forgiven = record("forgave Pasha", -40_00, in: checking, link: link)
+        let loan = record("Pasha", -100_00, in: checking, link: link, kind: .loanOrDebt)
+        loan.category = try context.lockedCategory(.loan)
+        let forgiven = record("forgave Pasha", -40_00, in: checking, link: link, kind: .loanOrDebt)
         forgiven.category = try context.lockedCategory(.otherExpense)
 
         #expect(forgiven.editFlow == nil)
@@ -103,7 +106,7 @@ struct TransactionDetailTests {
     @Test(arguments: [LockedRole.loan, .debt])
     func aLoanOrDebtWithPaymentsIsStillEditedAndDuplicatedInTheAddSheet(role: LockedRole) throws {
         try CategorySeeder.seedIfNeeded(in: context)
-        let original = record("Pasha", -100_00, in: checking, link: UUID())
+        let original = record("Pasha", -100_00, in: checking, link: UUID(), kind: .loanOrDebt)
         original.category = try context.lockedCategory(role)
 
         #expect(original.editFlow == .addSheet)
@@ -124,9 +127,9 @@ struct TransactionDetailTests {
 
     @Test func deletingOnlyThisOneKeepsTheRelatedTransactions() throws {
         let loan = UUID()
-        let lent = record("lent to Pasha", -100_00, in: checking, link: loan)
-        record("Pasha paid 60", 60_00, in: checking, link: loan)
-        record("Pasha paid 40", 40_00, in: checking, link: loan)
+        let lent = record("lent to Pasha", -100_00, in: checking, link: loan, kind: .loanOrDebt)
+        record("Pasha paid 60", 60_00, in: checking, link: loan, kind: .loanOrDebt)
+        record("Pasha paid 40", 40_00, in: checking, link: loan, kind: .loanOrDebt)
 
         try lent.delete(.onlySelected, in: context)
 

@@ -24,10 +24,11 @@ struct MultiDeleteTests {
 
     @discardableResult
     private func record(_ note: String, _ cents: Int, in wallet: Wallet, link: UUID? = nil) -> Transaction {
-        let transaction = Transaction(amount: Money(cents: cents), day: today, wallet: nil, category: nil, note: note)
-        context.insert(transaction)
+        let transaction = Transaction.insert(
+            Money(cents: cents), on: today, wallet: nil, category: nil, note: note, in: context
+        )
         transaction.wallet = wallet
-        transaction.linkID = link
+        transaction.joinTestLink(link, as: .transfer)
         return transaction
     }
 

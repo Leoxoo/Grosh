@@ -29,8 +29,7 @@ struct CardTransactionsTests {
     /// Records a transaction of `cents` (negative for money going out) paid with `card`.
     @discardableResult
     private func record(_ cents: Int, on day: CalendarDay, paidWith card: Card?) throws -> Transaction {
-        let transaction = Transaction(amount: Money(cents: cents), day: day, wallet: nil, category: nil)
-        context.insert(transaction)
+        let transaction = Transaction.insert(Money(cents: cents), on: day, wallet: nil, category: nil, in: context)
         transaction.wallet = checking
         transaction.category = try context.otherCategory(cents > 0 ? .income : .expense)
         transaction.card = card
