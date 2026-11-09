@@ -38,6 +38,16 @@ struct MonthGraphProjectionTests {
         return try RecurringTransaction.create(draft, today: today, in: context)
     }
 
+    /// Lunch club and Gym both fall on the 19th, and Lunch club alone on the 26th, so the popup lists at most two on a
+    /// day: the chart keeps room for two. Nothing due keeps room for none.
+    @Test func theMostScheduledOnADayIsTheBusiestDaysCount() throws {
+        #expect(try store.graph(.spent).mostScheduledOnADay == 0)
+        try schedule("Lunch club", 10_00, "Restaurants", starting: day(2026, 10, 5), preset: .weekly)
+        try schedule("Gym", 30_00, "Health & Fitness", starting: day(2026, 10, 19))
+
+        #expect(try store.graph(.spent).mostScheduledOnADay == 2)
+    }
+
     // MARK: What the dotted line adds
 
     /// Weekly from October 5: the 5th and the 12th were skipped when it was saved today, so the 19th and the 26th are

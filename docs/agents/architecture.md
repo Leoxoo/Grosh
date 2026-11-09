@@ -27,7 +27,9 @@ Pick the narrowest source that answers the question:
 2. **A slice of them**: `@Query` with a predicate that narrows in the store: a link (`RelatedTransactionsSection`), a date range (`MonthGraphHistory`), a category, Recently Deleted. Put the `FetchDescriptor` in Domain under a name that says what it reads.
 3. **One answer from the whole store** (the earliest counted day, whether anything matches): a `FetchDescriptor` with a sort and `fetchLimit`, rather than loading everything and reducing in Swift.
 
-`@Query(Transaction.notDeleted)` re-reads all ~16k rows after every save, once per screen showing it. The Report screens still do this; moving them onto `@NotDeletedTransactions` is the known next step.
+`@Query(Transaction.notDeleted)` re-reads all ~16k rows after every save, once per screen showing it, so no screen uses it.
+
+What counts on the Month graph and in the Report comes from one place, `CountedHistory`: each Report screen builds it once per draw from `@NotDeletedTransactions` (`CountedHistoryReader`), and Home's Month graph from the few months `MonthGraphHistory` reads (`MonthGraphHistory.read` does the same for tests and the benchmark). Its strip, first counted day, period totals and lists are the ones every screen shows.
 
 ## What day it is
 

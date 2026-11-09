@@ -70,13 +70,13 @@ nonisolated enum Period: Hashable, Sendable {
             let thisMonth = CalendarMonth(today)
             if month == thisMonth { return String(localized: Strings.Periods.thisMonth) }
             if month == thisMonth.adding(months: -1) { return String(localized: Strings.Periods.lastMonth) }
-            return String(format: "%02d/%d", month.month, month.year)
+            return month.numericTitle
         case .quarter(let year, let quarter):
             let thisQuarter = TimeRange.quarter.period(containing: today)
             if self == thisQuarter { return String(localized: Strings.Periods.thisQuarter) }
             let lastQuarter = TimeRange.quarter.period(containing: CalendarMonth(today).adding(months: -3).firstDay)
             if self == lastQuarter { return String(localized: Strings.Periods.lastQuarter) }
-            return "Q\(quarter) \(year)"
+            return Self.quarterTitle(year: year, quarter: quarter)
         case .year(let year):
             if year == today.year { return String(localized: Strings.Periods.thisYear) }
             if year == today.year - 1 { return String(localized: Strings.Periods.lastYear) }
@@ -91,6 +91,20 @@ nonisolated enum Period: Hashable, Sendable {
         case .future:
             return String(localized: Strings.Periods.future)
         }
+    }
+}
+
+extension Period {
+    /// A quarter as the strip and the Trend write it, `Q3 2025`.
+    nonisolated static func quarterTitle(year: Int, quarter: Int) -> String {
+        "Q\(quarter) \(year)"
+    }
+}
+
+extension CalendarMonth {
+    /// The month as the strip and the Trend write it, `08/2026`, whatever the locale.
+    nonisolated var numericTitle: String {
+        String(format: "%02d/%d", month, year)
     }
 }
 

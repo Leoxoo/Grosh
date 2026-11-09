@@ -18,9 +18,8 @@ struct CategoryBreakdownTests {
 
     /// The breakdown of `side` for October, the Total, from every transaction in the store.
     private func breakdown(_ side: SpentOrIncome) throws -> CategoryBreakdown {
-        let counted = try store.transactions().counted(
-            in: .total, during: .month(CalendarMonth(today)), today: today, otherIncome: store.otherIncome()
-        )
+        let counted = try CountedHistory(store.transactions(), in: .total, otherIncome: store.otherIncome())
+            .during(.month(CalendarMonth(today)), today: today)
         return CategoryBreakdown(side: side, of: counted)
     }
 
@@ -44,7 +43,7 @@ struct CategoryBreakdownTests {
         let spent = try breakdown(.spent)
         #expect(spent.categories.map(\.category.name) == ["Bills & Utilities"])
         #expect(spent.categories.map(\.total.cents) == [60_00])
-        #expect(describe(spent.slices).map(\.0) == ["Bills & Utilities"])
+        #expect(describe(spent.slices(for: .report)).map(\.0) == ["Bills & Utilities"])
         #expect(spent.total == Money(cents: 60_00))
     }
 
@@ -77,10 +76,10 @@ struct CategoryBreakdownTests {
         try store.record(-100_00, "Health & Fitness", on: day(2026, 10, 1))
 
         let spent = try breakdown(.spent)
-        #expect(describe(spent.slices).map(\.0) == [
+        #expect(describe(spent.slices(for: .report)).map(\.0) == [
             "Food & Beverage", "Products", "Bills & Utilities", "Personal Transport", "Other Transport", "Everything else",
         ])
-        #expect(describe(spent.slices).map(\.1) == [700_00, 600_00, 500_00, 400_00, 300_00, 300_00])
+        #expect(describe(spent.slices(for: .report)).map(\.1) == [700_00, 600_00, 500_00, 400_00, 300_00, 300_00])
     }
 
     /// The expanded details' donut gives every parent category its own slice, not just the five largest.
@@ -93,7 +92,7 @@ struct CategoryBreakdownTests {
         try store.record(-200_00, "Clothing", on: day(2026, 10, 1))
         try store.record(-100_00, "Health & Fitness", on: day(2026, 10, 1))
 
-        let all = try breakdown(.spent).donutSlices(ownSliceLimit: Int.max)
+        let all = try breakdown(.spent).slices(for: .details)
         #expect(describe(all).map(\.0) == [
             "Food & Beverage", "Products", "Bills & Utilities", "Personal Transport", "Other Transport", "Shopping",
             "Health & Fitness",
@@ -108,7 +107,7 @@ struct CategoryBreakdownTests {
         try store.record(-20_00, "Products", on: day(2026, 10, 1))
         try store.record(-10_00, "Health & Fitness", on: day(2026, 10, 1))
 
-        let all = try breakdown(.spent).donutSlices(ownSliceLimit: Int.max, minimumShare: 0.02)
+        let all = try breakdown(.spent).slices(for: .details)
         #expect(describe(all).map(\.0) == ["Food & Beverage", "Products", "Everything else"])
         #expect(describe(all).map(\.1) == [970_00, 20_00, 10_00])
     }
@@ -120,7 +119,7 @@ struct CategoryBreakdownTests {
         try store.record(-100_00, "Personal Transport", on: day(2026, 10, 1))
         try store.record(-50_00, "Other Transport", on: day(2026, 10, 1))
 
-        #expect(describe(try breakdown(.spent).slices).map(\.1) == [400_00, 300_00, 200_00, 100_00, 50_00])
+        #expect(describe(try breakdown(.spent).slices(for: .report)).map(\.1) == [400_00, 300_00, 200_00, 100_00, 50_00])
     }
 
     /// A parent whose refunds outweigh what was spent has no slice, though it still has its row in the Breakdown.
@@ -132,7 +131,7 @@ struct CategoryBreakdownTests {
         let spent = try breakdown(.spent)
         #expect(spent.categories.map(\.category.name) == ["Food & Beverage", "Shopping"])
         #expect(spent.categories.map(\.total.cents) == [40_00, -20_00])
-        #expect(describe(spent.slices).map(\.0) == ["Food & Beverage"])
+        #expect(describe(spent.slices(for: .report)).map(\.0) == ["Food & Beverage"])
     }
 
     /// The category a forgiven Loan is filed under gets its amount, as the Month graph counts it.

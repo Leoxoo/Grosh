@@ -35,7 +35,6 @@ struct MonthGraph {
     }
 
     let side: SpentOrIncome
-    /// The period the tab shows.
     let period: Period
     /// The days the period covers, which the line runs across.
     let span: GraphSpan
@@ -57,8 +56,8 @@ struct MonthGraph {
 
     /// The tab for `side` showing `period`, as it stands on `today`, with what `recurring` still has due, compared with
     /// `choice`, as the "vs last year" switch is set, for the transactions of `selection`. `counted` holds at least what
-    /// counts for `selection` in the periods the tab sums (the ``Transaction/countedAmount(in:)``s of its transactions,
-    /// worked out once for both tabs; Home reads only those of the months ``MonthGraphHistory`` names), and `firstDay`
+    /// counts for `selection` in the periods the tab sums (a ``CountedHistory``'s, worked out once for both tabs; Home
+    /// reads only those of the months ``MonthGraphHistory`` names), and `firstDay`
     /// is the first day anything counts, on either tab, or `nil` when nothing does.
     init(
         _ side: SpentOrIncome, of counted: [CountedAmount], countingFrom firstDay: CalendarDay?,
@@ -66,7 +65,7 @@ struct MonthGraph {
         comparingWith choice: MonthGraphComparison = .average, selection: WalletSelection = .total
     ) {
         guard let span = GraphSpan(period) else {
-            preconditionFailure("A Month graph shows a day, week, month, quarter or year")
+            preconditionFailure("A Month graph shows a week, month, quarter or year")
         }
         let dailyTotals = counted.dailyTotals(side, in: span, through: today)
         let lastYear = MonthGraphComparison.lastYear.dailyTotals(side, of: counted, countingFrom: firstDay, for: period)
@@ -122,15 +121,16 @@ struct MonthGraph {
 
     /// How the period's end is named in the legend and the popup: "month end", "week end" and so on.
     var endName: String {
-        switch period {
-        case .day: String(localized: Strings.Home.dayEnd)
+        switch span.length {
         case .week: String(localized: Strings.Home.weekEnd)
         case .month: String(localized: Strings.Home.monthEnd)
         case .quarter: String(localized: Strings.Home.quarterEnd)
         case .year: String(localized: Strings.Home.yearEnd)
-        case .all, .custom, .future: String(localized: Strings.Home.end)
         }
     }
+
+    /// The most Occurrences the popup lists on any one day of the period, which the chart keeps room above its plot for.
+    var mostScheduledOnADay: Int { projection?.mostOnADay ?? 0 }
 
     /// Where the end of `day` sits across the period, as the line's points do.
     func position(of day: CalendarDay) -> Double {
@@ -159,15 +159,6 @@ struct MonthGraph {
     private func points(_ daily: [DailyTotal]) -> [Point] {
         [Point(position: 0, total: Money(cents: 0))]
             + daily.map { Point(position: position(of: $0.day), total: $0.total) }
-    }
-}
-
-extension MonthGraph {
-    /// The months the strip above the card offers, oldest first: from the month of `firstDay`, the first day anything
-    /// counts on the Month graph, on either tab, through `today`'s month, or `today`'s month alone when nothing counts
-    /// (`nil`). Never Future.
-    static func months(from firstDay: CalendarDay?, today: CalendarDay) -> [Period] {
-        TimeRange.month.periods(from: firstDay, today: today).filter { $0 != .future }
     }
 }
 

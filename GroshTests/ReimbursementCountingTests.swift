@@ -27,12 +27,14 @@ struct ReimbursementCountingTests {
         try Reimbursement.add(ReimbursementDraft(amount: Money(cents: cents), day: paidOn ?? today), to: expense, in: context)
     }
 
-    /// The totals of this month for `selection`, as the Report counts them.
-    private func totals(_ selection: WalletSelection = .total) throws -> PeriodTotals {
-        try PeriodTotals(
-            of: store.transactions(), in: selection, period: .month(CalendarMonth(today)), today: today,
-            otherIncome: store.otherIncome()
-        )
+    /// What counts for `selection`, as the Report counts it.
+    private func history(_ selection: WalletSelection = .total) throws -> CountedHistory {
+        try CountedHistory(store.transactions(), in: selection, otherIncome: store.otherIncome())
+    }
+
+    /// The totals of `period`, this month unless another is given, for `selection`, as the Report counts them.
+    private func totals(_ selection: WalletSelection = .total, of period: Period? = nil) throws -> PeriodTotals {
+        try PeriodTotals(of: history(selection).during(period ?? .month(CalendarMonth(today)), today: today))
     }
 
     // MARK: What an Expense counts
@@ -125,9 +127,7 @@ struct ReimbursementCountingTests {
         try payBack(20_00, on: day(2026, 10, 5), to: dinner)
 
         let september = Period.month(CalendarMonth(year: 2026, month: 9))
-        #expect(try PeriodTotals(
-            of: store.transactions(), in: .total, period: september, today: today, otherIncome: store.otherIncome()
-        ).spent == Money(cents: 40_00))
+        #expect(try totals(of: september).spent == Money(cents: 40_00))
         #expect(try totals().spent == Money(cents: 0))
     }
 
@@ -172,9 +172,7 @@ struct ReimbursementCountingTests {
         try payBack(20_00, to: dinner)
         try payBack(50_00, to: lunch)
 
-        let counted = try store.transactions().counted(
-            in: .total, during: .month(CalendarMonth(today)), today: today, otherIncome: store.otherIncome()
-        )
+        let counted = try history().during(.month(CalendarMonth(today)), today: today)
         let spent = CategoryBreakdown(side: .spent, of: counted)
         let income = CategoryBreakdown(side: .income, of: counted)
 
@@ -190,13 +188,10 @@ struct ReimbursementCountingTests {
         let otherIncome = try context.lockedCategory(.otherIncome)
         let days = DayRange(first: day(2026, 10, 1), last: today)
 
-        let income = CategoryTransactions(
-            parent: otherIncome, side: .income, of: try store.transactions(), in: .total, days: days,
-            otherIncome: otherIncome
-        )
-        let spent = CategoryTransactions(
-            parent: try store.category("Food & Beverage"), side: .spent, of: try store.transactions(), in: .total, days: days,
-            otherIncome: otherIncome
+        let history = CountedHistory(try store.transactions(), in: .total, otherIncome: otherIncome)
+        let income = ReportTransactions(category: otherIncome, side: .income, on: days, in: history)
+        let spent = ReportTransactions(
+            category: try store.category("Food & Beverage"), side: .spent, on: days, in: history
         )
 
         #expect(income.transactions == [dinner])
@@ -208,9 +203,8 @@ struct ReimbursementCountingTests {
         let dinner = try dinner()
         try payBack(20_00, to: dinner)
 
-        let step = PeriodTransactions(
-            side: nil, of: try store.transactions(), in: .total, days: DayRange(first: day(2026, 10, 3), last: day(2026, 10, 3)),
-            otherIncome: try store.otherIncome()
+        let step = ReportTransactions(
+            step: nil, on: DayRange(first: day(2026, 10, 3), last: day(2026, 10, 3)), in: try history()
         )
 
         #expect(step.transactions == [dinner])

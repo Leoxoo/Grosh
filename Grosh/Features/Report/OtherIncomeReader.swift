@@ -22,3 +22,18 @@ struct OtherIncomeReader<Content: View>: View {
         }
     }
 }
+
+/// Draws a Report screen's `content` with what counts for `selection` (``CountedHistory``), worked out once for the
+/// screen from every transaction outside Recently Deleted.
+struct CountedHistoryReader<Content: View>: View {
+    let selection: WalletSelection
+    @ViewBuilder let content: (CountedHistory) -> Content
+
+    @NotDeletedTransactions private var transactions: [Transaction]
+
+    var body: some View {
+        OtherIncomeReader { otherIncome in
+            content(CountedHistory(transactions, in: selection, otherIncome: otherIncome))
+        }
+    }
+}

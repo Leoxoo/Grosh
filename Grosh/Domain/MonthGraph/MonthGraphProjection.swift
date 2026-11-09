@@ -10,6 +10,8 @@ struct MonthGraphProjection {
     private let scheduled: [ScheduledOccurrence]
     /// Today's total plus what is due through the end of each day, from today to the period's last day.
     let dailyTotals: [DailyTotal]
+    /// The most Occurrences due on any one day.
+    let mostOnADay: Int
 
     /// What `recurring` still has due for `side` in `span` as it stands on `today`, on top of `todaysTotal`, or `nil` when
     /// `today` isn't in the span or nothing is due for the tab. `selection` is the wallets whose Occurrences count.
@@ -23,6 +25,7 @@ struct MonthGraphProjection {
             .filter { $0.countedAmount?.side == side }
         guard !scheduled.isEmpty else { return nil }
         self.scheduled = scheduled
+        mostOnADay = Dictionary(grouping: scheduled, by: \.day).values.map(\.count).max() ?? 0
         dailyTotals = scheduled.compactMap(\.countedAmount).dailyTotals(side, in: span, through: span.last)
             .filter { $0.day >= today }
             .map { DailyTotal(day: $0.day, total: Money(cents: todaysTotal.cents + $0.total.cents)) }

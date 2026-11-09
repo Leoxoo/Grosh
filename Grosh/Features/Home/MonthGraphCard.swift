@@ -7,9 +7,6 @@ import SwiftUI
 /// transaction that counted in it is gone, gives way to this month. Its amounts show even while the Total is hidden.
 /// It reads only what the month picked needs from the store (``MonthGraphHistory``). Use inside a `List`.
 struct HomeMonthGraph: View {
-    /// Remembers across launches whether both tabs compare their month with Last year.
-    static let comparesWithLastYearKey = "home.monthGraph.comparesWithLastYear"
-
     let today: CalendarDay
     /// The month the card shows, picked in the strip. Home holds it, since the Report opens on it.
     @Binding var period: Period
@@ -18,9 +15,8 @@ struct HomeMonthGraph: View {
 
     @Query(MonthGraphHistory.earliestCounted) private var earliest: [Transaction]
     @Query(MonthGraphHistory.forgiven) private var forgiven: [Transaction]
-    /// The tab the card shows.
     @State private var side = SpentOrIncome.spent
-    @AppStorage(Self.comparesWithLastYearKey) private var comparesWithLastYear = false
+    @AppStorage(AppSettings.comparesWithLastYearKey) private var comparesWithLastYear = false
 
     var body: some View {
         OtherIncomeReader { otherIncome in
@@ -28,11 +24,10 @@ struct HomeMonthGraph: View {
         }
     }
 
-    /// The strip and the card, with Other Income read once for everything they count.
     @ViewBuilder
     private func content(otherIncome: Category) -> some View {
         let firstDay = MonthGraphHistory.firstDay(earliest: earliest, forgiven: forgiven, otherIncome: otherIncome)
-        let months = MonthGraph.months(from: firstDay, today: today)
+        let months = TimeRange.month.pastPeriods(from: firstDay, today: today)
         Section {
             HStack {
                 Spacer()
@@ -99,20 +94,22 @@ private struct HomeMonthGraphCard: View {
 
     var body: some View {
         // What counts is worked out once for both tabs.
-        let counted = (transactions + forgiven).compactMap { $0.countedAmount(otherIncome: otherIncome) }
+        let history = MonthGraphHistory.history(
+            read: transactions, forgiven: forgiven, firstDay: firstDay, otherIncome: otherIncome
+        )
         MonthGraphCard(
-            spent: graph(for: .spent, of: counted),
-            income: graph(for: .income, of: counted),
+            spent: graph(for: .spent, in: history),
+            income: graph(for: .income, in: history),
             side: $side,
             comparesWithLastYear: $comparesWithLastYear
         )
     }
 
     /// The graph of `side`'s tab for the month, compared as the "vs last year" switch is set.
-    private func graph(for side: SpentOrIncome, of counted: [CountedAmount]) -> MonthGraph {
-        MonthGraph(
-            side, of: counted, countingFrom: firstDay, recurring: recurringTransactions, in: .month(month),
-            today: today, comparingWith: comparesWithLastYear ? .lastYear : .average
+    private func graph(for side: SpentOrIncome, in history: CountedHistory) -> MonthGraph {
+        history.graph(
+            side, of: month, recurring: recurringTransactions, today: today,
+            comparingWith: comparesWithLastYear ? .lastYear : .average
         )
     }
 }
@@ -123,7 +120,6 @@ private struct HomeMonthGraphCard: View {
 struct MonthGraphCard: View {
     let spent: MonthGraph
     let income: MonthGraph
-    /// The tab shown.
     @Binding var side: SpentOrIncome
     /// Whether the "vs last year" switch, which both tabs share, is on.
     @Binding var comparesWithLastYear: Bool
@@ -149,7 +145,6 @@ struct MonthGraphCard: View {
         }
     }
 
-    /// The graph of the tab shown.
     private var graph: MonthGraph {
         side == .spent ? spent : income
     }
