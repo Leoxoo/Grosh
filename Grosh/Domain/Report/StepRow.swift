@@ -8,14 +8,6 @@ struct StepRow: Identifiable {
 
     var id: Step { step }
 
-    /// The Step's Income or Spent, as the side's bar and row show it.
-    func total(of side: SpentOrIncome) -> Money {
-        switch side {
-        case .income: totals.income
-        case .spent: totals.spent
-        }
-    }
-
     /// One row per Step of `days` on a screen showing `timeRange`, oldest first, each with what `counted` adds up to in its
     /// days. The Steps cover `days` once each, so the rows' totals add up to the period's.
     static func rows(

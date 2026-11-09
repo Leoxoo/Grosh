@@ -44,6 +44,43 @@ struct MonthGraphEarlierMonthTests {
         #expect(strip.map { $0.title(today: today) } == ["08/2026", "Last month", "This month"])
     }
 
+    /// August's Expense, paid back in full, counts nothing, so the strip starts in September, the first month anything
+    /// counts, rather than holding this month alone.
+    @Test func anExpensePaidBackInFullDoesntStartTheStrip() throws {
+        let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 8, 3))
+        try Reimbursement.add(ReimbursementDraft(amount: Money(cents: 60_00), day: day(2026, 8, 5)), to: dinner, in: context)
+        try store.record(-25_00, "Café", on: day(2026, 9, 5))
+
+        #expect(try store.strip() == [.month(month(2026, 9)), .month(month(2026, 10))])
+    }
+
+    /// August's Expense is paid back in full into Cash, another wallet of the Total: in the Total it counts nothing, and
+    /// nor does the payback, so the strip starts in September.
+    @Test func anExpensePaidBackInFullIntoAnotherWalletDoesntStartTheStrip() throws {
+        let cash = Wallet(name: "Cash")
+        context.insert(cash)
+        let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 8, 3))
+        try dinner.recordPaybackElsewhere(
+            ReimbursementDraft(amount: Money(cents: 60_00), day: day(2026, 8, 5)), into: cash, in: context
+        )
+        try store.record(-25_00, "Café", on: day(2026, 9, 5))
+
+        #expect(try store.strip() == [.month(month(2026, 9)), .month(month(2026, 10))])
+    }
+
+    /// The earliest transaction is a payback into Cash, which the Total leaves out since its Expense counts it; the
+    /// Expense, which still counts what wasn't paid back, starts the strip in August.
+    @Test func aPaybackTheTotalLeavesOutDoesntHideTheMonthsAfterIt() throws {
+        let cash = Wallet(name: "Cash")
+        context.insert(cash)
+        let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 8, 10))
+        try dinner.recordPaybackElsewhere(
+            ReimbursementDraft(amount: Money(cents: 20_00), day: day(2026, 7, 28)), into: cash, in: context
+        )
+
+        #expect(try store.strip() == [.month(month(2026, 8)), .month(month(2026, 9)), .month(month(2026, 10))])
+    }
+
     /// July's only transaction that counts is deleted, so the strip drops July: a card left on July shows this month,
     /// and one on September stays there.
     @Test func aMonthTheStripNoLongerOffersGivesWayToThisMonth() throws {

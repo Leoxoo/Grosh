@@ -4,7 +4,7 @@ import Foundation
 /// is on. Either is the mean of the running totals of other periods, each laid out across the period shown so that
 /// periods of different lengths line up.
 ///
-/// The Average takes up to three complete periods of the same length before the period shown. Periods count from the
+/// The Average takes up to ``averagePeriodCount`` complete periods of the same length before the period shown. Periods count from the
 /// period of the first transaction that counts on the Month graph, on either tab: a partial first period counts, a period
 /// before it doesn't, and a counted period with nothing for the tab counts as zero. The period shown is never part of its
 /// own Average.
@@ -15,8 +15,37 @@ enum MonthGraphComparison {
     case average
     case lastYear
 
-    /// The most complete periods the Average is taken over.
-    static let averageMonthCount = 3
+    /// The most complete periods the Average is taken over: weeks, months, quarters or years, as the period shown is.
+    static let averagePeriodCount = 3
+
+    /// The months the comparisons of `month` read, oldest first: Last year's month, then the Average's months. Home
+    /// reads the store for these and `month` alone (``MonthGraphHistory``).
+    static func monthsRead(for month: CalendarMonth) -> [CalendarMonth] {
+        let averaged = averagedPeriods(before: .month(month)).compactMap { period -> CalendarMonth? in
+            guard case .month(let month) = period else { return nil }
+            return month
+        }
+        return [lastYear(of: month)] + averaged.reversed()
+    }
+
+    /// The month Last year compares `month` with: the same month a year before.
+    private static func lastYear(of month: CalendarMonth) -> CalendarMonth {
+        month.adding(months: -12)
+    }
+
+    /// The ``averagePeriodCount`` periods of `period`'s length before it, the latest first, whether or not they count.
+    /// They are laid out as `period` is, so they line up with it whatever the calendar's first weekday is.
+    private static func averagedPeriods(before period: Period) -> [Period] {
+        guard let timeRange = period.timeRange, let shownStart = GraphSpan(period)?.first else { return [] }
+        var periods: [Period] = []
+        var earlier = period
+        for _ in 1...averagePeriodCount {
+            guard let start = GraphSpan(earlier)?.first else { break }
+            earlier = timeRange.period(containing: start.adding(days: -1), firstWeekday: shownStart.weekday)
+            periods.append(earlier)
+        }
+        return periods
+    }
 
     /// What the legend and the popup call the gray line.
     var name: String {
@@ -54,25 +83,16 @@ enum MonthGraphComparison {
         case .average:
             guard let firstDay, let timeRange = period.timeRange, let shownStart = GraphSpan(period)?.first
             else { return [] }
-            // The earlier periods are laid out as the period shown is, so they line up with it whatever the
-            // calendar's first weekday is.
-            let firstWeekday = shownStart.weekday
-            let firstCounted = timeRange.period(containing: firstDay, firstWeekday: firstWeekday)
+            let firstCounted = timeRange.period(containing: firstDay, firstWeekday: shownStart.weekday)
             guard let firstCountedStart = GraphSpan(firstCounted)?.first else { return [] }
-            var spans: [GraphSpan] = []
-            var earlier = period
-            for _ in 1...Self.averageMonthCount {
-                guard let start = GraphSpan(earlier)?.first else { break }
-                earlier = timeRange.period(containing: start.adding(days: -1), firstWeekday: firstWeekday)
-                // Each earlier period is before the last, so once one is before the first that counts, the rest are too.
-                guard let span = GraphSpan(earlier), span.first >= firstCountedStart else { break }
-                spans.append(span)
-            }
-            return spans
+            // Each earlier period is before the last, so once one is before the first that counts, the rest are too.
+            return Array(
+                Self.averagedPeriods(before: period).compactMap { GraphSpan($0) }.prefix { $0.first >= firstCountedStart }
+            )
         case .lastYear:
             // Only a month has a same month of last year, and it is there only when it holds something that counts.
             guard case .month(let month) = period else { return [] }
-            let lastYear = month.adding(months: -12)
+            let lastYear = Self.lastYear(of: month)
             guard counted.contains(where: { $0.side == side && CalendarMonth($0.day) == lastYear }),
                   let span = GraphSpan(.month(lastYear))
             else { return [] }

@@ -32,10 +32,14 @@ nonisolated struct MoneyLoverRow: Equatable, Sendable {
         let categoryName: String
         let note: String
     }
+}
 
-    /// Whether the row comes from a Grosh export, which names each row's Card and links rather than leaving the
-    /// import to work them out.
-    var isFromGroshExport: Bool { cardName != nil && link != nil }
+/// A MoneyLover CSV export as ``MoneyLoverCSV/read(_:)`` reads it: its rows, in the order the file lists them, and
+/// whether it is a Grosh export (``GroshCSVExport``), which the import restores as it was.
+nonisolated struct MoneyLoverExport: Equatable, Sendable {
+    let rows: [MoneyLoverRow]
+    /// Whether the file has a Grosh export's `Card` and `Linked` columns (``GroshCSVFormat/isGroshExport(_:)``).
+    let isGroshExport: Bool
 }
 
 /// Why a file can't be imported from MoneyLover. Nothing is replaced when it can't.
@@ -61,77 +65,71 @@ extension MoneyLoverImportError: LocalizedError {
     }
 }
 
-/// Reads a MoneyLover CSV export: `Id, Date (MM/DD/YYYY), Category, Amount, Currency, Wallet, Note, With, Event,
-/// Exclude from report, Members`, and a Grosh export's `Card`, `Linked` and `Forgiven` columns (``GroshCSVExport``).
-/// Columns are found by their header, so their order doesn't matter.
+/// Reads a MoneyLover CSV export, `Id, Date (MM/DD/YYYY), Category, Amount, Currency, Wallet, Note, With, Event,
+/// Exclude from report, Members`, and a Grosh export's own columns, in the file format both share
+/// (``GroshCSVFormat``). Columns are found by their header, so their order doesn't matter. The `Currency` column isn't
+/// read.
 nonisolated enum MoneyLoverCSV {
-    /// The export's rows, in the order the file lists them. Throws ``MoneyLoverImportError`` for a file that isn't
-    /// a MoneyLover export or has a row that can't be read.
-    static func rows(in text: String) throws -> [MoneyLoverRow] {
-        var records = Self.records(in: text)
+    /// The export `text` holds. Throws ``MoneyLoverImportError`` for a file that isn't a MoneyLover export or has a
+    /// row that can't be read.
+    static func read(_ text: String) throws -> MoneyLoverExport {
+        var records = GroshCSVFormat.records(in: text)
         guard !records.isEmpty else { throw MoneyLoverImportError.notAMoneyLoverExport }
         let columns = try Columns(header: records.removeFirst().fields)
         guard !records.isEmpty else { throw MoneyLoverImportError.noTransactions }
-        return try records.map { record in
+        let rows = try records.map { record in
             guard let row = columns.row(from: record.fields, line: record.line) else {
                 throw MoneyLoverImportError.unreadableRow(line: record.line)
             }
             return row
         }
+        return MoneyLoverExport(rows: rows, isGroshExport: columns.isGroshExport)
     }
 
     /// Where each column sits in a row, found by its header.
     private struct Columns {
-        let date: Int, category: Int, amount: Int, wallet: Int
-        let note: Int?, with: Int?, event: Int?, excluded: Int?, card: Int?, linked: Int?
-        let forgiven: Int?, forgivenDate: Int?, forgivenCategory: Int?, forgivenNote: Int?
+        typealias Column = GroshCSVFormat.Column
+
+        private let positions: [Column: Int]
+        let isGroshExport: Bool
 
         init(header: [String]) throws {
-            let names = header.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-            func index(_ name: String) -> Int? { names.firstIndex(of: name) }
-            guard let date = index("date"), let category = index("category"), let amount = index("amount"),
-                  let wallet = index("wallet")
-            else { throw MoneyLoverImportError.notAMoneyLoverExport }
-            self.date = date
-            self.category = category
-            self.amount = amount
-            self.wallet = wallet
-            note = index("note")
-            with = index("with")
-            event = index("event")
-            excluded = index("exclude from report")
-            card = index("card")
-            linked = index("linked")
-            forgiven = index("forgiven")
-            forgivenDate = index("forgiven date")
-            forgivenCategory = index("forgiven category")
-            forgivenNote = index("forgiven note")
+            let positions = GroshCSVFormat.positions(inHeader: header)
+            guard [Column.date, .category, .amount, .wallet].allSatisfy({ positions[$0] != nil }) else {
+                throw MoneyLoverImportError.notAMoneyLoverExport
+            }
+            self.positions = positions
+            isGroshExport = GroshCSVFormat.isGroshExport(positions)
         }
 
         /// The row `fields` hold, or `nil` when its date, amount, category or wallet (or a Forgiven mark's amount or
         /// date) can't be read. Columns missing at the end of the row are empty. The notes are kept as written; every
         /// other field loses the spaces and line breaks around it.
         func row(from fields: [String], line: Int) -> MoneyLoverRow? {
-            func written(_ index: Int?) -> String {
-                guard let index, fields.indices.contains(index) else { return "" }
+            func written(_ column: Column) -> String {
+                guard let index = positions[column], fields.indices.contains(index) else { return "" }
                 return fields[index]
             }
-            func field(_ index: Int?) -> String {
-                written(index).trimmingCharacters(in: .whitespacesAndNewlines)
+            func field(_ column: Column) -> String {
+                written(column).trimmingCharacters(in: .whitespacesAndNewlines)
             }
-            let categoryName = field(category)
-            let walletName = field(wallet)
-            guard let day = MoneyLoverCSV.day(from: field(date)), let amount = Money(decimalString: field(amount)),
+            // A Grosh export's own column, `nil` when the file has none.
+            func groshField(_ column: Column) -> String? {
+                positions[column] == nil ? nil : field(column)
+            }
+            let categoryName = field(.category)
+            let walletName = field(.wallet)
+            guard let day = GroshCSVFormat.day(from: field(.date)), let amount = Money(decimalString: field(.amount)),
                   !categoryName.isEmpty, !walletName.isEmpty
             else { return nil }
             var forgivenMark: MoneyLoverRow.Forgiven?
-            if !field(forgiven).isEmpty {
-                guard let forgivenAmount = Money(decimalString: field(forgiven)),
-                      let forgivenDay = MoneyLoverCSV.day(from: field(forgivenDate))
+            if !field(.forgiven).isEmpty {
+                guard let forgivenAmount = Money(decimalString: field(.forgiven)),
+                      let forgivenDay = GroshCSVFormat.day(from: field(.forgivenDate))
                 else { return nil }
                 forgivenMark = MoneyLoverRow.Forgiven(
-                    amount: forgivenAmount, day: forgivenDay, categoryName: field(forgivenCategory),
-                    note: written(forgivenNote)
+                    amount: forgivenAmount, day: forgivenDay, categoryName: field(.forgivenCategory),
+                    note: written(.forgivenNote)
                 )
             }
             return MoneyLoverRow(
@@ -140,84 +138,14 @@ nonisolated enum MoneyLoverCSV {
                 categoryName: categoryName,
                 amount: amount,
                 walletName: walletName,
-                note: written(note),
-                withName: field(with),
-                eventName: field(event),
-                isExcludedFromReport: !field(excluded).isEmpty,
-                cardName: card.map { field($0) },
-                link: linked.map { field($0) },
+                note: written(.note),
+                withName: field(.with),
+                eventName: field(.event),
+                isExcludedFromReport: !field(.excludeFromReport).isEmpty,
+                cardName: groshField(.card),
+                link: groshField(.linked),
                 forgiven: forgivenMark
             )
         }
-    }
-
-    /// The day a MoneyLover date such as `01/31/2026` (month first) names, or `nil` for anything else.
-    private static func day(from text: String) -> CalendarDay? {
-        guard let match = text.wholeMatch(of: #/([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})/#),
-            let month = Int(match.1), let day = Int(match.2), let year = Int(match.3),
-            (1...12).contains(month),
-            (1...CalendarMonth(year: year, month: month).dayCount).contains(day)
-        else { return nil }
-        return CalendarDay(year: year, month: month, day: day)
-    }
-
-    /// One record of a CSV file: its fields, and the line of the file it starts on.
-    struct Record {
-        /// The header is line 1.
-        let line: Int
-        let fields: [String]
-    }
-
-    /// Splits CSV text into records. A field in double quotes may hold commas, line breaks and doubled quotes
-    /// (`""` for one `"`). Blank lines are skipped.
-    static func records(in text: String) -> [Record] {
-        enum State { case fieldStart, unquoted, quoted, quoteInQuoted }
-        var records: [Record] = []
-        var record: [String] = []
-        var field = ""
-        var state = State.fieldStart
-        var line = 1
-        var recordLine = 1
-
-        func endField() {
-            record.append(field)
-            field = ""
-            state = .fieldStart
-        }
-        func endRecord() {
-            if state != .fieldStart || !record.isEmpty || !field.isEmpty {
-                endField()
-                records.append(Record(line: recordLine, fields: record))
-            }
-            record = []
-            state = .fieldStart
-        }
-
-        for character in text.drop(while: { $0 == "\u{FEFF}" }) {
-            switch state {
-            case .quoted:
-                if character == "\"" { state = .quoteInQuoted } else { field.append(character) }
-            case .quoteInQuoted where character == "\"":
-                field.append(character)
-                state = .quoted
-            case .fieldStart where character == "\"":
-                state = .quoted
-            case .fieldStart, .unquoted, .quoteInQuoted:
-                if character == "," {
-                    endField()
-                } else if character.isNewline {
-                    endRecord()
-                } else {
-                    field.append(character)
-                    state = .unquoted
-                }
-            }
-            if character.isNewline {
-                line += 1
-                if state == .fieldStart, record.isEmpty { recordLine = line }
-            }
-        }
-        endRecord()
-        return records
     }
 }

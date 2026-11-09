@@ -147,12 +147,10 @@ nonisolated enum Strings {
         static let vsLastYear: LocalizedStringResource = "vs last year"
         static let recentTransactions: LocalizedStringResource = "Recent transactions"
         static let recentTransactionsEmpty: LocalizedStringResource = "Transactions you add show up here."
-        static let dayEnd: LocalizedStringResource = "day end"
         static let weekEnd: LocalizedStringResource = "week end"
         static let monthEnd: LocalizedStringResource = "month end"
         static let quarterEnd: LocalizedStringResource = "quarter end"
         static let yearEnd: LocalizedStringResource = "year end"
-        static let end: LocalizedStringResource = "end"
         static let average: LocalizedStringResource = "Average"
         static func expected(_ amount: String) -> LocalizedStringResource { "Expected \(amount)" }
         static func scheduledExpectedBy(_ end: String, _ amount: String) -> LocalizedStringResource { "Scheduled · Expected by \(end) \(amount)" }
@@ -613,12 +611,12 @@ nonisolated enum Strings {
         static let cantCountIncome: LocalizedStringResource = "Can't Count Income"
         static let whatTheAverageIs: LocalizedStringResource = "What the Average is"
         static let comparedToLastYear: LocalizedStringResource = "Compared to last year"
-        static let comparedTo3WeekAverage: LocalizedStringResource = "Compared to 3-Week Avg"
-        static let comparedTo3MonthAverage: LocalizedStringResource = "Compared to 3-Month Avg"
-        static let comparedTo3QuarterAverage: LocalizedStringResource = "Compared to 3-Quarter Avg"
-        static let comparedTo3YearAverage: LocalizedStringResource = "Compared to 3-Year Avg"
-        static let comparedToAverage: LocalizedStringResource = "Compared to Average"
-        static let averageExplanation: LocalizedStringResource = "The Average is the mean of the running totals of up to three complete earlier periods of this length, counting from the first period with anything in it."
+        static func comparedToWeekAverage(_ count: Int) -> LocalizedStringResource { "Compared to \(count)-Week Avg" }
+        static func comparedToMonthAverage(_ count: Int) -> LocalizedStringResource { "Compared to \(count)-Month Avg" }
+        static func comparedToQuarterAverage(_ count: Int) -> LocalizedStringResource { "Compared to \(count)-Quarter Avg" }
+        static func comparedToYearAverage(_ count: Int) -> LocalizedStringResource { "Compared to \(count)-Year Avg" }
+        /// `count` spelled out: "three".
+        static func averageExplanation(_ count: String) -> LocalizedStringResource { "The Average is the mean of the running totals of up to \(count) complete earlier periods of this length, counting from the first period with anything in it." }
         static let dailyAverage: LocalizedStringResource = "Daily average"
         static let shows: LocalizedStringResource = "Shows"
         static let breakdown: LocalizedStringResource = "Breakdown"

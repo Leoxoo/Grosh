@@ -13,7 +13,7 @@ struct MoneyLoverCSVTests {
     }
 
     private func onlyRow(of csv: String) throws -> MoneyLoverRow {
-        let rows = try MoneyLoverCSV.rows(in: csv)
+        let rows = try MoneyLoverCSV.read(csv).rows
         try #require(rows.count == 1)
         return rows[0]
     }
@@ -38,10 +38,10 @@ struct MoneyLoverCSVTests {
     }
 
     @Test func withEventAndExcludeFromReportAreRead() throws {
-        let rows = try MoneyLoverCSV.rows(in: export(
+        let rows = try MoneyLoverCSV.read(export(
             "1,10/05/2026,Loan,-50,USD,Cash,Lunch money,Sam,Road trip,✅,",
             "2,10/04/2026,Café,-3.00,USD,Cash,,,,,"
-        ))
+        )).rows
 
         #expect(rows.map(\.withName) == ["Sam", ""])
         #expect(rows.map(\.eventName) == ["Road trip", ""])
@@ -49,10 +49,10 @@ struct MoneyLoverCSVTests {
     }
 
     @Test func aQuotedNoteCanHoldCommasQuotesAndLineBreaks() throws {
-        let rows = try MoneyLoverCSV.rows(in: export(
+        let rows = try MoneyLoverCSV.read(export(
             "1,10/05/2026,Café,-3.00,USD,Cash,\"Lunch, then \"\"dessert\"\"\nwith friends\",,,,",
             "2,10/04/2026,Products,-8.20,USD,Cash,Groceries,,,,"
-        ))
+        )).rows
 
         #expect(rows.map(\.note) == ["Lunch, then \"dessert\"\nwith friends", "Groceries"])
         #expect(rows.map(\.amount) == [Money(cents: -3_00), Money(cents: -8_20)])
@@ -74,35 +74,35 @@ struct MoneyLoverCSVTests {
     }
 
     @Test func aGroshExportsCardAndLinkedColumnsAreRead() throws {
-        let rows = try MoneyLoverCSV.rows(in: ([Self.header + ",Card,Linked"] + [
+        let file = try MoneyLoverCSV.read(([Self.header + ",Card,Linked"] + [
             "1,10/05/2026,Café,-3.00,USD,Cash,,,,,, Chase ,1",
             "2,10/04/2026,Café,-3.00,USD,Cash,,,,,,,",
         ]).joined(separator: "\r\n"))
 
-        #expect(rows.map(\.cardName) == ["Chase", ""])
-        #expect(rows.map(\.link) == ["1", ""])
-        #expect(rows.allSatisfy { $0.isFromGroshExport })
+        #expect(file.rows.map(\.cardName) == ["Chase", ""])
+        #expect(file.rows.map(\.link) == ["1", ""])
+        #expect(file.isGroshExport)
     }
 
     @Test func aMoneyLoverExportHasNoCardOrLinkedColumn() throws {
-        let row = try onlyRow(of: export("1,10/05/2026,Café,-3.00,USD,Cash,,,,,"))
+        let file = try MoneyLoverCSV.read(export("1,10/05/2026,Café,-3.00,USD,Cash,,,,,"))
 
-        #expect(row.cardName == nil)
-        #expect(row.link == nil)
-        #expect(!row.isFromGroshExport)
+        #expect(file.rows.map(\.cardName) == [nil])
+        #expect(file.rows.map(\.link) == [nil])
+        #expect(!file.isGroshExport)
     }
 
     // MARK: Files that can't be imported
 
     @Test func aFileWithoutMoneyLoversColumnsIsRefused() {
         #expect(throws: MoneyLoverImportError.notAMoneyLoverExport) {
-            try MoneyLoverCSV.rows(in: "Date,Description,Amount\r\n10/05/2026,Coffee,-3.00\r\n")
+            try MoneyLoverCSV.read("Date,Description,Amount\r\n10/05/2026,Coffee,-3.00\r\n")
         }
     }
 
     @Test func aFileWithNoTransactionsIsRefused() {
         #expect(throws: MoneyLoverImportError.noTransactions) {
-            try MoneyLoverCSV.rows(in: export())
+            try MoneyLoverCSV.read(export())
         }
     }
 
@@ -116,7 +116,7 @@ struct MoneyLoverCSVTests {
     func anUnreadableRowIsRefusedWithItsLineInTheFile(row: String) {
         // The note on line 2 runs over two lines, so the third row starts on line 5.
         #expect(throws: MoneyLoverImportError.unreadableRow(line: 5)) {
-            try MoneyLoverCSV.rows(in: export(
+            try MoneyLoverCSV.read(export(
                 "1,10/05/2026,Café,-3.00,USD,Cash,\"Two\nlines\",,,,",
                 "2,10/04/2026,Café,-3.00,USD,Cash,,,,,",
                 row

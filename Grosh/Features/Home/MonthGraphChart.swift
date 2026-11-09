@@ -87,7 +87,8 @@ struct MonthGraphChart: View {
         // The headline already says the amount so far, and the line's positions mean nothing read aloud.
         .accessibilityHidden(true)
         .frame(height: 150)
-        .padding(.top, popupHeight + occurrenceHeight * CGFloat(mostScheduledOnADay))
+        // Room for the longest popup, so the plot stays put as the marker moves.
+        .padding(.top, popupHeight + occurrenceHeight * CGFloat(graph.mostScheduledOnADay))
     }
 
     /// `points` joined into one line, kept apart from the chart's other lines by `series`.
@@ -109,12 +110,6 @@ struct MonthGraphChart: View {
     /// The days named along the bottom: every seventh day from the 1st.
     private var labeledDays: [CalendarDay] {
         stride(from: 1, through: graph.span.dayCount, by: 7).map { graph.span.day($0) }
-    }
-
-    /// The most Occurrences the popup lists on any one day, which the room above the plot is kept for, so the plot
-    /// stays put as the marker moves.
-    private var mostScheduledOnADay: Int {
-        (1...graph.span.dayCount).map { graph.popup(on: graph.span.day($0)).scheduled.count }.max() ?? 0
     }
 
     /// From zero, or below it when refunds take Spent under zero, to the highest total of any line, and at least one

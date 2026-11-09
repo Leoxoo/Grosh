@@ -30,9 +30,9 @@ struct ReportDestination: View {
         case .details(let details):
             DetailsScreen(details: details, walletSelection: $walletSelection, timeRange: $timeRange, period: $period)
         case .stepTransactions(let side, let title, let days, let selection):
-            StepTransactionsView(side: side, title: title, days: days, walletSelection: selection)
+            ReportTransactionsView(screen: .step(side: side, title: title), days: days, walletSelection: selection)
         case .category(let side, let category, let days, let selection):
-            CategoryTransactionsView(side: side, category: category, days: days, walletSelection: selection)
+            ReportTransactionsView(screen: .category(side, category), days: days, walletSelection: selection)
         }
     }
 }

@@ -16,4 +16,8 @@ nonisolated enum AppSettings {
     /// Settings → Currency: the currency a new wallet starts in.
     static let currencyCodeKey = "currencyCode"
     static let currencyCodeDefault = Money.defaultCurrencyCode
+
+    /// Whether the Month graph compares its period with Last year rather than the Average: the "vs last year" switch,
+    /// which Home's Month graph and the Income and Spent details' comparison card share. Off at first.
+    static let comparesWithLastYearKey = "home.monthGraph.comparesWithLastYear"
 }

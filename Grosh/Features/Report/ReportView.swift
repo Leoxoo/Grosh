@@ -5,7 +5,7 @@ import SwiftUI
 /// ending balances, its Net income and its Category report. It starts on the Total, This month's time range, and the
 /// period Home's strip was showing. Its period never reaches past today.
 struct ReportView: View {
-    @Query(Transaction.notDeleted) private var transactions: [Transaction]
+    @NotDeletedTransactions private var transactions: [Transaction]
     @State private var walletSelection = WalletSelection.total
     /// How long each period of the strip is, chosen with the calendar button.
     @State private var timeRange = TimeRange.month
@@ -21,18 +21,16 @@ struct ReportView: View {
     }
 
     var body: some View {
-        OtherIncomeReader { otherIncome in
-            content(otherIncome: otherIncome)
+        CountedHistoryReader(selection: walletSelection) { history in
+            content(history)
         }
         .onAppear { Signpost.opening("Open Report") }
     }
 
-    /// The Report, with Other Income read once for everything it counts.
     @ViewBuilder
-    private func content(otherIncome: Category) -> some View {
-        let selected = transactions.filter(walletSelection.includes)
-        let counted = transactions.counted(in: walletSelection, during: period, today: today, otherIncome: otherIncome)
-        let summary = PeriodSummary(of: selected, in: period, today: today)
+    private func content(_ history: CountedHistory) -> some View {
+        let counted = history.during(period, today: today)
+        let summary = PeriodSummary(of: transactions.filter(walletSelection.includes), in: period, today: today)
         NavigationStack(path: $path) {
             List {
                 Section {
@@ -58,7 +56,7 @@ struct ReportView: View {
             }
             .roundedSectionsListStyle()
             .reportPeriodControls(
-                walletSelection: $walletSelection, timeRange: $timeRange, period: $period, transactions: transactions
+                walletSelection: $walletSelection, timeRange: $timeRange, period: $period, history: history
             )
             .navigationTitle(Strings.Screens.report)
             #if os(iOS)

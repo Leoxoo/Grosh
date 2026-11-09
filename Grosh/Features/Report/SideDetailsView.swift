@@ -15,9 +15,8 @@ struct SideDetailsView: View {
     /// Whether the Breakdown or the Trend is shown, chosen with the segmented control.
     @State private var shows = Shows.breakdown
     /// Whether the comparison card compares with Last year, which Home's Month graph shares.
-    @AppStorage(HomeMonthGraph.comparesWithLastYearKey) private var comparesWithLastYear = false
+    @AppStorage(AppSettings.comparesWithLastYearKey) private var comparesWithLastYear = false
 
-    @Query(Transaction.notDeleted) private var transactions: [Transaction]
     @Query private var recurringTransactions: [RecurringTransaction]
     @Environment(\.today) private var today
 
@@ -28,18 +27,16 @@ struct SideDetailsView: View {
     }
 
     var body: some View {
-        OtherIncomeReader { otherIncome in
-            content(otherIncome: otherIncome)
+        CountedHistoryReader(selection: walletSelection) { history in
+            content(history)
         }
     }
 
-    /// The details, with Other Income read once for everything it counts.
     @ViewBuilder
-    private func content(otherIncome: Category) -> some View {
-        let days = transactions.reportDays(of: period, in: walletSelection, today: today)
-        let counted = transactions.counted(in: walletSelection, during: period, today: today, otherIncome: otherIncome)
-        let totals = PeriodTotals(of: counted)
-        let total = side == .income ? totals.income : totals.spent
+    private func content(_ history: CountedHistory) -> some View {
+        let days = history.days(of: period, today: today)
+        let counted = history.during(period, today: today)
+        let total = PeriodTotals(of: counted).total(of: side)
         List {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
@@ -60,18 +57,13 @@ struct SideDetailsView: View {
                 .padding(.vertical, 4)
             }
 
-            if timeRange.hasComparisonCard {
-                let countedEver = transactions.compactMap {
-                    $0.countedAmount(in: walletSelection, otherIncome: otherIncome)
-                }
-                PeriodComparisonCard(
-                    graph: MonthGraph(
-                        side, of: countedEver, countingFrom: countedEver.firstDay, recurring: recurringTransactions,
-                        in: period, today: today, comparingWith: comparesWithLastYear ? .lastYear : .average,
-                        selection: walletSelection
-                    ),
-                    comparesWithLastYear: $comparesWithLastYear
-                )
+            // Only a week, month, quarter or year has a graph. The period decides, not the time range: for a moment
+            // after the time range changes, the period is still one of the old range.
+            if let graph = history.graph(
+                side, in: period, recurring: recurringTransactions, today: today,
+                comparingWith: comparesWithLastYear ? .lastYear : .average
+            ) {
+                PeriodComparisonCard(graph: graph, comparesWithLastYear: $comparesWithLastYear)
             }
 
             Section {
@@ -92,7 +84,7 @@ struct SideDetailsView: View {
         }
         .roundedSectionsListStyle()
         .reportPeriodControls(
-            walletSelection: $walletSelection, timeRange: $timeRange, period: $period, transactions: transactions,
+            walletSelection: $walletSelection, timeRange: $timeRange, period: $period, history: history,
             showsWalletSelector: false
         )
         .navigationTitle(side.title)
@@ -105,8 +97,7 @@ struct SideDetailsView: View {
     private func breakdown(counted: [CountedAmount], days: DayRange) -> some View {
         let breakdown = CategoryBreakdown(side: side, of: counted)
         Section {
-            // The details show every parent category, not only the five largest the Report's donut does.
-            CategoryDonut(breakdown: breakdown, ownSliceLimit: Int.max, minimumShare: 0.02)
+            CategoryDonut(breakdown: breakdown, donut: .details)
                 .frame(maxWidth: 300)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
@@ -141,7 +132,7 @@ struct SideDetailsView: View {
                     )
                 ) {
                     LabeledContent(row.title) {
-                        Text(row.total(of: side).formatted())
+                        Text(row.totals.total(of: side).formatted())
                             .monospacedDigit()
                     }
                 }
@@ -182,31 +173,14 @@ private struct SideTrendChart: View {
     var body: some View {
         Chart {
             ForEach(rows) { row in
-                BarMark(x: .value(Strings.Common.step, row.title), y: .value(Strings.Common.total, row.total(of: side).cents))
-                    .foregroundStyle(side.color)
+                BarMark(
+                    x: .value(Strings.Common.step, row.title), y: .value(Strings.Common.total, row.totals.total(of: side).cents)
+                )
+                .foregroundStyle(side.color)
             }
             RuleMark(y: .value(Strings.Common.zero, 0))
                 .foregroundStyle(.secondary.opacity(0.4))
         }
-        .chartXAxis {
-            // Anchored, as the default label of a bar's category isn't one Charts accepts.
-            AxisMarks { _ in
-                AxisGridLine()
-                AxisTick()
-                AxisValueLabel(anchor: .top)
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading) { value in
-                AxisValueLabel(anchor: .trailing) {
-                    if let cents = value.as(Int.self) {
-                        Text(Money(cents: cents).formatted())
-                            .font(.caption2)
-                    }
-                }
-            }
-        }
-        .frame(height: 260)
-        .accessibilityHidden(true)
+        .stepBarAxes()
     }
 }

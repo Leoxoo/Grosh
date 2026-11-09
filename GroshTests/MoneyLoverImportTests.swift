@@ -25,7 +25,7 @@ struct MoneyLoverImportTests {
 
     @discardableResult
     private func importing(_ csv: String) throws -> MoneyLoverImportSummary {
-        try MoneyLoverImport.replaceAllData(with: MoneyLoverCSV.rows(in: csv), in: context)
+        try MoneyLoverImport.replaceAllData(with: MoneyLoverCSV.read(csv), in: context)
     }
 
     private func wallet(_ name: String) throws -> Wallet {
@@ -454,7 +454,7 @@ struct MoneyLoverImportTests {
         try addExistingData()
 
         #expect(throws: MoneyLoverImportError.noTransactions) {
-            try MoneyLoverImport.replaceAllData(with: [], in: context)
+            try MoneyLoverImport.replaceAllData(with: MoneyLoverExport(rows: [], isGroshExport: false), in: context)
         }
 
         #expect(try context.fetch(FetchDescriptor<Wallet>()).map(\.name) == ["Old wallet"])
@@ -535,7 +535,7 @@ struct MoneyLoverImportTests {
     @Test func aPersonIsLastUsedWhenTheirNewestImportedTransactionWasEntered() throws {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         try MoneyLoverImport.replaceAllData(
-            with: MoneyLoverCSV.rows(in: export(
+            with: MoneyLoverCSV.read(export(
                 "1,10/05/2026,Café,-3.00,USD,Checking,First,Sam,,,",
                 "2,10/04/2026,Café,-4.00,USD,Checking,Second,Kim,,,"
             )),

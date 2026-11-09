@@ -1,6 +1,6 @@
 /// What a period's Income and Spent come to on the Report, and their difference, Net income. Each counts as the Month
 /// graph counts it (``CountedAmount``), for the wallet selection the Report shows and only for the days of the period
-/// up to today, so no Report figure reaches into Future.
+/// up to today (``CountedHistory/during(_:today:)``), so no Report figure reaches into Future.
 struct PeriodTotals: Equatable {
     let income: Money
     let spent: Money
@@ -23,39 +23,16 @@ struct PeriodTotals: Equatable {
         self.init(income: Money(cents: incomeCents), spent: Money(cents: spentCents))
     }
 
-    /// The totals of `period` for the transactions of `selection`, as of `today`. An Expense paid back beyond its
-    /// amount counts the extra under `otherIncome`.
-    init(
-        of transactions: [Transaction], in selection: WalletSelection, period: Period, today: CalendarDay,
-        otherIncome: Category
-    ) {
-        self.init(of: transactions.counted(in: selection, during: period, today: today, otherIncome: otherIncome))
-    }
-
     /// Income less Spent: what the period came to, positive when more came in than went out.
     var netIncome: Money {
         Money(cents: income.cents - spent.cents)
     }
-}
 
-extension Sequence where Element == Transaction {
-    /// What these transactions count toward Spent or Income in `selection`, on the days of `period` up to `today`: what
-    /// the Report adds up. Nothing dated after today is in any Report period. An Expense paid back beyond its amount
-    /// counts the extra under `otherIncome`.
-    func counted(
-        in selection: WalletSelection, during period: Period, today: CalendarDay, otherIncome: Category
-    ) -> [CountedAmount] {
-        let days = period.days(today: today)
-        return compactMap { $0.countedAmount(in: selection, otherIncome: otherIncome) }.filter { days.contains($0.day) }
-    }
-}
-
-extension Sequence where Element == Transaction {
-    /// The days a Report screen's period covers, as its Steps and Daily average count them: the period's days through
-    /// today, where All time reaches back to the first transaction of `selection`.
-    func reportDays(of period: Period, in selection: WalletSelection, today: CalendarDay) -> DayRange {
-        let days = period.days(today: today)
-        let firstTransaction = filter(selection.includes).firstDay
-        return DayRange(first: days.first ?? firstTransaction ?? today, last: days.last ?? today)
+    /// The side's total, as its tab, bar and row show it.
+    func total(of side: SpentOrIncome) -> Money {
+        switch side {
+        case .income: income
+        case .spent: spent
+        }
     }
 }

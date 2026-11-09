@@ -53,6 +53,12 @@ nonisolated enum TimeRange: Hashable, Sendable {
         return periods + [.future]
     }
 
+    /// The periods a strip of what has happened offers, the Report's and Home's Month graph's:
+    /// ``periods(from:today:firstWeekday:)`` without Future.
+    func pastPeriods(from earliest: CalendarDay?, today: CalendarDay) -> [Period] {
+        periods(from: earliest, today: today).filter { $0 != .future }
+    }
+
     /// The period of this length that holds `day`. A custom range has only its own period, whatever `day` is.
     func period(containing day: CalendarDay, firstWeekday: Int = Calendar.current.firstWeekday) -> Period {
         switch self {

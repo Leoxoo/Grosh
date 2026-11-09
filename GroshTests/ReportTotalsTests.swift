@@ -20,8 +20,8 @@ struct ReportTotalsTests {
     /// The totals of `period` (this month unless another is given) for `selection`, as of today.
     private func totals(_ selection: WalletSelection = .total, in period: Period? = nil) throws -> PeriodTotals {
         try PeriodTotals(
-            of: store.transactions(), in: selection, period: period ?? .month(CalendarMonth(today)), today: today,
-            otherIncome: store.otherIncome()
+            of: CountedHistory(store.transactions(), in: selection, otherIncome: store.otherIncome())
+                .during(period ?? .month(CalendarMonth(today)), today: today)
         )
     }
 
