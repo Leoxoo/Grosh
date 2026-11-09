@@ -31,20 +31,19 @@ extension Wallet {
         for (position, wallet) in reordered.enumerated() {
             wallet.sortOrder = position
         }
-        try ordered.first?.modelContext?.save()
+        try ordered.first?.saveToStore()
     }
 
     /// Retires the wallet: it leaves the Total and every picker, but keeps all of its transactions. Its Recurring
     /// transactions pause, after making what has fallen due by `today`, and make nothing until it is unarchived. Saves.
     @MainActor
     func archive(today: CalendarDay) throws {
-        if let context = modelContext {
-            for schedule in recurringTransactions ?? [] {
-                schedule.makeDueTransactions(through: today, in: context)
-            }
+        let context = try storeContext()
+        for schedule in recurringTransactions ?? [] {
+            schedule.makeDueTransactions(through: today, in: context)
         }
         isArchived = true
-        try modelContext?.save()
+        try context.save()
     }
 
     /// Brings an archived wallet back into its place in the user's order. Its Recurring transactions resume, and what
@@ -55,7 +54,7 @@ extension Wallet {
         for schedule in recurringTransactions ?? [] where schedule.isActive {
             schedule.skipOccurrences(through: today)
         }
-        try modelContext?.save()
+        try saveToStore()
     }
 
     /// Whether the wallet counts toward the Total: unarchived, marked "Include in total", and not in Recently Deleted.

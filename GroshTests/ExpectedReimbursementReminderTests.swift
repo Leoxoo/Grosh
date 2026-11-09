@@ -217,13 +217,13 @@ struct ExpectedReimbursementReminderTests {
         let loan = try fixture.store.lendOrBorrow(.loan, 100_00, on: dinnerDay)
         loan.reminderDay = day(2026, 10, 20)
         try context.save()
-        let loanRemindersBefore = try DebtsAndLoans(in: context).reminders(from: today)
+        let loanRemindersBefore = DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions)).reminders(from: today)
 
         try fixture.dinner(on: dinnerDay, owing: [(alex, 30_00)])
 
-        #expect(try DebtsAndLoans(in: context).reminders(from: today) == loanRemindersBefore)
+        #expect(DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions)).reminders(from: today) == loanRemindersBefore)
         #expect(loanRemindersBefore.count == 1)
-        #expect(try DebtsAndLoans(in: context).due(on: today).isEmpty)
+        #expect(DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions)).due(on: today).isEmpty)
         #expect(ExpectedReimbursementReminder.identifierPrefix != DebtReminder.identifierPrefix)
         #expect(ExpectedReimbursementReminder.identifierPrefix != EstimateReminder.identifierPrefix)
     }

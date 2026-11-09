@@ -50,16 +50,15 @@ struct ExpectationFixture {
 
     /// Records a payment of `cents` on `expectation` on `date` (today unless given), into `wallet` (the Expense's own
     /// unless given).
-    @discardableResult
     func pay(
         _ cents: Int, on expectation: ExpectedReimbursement, day date: CalendarDay? = nil, into wallet: Wallet? = nil,
         note: String = ""
-    ) throws -> RecordedPayment {
+    ) throws {
         var draft = ExpectationPaymentDraft(paying: expectation, on: date ?? today)
         draft.amount = Money(cents: cents)
         if let wallet { draft.wallet = wallet }
         draft.note = note
-        return try expectation.recordPayment(draft, in: context)
+        try expectation.recordPayment(draft, in: context)
     }
 
     /// What the Report counts for `selection` in October.
@@ -72,6 +71,6 @@ struct ExpectationFixture {
 
     /// Every Expected reimbursement the way Debts & Loans reads them.
     func owesMe() throws -> ExpectedReimbursements {
-        try ExpectedReimbursements(in: context)
+        ExpectedReimbursements(try context.fetch(ExpectedReimbursements.all))
     }
 }

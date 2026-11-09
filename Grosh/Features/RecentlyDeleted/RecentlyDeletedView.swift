@@ -100,12 +100,13 @@ struct RecentlyDeletedView: View {
             if !bin.transactions.isEmpty {
                 Section {
                     ForEach(bin.transactions) { transaction in
-                        DeletedTransactionRow(transaction: transaction, now: now)
+                        let blocker = transaction.restoreBlocker()
+                        DeletedTransactionRow(transaction: transaction, blocker: blocker, now: now)
                             .swipeActions(edge: .trailing) {
                                 Button(Strings.RecentlyDeleted.deleteForever, systemImage: "trash", role: .destructive) {
                                     pendingRemoval = .transaction(transaction)
                                 }
-                                if transaction.restoreBlocker == nil {
+                                if blocker == nil {
                                     Button(Strings.Common.restore, systemImage: "arrow.uturn.backward") {
                                         perform { try transaction.restore() }
                                     }
@@ -116,7 +117,7 @@ struct RecentlyDeletedView: View {
                                 Button(Strings.Common.restore, systemImage: "arrow.uturn.backward") {
                                     perform { try transaction.restore() }
                                 }
-                                .disabled(transaction.restoreBlocker != nil)
+                                .disabled(blocker != nil)
                                 Button(Strings.RecentlyDeleted.deleteForever, systemImage: "trash", role: .destructive) {
                                     pendingRemoval = .transaction(transaction)
                                 }
@@ -253,13 +254,15 @@ private struct DeletedWalletRow: View {
 /// Recently Deleted too, that the wallet has to be restored first.
 private struct DeletedTransactionRow: View {
     let transaction: Transaction
+    /// Why it can't be restored, asked once for the row.
+    let blocker: RecentlyDeletedError?
     let now: Date
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             TransactionRow(transaction: transaction, showsDay: true)
             HStack {
-                if transaction.restoreBlocker == .walletIsDeleted {
+                if blocker == .walletIsDeleted {
                     Text(Strings.RecentlyDeleted.restoreWalletFirst)
                         .foregroundStyle(.attention)
                 }

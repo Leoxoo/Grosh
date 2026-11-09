@@ -64,4 +64,5 @@ Each step has a budget in `GroshTests/BenchmarkBudgets.swift`, and a step over i
 
 - **Doc comments** say in the user's words what something is or does, using glossary terms, and cite the ADR that decides it (`(ADR-0004)`). They explain *why* a choice was made when the code can't.
 - **Commit subjects** describe the user-visible change in plain English ("Keep every transaction in memory instead of re-reading the store after each save"), not the code edit.
+- **A rule saves through the store, or refuses.** A rule that changes a model and saves reaches the store with `storeContext()` or `saveToStore()` (`Domain/Store/StoreContext.swift`), never `modelContext?.save()`: a model the store no longer holds throws `StoreError.notInStore` instead of dropping the change without a word.
 - **One home per rule.** A check like "is this an ordinary Expense" or "which part is the original" lives in one Domain property that every caller uses; a second copy in a view, export or report drifts from the first.

@@ -40,7 +40,10 @@ struct DebtsAndLoansByPersonTests {
     }
 
     private func listing() throws -> DebtsAndLoansByPerson {
-        try DebtsAndLoansByPerson(in: context)
+        DebtsAndLoansByPerson(
+            DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions)),
+            ExpectedReimbursements(try context.fetch(ExpectedReimbursements.all))
+        )
     }
 
     private func euroWallet() -> Wallet {
@@ -276,5 +279,12 @@ struct DebtsAndLoansByPersonTests {
         #expect(DebtsLoansGrouping(rawValue: DebtsLoansGrouping.people.rawValue) == .people)
         #expect(DebtsLoansGrouping(rawValue: DebtsLoansGrouping.loanOrDebt.rawValue) == .loanOrDebt)
         #expect(DebtsLoansGrouping(rawValue: "something else") == nil)
+    }
+}
+
+private extension DebtsAndLoansByPerson {
+    /// `person`'s entry, open or settled, or `nil` when they are not listed.
+    func entry(for person: Person) -> PersonDebtsAndLoans? {
+        (open + settled).first { $0.person === person }
     }
 }

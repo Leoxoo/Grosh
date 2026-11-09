@@ -7,7 +7,7 @@ extension Transaction {
     static func create(_ draft: TransactionDraft, in context: ModelContext) throws -> Transaction {
         try draft.validate()
         let transaction = Transaction.insert(Money(cents: 0), on: draft.day, wallet: nil, category: nil, in: context)
-        transaction.apply(draft)
+        try transaction.apply(draft)
         try context.save()
         return transaction
     }
@@ -18,14 +18,14 @@ extension Transaction {
         try draft.validate()
         // Editing the amount confirms an Estimated transaction. Only the amount's size counts, not its direction.
         let amountChanged = abs(amountCents) != draft.amount.cents
-        apply(draft)
+        try apply(draft)
         if amountChanged {
             clearEstimate()
         }
-        try modelContext?.save()
+        try saveToStore()
     }
 
-    private func apply(_ draft: TransactionDraft) {
+    private func apply(_ draft: TransactionDraft) throws {
         amountCents = draft.amount.cents * draft.sign
         day = draft.day
         wallet = draft.wallet
@@ -33,7 +33,7 @@ extension Transaction {
         card = draft.offersCard ? draft.card : nil
         note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
         setPeople(draft.people)
-        setExpectations(draft.owes)
+        try setExpectations(draft.owes)
         isExcludedFromReport = draft.isExcludedFromReport
         reminderDay = draft.offersReminder ? draft.reminderDay : nil
     }

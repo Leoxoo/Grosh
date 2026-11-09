@@ -9,6 +9,7 @@ import Foundation
 nonisolated enum Strings {
     /// Words and messages that many screens share.
     enum Common {
+        static let notInStore: LocalizedStringResource = "It's no longer in Grosh."
         static let cancel: LocalizedStringResource = "Cancel"
         static let done: LocalizedStringResource = "Done"
         static let save: LocalizedStringResource = "Save"
@@ -647,6 +648,7 @@ nonisolated enum Strings {
         static let walletIsDeleted: LocalizedStringResource = "Its wallet is in Recently Deleted. Restore the wallet first."
         static let deletedWithWallet: LocalizedStringResource = "It was deleted with its wallet. Restore or delete the wallet instead."
         static let loanOrDebtIsForgiven: LocalizedStringResource = "Its Loan or Debt was forgiven since. Un-forgive it first."
+        static let couldntCheck: LocalizedStringResource = "Grosh couldn't read what it's linked to, so it stays here for now. Try again."
         static let deleteForever: LocalizedStringResource = "Delete Forever"
         static let nothingRecentlyDeleted: LocalizedStringResource = "Nothing Recently Deleted"
         static let emptyBin: LocalizedStringResource = "Empty Bin"

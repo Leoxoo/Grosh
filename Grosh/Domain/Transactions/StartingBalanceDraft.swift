@@ -24,6 +24,6 @@ extension Transaction {
         amountCents = draft.amount.cents
         day = draft.day
         note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
-        try modelContext?.save()
+        try saveToStore()
     }
 }

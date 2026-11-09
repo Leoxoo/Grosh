@@ -34,12 +34,18 @@ struct CardManagementTests {
         let chase = try Card.create(CardDraft(name: "Chase", kind: .credit, payingWallet: checking, statementDay: 15), in: context)
         let debit = try Card.create(CardDraft(name: "Navy Federal Debit", kind: .debit, payingWallet: checking), in: context)
 
-        #expect(appleCard.statementClosingDay(year: 2026, month: 10) == CalendarDay(year: 2026, month: 10, day: 31))
-        #expect(appleCard.statementClosingDay(year: 2026, month: 4) == CalendarDay(year: 2026, month: 4, day: 30))
-        #expect(appleCard.statementClosingDay(year: 2026, month: 2) == CalendarDay(year: 2026, month: 2, day: 28))
-        #expect(appleCard.statementClosingDay(year: 2028, month: 2) == CalendarDay(year: 2028, month: 2, day: 29))
-        #expect(chase.statementClosingDay(year: 2026, month: 2) == CalendarDay(year: 2026, month: 2, day: 15))
-        #expect(debit.statementClosingDay(year: 2026, month: 2) == nil)
+        #expect(statementCloses(appleCard, year: 2026, month: 10) == CalendarDay(year: 2026, month: 10, day: 31))
+        #expect(statementCloses(appleCard, year: 2026, month: 4) == CalendarDay(year: 2026, month: 4, day: 30))
+        #expect(statementCloses(appleCard, year: 2026, month: 2) == CalendarDay(year: 2026, month: 2, day: 28))
+        #expect(statementCloses(appleCard, year: 2028, month: 2) == CalendarDay(year: 2028, month: 2, day: 29))
+        #expect(statementCloses(chase, year: 2026, month: 2) == CalendarDay(year: 2026, month: 2, day: 15))
+        // With no statement date, a Card's period is the calendar month.
+        #expect(statementCloses(debit, year: 2026, month: 2) == CalendarDay(year: 2026, month: 2, day: 28))
+    }
+
+    /// The last day of `card`'s statement period that starts in `month` of `year`, as its Card statement shows it.
+    private func statementCloses(_ card: Card, year: Int, month: Int) -> CalendarDay {
+        CardPeriod(containing: CalendarDay(year: year, month: month, day: 1), statementDay: card.statementDay).lastDay
     }
 
     private func allCards() throws -> [Card] {

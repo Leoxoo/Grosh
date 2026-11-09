@@ -64,7 +64,7 @@ struct MonthGraphProjectionTests {
         #expect(dotted.map(\.total.cents) ==
             Array(repeating: 40_00, count: 7) + Array(repeating: 50_00, count: 7) + Array(repeating: 60_00, count: 6))
         #expect(dotted.first?.position == spent.line.last?.position)
-        #expect(spent.expectedByMonthEnd == Money(cents: 60_00))
+        #expect(spent.expectedByPeriodEnd == Money(cents: 60_00))
     }
 
     /// Daily from October 1 for fifteen days: the first twelve were skipped when it was saved today, so three are left.
@@ -81,7 +81,7 @@ struct MonthGraphProjectionTests {
         #expect(spent.popup(on: day(2026, 10, 15)).scheduled.map(\.recurring.name) == ["Parking"])
         #expect(spent.popup(on: day(2026, 10, 16)).scheduled.isEmpty)
         #expect(spent.popup(on: day(2026, 10, 27)).scheduled.isEmpty)
-        #expect(spent.expectedByMonthEnd == Money(cents: 46_00))
+        #expect(spent.expectedByPeriodEnd == Money(cents: 46_00))
     }
 
     /// Two Electricity Bills averaging 60.00 were paid in September, so the Bill's transactions start at 60.00, not at
@@ -99,20 +99,20 @@ struct MonthGraphProjectionTests {
         let scheduled = spent.popup(on: day(2026, 10, 20)).scheduled
         #expect(scheduled.map(\.recurring.name) == ["Electricity"])
         #expect(scheduled.compactMap(\.countedAmount?.amount) == [Money(cents: 60_00)])
-        #expect(spent.expectedByMonthEnd == Money(cents: 60_00))
+        #expect(spent.expectedByPeriodEnd == Money(cents: 60_00))
     }
 
     // MARK: What adds nothing
 
     @Test func aDeletedScheduleAddsNothing() throws {
         let gym = try schedule("Gym", 30_00, "Sports", starting: day(2026, 10, 20))
-        #expect(try store.graph(.spent).expectedByMonthEnd == Money(cents: 30_00))
+        #expect(try store.graph(.spent).expectedByPeriodEnd == Money(cents: 30_00))
 
         try gym.delete(today: today, in: context)
 
         let spent = try store.graph(.spent)
         #expect(spent.scheduledLine == nil)
-        #expect(spent.expectedByMonthEnd == nil)
+        #expect(spent.expectedByPeriodEnd == nil)
         #expect(spent.popup(on: day(2026, 10, 20)).scheduled.isEmpty)
     }
 
@@ -128,8 +128,8 @@ struct MonthGraphProjectionTests {
         try schedule("Rent", 900_00, "Rentals", starting: day(2026, 10, 15), wallet: oldBank)
         try schedule("Tips", 20_00, "Tips", .income, starting: day(2026, 10, 16), wallet: cash)
         try schedule("Interest", 5_00, "Collect Interest", .income, starting: day(2026, 10, 17), wallet: savings)
-        #expect(try store.graph(.spent).expectedByMonthEnd == Money(cents: 900_00))
-        #expect(try store.graph(.income).expectedByMonthEnd == Money(cents: 20_00))
+        #expect(try store.graph(.spent).expectedByPeriodEnd == Money(cents: 900_00))
+        #expect(try store.graph(.income).expectedByPeriodEnd == Money(cents: 20_00))
 
         oldBank.isArchived = true
         cash.deletedAt = Date.now
@@ -137,7 +137,7 @@ struct MonthGraphProjectionTests {
         for side in SpentOrIncome.allCases {
             let card = try store.graph(side)
             #expect(card.scheduledLine == nil)
-            #expect(card.expectedByMonthEnd == nil)
+            #expect(card.expectedByPeriodEnd == nil)
         }
     }
 
@@ -150,13 +150,13 @@ struct MonthGraphProjectionTests {
 
         #expect(spent.popup(on: day(2026, 10, 31)).scheduled.map(\.recurring.name) == ["Cinema"])
         #expect(spent.scheduledLine?.last?.position == 1)
-        #expect(spent.expectedByMonthEnd == Money(cents: 12_00))
+        #expect(spent.expectedByPeriodEnd == Money(cents: 12_00))
     }
 
     // MARK: Expected by month end
 
     /// The Loan's schedule is filed under a Debt/Loan category, so it counts on neither card.
-    @Test func expectedByMonthEndIsTodaysTotalPlusWhatIsScheduledForTheCard() throws {
+    @Test func expectedByPeriodEndIsTodaysTotalPlusWhatIsScheduledForTheCard() throws {
         try store.record(-40_00, "Café", on: day(2026, 10, 3))
         try store.record(1_000_00, "Salary", .income, on: day(2026, 10, 1))
         try schedule("Netflix", 15_99, "Streaming Service", starting: day(2026, 10, 20))
@@ -167,9 +167,9 @@ struct MonthGraphProjectionTests {
         let income = try store.graph(.income)
 
         #expect(spent.headline == Money(cents: 40_00))
-        #expect(spent.expectedByMonthEnd == Money(cents: 55_99))
+        #expect(spent.expectedByPeriodEnd == Money(cents: 55_99))
         #expect(income.headline == Money(cents: 1_000_00))
-        #expect(income.expectedByMonthEnd == Money(cents: 3_000_00))
+        #expect(income.expectedByPeriodEnd == Money(cents: 3_000_00))
     }
 
     @Test(arguments: SpentOrIncome.allCases)
@@ -180,7 +180,7 @@ struct MonthGraphProjectionTests {
         let card = try store.graph(side)
 
         #expect(card.scheduledLine == nil)
-        #expect(card.expectedByMonthEnd == nil)
+        #expect(card.expectedByPeriodEnd == nil)
     }
 
     // MARK: The popup on a day still to come
@@ -246,9 +246,9 @@ struct MonthGraphProjectionTests {
         let lastDay = september.popup(on: day(2026, 9, 30))
 
         #expect(september.scheduledLine == nil)
-        #expect(september.expectedByMonthEnd == nil)
+        #expect(september.expectedByPeriodEnd == nil)
         #expect(lastDay.scheduled.isEmpty)
         #expect(lastDay.expected == nil)
-        #expect(try store.graph(side).expectedByMonthEnd != nil)
+        #expect(try store.graph(side).expectedByPeriodEnd != nil)
     }
 }
