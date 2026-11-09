@@ -154,7 +154,7 @@ struct TextReminderTests {
         let dinner = try fixture.dinner(on: dinnerDay, owing: [(alex, 30_00)])
         dinner.note = "Dinner"
         let reminder = try #require(fixture.owesMe().reminders(from: dinnerDay).first)
-        alex.name = "Alexander"
+        alex.rename(to: "Alexander")
         alex.phone = "555 0200"
         alex.contactIdentifier = "c1"
 
