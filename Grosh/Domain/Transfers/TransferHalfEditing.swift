@@ -8,14 +8,12 @@ nonisolated struct TransferHalfDraft {
     var day: CalendarDay
     var note: String
 
-    /// The half as it is, to edit.
     init(editing half: Transaction) {
         amount = Money(cents: abs(half.amountCents), currencyCode: half.amount.currencyCode)
         day = half.day
         note = half.note
     }
 
-    /// Checks the draft against the transfer rules before anything is saved.
     func validate() throws {
         guard amount.cents > 0 else { throw TransferRuleError.missingAmount }
     }
@@ -40,7 +38,7 @@ extension Transaction {
 
     /// Saves an edited transfer half, and with ``TransferUpdateScope/bothHalves`` carries a new amount or date over
     /// to the other half: a date-only change keeps a fee the halves already differ by. The note is this half's
-    /// own. Saves. Nothing changes when the draft breaks a transfer rule.
+    /// own. Saves.
     func update(with draft: TransferHalfDraft, scope: TransferUpdateScope, in context: ModelContext) throws {
         guard editFlow == .transferHalf else { throw TransferRuleError.notATransferHalf }
         try draft.validate()

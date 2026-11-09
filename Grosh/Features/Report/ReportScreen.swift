@@ -4,7 +4,6 @@ import SwiftUI
 /// A screen the Report pushes: a details screen, the transactions of a Net income or Trend row's Step, or one parent
 /// category's transactions. A details screen opened from the Report shares its wallet selection, time range and period.
 enum ReportScreen: Hashable {
-    /// Which details screen.
     enum Details: Hashable {
         case netIncome
         case side(SpentOrIncome)

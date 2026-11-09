@@ -46,7 +46,7 @@ nonisolated enum ReminderArrival: Hashable, Sendable {
 protocol ReminderScheduler {
     /// Asks the user to allow notifications, unless they already answered. Returns whether they are allowed.
     func requestPermission() async -> Bool
-    /// Makes `reminders` the pending reminders of their sort, whether Loan and Debt or Estimated-amount ones, replacing
+    /// Makes `reminders` the pending reminders of their sort, whether Loan and Debt, Estimated-amount or Owes me ones, replacing
     /// every one of that sort scheduled before. Schedules nothing while notifications aren't allowed.
     func replacePending<Reminder: PendingReminder>(_ reminders: [Reminder]) async
 }

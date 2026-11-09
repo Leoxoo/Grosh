@@ -87,7 +87,6 @@ extension Transaction {
         )
     }
 
-    /// Whether this Loan or Debt was forgiven.
     var isForgiven: Bool { forgivenCents != nil }
 
     /// Takes the Forgiven mark off this Loan or Debt, so what was forgiven is outstanding again and stops counting in

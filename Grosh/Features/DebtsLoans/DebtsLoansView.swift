@@ -69,7 +69,7 @@ struct DebtsLoansView: View {
         }
     }
 
-    /// Show by Loan/Debt: the list as it was before people.
+    /// Show by Loan/Debt: the open Loans and Debts, the open Owes me, then the settled ones of each.
     @ViewBuilder
     private func byLoanOrDebt(_ list: DebtsAndLoans, _ owesMe: ExpectedReimbursements) -> some View {
         if !list.open.isEmpty {

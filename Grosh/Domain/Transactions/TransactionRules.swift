@@ -12,8 +12,7 @@ extension Transaction {
         return transaction
     }
 
-    /// Saves an edited draft. The transaction keeps its place within its day. Nothing changes when the draft
-    /// breaks a transaction rule.
+    /// The transaction keeps its place within its day. Saves.
     func update(with draft: TransactionDraft) throws {
         try draft.validate()
         // Editing the amount confirms an Estimated transaction. Only the amount's size counts, not its direction.

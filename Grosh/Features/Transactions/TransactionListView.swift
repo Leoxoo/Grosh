@@ -74,7 +74,6 @@ private struct TransactionListContent: View {
         let scheduled: [ScheduledOccurrence] = period == .future && grouping == .day && !filter.isOn && !isSelecting
             ? recurringTransactions.scheduledOccurrences(selection: walletSelection, today: today)
             : []
-        // The rows highlighted: the chosen ones while selecting, otherwise the one whose detail is showing.
         let highlighted = isSelecting ? chosen : Set([selectedTransaction].compactMap { $0 })
 
         list {
@@ -136,7 +135,6 @@ private struct TransactionListContent: View {
                 }
             }
             .padding(.vertical, 8)
-            // Rises into the title's place as the list scrolls up, and moves down with the title on a pull.
             .risingWithTabRootTitle(scroll)
         }
         .modifier(TransactionSearchField(text: $filter.searchText, isOpen: $isSearchPresented))

@@ -218,8 +218,8 @@ extension Wallet {
         try saveToStore()
     }
 
-    /// Delete Forever: removes the wallet in Recently Deleted and every transaction in it for good, with the Cards
-    /// paid from it. Saves.
+    /// Delete Forever: removes the wallet in Recently Deleted for good, with every transaction and Recurring transaction
+    /// in it and the Cards paid from it that are left with none. Saves.
     func deleteForever(in context: ModelContext) throws {
         guard isInRecentlyDeleted else { throw RecentlyDeletedError.notDeleted }
         try RecentlyDeleted.removeForGood(wallets: [self], transactions: [], in: context)

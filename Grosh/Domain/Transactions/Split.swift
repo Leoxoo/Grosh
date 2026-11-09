@@ -13,7 +13,6 @@ nonisolated struct SplitPart {
     var people: [Person]
     var eventName: String
 
-    /// The part as `transaction` is now.
     init(of transaction: Transaction) {
         amount = Money(cents: abs(transaction.amountCents), currencyCode: transaction.amount.currencyCode)
         category = transaction.category
@@ -224,8 +223,9 @@ extension Transaction {
     }
 
     /// Undo split: merges every part of the split back into the oldest one, the original, which takes the sum of their
-    /// amounts and loses its link, and every part's Reimbursements. The other parts are removed. A part in Recently Deleted is left where it is and
-    /// isn't counted. Returns the original. Saves. Throws when there is no other part to merge.
+    /// amounts and every part's Reimbursements, and loses its link. The other parts are removed. A part in Recently
+    /// Deleted is left where it is and isn't counted. Returns the original. Saves. Throws when there is no other part
+    /// to merge.
     @discardableResult
     func undoSplit(in context: ModelContext) throws -> Transaction {
         let parts = try context.fetch(linkedTransactions)

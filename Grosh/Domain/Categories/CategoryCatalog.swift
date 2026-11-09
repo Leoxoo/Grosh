@@ -179,8 +179,8 @@ struct CategoryCatalog {
         try categories(of: source.type).filter { (try? checkMerge(source, into: $0)) != nil }
     }
 
-    /// Moves every transaction of `source` into `target`, then removes `source`. A parent's subcategories move
-    /// under `target`, after its own.
+    /// Moves every transaction, forgiven amount and Recurring transaction of `source` into `target`, then removes
+    /// `source`. A parent's subcategories move under `target`, after its own.
     func merge(_ source: Category, into target: Category) throws {
         try checkMerge(source, into: target)
         for transaction in source.transactions ?? [] {

@@ -55,7 +55,6 @@ extension CardRuleError: LocalizedError {
 }
 
 nonisolated extension CardDraft {
-    /// The Card's current fields, ready to edit.
     init(_ card: Card) {
         self.init(
             name: card.name,
@@ -112,7 +111,6 @@ nonisolated extension CardDraft {
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    /// Checks the draft against the Card rules before anything is saved.
     func validate() throws {
         guard !trimmedName.isEmpty else { throw CardRuleError.missingName }
         guard payingWallet != nil else { throw CardRuleError.missingPayingWallet }
@@ -148,7 +146,6 @@ extension Card {
         return card
     }
 
-    /// Saves an edited draft. Nothing changes when the draft breaks a Card rule.
     func update(with draft: CardDraft) throws {
         try draft.validate()
         guard draft.payingWallet == payingWallet || !hasTransactions else {
@@ -209,7 +206,7 @@ extension Card {
         Card.pickerChoices(for: payingWallet, keeping: nil).filter { $0 != self }
     }
 
-    /// Moves every transaction paid with this Card to `target`, then removes this Card. Saves.
+    /// Moves every transaction and Recurring transaction paid with this Card to `target`, then removes this Card. Saves.
     func merge(into target: Card, in context: ModelContext) throws {
         guard target != self else { throw CardRuleError.mergeIntoItself }
         guard target.payingWallet == payingWallet else { throw CardRuleError.mergeIntoAnotherWallet }

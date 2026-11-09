@@ -177,7 +177,6 @@ extension RecurringTransaction {
         }
     }
 
-    /// When the schedule stops making occurrences.
     var end: RepeatEnd {
         get {
             switch endKind {

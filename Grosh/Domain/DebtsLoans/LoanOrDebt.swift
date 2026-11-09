@@ -147,7 +147,6 @@ extension Transaction {
     /// Whether this is a Loan or a Debt, which payments settle.
     var isLoanOrDebt: Bool { loanOrDebtKind != nil }
 
-    /// Loan or Debt, or `nil` for any other transaction.
     var loanOrDebtKind: LoanOrDebtKind? { LoanOrDebtKind(category?.lockedRole) }
 
     /// Whether this is the ordinary expense or income a Loan or Debt adds beside a payment (``LoanOrDebt/addLinked``):

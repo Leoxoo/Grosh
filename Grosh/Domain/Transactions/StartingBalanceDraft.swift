@@ -9,7 +9,6 @@ struct StartingBalanceDraft {
     var day: CalendarDay
     var note: String
 
-    /// The Starting balance as it is, to edit.
     init(editing transaction: Transaction) {
         amount = transaction.amount
         day = transaction.day

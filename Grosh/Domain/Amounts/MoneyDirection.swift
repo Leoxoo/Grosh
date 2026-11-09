@@ -20,7 +20,6 @@ nonisolated enum MoneyDirection: Hashable, Sendable {
 }
 
 nonisolated extension Money {
-    /// Whether the amount comes in, goes out, or is zero.
     var direction: MoneyDirection { MoneyDirection(sign: cents) }
 }
 

@@ -15,7 +15,7 @@ nonisolated enum Log {
     static let importing = Logger(subsystem: subsystem, category: "Import")
     /// Recurring transactions making the transactions that came due.
     static let recurring = Logger(subsystem: subsystem, category: "Recurring")
-    /// Scheduling the Loan, Debt and Estimated-amount reminders.
+    /// Scheduling the Loan and Debt, Estimated-amount and Owes me reminders, and their Text them action.
     static let reminders = Logger(subsystem: subsystem, category: "Reminders")
     /// Reading the user's Contacts for With.
     static let contacts = Logger(subsystem: subsystem, category: "Contacts")

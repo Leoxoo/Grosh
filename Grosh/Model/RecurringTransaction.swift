@@ -100,7 +100,6 @@ final class RecurringTransaction {
         set { endKindRaw = newValue.rawValue }
     }
 
-    /// What sort of Recurring transaction it is, which the Recurring tab groups it by.
     var kind: RecurringKind {
         get { RecurringKind(rawValue: kindRaw) ?? .regular }
         set { kindRaw = newValue.rawValue }
@@ -115,7 +114,6 @@ final class RecurringTransaction {
     /// The currency its amounts are in: its wallet's, or the default while it has no wallet.
     var currencyCode: String { wallet.currencyCodeOrDefault }
 
-    /// The last due day dealt with, or `nil` before any has been.
     var handledThrough: CalendarDay? {
         get { handledThroughRaw.map { CalendarDay(rawValue: $0) } }
         set { handledThroughRaw = newValue?.rawValue }

@@ -10,7 +10,7 @@ struct RecurringTransactionsView: View {
     private var recurring: [RecurringTransaction]
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     @State private var editorMode: RecurringTransactionEditor.Mode?
-    /// The wallet the list is narrowed to, or `nil` for every wallet. Each time the tab opens it shows every wallet.
+    /// The wallet the list is narrowed to, or `nil` for every wallet. Each time the screen opens it shows every wallet.
     @State private var walletFilter: Wallet?
 
     private var groups: [RecurringListing.KindGroup] {

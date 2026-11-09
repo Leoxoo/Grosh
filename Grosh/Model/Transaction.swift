@@ -124,7 +124,6 @@ final class Transaction {
         set { dayRaw = newValue.rawValue }
     }
 
-    /// Whether the transaction is in Recently Deleted.
     var isInRecentlyDeleted: Bool { deletedAt != nil }
 
     /// On a Loan or Debt, the day the user is reminded of it (its due date), or `nil` for no reminder.
@@ -180,7 +179,6 @@ extension Transaction {
         linkKindRaw = nil
     }
 
-    /// What the names in ``withName`` are joined with.
     static var withSeparator: String { "; " }
 
     /// The people in With, by name.

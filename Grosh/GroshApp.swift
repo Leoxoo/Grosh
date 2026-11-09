@@ -62,7 +62,6 @@ struct GroshApp: App {
         }
     }
 
-    /// Moves `today` on to the real day when it has changed, and returns it.
     @discardableResult
     private func refreshToday() -> CalendarDay {
         let now = CalendarDay.today

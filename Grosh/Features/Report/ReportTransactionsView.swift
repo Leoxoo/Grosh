@@ -7,7 +7,6 @@ struct ReportTransactionsView: View {
     let days: DayRange
     let walletSelection: WalletSelection
 
-    /// Which list it is.
     enum Screen {
         /// A Step's: what counts toward `side`, or toward both sides with Net income for `nil`. `title` names the Step.
         case step(side: SpentOrIncome?, title: String)

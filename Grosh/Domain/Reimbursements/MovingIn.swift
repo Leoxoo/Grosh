@@ -11,7 +11,7 @@ extension Transaction {
     /// Why it can't be moved into `expense` as a Reimbursement, or `nil` when it can: it must be money that came in
     /// under an Income category, outside Recently Deleted, into the Expense's own wallet. A transfer's incoming half, a
     /// balance adjustment, a Loan or Debt and their payments, and what an overpaid Loan brought in can't; money paid
-    /// into another wallet is a transfer or income, never a Reimbursement (ADR 0008).
+    /// into another wallet is a transfer or income, never a Reimbursement (ADR-0008).
     func reimbursementMoveInBlocker(into expense: Transaction) -> ReimbursementRuleError? {
         guard deletedAt == nil, category?.type == .income, category?.isTransferHalf != true, !isBalanceAdjustment,
               amountCents > 0

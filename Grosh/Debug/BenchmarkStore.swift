@@ -15,7 +15,6 @@ enum BenchmarkStore {
         return try ModelContainer(for: GroshStore.schema, configurations: configuration)
     }
 
-    /// Makes the store at `url` unless it is there already, made today.
     static func prepare(at url: URL, years: Int) throws {
         let stamp = url.appendingPathExtension("made")
         let today = String(CalendarDay.today.rawValue)

@@ -152,7 +152,6 @@ extension ExpectedReimbursement {
         return expense.note.isEmpty ? expense.categoryName : expense.note
     }
 
-    /// The Person's name.
     var personName: String { person?.name ?? "" }
 }
 

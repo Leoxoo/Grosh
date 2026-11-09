@@ -16,7 +16,6 @@ nonisolated struct WalletDraft {
         self.currencyCode = currencyCode
     }
 
-    /// The wallet's current fields, ready to edit.
     @MainActor init(_ wallet: Wallet) {
         name = wallet.name
         symbolName = wallet.symbolName
@@ -27,7 +26,6 @@ nonisolated struct WalletDraft {
 
     fileprivate var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
-    /// Checks the draft against the wallet rules before anything is saved.
     func validate() throws {
         guard !trimmedName.isEmpty else { throw WalletRuleError.missingName }
     }
@@ -94,7 +92,6 @@ extension Wallet {
         return wallet
     }
 
-    /// Saves an edited draft. Nothing changes when the draft breaks a wallet rule.
     func update(with draft: WalletDraft) throws {
         try draft.validate()
         apply(draft)

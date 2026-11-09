@@ -18,7 +18,6 @@ struct TransactionRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        // At the accessibility text sizes the amounts go under the name, where they have the row's full width.
         let stacks = dynamicTypeSize.isAccessibilitySize
         HStack(alignment: stacks ? .top : .center, spacing: 12) {
             CategoryIcon(category: transaction.category, subscriptionIcon: transaction.recurring?.subscriptionIcon)

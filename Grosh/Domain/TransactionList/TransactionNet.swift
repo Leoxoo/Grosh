@@ -23,7 +23,7 @@ nonisolated extension Sequence where Element == Transaction {
 }
 
 /// Which amount a list shows for each transaction and adds up: its net, Reimbursements counted, as every list shows it;
-/// or what its Card was charged, as a Card's statement shows it, so the statement reconciles with the Card (ADR 0008);
+/// or what its Card was charged, as a Card's statement shows it, so the statement reconciles with the Card (ADR-0008);
 /// or, in the Total, its net less what was paid back into other wallets in the Total, which that list leaves out
 /// (ADR-0010).
 nonisolated enum ListedAmount: Sendable {

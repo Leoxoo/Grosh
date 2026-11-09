@@ -36,7 +36,6 @@ final class Wallet {
         set { colorName = newValue.rawValue }
     }
 
-    /// Whether the wallet is in Recently Deleted.
     var isInRecentlyDeleted: Bool { deletedAt != nil }
 }
 

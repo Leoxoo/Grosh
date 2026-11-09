@@ -144,7 +144,6 @@ nonisolated struct RecurringDraft {
         untilDay = startDay.adding(days: 365)
     }
 
-    /// The Recurring transaction's current fields, ready to edit.
     init(editing recurring: RecurringTransaction) {
         let schedule = recurring.schedule
         self.init(startDay: schedule.start)
@@ -216,7 +215,6 @@ nonisolated struct RecurringDraft {
         RepeatSchedule(start: startDay, rule: rule, end: end, monthlyDay: monthlyDay)
     }
 
-    /// Checks the draft against the Recurring transaction rules before anything is saved.
     func validate() throws {
         guard !trimmedName.isEmpty else { throw RecurringRuleError.missingName }
         guard wallet != nil else { throw RecurringRuleError.missingWallet }
@@ -237,8 +235,8 @@ nonisolated struct RecurringDraft {
 }
 
 extension RecurringTransaction {
-    /// Adds a Recurring transaction and saves it. Occurrences dated `today` or earlier are not made here: they are
-    /// dealt with as the editor's start-date prompt picks them, see ``unenteredOccurrences(through:)``. Saves.
+    /// Adds a Recurring transaction. Occurrences dated `today` or earlier are not made here: they are skipped, and the
+    /// editor's start-date prompt offers them (``unenteredOccurrences(through:)``). Saves.
     @discardableResult
     @MainActor
     static func create(
@@ -253,8 +251,7 @@ extension RecurringTransaction {
         return recurring
     }
 
-    /// Saves an edited draft. Edits change only the occurrences still to come: nothing already made is touched.
-    /// Nothing changes when the draft breaks a rule. Saves.
+    /// Edits change only the occurrences still to come: nothing already made is touched. Saves.
     @MainActor
     func update(with draft: RecurringDraft, today: CalendarDay) throws {
         try draft.validate()

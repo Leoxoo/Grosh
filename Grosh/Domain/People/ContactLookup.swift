@@ -62,8 +62,8 @@ nonisolated enum ContactsAccess: Hashable, Sendable {
 }
 
 /// Where Grosh reads the user's Contacts: the Contacts framework in the app, a stand-in in tests. A Person links to a
-/// contact by its identifier alone (ADR-0009). It is also how a later feature resolves that identifier to the contact's
-/// current phone number (``contact(withIdentifier:)``).
+/// contact by its identifier alone (ADR-0009), which Text them resolves to the contact's current phone number
+/// (``contact(withIdentifier:)``, ``TextReminder/phone(using:)``).
 protocol ContactLookup {
     /// What the user has allowed right now, without asking.
     var access: ContactsAccess { get }

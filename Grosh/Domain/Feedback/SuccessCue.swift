@@ -2,7 +2,7 @@ import Foundation
 
 /// The sound and haptic that play together when a new Expense or Income is saved from the Add Transaction sheet: the
 /// chime picked in Settings → Sounds & Haptics, ending the Income way or the Expense way. Each chime ships as a note
-/// list beside the two sounds rendered from it (ADR 0006), and its haptic is made from the very same notes
+/// list beside the two sounds rendered from it (ADR-0006), and its haptic is made from the very same notes
 /// (``SuccessCue/Haptic``), so the two match by construction.
 nonisolated enum SuccessCue {
     /// One of the chimes the user can pick for the cue. All three ship for now.
@@ -75,7 +75,6 @@ nonisolated enum SuccessCue {
 }
 
 extension SuccessCue.NoteList {
-    /// Reads a note list from its JSON file's contents.
     nonisolated init(json: Data) throws {
         self = try JSONDecoder().decode(Self.self, from: json)
     }

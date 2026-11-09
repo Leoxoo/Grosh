@@ -42,7 +42,6 @@ nonisolated protocol ValidatedDraft {
 }
 
 nonisolated extension ValidatedDraft {
-    /// The draft checked against its rules.
     var check: RuleCheck { RuleCheck(validate) }
 
     /// Whether every rule passes, so Save can be enabled.

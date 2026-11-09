@@ -103,7 +103,6 @@ nonisolated struct TransactionDraft {
         self.day = day
     }
 
-    /// The transaction as it is, to edit.
     @MainActor init(editing transaction: Transaction) {
         self.init(copying: transaction, day: transaction.day)
         eventName = transaction.eventName
@@ -200,7 +199,6 @@ extension TransactionRuleError: LocalizedError {
 }
 
 nonisolated extension TransactionDraft {
-    /// Checks the draft against the transaction rules before anything is saved.
     func validate() throws {
         guard wallet != nil else { throw TransactionRuleError.missingWallet }
         guard amount.cents > 0 else { throw TransactionRuleError.missingAmount }

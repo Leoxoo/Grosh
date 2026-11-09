@@ -7,7 +7,6 @@ nonisolated struct ReimbursementDraft {
     var day: CalendarDay
     var note = ""
 
-    /// The entry as it is now, ready to edit.
     init(editing reimbursement: Reimbursement) {
         amount = reimbursement.amount
         day = reimbursement.day
@@ -20,7 +19,6 @@ nonisolated struct ReimbursementDraft {
         self.note = note
     }
 
-    /// Checks the draft against the Reimbursement rules before anything is saved.
     func validate() throws {
         guard amount.cents > 0 else { throw ReimbursementRuleError.missingAmount }
     }
@@ -118,7 +116,6 @@ extension Reimbursement {
         expense.recountReimbursements()
     }
 
-    /// Saves an edited draft. Nothing changes when the draft breaks a Reimbursement rule.
     func update(with draft: ReimbursementDraft) throws {
         try draft.validate()
         apply(draft)

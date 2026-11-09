@@ -3,8 +3,8 @@ import SwiftData
 import SwiftUI
 
 /// Every transaction outside Recently Deleted (``Transaction/notDeleted``), as `@Query(Transaction.notDeleted)` gives
-/// them, for the screens that need them all: Home's balances, the Transactions tab, search and Link Existing. Its
-/// projected value holds their ``LedgerEntry``s, for adding balances up.
+/// them, for the screens that need them all, such as Home's balances, the Transactions tab, the Report, search and Link
+/// Existing. Its projected value holds their ``LedgerEntry``s, for adding balances up.
 ///
 /// They are read from the store once for the view's model context and then kept in step with each of its saves: a
 /// transaction saved new or brought back from Recently Deleted joins them, and one moved there or removed for good leaves.

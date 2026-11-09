@@ -41,7 +41,6 @@ extension TransferRuleError: LocalizedError {
 }
 
 nonisolated extension TransferDraft {
-    /// Checks the draft against the transfer rules before anything is saved.
     func validate() throws {
         guard let from else { throw TransferRuleError.missingSourceWallet }
         guard let to else { throw TransferRuleError.missingDestinationWallet }

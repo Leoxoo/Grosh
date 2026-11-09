@@ -17,7 +17,6 @@ struct PhotoCropView: View {
     @GestureState private var dragTranslation = CGSize.zero
     @GestureState private var pinchFactor: CGFloat = 1
 
-    /// The window's width in points, and its height in the shape's proportions.
     private var windowWidth: CGFloat { shape == .appIcon ? 260 : 300 }
     private var windowHeight: CGFloat { windowWidth / shape.aspect }
 

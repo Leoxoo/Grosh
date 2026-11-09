@@ -9,7 +9,6 @@ nonisolated protocol ForgivenMarked: AnyObject {
 }
 
 nonisolated extension ForgivenMarked {
-    /// The day it was forgiven on, or `nil` while it isn't.
     var forgivenDay: CalendarDay? {
         get { forgivenDayRaw.map(CalendarDay.init(rawValue:)) }
         set { forgivenDayRaw = newValue?.rawValue }

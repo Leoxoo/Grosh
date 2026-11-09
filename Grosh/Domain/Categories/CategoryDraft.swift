@@ -25,7 +25,6 @@ struct CategoryDraft {
         self.ownKind = ownKind
     }
 
-    /// The category's current fields, ready to edit.
     init(_ category: Category) {
         self.init(
             name: category.name,

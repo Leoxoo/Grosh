@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 /// Deletes a transaction after asking how: a plain confirmation for a transaction on its own, or whether to
-/// delete its related transactions too. Every delete goes through ``Transaction/delete(_:in:)``.
+/// delete its related transactions too. Every delete goes through ``Swift/Collection/delete(_:in:at:)``.
 struct TransactionDeleteButton: View {
     let transaction: Transaction
     /// Called once the transaction is gone, so the screen showing it can close.
@@ -26,7 +26,7 @@ struct TransactionDeleteButton: View {
 
 extension View {
     /// Asks how to delete the transactions of `prompt` while it is set, then deletes them through
-    /// ``Swift/Collection/delete(_:in:)`` and calls `didDelete`.
+    /// ``Swift/Collection/delete(_:in:at:)`` and calls `didDelete`.
     func transactionDeleteDialog(
         _ prompt: Binding<TransactionDeletePrompt?>,
         didDelete: @escaping () -> Void

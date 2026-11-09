@@ -27,7 +27,6 @@ nonisolated struct LedgerEntry: DatedAmount {
         netCents = transaction.netCents
     }
 
-    /// Whether `other` holds the same wallet, day and net amount.
     func hasSameFigures(as other: LedgerEntry) -> Bool {
         wallet === other.wallet && dayRaw == other.dayRaw && netCents == other.netCents
     }

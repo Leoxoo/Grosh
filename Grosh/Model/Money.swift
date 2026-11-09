@@ -2,7 +2,8 @@ import Foundation
 
 /// An exact amount of money in minor units (cents). Never stored or computed as a floating-point number.
 nonisolated struct Money: Hashable, Sendable, Codable {
-    /// The only currency offered for now; each wallet stores its own code so more can follow.
+    /// The currency a new wallet starts in until the user picks another in Settings → Currency (``AppSettings``).
+    /// Each wallet stores its own code.
     static let defaultCurrencyCode = "USD"
 
     var cents: Int
