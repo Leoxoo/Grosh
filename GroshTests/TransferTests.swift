@@ -262,7 +262,7 @@ struct TransferTests {
         let transfer = try Transfer.create(draft(250_00), in: context)
 
         #expect(try transfer.incoming.deleteScopes(in: context) == [.withRelated, .onlySelected])
-        #expect(TransactionDeleteScope.withRelated.buttonTitle(relatedCount: 1) == "Delete Both")
+        #expect(TransactionDeleteScope.withRelated.buttonTitle(selectedCount: 1, relatedCount: 1) == "Delete Both")
     }
 
     @Test func deletingBothHalvesUndoesTheTransfer() throws {
