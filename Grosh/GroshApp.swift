@@ -37,23 +37,20 @@ struct GroshApp: App {
                 .onChange(of: scenePhase, initial: true) { _, phase in
                     // Items in Recently Deleted that have waited 30 days are removed for good, and Recurring transactions
                     // make the days that came due while the app was closed, whenever the app opens or comes back to the
-                    // foreground; nothing runs in the background.
+                    // foreground; nothing runs in the background. The day moves on first, in case it changed meanwhile.
                     if phase == .active {
+                        let today = refreshToday()
                         Signpost.interval("Launch") {
                             Log.store.attempt("Removing what Recently Deleted kept for good") {
                                 try RecentlyDeleted.purgeExpired(in: container.mainContext)
                             }
                             Log.recurring.attempt("Making the Recurring transactions that came due") {
-                                try RecurringTransaction.catchUp(in: container.mainContext)
+                                try RecurringTransaction.catchUp(through: today, in: container.mainContext)
                             }
                         }
                     }
                 }
                 .environment(\.today, today)
-                // A day that changed while the app was in the background.
-                .onChange(of: scenePhase) { _, phase in
-                    if phase == .active { refreshToday() }
-                }
                 // Midnight passing while the app is open.
                 .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
                     refreshToday()
@@ -65,9 +62,11 @@ struct GroshApp: App {
         }
     }
 
-    /// Moves `today` on to the real day when it has changed.
-    private func refreshToday() {
+    /// Moves `today` on to the real day when it has changed, and returns it.
+    @discardableResult
+    private func refreshToday() -> CalendarDay {
         let now = CalendarDay.today
         if now != today { today = now }
+        return now
     }
 }

@@ -175,7 +175,7 @@ struct RecentlyDeletedTests {
         #expect(throws: RecentlyDeletedError.deletedWithWallet) { try salary.restore() }
         #expect(throws: RecentlyDeletedError.deletedWithWallet) { try salary.deleteForever(in: context) }
 
-        try checking.restore()
+        try checking.restore(today: today)
 
         #expect(!checking.isInRecentlyDeleted)
         #expect(!salary.isInRecentlyDeleted)
@@ -193,7 +193,7 @@ struct RecentlyDeletedTests {
         #expect(coffee.restoreBlocker == .walletIsDeleted)
         #expect(throws: RecentlyDeletedError.walletIsDeleted) { try coffee.restore() }
 
-        try checking.restore()
+        try checking.restore(today: today)
 
         #expect(coffee.isInRecentlyDeleted)
         #expect(checking.balance(asOf: today) == Money(cents: 100_00))
@@ -209,7 +209,7 @@ struct RecentlyDeletedTests {
         try checking.delete(at: deletedAt)
         #expect(chase.isPaidFromDeletedWallet)
 
-        try checking.restore()
+        try checking.restore(today: today)
         #expect(!chase.isPaidFromDeletedWallet)
 
         try checking.delete(at: deletedAt)
@@ -281,6 +281,6 @@ struct RecentlyDeletedTests {
 
         #expect(throws: RecentlyDeletedError.notDeleted) { try coffee.restore() }
         #expect(throws: RecentlyDeletedError.notDeleted) { try coffee.deleteForever(in: context) }
-        #expect(throws: RecentlyDeletedError.notDeleted) { try checking.restore() }
+        #expect(throws: RecentlyDeletedError.notDeleted) { try checking.restore(today: today) }
     }
 }

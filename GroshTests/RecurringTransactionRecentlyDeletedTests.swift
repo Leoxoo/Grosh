@@ -85,7 +85,7 @@ struct RecurringTransactionRecentlyDeletedTests {
         try store.wallet.delete(at: day(2026, 10, 14).date())
 
         #expect(recurring.restoreBlocker == .walletIsDeleted)
-        #expect(throws: RecentlyDeletedError.walletIsDeleted) { try recurring.restore() }
+        #expect(throws: RecentlyDeletedError.walletIsDeleted) { try recurring.restore(today: today) }
     }
 
     // MARK: Wallets
@@ -98,7 +98,7 @@ struct RecurringTransactionRecentlyDeletedTests {
 
         #expect(recurring.deletedWithWallet)
         #expect(recurring.restoreBlocker == .deletedWithWallet)
-        #expect(throws: RecentlyDeletedError.deletedWithWallet) { try recurring.restore() }
+        #expect(throws: RecentlyDeletedError.deletedWithWallet) { try recurring.restore(today: today) }
         #expect(try RecentlyDeleted(in: context).recurring.isEmpty)
         #expect(store.wallet.recurringDeletedWithIt == [recurring])
 
