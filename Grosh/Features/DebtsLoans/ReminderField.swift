@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// A Loan's or Debt's reminder: a switch, and once it is on, the day a notification arrives. Once the first reminder
-/// is saved, the app asks to send notifications (``SwiftUI/View/syncsDebtReminders()``) and schedules it as soon as
-/// the user allows them. Use inside a `Form` or `List`.
+/// A Loan's, Debt's or Owes me's reminder: a switch, and once it is on, the day a notification arrives. Once the first
+/// reminder is saved, the app asks to send notifications (``SwiftUI/View/syncsDebtReminders()`` and
+/// ``SwiftUI/View/syncsExpectedReimbursementReminders()``) and schedules it as soon as the user allows them. Use inside
+/// a `Form` or `List`.
 struct ReminderField: View {
     @Binding var day: CalendarDay?
     /// The day switching the reminder on starts at: a week from today for a Loan or Debt; an Owes me passes a week after

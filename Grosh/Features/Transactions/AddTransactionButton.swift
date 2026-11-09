@@ -39,6 +39,12 @@ private struct AddTransactionButtonPlacement: ViewModifier {
     func body(content: Content) -> some View {
         let inToolbar = dynamicTypeSize.isAccessibilitySize
         content
+            #if os(macOS)
+            // The 56pt circle, its 16pt padding, and a 16pt gap above the last row. Room in the list's safe area
+            // rather than content margins, which would reach every scroll view in the list too, such as the period
+            // strip; the button, over it, keeps its own place in the corner.
+            .safeAreaPadding(.bottom, 88)
+            #endif
             .overlay(alignment: .bottomTrailing) {
                 if !inToolbar {
                     AddTransactionButton()
@@ -56,9 +62,5 @@ private struct AddTransactionButtonPlacement: ViewModifier {
                     }
                 }
             }
-            #if os(macOS)
-            // The 56pt circle, its 16pt padding, and a 16pt gap above the last row.
-            .contentMargins(.bottom, 88, for: .scrollContent)
-            #endif
     }
 }

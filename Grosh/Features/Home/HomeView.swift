@@ -4,9 +4,6 @@ import SwiftUI
 /// The Home tab: the Total, the user's wallets, the Month graph with its Spent and Income tabs, and the coming-soon
 /// cards. Its toolbar opens search and the bell of due Loan and Debt reminders.
 struct HomeView: View {
-    /// Remembers across launches whether the Total is hidden.
-    static let isTotalHiddenKey = "home.isTotalHidden"
-
     @Environment(\.today) private var today
 
     var body: some View {
@@ -20,7 +17,7 @@ private struct HomeContent: View {
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     /// What the Total and the wallets' balances add up.
     @NotDeletedTransactions private var transactions: [Transaction]
-    @AppStorage(HomeView.isTotalHiddenKey) private var isTotalHidden = false
+    @AppStorage(AppSettings.isTotalHiddenKey) private var isTotalHidden = AppSettings.isTotalHiddenDefault
     @Environment(\.today) private var today
     /// The month Home's Month graph shows, which the Report opens on.
     @State private var monthPeriod: Period

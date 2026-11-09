@@ -1,4 +1,5 @@
 import Contacts
+import os
 
 /// Reads the user's Contacts with the Contacts framework. Only the name and phone numbers of each contact are fetched,
 /// and fetching runs off the main actor (ADR-0009).
@@ -14,7 +15,13 @@ struct SystemContacts: ContactLookup {
     }
 
     func requestAccess() async -> ContactsAccess {
-        _ = try? await CNContactStore().requestAccess(for: .contacts)
+        do {
+            _ = try await CNContactStore().requestAccess(for: .contacts)
+        } catch {
+            // The Contacts framework throws when the user says no as well as when asking fails, and the user's answer
+            // is read back from the status either way.
+            Log.contacts.failed("Asking for Contacts access", error, expected: true)
+        }
         return access
     }
 
@@ -42,7 +49,9 @@ private nonisolated enum ContactsReader {
         let request = CNContactFetchRequest(keysToFetch: keys)
         request.sortOrder = .userDefault
         var found: [CNContact] = []
-        try? CNContactStore().enumerateContacts(with: request) { contact, _ in found.append(contact) }
+        Log.contacts.attempt("Reading every contact") {
+            try CNContactStore().enumerateContacts(with: request) { contact, _ in found.append(contact) }
+        }
         return found.compactMap(read)
     }
 
@@ -50,7 +59,9 @@ private nonisolated enum ContactsReader {
     @concurrent
     static func contacts(withIdentifiers identifiers: [String]) async -> [Contact] {
         let predicate = CNContact.predicateForContacts(withIdentifiers: identifiers)
-        let found = (try? CNContactStore().unifiedContacts(matching: predicate, keysToFetch: keys)) ?? []
+        let found = Log.contacts.attempt("Reading the contacts people are linked to") {
+            try CNContactStore().unifiedContacts(matching: predicate, keysToFetch: keys)
+        } ?? []
         return found.compactMap(read)
     }
 

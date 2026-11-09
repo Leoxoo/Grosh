@@ -12,6 +12,7 @@ One subsystem, `Leoxo.Grosh` (the bundle identifier), and a category per area:
 | `Import` | `Log.importing` | Import from MoneyLover. |
 | `Recurring` | `Log.recurring` | Recurring transactions: making what came due, and saving them. |
 | `Reminders` | `Log.reminders` | Scheduling Loan, Debt and Estimated-amount reminders, and saving a Loan's or Debt's reminder day. |
+| `Contacts` | `Log.contacts` | Asking for Contacts access and reading contacts for With. |
 | `Reports` | `Log.reports` | The Report. Nothing logs here yet. |
 
 In a `catch`, `Log.store.failed("Saving a transaction", error)`. Where a `try?` dropped the error, `Log.store.attempt("Reading every transaction") { try … } ?? []` gives the same value and logs why it failed. Log only on save, fetch, import and reminder paths, never in a row, a per-transaction loop or anything that runs per frame.

@@ -138,11 +138,6 @@ private struct AmountBoundField: View {
 
     /// `amount` on the Keypad, with a bound of zero shown as 0 rather than as any.
     private static func entry(for amount: Money?) -> AmountEntry {
-        guard let amount else { return AmountEntry() }
-        var entry = AmountEntry(cents: amount.cents)
-        if amount.cents == 0 {
-            entry.press(.digit(0))
-        }
-        return entry
+        amount.map { AmountEntry(showing: $0.cents) } ?? AmountEntry()
     }
 }

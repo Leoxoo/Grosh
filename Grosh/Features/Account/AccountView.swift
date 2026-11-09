@@ -57,7 +57,11 @@ struct AccountView: View {
                 }
 
                 Section {
-                    RecurringTransactionsRow()
+                    NavigationLink {
+                        RecurringTransactionsView()
+                    } label: {
+                        Label(Strings.Screens.recurringTransactions, systemImage: "repeat")
+                    }
                 }
             }
             .navigationTitle(Strings.Screens.account)

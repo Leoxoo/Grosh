@@ -10,8 +10,8 @@ enum LoanOrDebtAction: Hashable, Identifiable {
 
 /// The transaction detail's section for a Loan or Debt: its story (what was lent or borrowed, paid back and
 /// forgiven), what is outstanding, Record Payment, Forgive the Rest and the reminder, or that it is settled, or
-/// forgiven with Un-forgive. Shows nothing for any other transaction. Use inside a `List`, with
-/// ``SwiftUI/View/loanOrDebtSheets(for:action:)`` on the screen to present what `action` opens.
+/// forgiven with Un-forgive. Shows nothing for any other transaction. Use inside a `List`, with the screen presenting
+/// ``LoanOrDebtAction/sheet(for:)`` for what `action` opens.
 struct LoanOrDebtSection: View {
     let transaction: Transaction
     @Binding var action: LoanOrDebtAction?
@@ -106,15 +106,14 @@ private struct ForgivenRows: View {
     }
 }
 
-extension View {
-    /// Presents Record Payment or Forgive the Rest for `transaction` while `action` says which. Attach to the screen,
-    /// outside its `List`, so presenting doesn't depend on the list's rows.
-    func loanOrDebtSheets(for transaction: Transaction, action: Binding<LoanOrDebtAction?>) -> some View {
-        sheet(item: action) { action in
-            switch action {
-            case .recordPayment: RecordPaymentEditor(original: transaction)
-            case .forgive: ForgiveEditor(original: transaction)
-            }
+extension LoanOrDebtAction {
+    /// The sheet this opens for `transaction`: Record Payment or Forgive the Rest. Present it from the screen, outside
+    /// its `List`, so presenting doesn't depend on the list's rows.
+    @ViewBuilder
+    func sheet(for transaction: Transaction) -> some View {
+        switch self {
+        case .recordPayment: RecordPaymentEditor(original: transaction)
+        case .forgive: ForgiveEditor(original: transaction)
         }
     }
 }

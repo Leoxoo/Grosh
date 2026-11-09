@@ -6,11 +6,6 @@ import SwiftData
 nonisolated enum DebtsLoansGrouping: String, Hashable, Sendable {
     case people
     case loanOrDebt
-
-    /// Where the choice is kept.
-    static let storageKey = "debtsLoans.grouping"
-    /// The list as it was before Show by people existed.
-    static let `default` = DebtsLoansGrouping.loanOrDebt
 }
 
 /// One Person in Show by people: their Loans, Debts and Expected reimbursements, and what they come to (ADR-0009,

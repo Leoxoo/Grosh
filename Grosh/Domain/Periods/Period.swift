@@ -99,6 +99,15 @@ extension Period {
     nonisolated static func quarterTitle(year: Int, quarter: Int) -> String {
         "Q\(quarter) \(year)"
     }
+
+    /// Stays the period shown while `strip` still offers it; otherwise becomes `current`, the Current period. A strip
+    /// of a wallet with a shorter history, or with the only transaction of its first period gone, may no longer offer
+    /// it.
+    nonisolated mutating func showCurrentPeriod(_ current: Period, unlessOfferedBy strip: [Period]) {
+        if !strip.contains(self) {
+            self = current
+        }
+    }
 }
 
 extension CalendarMonth {

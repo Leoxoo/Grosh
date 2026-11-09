@@ -5,71 +5,22 @@ import SwiftUI
 /// outside Recently Deleted, newest first (``Transaction/reimbursementMoveInBlocker(into:)``). Tapping
 /// one makes its amount, day and note an entry on the Expense, sends it to Recently Deleted, and closes the picker.
 struct ReimbursementMoveInPicker: View {
-    /// The Expense that was paid back.
     let expense: Transaction
 
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @NotDeletedTransactions private var transactions: [Transaction]
-    @State private var filter = TransactionFilter()
-    @State private var errorMessage: String?
-
-    private var candidates: [Transaction] {
-        transactions
-            .filter { $0.canBeMovedIntoReimbursement(of: expense) }
-            .matching(filter)
-            .inListOrder()
-    }
 
     var body: some View {
-        let candidates = candidates
-        NavigationStack {
-            Group {
-                if candidates.isEmpty {
-                    if filter.isOn {
-                        NoMatchingTransactionsView(filter: filter)
-                    } else {
-                        ContentUnavailableView(
-                            Strings.Reimbursements.noTransactionsToMoveIn,
-                            systemImage: "tray",
-                            description: Text(Strings.Reimbursements.noTransactionsToMoveInDescription)
-                        )
-                    }
-                } else {
-                    List(candidates) { transaction in
-                        Button {
-                            moveIn(transaction)
-                        } label: {
-                            TransactionRow(transaction: transaction, showsDay: true, showsWalletIcon: false)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .navigationTitle(Strings.Reimbursements.moveTransactionIn)
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .searchable(text: $filter.searchText, prompt: Strings.Common.searchPrompt)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(Strings.Common.cancel) { dismiss() }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    TransactionFilterButton(filter: $filter)
-                }
-            }
-            .errorAlert(Strings.Reimbursements.couldntMoveIn, message: $errorMessage)
-        }
-    }
-
-    private func moveIn(_ deposit: Transaction) {
-        do {
+        TransactionPickerSheet(
+            Strings.Reimbursements.moveTransactionIn,
+            candidates: transactions.filter { $0.canBeMovedIntoReimbursement(of: expense) },
+            emptyTitle: Strings.Reimbursements.noTransactionsToMoveIn,
+            emptyDescription: Strings.Reimbursements.noTransactionsToMoveInDescription,
+            candidatesShareAWallet: true,
+            errorTitle: Strings.Reimbursements.couldntMoveIn,
+            failure: ("Moving a transaction in", Log.store)
+        ) { deposit in
             try Reimbursement.moveIn(deposit, to: expense, in: context)
-            dismiss()
-        } catch {
-            Log.store.failed("Moving a transaction in", error)
-            errorMessage = error.localizedDescription
         }
     }
 }
