@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 
 /// Fills an empty store with ``DefaultCategories``. Does nothing once any category exists, so a user's edits survive.
@@ -10,43 +11,60 @@ enum CategorySeeder {
         try context.save()
     }
 
-    /// Puts back what an upgrade from an older build can lose. Older builds stored a category's type, icon and locked
-    /// role under other names, and an upgrade that didn't carry them over left every category an Expense with a
-    /// question-mark icon and no locked role, so wallets and imports couldn't find their Starting balance or Other
-    /// Income. A healthy store always has Income and Debt/Loan categories, so only a store with none of them gets its
-    /// types back, by name from the seeded tree. A locked category keeps its seeded name, and an icon is only replaced
-    /// while it is still the placeholder. Runs on every launch and changes nothing once the store is complete. Saves
-    /// when it changed something.
+    /// Gives the store every locked category the app depends on, and repairs a store an older build's upgrade broke.
+    /// Run at every open, after ``seedIfNeeded(in:)``; on a complete store it reads the locked categories and changes
+    /// nothing. Saves when it changed something.
     static func restoreMissingDefaults(in context: ModelContext) throws {
-        var categories = try context.fetch(FetchDescriptor<Category>())
+        try repairLostUpgrade(in: context)
+        try addMissingLockedCategories(in: context)
+        if context.hasChanges {
+            try context.save()
+        }
+    }
+
+    /// The one-time repair of a store upgraded by a build that dropped three of a category's fields. Older builds kept
+    /// a category's type, icon and locked role under other names (``Category`` now reads them through
+    /// `originalName`), and that upgrade left every category an Expense with the placeholder icon and no locked role,
+    /// so wallets and imports couldn't find their Starting balance or Other Income. Only a store with no locked role
+    /// at all is one of those: the repair gives the roles back (``addMissingLockedCategories(in:)``), so it never runs
+    /// on that store again. Types come back by name from the seeded tree while every category is an Expense, and an
+    /// icon only while it is still the placeholder, so a choice the user made since is kept.
+    private static func repairLostUpgrade(in context: ModelContext) throws {
+        guard try context.fetchCount(FetchDescriptor<Category>(predicate: #Predicate { $0.lockedRoleRaw != nil })) == 0
+        else { return }
+        let categories = try context.fetch(FetchDescriptor<Category>())
         let seeds = allSeeds(in: DefaultCategories.tree)
-        var changed = false
         if !categories.isEmpty, categories.allSatisfy({ $0.type == .expense }) {
             for category in categories {
                 if let seed = seeds.first(where: { $0.name == category.name }), seed.type != category.type {
                     category.type = seed.type
-                    changed = true
                 }
             }
         }
         for seed in seeds {
-            let matches = categories.filter { $0.name == seed.name && $0.type == seed.type }
-            for category in matches where category.symbolName == "questionmark" {
+            for category in categories
+            where category.name == seed.name && category.type == seed.type && category.symbolName == "questionmark" {
                 category.symbolName = seed.symbolName
-                changed = true
             }
-            guard let role = seed.lockedRole, !categories.contains(where: { $0.lockedRole == role }) else { continue }
-            if let match = matches.first {
+        }
+    }
+
+    /// Gives each locked role a category: one the store lacks, as a store from before that role existed does, goes to
+    /// the category of the role's seeded name and type, or else to a new one as seeded.
+    private static func addMissingLockedCategories(in context: ModelContext) throws {
+        let locked = try context.fetch(FetchDescriptor<Category>(predicate: #Predicate { $0.lockedRoleRaw != nil }))
+        let missing = Set(LockedRole.allCases).subtracting(locked.compactMap(\.lockedRole))
+        guard !missing.isEmpty else { return }
+        var categories = try context.fetch(FetchDescriptor<Category>())
+        for seed in allSeeds(in: DefaultCategories.tree) {
+            guard let role = seed.lockedRole, missing.contains(role) else { continue }
+            if let match = categories.first(where: { $0.name == seed.name && $0.type == seed.type }) {
                 match.lockedRole = role
             } else {
                 let sortOrder = (categories.map(\.sortOrder).max() ?? -1) + 1
                 insert(seed, parent: nil, sortOrder: sortOrder, into: context)
                 categories = try context.fetch(FetchDescriptor<Category>())
             }
-            changed = true
-        }
-        if changed {
-            try context.save()
         }
     }
 
