@@ -17,11 +17,6 @@ extension Card {
         return "\(name) ••\(lastFourDigits)"
     }
 
-    /// The Card's image, decoded for drawing, or `nil` when it has none.
-    var image: CGImage? {
-        imageData.flatMap(CroppedPhoto.image(from:))
-    }
-
     /// A day of the month as people say it: "1st", "22nd", "31st".
     static func ordinalDay(_ day: Int) -> String {
         let formatter = NumberFormatter()

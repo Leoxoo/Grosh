@@ -11,6 +11,8 @@ struct TransactionDaySections<Row: View>: View {
     var isSelected: (Transaction) -> Bool = { _ in false }
     /// What each day's total adds up: the net, or on a Card's statement what the Card was charged.
     var listed = ListedAmount.net
+    /// Whether Scheduled rows show their wallet's icon, as `row` does for a list that mixes wallets.
+    var showsWalletIcon = true
     @ViewBuilder let row: (Transaction) -> Row
 
     var body: some View {
@@ -22,7 +24,7 @@ struct TransactionDaySections<Row: View>: View {
                     NavigationLink {
                         RecurringTransactionDetailView(recurring: occurrence.recurring)
                     } label: {
-                        ScheduledRow(occurrence: occurrence)
+                        ScheduledRow(occurrence: occurrence, showsWalletIcon: showsWalletIcon)
                     }
                 }
             } header: {
