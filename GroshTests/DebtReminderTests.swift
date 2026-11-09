@@ -31,6 +31,11 @@ struct DebtReminderTests {
         return try Transaction.create(draft, in: context)
     }
 
+    /// The Person `original` is with, as a reminder names them.
+    private func personID(of original: Transaction) -> PersistentIdentifier? {
+        original.orderedPeople.first?.persistentModelID
+    }
+
     private func pay(_ cents: Int, on original: Transaction) throws {
         var draft = try DebtPaymentDraft(settling: original, on: today, in: context)
         draft.amount = Money(cents: cents)
@@ -76,12 +81,12 @@ struct DebtReminderTests {
 
         #expect(reminders == [
             DebtReminder(
-                original: anna.persistentModelID, day: today, withName: "Anna", outstanding: Money(cents: 50_00),
-                kind: .debt
+                original: anna.persistentModelID, day: today, person: personID(of: anna), withName: "Anna",
+                outstanding: Money(cents: 50_00), kind: .debt
             ),
             DebtReminder(
-                original: loan.persistentModelID, day: today.adding(days: 5), withName: "Pasha",
-                outstanding: Money(cents: 40_00), kind: .loan
+                original: loan.persistentModelID, day: today.adding(days: 5), person: personID(of: loan),
+                withName: "Pasha", outstanding: Money(cents: 40_00), kind: .loan
             ),
         ])
         #expect(reminders.allSatisfy { $0.arrival == .onItsDay })
@@ -114,7 +119,8 @@ struct DebtReminderTests {
             .requestPermission,
             .replacePending([
                 DebtReminder(
-                    original: loan.persistentModelID, day: today.adding(days: 5), withName: "Pasha",
+                    original: loan.persistentModelID, day: today.adding(days: 5), person: personID(of: loan),
+                    withName: "Pasha",
                     outstanding: Money(cents: 100_00), kind: .loan
                 ),
             ]),

@@ -39,6 +39,16 @@ struct WalletManagementTests {
         #expect(savings.balance(asOf: today) == Money(cents: 1_250_00))
     }
 
+    @Test func aNewWalletStartsInTheCurrencyItsDraftHasAndEditingKeepsIt() throws {
+        var draft = WalletDraft(currencyCode: "EUR")
+        draft.name = "Travel"
+        let travel = try Wallet.create(draft, startingBalance: Money(cents: 0), on: today, in: context)
+
+        #expect(travel.currencyCode == "EUR")
+        #expect(WalletDraft(travel).currencyCode == "EUR")
+        #expect(WalletDraft().currencyCode == "USD")
+    }
+
     @Test func aWalletNeedsAName() throws {
         var draft = WalletDraft()
         draft.name = "  "

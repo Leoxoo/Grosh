@@ -218,7 +218,7 @@ extension RecurringTransaction {
     @discardableResult
     @MainActor
     static func create(
-        _ draft: RecurringDraft, today: CalendarDay = .today, in context: ModelContext
+        _ draft: RecurringDraft, today: CalendarDay, in context: ModelContext
     ) throws -> RecurringTransaction {
         try draft.validate()
         let recurring = RecurringTransaction()
@@ -232,7 +232,7 @@ extension RecurringTransaction {
     /// Saves an edited draft. Edits change only the occurrences still to come: nothing already made is touched.
     /// Nothing changes when the draft breaks a rule. Saves.
     @MainActor
-    func update(with draft: RecurringDraft, today: CalendarDay = .today) throws {
+    func update(with draft: RecurringDraft, today: CalendarDay) throws {
         try draft.validate()
         // What fell due under the old schedule is made under it first, before the edit reshapes what is still to come.
         if let context = modelContext {
@@ -246,7 +246,7 @@ extension RecurringTransaction {
     /// Moves the schedule to Recently Deleted, after making what has fallen due by `today` so no due day is lost. The
     /// transactions it made stay as ordinary transactions: they lose their link to it. Saves.
     @MainActor
-    func delete(today: CalendarDay = .today, at now: Date = .now, in context: ModelContext) throws {
+    func delete(today: CalendarDay, at now: Date = .now, in context: ModelContext) throws {
         makeDueTransactions(through: today, in: context)
         deletedAt = now
         for transaction in transactions ?? [] {
@@ -349,7 +349,7 @@ extension RecurringTransaction {
     /// consumes or skips nothing: the next occurrence still falls on its day. Throws its ``addBlocker`` rather than
     /// saving nothing. Saves.
     @MainActor
-    func addTransactionNow(today: CalendarDay = .today, in context: ModelContext) throws {
+    func addTransactionNow(today: CalendarDay, in context: ModelContext) throws {
         if let addBlocker { throw addBlocker }
         makeTransaction(on: today, history: estimateHistory, in: context)
         try context.save()
@@ -377,7 +377,7 @@ extension RecurringTransaction {
     /// Makes the transactions that have come due by `today`, for every Recurring transaction, and saves. The app runs
     /// this when it opens or comes back to the foreground, so the due days missed while it was closed are made then.
     @MainActor
-    static func catchUp(through today: CalendarDay = .today, in context: ModelContext) throws {
+    static func catchUp(through today: CalendarDay, in context: ModelContext) throws {
         for recurring in try context.fetch(FetchDescriptor<RecurringTransaction>()) {
             recurring.makeDueTransactions(through: today, in: context)
         }

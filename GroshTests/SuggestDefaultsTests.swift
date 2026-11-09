@@ -32,8 +32,8 @@ struct SuggestDefaultsTests {
     }
 
     @Test func aReminderTurnedOnStartsAWeekFromToday() {
-        #expect(TransactionDefaults.reminderDay(from: today) == CalendarDay(year: 2026, month: 10, day: 16))
-        #expect(TransactionDefaults.reminderDay(from: CalendarDay(year: 2026, month: 12, day: 28))
+        #expect(ReminderDay.default(after: today) == CalendarDay(year: 2026, month: 10, day: 16))
+        #expect(ReminderDay.default(after: CalendarDay(year: 2026, month: 12, day: 28))
             == CalendarDay(year: 2027, month: 1, day: 4))
     }
 

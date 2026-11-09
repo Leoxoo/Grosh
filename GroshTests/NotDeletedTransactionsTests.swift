@@ -99,7 +99,7 @@ struct NotDeletedTransactionsTests {
         try savings.delete()
         #expect(try notes().shared == ["coffee"])
 
-        try savings.restore()
+        try savings.restore(today: today)
         #expect(try notes().shared == ["coffee", "interest"])
 
         try savings.delete()

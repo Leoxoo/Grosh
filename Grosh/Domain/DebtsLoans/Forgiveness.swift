@@ -69,8 +69,7 @@ extension Forgiveness {
             guard let category = draft.category else { throw TransactionRuleError.missingCategory }
             let original = current.original
             original.forgivenCents = (original.forgivenCents ?? 0) + current.outstanding.cents
-            original.forgivenDay = draft.day
-            original.forgivenNote = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
+            original.markForgiven(on: draft.day, note: draft.note)
             original.forgivenCategory = category
             guard let forgiveness = original.forgiveness else { throw DebtLoanRuleError.notALoanOrDebt }
             return forgiveness
@@ -91,21 +90,14 @@ extension Transaction {
     /// Whether this Loan or Debt was forgiven.
     var isForgiven: Bool { forgivenCents != nil }
 
-    /// The day this Loan or Debt was forgiven on, or `nil` while it isn't forgiven.
-    var forgivenDay: CalendarDay? {
-        get { forgivenDayRaw.map(CalendarDay.init(rawValue:)) }
-        set { forgivenDayRaw = newValue?.rawValue }
-    }
-
     /// Takes the Forgiven mark off this Loan or Debt, so what was forgiven is outstanding again and stops counting in
     /// reports. Its payments stay as they are. Saves.
     func unforgive() throws {
         guard isLoanOrDebt else { throw DebtLoanRuleError.notALoanOrDebt }
         guard isForgiven else { throw DebtLoanRuleError.notForgiven }
         forgivenCents = nil
-        forgivenDay = nil
-        forgivenNote = ""
         forgivenCategory = nil
+        clearForgivenMark()
         try modelContext?.save()
     }
 }

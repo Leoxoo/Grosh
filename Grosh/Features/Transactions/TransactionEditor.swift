@@ -59,9 +59,9 @@ private struct TransactionForm: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
-    @AppStorage(SoundsAndHaptics.soundsKey) private var soundsOn = SoundsAndHaptics.defaultIsOn
-    @AppStorage(SoundsAndHaptics.hapticsKey) private var hapticsOn = SoundsAndHaptics.defaultIsOn
-    @AppStorage(SoundsAndHaptics.chimeKey) private var chime = SuccessCue.Chime.default
+    @AppStorage(AppSettings.soundsKey) private var soundsOn = AppSettings.soundsDefault
+    @AppStorage(AppSettings.hapticsKey) private var hapticsOn = AppSettings.hapticsDefault
+    @AppStorage(AppSettings.chimeKey) private var chime = AppSettings.chimeDefault
 
     @State private var draft: TransactionDraft
     @State private var entry: AmountEntry
@@ -217,8 +217,8 @@ private struct TransactionForm: View {
         SuccessCuePlayer.shared.play(
             chime,
             ending: ending,
-            sound: SoundsAndHaptics.playsSounds(on: .current, soundsOn: soundsOn),
-            haptic: SoundsAndHaptics.playsHaptics(on: .current, hapticsOn: hapticsOn)
+            sound: SoundsAndHaptics.plays(on: .current, isOn: soundsOn),
+            haptic: SoundsAndHaptics.plays(on: .current, isOn: hapticsOn)
         )
     }
 }

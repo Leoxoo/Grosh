@@ -68,7 +68,7 @@ private struct OwesMeRow: View {
         }
         .onChange(of: amountEntry) { entry.amount = Self.amount(typed: amountEntry, currencyCode: currencyCode) }
         ReminderField(
-            day: $entry.reminderDay, turnsOnAt: ExpectedReimbursement.defaultReminderDay(expenseOn: expenseDay)
+            day: $entry.reminderDay, turnsOnAt: ReminderDay.default(after: expenseDay)
         )
         if let remove {
             Button("Remove Owes Me", systemImage: "minus.circle", role: .destructive, action: remove)

@@ -73,12 +73,12 @@ struct ExpectedReimbursementDetailView: View {
                 Section {
                     Button("Record Payment", systemImage: "plus.circle") { isRecordingPayment = true }
                     if expectation.hasOpenAmount {
-                        Button("Close", systemImage: "checkmark.circle") { perform { try expectation.close() } }
+                        Button("Close", systemImage: "checkmark.circle") { perform { try expectation.close(on: today) } }
                     }
                     Button("Forgive", systemImage: "hand.raised") { isForgiving = true }
-                    ReminderField(day: reminderDay, turnsOnAt: ExpectedReimbursement.defaultReminderDay(
-                        expenseOn: expectation.expense?.day ?? .today
-                    ))
+                    ReminderField(
+                        day: reminderDay, turnsOnAt: ReminderDay.default(after: expectation.expense?.day ?? today)
+                    )
                 }
             }
 

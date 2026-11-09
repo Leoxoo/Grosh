@@ -204,7 +204,7 @@ extension Wallet {
     /// Transactions deleted on their own before it stay in the bin. Its Recurring transactions skip what fell due while
     /// it was away, so nothing is backfilled. Saves.
     @MainActor
-    func restore(today: CalendarDay = .today) throws {
+    func restore(today: CalendarDay) throws {
         guard isInRecentlyDeleted else { throw RecentlyDeletedError.notDeleted }
         for transaction in transactionsDeletedWithIt {
             transaction.deletedAt = nil
@@ -239,7 +239,7 @@ extension RecurringTransaction {
     /// Brings a schedule deleted on its own back from Recently Deleted, with its settings. What fell due while it was
     /// away is not made: it is skipped through `today`, as saving a schedule today skips the days before it. Saves.
     @MainActor
-    func restore(today: CalendarDay = .today) throws {
+    func restore(today: CalendarDay) throws {
         if let restoreBlocker { throw restoreBlocker }
         skipOccurrences(through: today)
         deletedAt = nil

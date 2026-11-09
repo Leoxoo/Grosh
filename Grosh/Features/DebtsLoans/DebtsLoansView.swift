@@ -155,10 +155,10 @@ struct LoanOrDebtRow: View {
                 Text(loanOrDebt.kind.summary(lentOrBorrowedOn: original.day.date().formatted(date: .abbreviated, time: .omitted)))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                if !loanOrDebt.isSettled, let due = original.reminderDay {
+                if let due = loanOrDebt.openReminderDay {
                     Text("\(Image(systemName: "bell")) \(Text(Strings.DebtsLoans.due(due.date().formatted(date: .abbreviated, time: .omitted))))")
                         .font(.caption)
-                        .foregroundStyle(due <= today ? .urgent : .secondary)
+                        .foregroundStyle(loanOrDebt.isReminderDue(on: today) ? .urgent : .secondary)
                 }
             }
             Spacer(minLength: 8)

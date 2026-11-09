@@ -16,10 +16,10 @@ struct ExpectedReimbursementRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                if expectation.isOpen, let due = expectation.reminderDay {
+                if let due = expectation.openReminderDay {
                     Text("\(Image(systemName: "bell")) Due \(due.date().formatted(date: .abbreviated, time: .omitted))")
                         .font(.caption)
-                        .foregroundStyle(due <= today ? .red : .secondary)
+                        .foregroundStyle(expectation.isReminderDue(on: today) ? .red : .secondary)
                 }
             }
             Spacer(minLength: 8)

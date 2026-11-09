@@ -47,8 +47,8 @@ nonisolated struct TransactionDraft {
     var day: CalendarDay {
         didSet {
             guard day != oldValue else { return }
-            let before = ExpectedReimbursement.defaultReminderDay(expenseOn: oldValue)
-            let after = ExpectedReimbursement.defaultReminderDay(expenseOn: day)
+            let before = ReminderDay.default(after: oldValue)
+            let after = ReminderDay.default(after: day)
             for index in owes.indices where owes[index].reminderDay == before {
                 owes[index].reminderDay = after
             }

@@ -24,7 +24,7 @@ struct Keypad: View {
     /// The top row is shorter than the digit rows, by this much.
     private static let topRowScale: CGFloat = 0.72
 
-    @AppStorage(SoundsAndHaptics.hapticsKey) private var hapticsOn = SoundsAndHaptics.defaultIsOn
+    @AppStorage(AppSettings.hapticsKey) private var hapticsOn = AppSettings.hapticsDefault
 
     var body: some View {
         GeometryReader { geometry in
@@ -115,7 +115,7 @@ struct Keypad: View {
     }
 
     private var playsTicks: Bool {
-        SoundsAndHaptics.playsHaptics(on: .current, hapticsOn: hapticsOn)
+        SoundsAndHaptics.plays(on: .current, isOn: hapticsOn)
     }
 }
 

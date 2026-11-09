@@ -22,7 +22,7 @@ struct ReminderField: View {
         Binding {
             day != nil
         } set: { isOn in
-            day = isOn ? turnsOnAt ?? TransactionDefaults.reminderDay(from: today) : nil
+            day = isOn ? turnsOnAt ?? ReminderDay.default(after: today) : nil
         }
     }
 }
