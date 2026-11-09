@@ -49,6 +49,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, Optional, Union
 
+import message_text
+
 APP_PROCESS = "Grosh"
 RUNTIME_ISSUES_SUBSYSTEM = "com.apple.runtime-issues"
 STEPS_SUBSYSTEM = "Leoxo.GroshUITests"
@@ -368,12 +370,8 @@ def group_messages(messages: list[Message]) -> list[Group]:
 
 def shorten(text: str) -> str:
     """The first line of a message, cut to MAX_MESSAGE characters; … shows there was more."""
-    lines = text.splitlines()
-    line = lines[0].strip() if lines else ""
-    cut = len(lines) > 1
-    if len(line) > MAX_MESSAGE:
-        line, cut = line[:MAX_MESSAGE].rstrip(), True
-    return f"{line} …" if cut else line
+    lines = [line for line in text.splitlines() if line.strip()]
+    return message_text.shorten(message_text.first_line(text), MAX_MESSAGE, more=len(lines) > 1)
 
 
 def render(groups: list[Group]) -> list[str]:

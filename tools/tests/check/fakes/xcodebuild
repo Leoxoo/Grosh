@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Stands in for xcodebuild in tools/tests/check/run.sh. A test run records its arguments in $FAKE_CALLS, prints lines
-# that tools/check must not show, sleeps $FAKE_SLEEP seconds, writes the result bundle (unless $FAKE_NO_BUNDLE is set)
-# writes a crash report into $GROSH_CRASH_REPORTS when $FAKE_CRASH_REPORT is set, another process's report when
-# $FAKE_OTHER_CRASH_REPORT is set, shuts the simulator down when
-# $FAKE_SHUT_DOWN is set, and exits $FAKE_EXIT.
+# that tools/check must not show, and then:
+#   sleeps $FAKE_SLEEP seconds;
+#   writes the result bundle, unless $FAKE_NO_BUNDLE is set;
+#   writes a crash report of Grosh into $GROSH_CRASH_REPORTS when $FAKE_CRASH_REPORT is set, or of another process
+#   when $FAKE_OTHER_CRASH_REPORT is set;
+#   shuts the simulator down when $FAKE_SHUT_DOWN is set;
+#   exits $FAKE_EXIT.
 
 if [ "${1:-}" = -version ]; then
     echo "Xcode 26.4"
