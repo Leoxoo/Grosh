@@ -4,9 +4,9 @@ struct WalletSelectorChoices {
     /// One row of the list: what tapping it selects, and that selection's balance today.
     struct Choice: Identifiable {
         let selection: WalletSelection
-        /// The Total's balance, or the wallet's in its own currency: the figure the Wallet selector names once the
-        /// row is selected.
-        let balance: Money
+        /// The Total's balance, per currency, or the wallet's in its own currency: the figure the Wallet selector
+        /// names once the row is selected.
+        let balance: [Money]
 
         var id: WalletSelection { selection }
     }
@@ -18,11 +18,11 @@ struct WalletSelectorChoices {
     /// The unarchived wallets marked not to count in the Total: the "Not in total" section, absent when it is empty.
     let notInTotal: [Choice]
 
-    /// Lists `wallets`, kept in the order given, with their balances on `today`. Archived wallets and those in
-    /// Recently Deleted are left out.
-    init(wallets: [Wallet], asOf today: CalendarDay) {
+    /// Lists `wallets`, kept in the order given, with their `balances`. Archived wallets and those in Recently
+    /// Deleted are left out.
+    init(wallets: [Wallet], balances: WalletBalances) {
         func choice(_ selection: WalletSelection) -> Choice {
-            Choice(selection: selection, balance: selection.balance(asOf: today, wallets: wallets))
+            Choice(selection: selection, balance: balances.balance(of: selection, wallets: wallets))
         }
         let listed = wallets.filter { !$0.isArchived && !$0.isInRecentlyDeleted }
         total = choice(.total)

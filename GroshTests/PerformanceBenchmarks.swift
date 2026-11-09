@@ -129,8 +129,8 @@ struct PerformanceBenchmarks {
         let all = try container.mainContext.fetch(Grosh.Transaction.notDeleted)
         for text in ["Lunch", "12"] {
             time("search for \"\(text)\" and group the results by day") {
-                let results = all.matching(TransactionFilter(searchText: text))
-                _ = TransactionDay.days(of: results, scheduled: [])
+                let listing = TransactionListing.search(all, filter: TransactionFilter(searchText: text))
+                _ = TransactionDay.days(of: listing.transactions, scheduled: [])
             }
         }
     }
@@ -144,12 +144,12 @@ struct PerformanceBenchmarks {
         let old = Period.month(CalendarMonth(today).adding(months: -30))
         let entries = NotDeletedTransactions.Store.of(container.mainContext).entries
         time("Transactions body work for a month 2½ years back") {
-            let filter = TransactionFilter()
-            let selected = filter.transactions(in: .total, from: entries)
-            _ = TimeRange.month.periods(from: selected.firstDay, today: today)
-            let shown = filter.listed(from: all, selected: selected, on: old.days(today: today))
-            _ = PeriodSummary(of: selected, in: old, today: today)
-            _ = TransactionDay.days(of: shown, scheduled: [])
+            let listing = TransactionListing(
+                all, ledger: entries, showing: .total, on: old.days(today: today), filter: TransactionFilter()
+            )
+            _ = TimeRange.month.periods(from: listing.selected.firstDay, today: today)
+            _ = PeriodSummary(of: listing.selected, in: old, today: today)
+            _ = TransactionDay.days(of: listing.transactions, scheduled: [])
         }
         try time("Home Month graph work for a month 2½ years back") {
             let context = container.mainContext

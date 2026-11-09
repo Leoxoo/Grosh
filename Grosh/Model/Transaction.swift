@@ -100,7 +100,7 @@ final class Transaction {
         self.note = note
     }
 
-    var amount: Money { Money(cents: amountCents, currencyCode: wallet?.currencyCode ?? Money.defaultCurrencyCode) }
+    var amount: Money { Money(cents: amountCents, currencyCode: wallet.currencyCodeOrDefault) }
 
     var day: CalendarDay {
         get { CalendarDay(rawValue: dayRaw) }

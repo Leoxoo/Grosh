@@ -103,11 +103,4 @@ struct PersonSearchTests {
         #expect(!filter.hasFilters)
         #expect(filter.searchText == "x")
     }
-
-    @Test func aTransactionMatchesTheFilterThroughTheSingleTransactionCheckToo() {
-        let filter = TransactionFilter(person: olga)
-
-        #expect(filter.matches(lunch))
-        #expect(!filter.matches(dinner))
-    }
 }

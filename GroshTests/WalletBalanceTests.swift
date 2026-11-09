@@ -59,7 +59,7 @@ struct WalletBalanceTests {
         record(100_00, on: today, in: checking)
         record(25_50, on: today, in: cash)
 
-        #expect(Wallet.total(of: [checking, cash], asOf: today) == Money(cents: 125_50))
+        #expect(Wallet.total(of: [checking, cash], asOf: today) == [Money(cents: 125_50)])
     }
 
     @Test func totalLeavesOutWalletsNotIncludedInTheTotal() {
@@ -69,7 +69,7 @@ struct WalletBalanceTests {
         record(100_00, on: today, in: checking)
         record(5_000_00, on: today, in: brokerage)
 
-        #expect(Wallet.total(of: [checking, brokerage], asOf: today) == Money(cents: 100_00))
+        #expect(Wallet.total(of: [checking, brokerage], asOf: today) == [Money(cents: 100_00)])
     }
 
     @Test func totalLeavesOutArchivedWallets() {
@@ -79,7 +79,7 @@ struct WalletBalanceTests {
         record(300_00, on: today, in: oldBank)
         oldBank.isArchived = true
 
-        #expect(Wallet.total(of: [checking, oldBank], asOf: today) == Money(cents: 100_00))
+        #expect(Wallet.total(of: [checking, oldBank], asOf: today) == [Money(cents: 100_00)])
     }
 
     @Test func totalIgnoresTransactionsDatedAfterToday() {
@@ -88,11 +88,11 @@ struct WalletBalanceTests {
         record(100_00, on: today, in: checking)
         record(-40_00, on: CalendarDay(year: 2026, month: 11, day: 1), in: cash)
 
-        #expect(Wallet.total(of: [checking, cash], asOf: today) == Money(cents: 100_00))
+        #expect(Wallet.total(of: [checking, cash], asOf: today) == [Money(cents: 100_00)])
     }
 
     @Test func totalOfNoWalletsIsZero() {
-        #expect(Wallet.total(of: [], asOf: today) == Money(cents: 0))
+        #expect(Wallet.total(of: [], asOf: today) == [Money(cents: 0)])
     }
 
     /// Home and the Wallet selector add every balance up in one pass over the shared ledger entries.
@@ -120,6 +120,6 @@ struct WalletBalanceTests {
         }
         let wallets = [checking, cash, brokerage, empty]
         #expect(balances.total(of: wallets) == Wallet.total(of: wallets, asOf: today))
-        #expect(balances.total(of: wallets) == Money(cents: 112_74))
+        #expect(balances.total(of: wallets) == [Money(cents: 112_74)])
     }
 }

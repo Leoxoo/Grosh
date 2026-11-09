@@ -34,29 +34,10 @@ extension Wallet {
         try ordered.first?.modelContext?.save()
     }
 
-    /// Adds a wallet named `name` with its Starting balance, as ``create(_:startingBalance:on:in:)`` does.
-    @discardableResult
-    static func create(
-        name: String,
-        symbolName: String = WalletDraft().symbolName,
-        color: PaletteColor = WalletDraft().color,
-        includeInTotal: Bool = true,
-        startingBalance: Money,
-        on day: CalendarDay,
-        in context: ModelContext
-    ) throws -> Wallet {
-        var draft = WalletDraft()
-        draft.name = name
-        draft.symbolName = symbolName
-        draft.color = color
-        draft.includeInTotal = includeInTotal
-        return try create(draft, startingBalance: startingBalance, on: day, in: context)
-    }
-
     /// Retires the wallet: it leaves the Total and every picker, but keeps all of its transactions. Its Recurring
     /// transactions pause, after making what has fallen due by `today`, and make nothing until it is unarchived. Saves.
     @MainActor
-    func archive(today: CalendarDay = .today) throws {
+    func archive(today: CalendarDay) throws {
         if let context = modelContext {
             for schedule in recurringTransactions ?? [] {
                 schedule.makeDueTransactions(through: today, in: context)
@@ -69,7 +50,7 @@ extension Wallet {
     /// Brings an archived wallet back into its place in the user's order. Its Recurring transactions resume, and what
     /// fell due while it was archived is not made. Saves.
     @MainActor
-    func unarchive(today: CalendarDay = .today) throws {
+    func unarchive(today: CalendarDay) throws {
         isArchived = false
         for schedule in recurringTransactions ?? [] where schedule.isActive {
             schedule.skipOccurrences(through: today)
@@ -77,31 +58,15 @@ extension Wallet {
         try modelContext?.save()
     }
 
-    /// The wallet's balance on `today`: the sum of its transactions dated today or earlier.
-    /// Transactions dated after today belong to Future and don't count yet, and those in Recently Deleted never do.
-    func balance(asOf today: CalendarDay) -> Money {
-        let cents = (transactions ?? []).notDeleted
-            .filter { $0.dayRaw <= today.rawValue }
-            .reduce(0) { $0 + $1.netCents }
-        return Money(cents: cents, currencyCode: currencyCode)
-    }
-
     /// Whether the wallet counts toward the Total: unarchived, marked "Include in total", and not in Recently Deleted.
     var countsInTotal: Bool { !isArchived && includeInTotal && deletedAt == nil }
-
-    /// The Total on `today`: the combined balance of every unarchived wallet marked "Include in total".
-    static func total(of wallets: [Wallet], asOf today: CalendarDay) -> Money {
-        let cents = wallets
-            .filter(\.countsInTotal)
-            .reduce(0) { $0 + $1.balance(asOf: today).cents }
-        return Money(cents: cents)
-    }
 }
 
 /// The balance of every wallet on one day, added up in one pass over every transaction outside Recently Deleted, as
-/// ``NotDeletedTransactions`` keeps them: what ``Wallet/balance(asOf:)`` and ``Wallet/total(of:asOf:)`` work out wallet
-/// by wallet, reading each wallet's own transactions.
-struct WalletBalances {
+/// ``NotDeletedTransactions`` keeps them: every balance the app shows, a wallet's, the Total's or what Adjust Balance
+/// calls the recorded balance, is read from it. A wallet's balance is the sum of its transactions dated that day or
+/// earlier: those dated after belong to Future and don't count yet, and those in Recently Deleted never do.
+nonisolated struct WalletBalances {
     private let centsByWallet: [ObjectIdentifier: Int]
 
     /// The balances on `today` of the wallets `transactions` belong to, from every transaction outside Recently
@@ -115,22 +80,25 @@ struct WalletBalances {
         self.centsByWallet = centsByWallet
     }
 
-    /// The wallet's balance, as ``Wallet/balance(asOf:)`` has it.
+    /// The wallet's balance, in its own currency.
     func balance(of wallet: Wallet) -> Money {
         Money(cents: centsByWallet[ObjectIdentifier(wallet)] ?? 0, currencyCode: wallet.currencyCode)
     }
 
-    /// The Total of `wallets`, as ``Wallet/total(of:asOf:)`` has it.
-    func total(of wallets: [Wallet]) -> Money {
-        Money(cents: wallets.filter(\.countsInTotal).reduce(0) { $0 + balance(of: $1).cents })
+    /// The Total of `wallets`: the balances of those that count in it (``Wallet/countsInTotal``), added up per
+    /// currency as ``Swift/Sequence/totalsPerCurrency`` adds them, a currency never added to another. With nothing to
+    /// add up, or everything adding up to nothing, it is nothing in the currency of the first wallet in the Total.
+    func total(of wallets: [Wallet]) -> [Money] {
+        let counted = wallets.filter(\.countsInTotal)
+        let totals = counted.map(balance(of:)).totalsPerCurrency
+        return totals.isEmpty ? [Money(cents: 0, currencyCode: counted.first.currencyCodeOrDefault)] : totals
     }
 
-    /// The balance of `selection`, as ``WalletSelection/balance(asOf:wallets:)`` has it: the Total of `wallets`, or the
-    /// one wallet's balance.
-    func balance(of selection: WalletSelection, wallets: [Wallet]) -> Money {
+    /// The balance of `selection`: the Total of `wallets`, or the one wallet's balance.
+    func balance(of selection: WalletSelection, wallets: [Wallet]) -> [Money] {
         switch selection {
         case .total: total(of: wallets)
-        case .wallet(let wallet): balance(of: wallet)
+        case .wallet(let wallet): [balance(of: wallet)]
         }
     }
 }

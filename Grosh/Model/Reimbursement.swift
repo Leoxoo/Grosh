@@ -28,7 +28,7 @@ final class Reimbursement {
         self.note = note
     }
 
-    var amount: Money { Money(cents: amountCents, currencyCode: expense?.amount.currencyCode ?? Money.defaultCurrencyCode) }
+    var amount: Money { Money(cents: amountCents, currencyCode: (expense?.wallet).currencyCodeOrDefault) }
 
     var day: CalendarDay {
         get { CalendarDay(rawValue: dayRaw) }

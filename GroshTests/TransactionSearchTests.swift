@@ -96,10 +96,12 @@ struct TransactionSearchTests {
             record(-2_00, "atm fee", on: today),
             record(-40_00, "groceries", on: today),
         ]
-        try oldBank.archive()
+        try oldBank.archive(today: today)
 
-        let listed = TransactionFilter(searchText: "fee")
-            .listed(from: all, selection: .total, on: Period.month(CalendarMonth(today)).days(today: today))
+        let listed = TransactionListing(
+            all, showing: .total, on: Period.month(CalendarMonth(today)).days(today: today),
+            filter: TransactionFilter(searchText: "fee")
+        ).transactions
 
         #expect(Set(listed.map(\.note)) == ["monthly fee", "trading fee", "atm fee"])
     }

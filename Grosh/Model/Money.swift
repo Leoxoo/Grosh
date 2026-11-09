@@ -37,6 +37,14 @@ nonisolated extension Sequence where Element == Money {
     }
 }
 
+nonisolated extension Array where Element == Money {
+    /// The amounts one after another, as a balance held in more than one currency is written: "$100.00, €50.00". A
+    /// single amount reads as ``Money/formatted(locale:)`` writes it.
+    func formatted(locale: Locale = .current) -> String {
+        map { $0.formatted(locale: locale) }.formatted(.list(type: .and, width: .narrow).locale(locale))
+    }
+}
+
 nonisolated extension Money {
     /// Parses a plain decimal number such as `-74.910004`, rounding half away from zero to the nearest cent.
     /// No grouping separators or currency symbols are accepted.

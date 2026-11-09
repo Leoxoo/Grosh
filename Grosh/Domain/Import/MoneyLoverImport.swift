@@ -92,9 +92,7 @@ private struct Importer {
         self.rows = rows
         self.context = context
         self.now = now
-        adjustmentReasons = try [CategoryType.income, .expense].reduce(into: [:]) { reasons, type in
-            reasons[type] = try BalanceAdjustmentDraft.defaultReason(for: type, in: context)
-        }
+        adjustmentReasons = try BalanceAdjustmentDraft.defaultReasons(in: context)
     }
 
     /// Records every row, links the transfers and the payments, and says what was done. Doesn't save.

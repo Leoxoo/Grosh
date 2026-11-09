@@ -215,7 +215,7 @@ struct ScheduledOccurrenceTests {
         context.insert(dinner)
 
         let future = Period.future.days(today: today)
-        let shown = TransactionFilter().listed(from: [dinner], selection: .total, on: future)
+        let shown = TransactionListing([dinner], showing: .total, on: future).transactions
         let days = TransactionDay.days(of: shown, scheduled: rows)
 
         #expect(shown == [dinner])

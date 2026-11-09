@@ -49,17 +49,6 @@ private struct TransactionListContent: View {
         _period = State(initialValue: startingPeriod)
     }
 
-    /// Which amount the rows and totals show: in the Total with no wallet filter, an Expense's net less what was paid back
-    /// into other wallets there (ADR-0010); in a wallet, its own net.
-    private var listed: ListedAmount {
-        filter.selection(replacing: walletSelection) == .total ? .netInTotal : .net
-    }
-
-    /// The selected wallet's transactions, or the wallet filter's when one is set, as ledger entries.
-    private var selected: [LedgerEntry] {
-        filter.transactions(in: walletSelection, from: $transactions)
-    }
-
     /// The periods the strip offers for `selected`, back to its first day with data.
     private func strip(for selected: [LedgerEntry]) -> [Period] {
         timeRange.periods(from: selected.firstDay, today: today)
@@ -71,12 +60,15 @@ private struct TransactionListContent: View {
     }
 
     var body: some View {
-        let selected = selected
-        let periods = strip(for: selected)
-        let shownDays = period.days(today: today)
-        let shown = filter.listed(
-            from: transactions, selected: selected, on: shownDays,
-            hidingPaybacksIn: filter.selection(replacing: walletSelection)
+        let listing = TransactionListing(
+            transactions, ledger: $transactions, showing: walletSelection, on: period.days(today: today), filter: filter
+        )
+        let shown = listing.transactions
+        let periods = strip(for: listing.selected)
+        // Both places the Wallet selector shows, under the title and in the bar once the header has risen, read the
+        // balances added up here once.
+        let walletSelector = WalletSelector(
+            selection: $walletSelection, balances: WalletBalances($transactions, asOf: today), fillsWidth: false
         )
         // Future's Scheduled rows are listed by day, and only while nothing is searched, filtered or being selected.
         let scheduled: [ScheduledOccurrence] = period == .future && grouping == .day && !filter.isOn && !isSelecting
@@ -105,13 +97,14 @@ private struct TransactionListContent: View {
             switch grouping {
             case .day:
                 TransactionDaySections(
-                    transactions: shown, scheduled: scheduled, isSelected: { highlighted.contains($0) }, listed: listed
-                ) { row($0) }
+                    transactions: shown, scheduled: scheduled, isSelected: { highlighted.contains($0) },
+                    listed: listing.listed
+                ) { row($0, in: listing) }
             case .category:
-                ForEach(TransactionCategoryGroup.groups(of: shown, listed: listed)) { group in
+                ForEach(TransactionCategoryGroup.groups(of: shown, listed: listing.listed)) { group in
                     Section {
                         GroupedForEach(group.transactions, isSelected: { highlighted.contains($0) }) {
-                            row($0, showsDay: true)
+                            row($0, in: listing, showsDay: true)
                         }
                     } header: {
                         TransactionCategoryHeader(group: group)
@@ -128,16 +121,18 @@ private struct TransactionListContent: View {
         .safeAreaBar(edge: .top, spacing: 0) {
             VStack(spacing: 4) {
                 VStack(spacing: 4) {
-                    WalletSelector(selection: $walletSelection, today: today, fillsWidth: false)
+                    walletSelector
                         .linedUpWithTabRootTitle(scroll)
                         .hiddenOnceRisen(scroll)
                     PeriodStrip(periods: periods, selection: $period, current: currentPeriod, today: today)
                 }
                 .hiddenWhileSearching(filter)
                 if filter.isOn {
-                    FilterSummaryFigures(filter: $filter, transactions: shown)
+                    FilterSummary(filter: $filter, listing: listing)
                 } else {
-                    PeriodSummaryView(summary: PeriodSummary(of: selected, in: period, today: today), period: period)
+                    PeriodSummaryView(
+                        summary: PeriodSummary(of: listing.selected, in: period, today: today), period: period
+                    )
                 }
             }
             .padding(.vertical, 8)
@@ -145,12 +140,9 @@ private struct TransactionListContent: View {
             .risingWithTabRootTitle(scroll)
         }
         .modifier(TransactionSearchField(text: $filter.searchText, isOpen: $isSearchPresented))
-        .onChange(of: walletSelection) {
+        .onChange(of: listing.selection) {
             // A wallet with a shorter history may not reach back to the period being shown.
-            period.showCurrentPeriod(currentPeriod, unlessOfferedBy: strip(for: selected))
-        }
-        .onChange(of: filter.wallet) {
-            period.showCurrentPeriod(currentPeriod, unlessOfferedBy: strip(for: selected))
+            period.showCurrentPeriod(currentPeriod, unlessOfferedBy: periods)
         }
         .onChange(of: timeRange) {
             // Unlike a wallet change, a new time range always starts on the Current period, even from Future.
@@ -160,7 +152,7 @@ private struct TransactionListContent: View {
             isSelecting: $isSelecting, chosen: $chosen, title: String(localized: Strings.Common.transactions)
         )
         .tabRootTitle(Strings.Common.transactions, scroll: scroll, showsSmallTitle: isSelecting) {
-            WalletSelector(selection: $walletSelection, today: today, fillsWidth: false)
+            walletSelector
         }
         .toolbar {
             if !isSelecting {
@@ -201,18 +193,14 @@ private struct TransactionListContent: View {
     }
 
     @ViewBuilder
-    private func row(_ transaction: Transaction, showsDay: Bool = false) -> some View {
-        // The Total with no wallet filter lists every wallet; a selected wallet or a wallet filter lists one.
-        let showsWalletIcon = walletSelection == .total && filter.wallet == nil
+    private func row(_ transaction: Transaction, in listing: TransactionListing, showsDay: Bool = false) -> some View {
+        let row = TransactionRow(
+            transaction: transaction, showsDay: showsDay, showsWalletIcon: listing.mixesWallets, listed: listing.listed
+        )
         if isSelecting {
-            TransactionRow(transaction: transaction, showsDay: showsDay, showsWalletIcon: showsWalletIcon, listed: listed)
-                .tag(transaction)
+            row.tag(transaction)
         } else {
-            NavigationLink(value: transaction) {
-                TransactionRow(
-                    transaction: transaction, showsDay: showsDay, showsWalletIcon: showsWalletIcon, listed: listed
-                )
-            }
+            NavigationLink(value: transaction) { row }
         }
     }
 

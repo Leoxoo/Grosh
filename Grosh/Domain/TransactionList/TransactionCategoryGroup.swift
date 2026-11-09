@@ -6,14 +6,18 @@ struct TransactionCategoryGroup: Identifiable {
     let category: Category?
     /// In list order: newest day first, the most recently entered on top within a day.
     let transactions: [Transaction]
-    /// What the total adds up: the net, or in the Total the net it shows (ADR-0010).
-    var listed = ListedAmount.net
+    /// What the category added to or took from the balance, as the list shows each amount (``ListedAmount``): every
+    /// transaction counts, excluded from report or not, so the groups of a period add up to its difference. Added up
+    /// once, when the group is made, since sorting the groups compares it again and again.
+    let total: Money
 
     var id: PersistentIdentifier? { category?.persistentModelID }
 
-    /// What the category added to or took from the balance: every transaction counts, excluded from report or
-    /// not, so the groups of a period add up to its difference.
-    var total: Money { transactions.total(listed) }
+    init(category: Category?, transactions: [Transaction], listed: ListedAmount) {
+        self.category = category
+        self.transactions = transactions
+        total = transactions.total(listed)
+    }
 }
 
 extension TransactionCategoryGroup {

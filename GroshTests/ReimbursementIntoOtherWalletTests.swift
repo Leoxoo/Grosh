@@ -42,10 +42,16 @@ struct ReimbursementIntoOtherWalletTests {
 
     private var monthDays: DayRange { Period.month(CalendarMonth(today)).days(today: today) }
 
+    /// What the Transactions tab lists for `selection` in October, narrowed by `filter`.
+    private func listing(
+        in selection: WalletSelection, filter: TransactionFilter = TransactionFilter()
+    ) throws -> TransactionListing {
+        TransactionListing(try context.fetch(Transaction.notDeleted), showing: selection, on: monthDays, filter: filter)
+    }
+
     /// What the Transactions tab lists for `selection` in October.
     private func listed(in selection: WalletSelection) throws -> [Transaction] {
-        let all = try context.fetch(Transaction.notDeleted)
-        return TransactionFilter().listed(from: all, selection: selection, on: monthDays)
+        try listing(in: selection).transactions
     }
 
     // MARK: Recording it
@@ -127,12 +133,12 @@ struct ReimbursementIntoOtherWalletTests {
 
         #expect(checking.balance(asOf: today) == Money(cents: -60_00))
         #expect(cash.balance(asOf: today) == Money(cents: 20_00))
-        #expect(Wallet.total(of: [checking, cash], asOf: today) == Money(cents: -40_00))
+        #expect(Wallet.total(of: [checking, cash], asOf: today) == [Money(cents: -40_00)])
         #expect(dinner.netCents == -60_00)
         let entries = try context.fetch(Transaction.notDeleted).map(LedgerEntry.init)
         let balances = WalletBalances(entries, asOf: today)
         #expect(balances.balance(of: cash) == Money(cents: 20_00))
-        #expect(balances.total(of: [checking, cash]) == Money(cents: -40_00))
+        #expect(balances.total(of: [checking, cash]) == [Money(cents: -40_00)])
     }
 
     // MARK: Lists
@@ -149,11 +155,33 @@ struct ReimbursementIntoOtherWalletTests {
 
     @Test func searchStillFindsThePayback() throws {
         let (_, _, payback) = try paidBackIntoCash()
-        let all = try context.fetch(Transaction.notDeleted)
-
-        let found = TransactionFilter(searchText: "Alex").listed(from: all, selection: .total, on: monthDays)
+        let found = try listing(in: .total, filter: TransactionFilter(searchText: "Alex")).transactions
 
         #expect(found.contains(payback))
+    }
+
+    @Test func aFilteredTotalListAddsUpTheRowsAsTheyShowTheExpensesNet() throws {
+        let (dinner, _, _) = try paidBackIntoCash()
+
+        let filtered = try listing(in: .total, filter: TransactionFilter(type: .expense))
+
+        #expect(filtered.transactions == [dinner])
+        #expect(filtered.listed == .netInTotal)
+        #expect(filtered.total == Money(cents: -40_00))
+        #expect(TransactionDay.days(of: filtered.transactions).map { $0.total(filtered.listed) } == [filtered.total])
+    }
+
+    @Test func aSearchThatFindsThePaybackCountsTheExpenseAtItsFullNetSoNothingIsCountedTwice() throws {
+        let (dinner, _, payback) = try paidBackIntoCash()
+
+        let found = try listing(in: .total, filter: TransactionFilter(searchText: "Alex"))
+
+        #expect(Set(found.transactions) == [dinner, payback])
+        #expect(found.listed == .net)
+        #expect(found.mixesWallets)
+        #expect(found.total == Money(cents: -40_00))
+        #expect(TransactionListing.search(try context.fetch(Transaction.notDeleted), filter: TransactionFilter(searchText: "Alex")).total
+            == found.total)
     }
 
     @Test func theExpenseShowsItsNetInTheTotalAndTheFullAmountInItsOwnWallet() throws {
@@ -180,7 +208,7 @@ struct ReimbursementIntoOtherWalletTests {
         let (dinner, _, _) = try paidBackIntoCash()
 
         #expect(dinner.totalViewNetCents == -60_00)
-        #expect(Wallet.total(of: [checking, cash], asOf: today) == Money(cents: -60_00))
+        #expect(Wallet.total(of: [checking, cash], asOf: today) == [Money(cents: -60_00)])
         #expect(try listed(in: .total) == [dinner])
         #expect(try fixture.totals(in: .total).spent == Money(cents: 60_00))
         #expect(try listed(in: .wallet(cash)).count == 1)
@@ -192,7 +220,7 @@ struct ReimbursementIntoOtherWalletTests {
 
         #expect(!payback.isHiddenInTotal)
         #expect(try listed(in: .total) == [payback])
-        #expect(Wallet.total(of: [checking, cash], asOf: today) == Money(cents: 20_00))
+        #expect(Wallet.total(of: [checking, cash], asOf: today) == [Money(cents: 20_00)])
     }
 
     // MARK: Reports

@@ -117,7 +117,7 @@ final class RecurringTransaction {
     var estimatesAmount: Bool { kind.estimates(amountVaries: amountVaries) }
 
     /// The currency its amounts are in: its wallet's, or the default while it has no wallet.
-    var currencyCode: String { wallet?.currencyCode ?? Money.defaultCurrencyCode }
+    var currencyCode: String { wallet.currencyCodeOrDefault }
 
     /// The last due day dealt with, or `nil` before any has been.
     var handledThrough: CalendarDay? {

@@ -162,7 +162,7 @@ struct RecentlyDeletedTests {
         #expect(bin.transactions.isEmpty)
         #expect(checking.transactionsDeletedWithIt.count == 3)
         #expect(try context.fetch(Wallet.unarchived) == [savings])
-        #expect(Wallet.total(of: [checking, savings], asOf: today) == Money(cents: 20_00))
+        #expect(Wallet.total(of: [checking, savings], asOf: today) == [Money(cents: 20_00)])
         // The transfer's other half stays in its wallet, its own half now a dash.
         #expect(!incoming.isInRecentlyDeleted)
         #expect(try incoming.related(in: context).isEmpty)

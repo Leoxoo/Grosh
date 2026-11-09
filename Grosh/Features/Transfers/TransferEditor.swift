@@ -20,6 +20,8 @@ private struct TransferForm: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Environment(\.today) private var today
+    /// What the pickers' balances add up.
+    @NotDeletedTransactions private var transactions: [Transaction]
 
     @State private var draft: TransferDraft
     @State private var entry = AmountEntry(cents: 0)
@@ -29,7 +31,7 @@ private struct TransferForm: View {
         _draft = State(initialValue: startingDraft)
     }
 
-    private var currencyCode: String { draft.from?.currencyCode ?? Money.defaultCurrencyCode }
+    private var currencyCode: String { draft.from.currencyCodeOrDefault }
 
     /// The draft with the amount the keypad comes to.
     private var draftToSave: TransferDraft {
@@ -39,11 +41,12 @@ private struct TransferForm: View {
     }
 
     var body: some View {
+        // Always today's balances, whatever the Date: a transfer dated later doesn't move them today.
+        let balances = WalletBalances($transactions, asOf: today)
         KeypadSheet(title: Text(Strings.Transfers.transfer), entry: $entry, canSave: draftToSave.canSave, save: save) { fields in
             Section {
-                // Always today's balances, whatever the Date: a transfer dated later doesn't move them today.
-                WalletPicker(title: Strings.Common.from, selection: $draft.from, balancesAsOf: today)
-                WalletPicker(title: Strings.Common.to, selection: $draft.to, balancesAsOf: today)
+                WalletPicker(title: Strings.Common.from, selection: $draft.from, balances: balances)
+                WalletPicker(title: Strings.Common.to, selection: $draft.to, balances: balances)
                 fields.amountRow(Strings.Common.amount, currencyCode: currencyCode)
                 DayStepper(title: Strings.Common.date, day: $draft.day)
                 fields.noteField($draft.note)

@@ -146,10 +146,10 @@ struct WalletManagementTests {
         let checking = try addWallet("Checking", startingBalance: 100_00)
         let oldBank = try addWallet("Old bank", startingBalance: 300_00)
 
-        try oldBank.archive()
+        try oldBank.archive(today: today)
 
         #expect(try unarchivedNames() == ["Checking"])
-        #expect(Wallet.total(of: try context.fetch(FetchDescriptor<Wallet>()), asOf: today) == Money(cents: 100_00))
+        #expect(Wallet.total(of: try context.fetch(FetchDescriptor<Wallet>()), asOf: today) == [Money(cents: 100_00)])
         #expect(oldBank.transactions?.count == 1)
         #expect(oldBank.balance(asOf: today) == Money(cents: 300_00))
         #expect(checking.isArchived == false)
@@ -159,11 +159,11 @@ struct WalletManagementTests {
         try addWallet("Checking")
         let oldBank = try addWallet("Old bank", startingBalance: 300_00)
         try addWallet("Cash")
-        try oldBank.archive()
+        try oldBank.archive(today: today)
 
-        try oldBank.unarchive()
+        try oldBank.unarchive(today: today)
 
         #expect(try unarchivedNames() == ["Checking", "Old bank", "Cash"])
-        #expect(Wallet.total(of: try context.fetch(Wallet.unarchived), asOf: today) == Money(cents: 300_00))
+        #expect(Wallet.total(of: try context.fetch(Wallet.unarchived), asOf: today) == [Money(cents: 300_00)])
     }
 }
