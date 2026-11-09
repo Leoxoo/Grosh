@@ -36,9 +36,4 @@ struct DebtsAndLoans {
             second.original.isListed(before: first.original)
         }
     }
-
-    /// Every Loan and Debt in the store.
-    init(in context: ModelContext) throws {
-        self.init(try context.fetch(Self.transactions))
-    }
 }

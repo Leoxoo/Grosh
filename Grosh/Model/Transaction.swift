@@ -124,6 +124,9 @@ final class Transaction {
         set { dayRaw = newValue.rawValue }
     }
 
+    /// Whether the transaction is in Recently Deleted.
+    var isInRecentlyDeleted: Bool { deletedAt != nil }
+
     /// On a Loan or Debt, the day the user is reminded of it (its due date), or `nil` for no reminder.
     var reminderDay: CalendarDay? {
         get { reminderDayRaw.map(CalendarDay.init(rawValue:)) }

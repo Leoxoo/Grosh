@@ -574,6 +574,7 @@ struct DebtLoanTests {
         #expect(try outstanding(loan) == Money(cents: 100_00))
 
         try loan.linkPayment(collection)
+        try context.save()
 
         #expect(try isSettled(loan))
         #expect(try loan.related(in: context) == [collection])
@@ -603,7 +604,7 @@ struct DebtLoanTests {
         try pay(60_00, on: pasha)
         store.spend(4_50, on: try store.category("Café"))
 
-        let list = try DebtsAndLoans(in: context)
+        let list = DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions))
 
         #expect(list.open.map(\.original) == [anna, pasha])
         #expect(list.open.map(\.outstanding) == [Money(cents: 50_00), Money(cents: 40_00)])

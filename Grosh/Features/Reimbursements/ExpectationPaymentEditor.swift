@@ -7,6 +7,17 @@ import SwiftUI
 struct ExpectationPaymentEditor: View {
     let expectation: ExpectedReimbursement
 
+    @Environment(\.today) private var today
+
+    var body: some View {
+        ExpectationPaymentForm(expectation: expectation, today: today)
+    }
+}
+
+/// The form behind ``ExpectationPaymentEditor``, holding the draft from the moment the sheet opens.
+private struct ExpectationPaymentForm: View {
+    let expectation: ExpectedReimbursement
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
@@ -14,7 +25,7 @@ struct ExpectationPaymentEditor: View {
     @State private var entry: AmountEntry
     @State private var errorMessage: String?
 
-    /// `today` is the day the payment starts on, from the presenting screen's environment.
+    /// `today` is the day the payment starts on.
     init(expectation: ExpectedReimbursement, today: CalendarDay) {
         self.expectation = expectation
         let startingDraft = ExpectationPaymentDraft(paying: expectation, on: today)

@@ -10,10 +10,7 @@ struct PeriodComparisonCard: View {
     /// Whether the "vs last year" switch, which Home's Month graph shares, is on.
     @Binding var comparesWithLastYear: Bool
 
-    /// Remembers across launches whether the card is shown.
-    @AppStorage("report.comparisonCard.isShown") private var isShown = false
-    /// Whether the ⓘ explanation of the Average is showing.
-    @State private var isExplaining = false
+    @AppStorage(AppSettings.isComparisonCardShownKey) private var isShown = AppSettings.isComparisonCardShownDefault
     /// The day the user last moved the marker to, or `nil` until they move it.
     @State private var scrubbedDay: CalendarDay?
 
@@ -39,21 +36,7 @@ struct PeriodComparisonCard: View {
         HStack(spacing: 6) {
             Text(title)
                 .font(.subheadline.weight(.semibold))
-            Button {
-                isExplaining = true
-            } label: {
-                Image(systemName: "info.circle")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.borderless)
-            .accessibilityLabel(Strings.Report.whatTheAverageIs)
-            .popover(isPresented: $isExplaining) {
-                Text(explanation)
-                    .font(.subheadline)
-                    .padding()
-                    .frame(maxWidth: 320, alignment: .leading)
-                    .presentationCompactAdaptation(.popover)
-            }
+            ExplanationButton(label: Strings.Report.whatTheAverageIs, explanation: explanation)
             Spacer()
             Button(isShown ? Strings.Common.hide : Strings.Common.show) {
                 withAnimation { isShown.toggle() }

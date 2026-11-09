@@ -131,6 +131,16 @@ struct AmountEntryTests {
         #expect(AmountEntry(cents: 0).isEmpty)
     }
 
+    @Test func aZeroSetOnPurposeShowsAsZeroAndTheFirstDigitReplacesIt() {
+        var bound = AmountEntry(showing: 0)
+
+        #expect(!bound.isEmpty)
+        #expect(bound.cents == 0)
+        #expect(bound.text(locale: usEnglish) == "0")
+        bound.press(.digit(5))
+        #expect(bound.cents == 500)
+    }
+
     @Test func theFirstDigitReplacesAnExistingAmount() {
         var existing = AmountEntry(cents: 1250)
         existing.press(.digit(5))

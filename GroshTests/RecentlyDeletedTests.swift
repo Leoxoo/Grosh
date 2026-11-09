@@ -137,7 +137,7 @@ struct RecentlyDeletedTests {
         try collection.delete(.onlySelected, in: context, at: deletedAt)
         try Forgiveness.record(try ForgiveDraft(forgiving: loan, on: today, in: context), in: context)
 
-        #expect(collection.restoreBlocker == .loanOrDebtIsForgiven)
+        #expect(collection.restoreBlocker() == .loanOrDebtIsForgiven)
         #expect(throws: RecentlyDeletedError.loanOrDebtIsForgiven) { try collection.restore() }
 
         try loan.unforgive()
@@ -191,7 +191,7 @@ struct RecentlyDeletedTests {
         try checking.delete(at: deletedAt.addingTimeInterval(days(1)))
 
         #expect(try bin().transactions == [coffee])
-        #expect(coffee.restoreBlocker == .walletIsDeleted)
+        #expect(coffee.restoreBlocker() == .walletIsDeleted)
         #expect(throws: RecentlyDeletedError.walletIsDeleted) { try coffee.restore() }
 
         try checking.restore(today: today)

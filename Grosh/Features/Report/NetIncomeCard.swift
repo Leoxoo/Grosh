@@ -4,29 +4,16 @@ import SwiftUI
 /// labelled with its amount. The larger of the two fills the width and the other is drawn in proportion to it.
 struct NetIncomeCard: View {
     let totals: PeriodTotals
-    /// Whether the ⓘ explanation is showing.
-    @State private var isExplaining = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 6) {
                 Text(Strings.Screens.netIncome)
                     .font(.headline)
-                Button {
-                    isExplaining = true
-                } label: {
-                    Image(systemName: "info.circle")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.borderless)
-                .accessibilityLabel(Strings.Report.whatNetIncomeCounts)
-                .popover(isPresented: $isExplaining) {
-                    Text(Self.explanation)
-                        .font(.subheadline)
-                        .padding()
-                        .frame(maxWidth: 320, alignment: .leading)
-                        .presentationCompactAdaptation(.popover)
-                }
+                ExplanationButton(
+                    label: Strings.Report.whatNetIncomeCounts,
+                    explanation: String(localized: Strings.Report.netIncomeExplanation)
+                )
             }
 
             AmountText(amount: totals.netIncome, showsPlusSign: true)
@@ -46,11 +33,6 @@ struct NetIncomeCard: View {
         .padding(.vertical, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-
-    /// What Net income counts, in one sentence.
-    static let explanation = String(
-        localized: Strings.Report.netIncomeExplanation
-    )
 }
 
 /// One side's amount as a bar in its color, labelled with the side's name and amount. The larger side's bar fills the

@@ -66,7 +66,7 @@ extension Person {
     /// again brings them back (``add(named:phone:in:)``). Saves.
     func hide() throws {
         isHidden = true
-        try modelContext?.save()
+        try saveToStore()
     }
 
     /// Everyone who isn't hidden, the one used most lately first and equal dates by name: what the With menu's Previous

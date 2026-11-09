@@ -42,7 +42,7 @@ nonisolated extension RemindedRecord {
     func setReminder(_ day: CalendarDay?) throws {
         try checkTakesReminder()
         reminderDay = day
-        try modelContext?.save()
+        try saveToStore()
     }
 }
 

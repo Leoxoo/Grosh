@@ -98,7 +98,7 @@ private struct TransactionListContent: View {
             case .day:
                 TransactionDaySections(
                     transactions: shown, scheduled: scheduled, isSelected: { highlighted.contains($0) },
-                    listed: listing.listed
+                    listed: listing.listed, showsWalletIcon: listing.mixesWallets
                 ) { row($0, in: listing) }
             case .category:
                 ForEach(TransactionCategoryGroup.groups(of: shown, listed: listing.listed)) { group in

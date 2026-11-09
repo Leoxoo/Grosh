@@ -20,4 +20,17 @@ nonisolated enum AppSettings {
     /// Whether the Month graph compares its period with Last year rather than the Average: the "vs last year" switch,
     /// which Home's Month graph and the Income and Spent details' comparison card share. Off at first.
     static let comparesWithLastYearKey = "home.monthGraph.comparesWithLastYear"
+    static let comparesWithLastYearDefault = false
+
+    /// Whether Home hides the Total behind dots: its eye button. Shown at first.
+    static let isTotalHiddenKey = "home.isTotalHidden"
+    static let isTotalHiddenDefault = false
+
+    /// Whether the Income and Spent details show their comparison card. Hidden at first.
+    static let isComparisonCardShownKey = "report.comparisonCard.isShown"
+    static let isComparisonCardShownDefault = false
+
+    /// How Debts & Loans lists them: by Loan or Debt, as it did before Show by people existed, or by person.
+    static let debtsLoansGroupingKey = "debtsLoans.grouping"
+    static let debtsLoansGroupingDefault = DebtsLoansGrouping.loanOrDebt
 }

@@ -11,8 +11,8 @@ enum ReimbursementAction: Hashable, Identifiable {
 
 /// The transaction detail's section for an Expense: each Reimbursement with its day and note, opening its sheet to edit
 /// and deleted by swipe or from its menu, then Someone paid me back and Move an existing transaction in. Shows nothing
-/// for any other transaction. Use inside a `List`, with ``SwiftUI/View/reimbursementSheets(for:action:)`` on the screen
-/// to present what `action` opens.
+/// for any other transaction. Use inside a `List`, with the screen presenting ``ReimbursementAction/sheet(for:)`` for
+/// what `action` opens.
 struct ReimbursementSection: View {
     let transaction: Transaction
     @Binding var action: ReimbursementAction?
@@ -76,16 +76,15 @@ private struct ReimbursementRow: View {
     }
 }
 
-extension View {
-    /// Presents Someone paid me back, Move an existing transaction in or an entry's edit sheet for `transaction` while
-    /// `action` says which. Attach to the screen, outside its `List`, so presenting doesn't depend on the list's rows.
-    func reimbursementSheets(for transaction: Transaction, action: Binding<ReimbursementAction?>) -> some View {
-        sheet(item: action) { action in
-            switch action {
-            case .paidBack: ReimbursementEditor(expense: transaction)
-            case .moveIn: ReimbursementMoveInPicker(expense: transaction)
-            case .edit(let entry): ReimbursementEditor(expense: transaction, editing: entry)
-            }
+extension ReimbursementAction {
+    /// The sheet this opens for `transaction`: Someone paid me back, Move an existing transaction in or an entry's edit
+    /// sheet. Present it from the screen, outside its `List`, so presenting doesn't depend on the list's rows.
+    @ViewBuilder
+    func sheet(for transaction: Transaction) -> some View {
+        switch self {
+        case .paidBack: ReimbursementEditor(expense: transaction)
+        case .moveIn: ReimbursementMoveInPicker(expense: transaction)
+        case .edit(let entry): ReimbursementEditor(expense: transaction, editing: entry)
         }
     }
 }

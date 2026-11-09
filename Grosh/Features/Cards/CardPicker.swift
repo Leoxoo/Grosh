@@ -60,16 +60,7 @@ struct CardPicker: View {
     }
 
     /// A Card's mark in the picker: its image as a small card 16 points tall, or its coloured symbol when it has none.
-    /// The image is a copy shrunk to that size for this screen, drawn at its own size since a picker ignores a frame.
     private func mark(of card: Card) -> some View {
-        let height: CGFloat = 16
-        return CardMark(
-            image: card.shrunkImage(height: height, scale: displayScale),
-            height: height,
-            sizing: .shrunk(scale: displayScale)
-        ) {
-            Image(systemName: Card.symbolName)
-                .foregroundStyle(card.color.color)
-        }
+        CardMark(card: card, height: 16, shrunkForScale: displayScale)
     }
 }

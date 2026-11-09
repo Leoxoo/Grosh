@@ -72,11 +72,3 @@ nonisolated enum TimeRange: Hashable, Sendable {
         }
     }
 }
-
-extension CalendarDay {
-    /// The day of the week, numbered as `Calendar` numbers them: 1 is Sunday, 7 is Saturday.
-    nonisolated var weekday: Int {
-        let calendar = Calendar.utcGregorian
-        return calendar.component(.weekday, from: date(in: calendar))
-    }
-}

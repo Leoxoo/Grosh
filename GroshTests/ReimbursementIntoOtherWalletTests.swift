@@ -30,15 +30,10 @@ struct ReimbursementIntoOtherWalletTests {
         let alex = try fixture.person("Alex")
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
         let owed = try fixture.expectation(of: alex, on: dinner)
-        let recorded = try fixture.pay(cents, on: owed, day: receivedDay, into: cash, note: "Cash")
-        guard case .inOtherWallet(let payback) = recorded else {
-            Issue.record("Expected a transaction in the other wallet.")
-            throw PaybackTestError.notElsewhere
-        }
-        return (dinner, owed, payback)
+        try fixture.pay(cents, on: owed, day: receivedDay, into: cash, note: "Cash")
+        #expect(dinner.orderedReimbursements.isEmpty)
+        return (dinner, owed, try #require(dinner.paybacksElsewhere.first))
     }
-
-    private enum PaybackTestError: Error { case notElsewhere }
 
     private var monthDays: DayRange { Period.month(CalendarMonth(today)).days(today: today) }
 
@@ -61,12 +56,10 @@ struct ReimbursementIntoOtherWalletTests {
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
         let owed = try fixture.expectation(of: alex, on: dinner)
 
-        let recorded = try fixture.pay(10_00, on: owed, into: checking)
+        try fixture.pay(10_00, on: owed, into: checking)
 
-        guard case .onExpense = recorded else {
-            Issue.record("Expected a Reimbursement on the Expense.")
-            return
-        }
+        #expect(dinner.orderedReimbursements.map(\.amountCents) == [10_00])
+        #expect(dinner.paybacksElsewhere.isEmpty)
         #expect(dinner.reimbursedCents == 10_00)
         #expect(!dinner.hasPaybacksElsewhere)
         #expect(dinner.linkID == nil)

@@ -81,7 +81,9 @@ struct ImportFromMoneyLoverView: View {
         } completion: {
             // The import logs its own failure, so this only shows it.
             do {
-                summary = try MoneyLoverImport.replaceAllData(with: export.export, in: context)
+                summary = try MoneyLoverImport.replaceAllData(
+                    with: export.export, cards: .ownersCards, in: context
+                )
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -100,5 +102,5 @@ private struct PickedExport {
     NavigationStack {
         ImportFromMoneyLoverView()
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+    .modelContainer(try! StoreOpening.open(inMemory: true))
 }

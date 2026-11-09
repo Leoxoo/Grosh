@@ -28,7 +28,8 @@ struct RelatedTransactionsSection: View {
                     NavigationLink {
                         TransactionDetailView(transaction: other)
                     } label: {
-                        RelatedTransactionRow(transaction: other)
+                        // With its day, since it may fall on another.
+                        TransactionRow(transaction: other, showsDay: true)
                     }
                 }
                 if transaction.isSplitPart {
@@ -56,21 +57,6 @@ struct RelatedTransactionsSection: View {
             if try transaction.undoSplit(in: context).persistentModelID != id {
                 dismiss()
             }
-        }
-    }
-}
-
-/// A related transaction with its date, since it may fall on another day.
-private struct RelatedTransactionRow: View {
-    let transaction: Transaction
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            TransactionRow(transaction: transaction)
-            Text(transaction.day.date().formatted(date: .abbreviated, time: .omitted))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.leading, 44)
         }
     }
 }

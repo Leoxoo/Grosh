@@ -163,6 +163,14 @@ extension Transaction {
         [LoanOrDebtKind.loan, .debt].first { isPayment(of: $0) }
     }
 
+    /// Whether this is a Debt Collection or Repayment on the link of a Loan or Debt that is forgiven. Restoring such a
+    /// payment from Recently Deleted would count it a second time, since the forgiven amount already settles what it
+    /// paid (ADR-0004). Reads the transactions on its link.
+    func paysForgivenLoanOrDebt(in context: ModelContext) throws -> Bool {
+        guard let kind = paidLoanOrDebtKind, linkKind == .loanOrDebt else { return false }
+        return try context.fetch(linkedTransactions).contains { $0.isForgiven && $0.loanOrDebtKind == kind }
+    }
+
     /// Its payments, those in Recently Deleted too: restoring one brings it back against this Loan or Debt, so until
     /// then it still holds the wallet, category and lowest amount in place (``TransactionDraft/isLockedByPayments``).
     /// Empty for anything but a Loan or Debt with a link.
@@ -174,14 +182,8 @@ extension Transaction {
 
     /// Links `payment`, a Debt Collection (for a Loan) or Repayment (for a Debt) recorded without one, such as by an
     /// import, so it counts against this Loan or Debt and they show as each other's Related transactions. Only the
-    /// links change. Saves.
+    /// links change. Doesn't save: an import links many and saves once.
     func linkPayment(_ payment: Transaction) throws {
-        try linkPaymentWithoutSaving(payment)
-        try modelContext?.save()
-    }
-
-    /// ``linkPayment(_:)`` without the save, for a caller that saves once after linking many, such as an import.
-    func linkPaymentWithoutSaving(_ payment: Transaction) throws {
         guard let kind = loanOrDebtKind else { throw DebtLoanRuleError.notALoanOrDebt }
         guard payment.isPayment(of: kind) else { throw DebtLoanRuleError.paymentDoesNotMatch }
         payment.join(self, as: .loanOrDebt)

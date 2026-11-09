@@ -9,15 +9,8 @@ struct TransactionDetailView: View {
     var didDelete: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
-    /// The editor Edit opened, while it is open.
-    @State private var editing: TransactionEditFlow?
-    @State private var isDuplicating = false
-    @State private var isSplitting = false
-    @State private var isEnteringAmount = false
-    /// What the Loan or Debt section opened, while it is open.
-    @State private var loanOrDebtAction: LoanOrDebtAction?
-    /// What the Reimbursement section opened, while it is open.
-    @State private var reimbursementAction: ReimbursementAction?
+    /// The one sheet open over the detail, if any.
+    @State private var sheet: TransactionDetailSheet?
 
     var body: some View {
         Group {
@@ -31,24 +24,36 @@ struct TransactionDetailView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .sheet(item: $editing) { flow in
-            switch flow {
-            case .addSheet: TransactionEditor(mode: .edit(transaction))
-            case .startingBalance: StartingBalanceEditor(transaction: transaction)
-            case .transferHalf: TransferHalfEditor(transaction: transaction)
+        .sheet(item: $sheet) { sheet in
+            switch sheet {
+            case .edit(.addSheet): TransactionEditor(mode: .edit(transaction))
+            case .edit(.startingBalance): StartingBalanceEditor(transaction: transaction)
+            case .edit(.transferHalf): TransferHalfEditor(transaction: transaction)
+            case .duplicate: TransactionEditor(mode: .duplicate(transaction))
+            case .split: SplitSheet(transaction: transaction)
+            case .enterAmount: EstimatedAmountEditor(transaction: transaction)
+            case .loanOrDebt(let action): action.sheet(for: transaction)
+            case .reimbursement(let action): action.sheet(for: transaction)
             }
         }
-        .sheet(isPresented: $isDuplicating) {
-            TransactionEditor(mode: .duplicate(transaction))
+    }
+
+    /// What the Loan or Debt section has open: one case of ``sheet``.
+    private var loanOrDebtAction: Binding<LoanOrDebtAction?> {
+        Binding {
+            if case .loanOrDebt(let action) = sheet { action } else { nil }
+        } set: { action in
+            sheet = action.map(TransactionDetailSheet.loanOrDebt)
         }
-        .sheet(isPresented: $isSplitting) {
-            SplitSheet(transaction: transaction)
+    }
+
+    /// What the Reimbursement section has open: one case of ``sheet``.
+    private var reimbursementAction: Binding<ReimbursementAction?> {
+        Binding {
+            if case .reimbursement(let action) = sheet { action } else { nil }
+        } set: { action in
+            sheet = action.map(TransactionDetailSheet.reimbursement)
         }
-        .sheet(isPresented: $isEnteringAmount) {
-            EstimatedAmountEditor(transaction: transaction)
-        }
-        .loanOrDebtSheets(for: transaction, action: $loanOrDebtAction)
-        .reimbursementSheets(for: transaction, action: $reimbursementAction)
     }
 
     private var details: some View {
@@ -68,7 +73,7 @@ struct TransactionDetailView: View {
             if transaction.isEstimated {
                 Section {
                     Button(Strings.Transactions.enterAmount, systemImage: "checkmark.circle") {
-                        isEnteringAmount = true
+                        sheet = .enterAmount
                     }
                 } footer: {
                     Text(Strings.Transactions.estimatedFooter)
@@ -77,9 +82,9 @@ struct TransactionDetailView: View {
 
             BalanceChangeSection(transaction: transaction)
 
-            LoanOrDebtSection(transaction: transaction, action: $loanOrDebtAction)
+            LoanOrDebtSection(transaction: transaction, action: loanOrDebtAction)
 
-            ReimbursementSection(transaction: transaction, action: $reimbursementAction)
+            ReimbursementSection(transaction: transaction, action: reimbursementAction)
 
             OwesMeSection(transaction: transaction)
 
@@ -92,13 +97,13 @@ struct TransactionDetailView: View {
             Section {
                 if canBeDuplicated {
                     Button(Strings.Common.duplicate, systemImage: "plus.square.on.square") {
-                        isDuplicating = true
+                        sheet = .duplicate
                     }
                     .fullWidthRowButton()
                 }
                 if transaction.canBeSplit {
                     Button(Strings.Transactions.split, systemImage: "square.split.2x1") {
-                        isSplitting = true
+                        sheet = .split
                     }
                     .fullWidthRowButton()
                 }
@@ -120,7 +125,7 @@ struct TransactionDetailView: View {
         .toolbar {
             if let editFlow {
                 ToolbarItem(placement: .primaryAction) {
-                    Button(Strings.Common.edit) { editing = editFlow }
+                    Button(Strings.Common.edit) { sheet = .edit(editFlow) }
                 }
             }
         }
@@ -135,10 +140,7 @@ struct TransactionDetailView: View {
         if let card = transaction.card {
             LabeledContent(Strings.Common.card) {
                 HStack(spacing: 6) {
-                    CardMark(image: card.image, height: 18) {
-                        Image(systemName: Card.symbolName)
-                            .foregroundStyle(card.color.color)
-                    }
+                    CardMark(card: card, height: 18)
                     Text(card.displayName)
                 }
             }
@@ -199,7 +201,16 @@ private struct ExcludedFromReportBanner: View {
     }
 }
 
-extension TransactionEditFlow: Identifiable {
+/// The sheet a transaction's detail has open: the editor Edit opens, Duplicate, Split, Enter amount, or what the Loan or
+/// Debt and Reimbursement sections open. One at a time, so one `sheet` presents them all.
+private enum TransactionDetailSheet: Hashable, Identifiable {
+    case edit(TransactionEditFlow)
+    case duplicate
+    case split
+    case enterAmount
+    case loanOrDebt(LoanOrDebtAction)
+    case reimbursement(ReimbursementAction)
+
     var id: Self { self }
 }
 

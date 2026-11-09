@@ -169,14 +169,14 @@ extension ExpectedReimbursement: RemindedRecord, ListedWithReminder {
         guard isOpen else { throw ExpectedReimbursementRuleError.notOpen }
         guard hasOpenAmount else { throw ExpectedReimbursementRuleError.hasAnAmount }
         closedDay = day
-        try modelContext?.save()
+        try saveToStore()
     }
 
     /// Opens a closed expectation again. Saves.
     func reopen() throws {
         guard closedDayRaw != nil else { throw ExpectedReimbursementRuleError.notClosed }
         closedDay = nil
-        try modelContext?.save()
+        try saveToStore()
     }
 
     /// Forgive: the money won't come back. It is marked Forgiven on `day` with an optional note and counts as settled
@@ -185,14 +185,14 @@ extension ExpectedReimbursement: RemindedRecord, ListedWithReminder {
     func forgive(on day: CalendarDay, note: String = "") throws {
         guard isOpen else { throw ExpectedReimbursementRuleError.notOpen }
         markForgiven(on: day, note: note)
-        try modelContext?.save()
+        try saveToStore()
     }
 
     /// Takes the Forgiven mark off, so it is open again if anything is still expected. Saves.
     func unforgive() throws {
         guard forgivenDayRaw != nil else { throw ExpectedReimbursementRuleError.notForgiven }
         clearForgivenMark()
-        try modelContext?.save()
+        try saveToStore()
     }
 }
 
@@ -237,8 +237,8 @@ extension Transaction {
     /// Makes the expectations of this Expense match `entries`: a new one for each entry with no `existing`, the others
     /// changed to the entry, and any not among the entries removed. Whether that is allowed is
     /// ``TransactionDraft/validate()``'s to check. Doesn't save, and moves no balance or report.
-    func setExpectations(_ entries: [OwesMeDraft]) {
-        guard let context = modelContext else { return }
+    func setExpectations(_ entries: [OwesMeDraft]) throws {
+        let context = try storeContext()
         for existing in expectations ?? [] where !entries.contains(where: { $0.existing === existing }) {
             expectations?.removeAll { $0 === existing }
             context.delete(existing)
@@ -345,11 +345,6 @@ struct ExpectedReimbursements {
         }
         self.open = open.sorted { $0.isDue(before: $1) }.map(\.expectation)
         self.settled = settled.sorted { $1.isOlder(than: $0) }.map(\.expectation)
-    }
-
-    /// Every Expected reimbursement in `context`.
-    init(in context: ModelContext) throws {
-        self.init(try context.fetch(Self.all))
     }
 
     /// An expectation with what it is sorted by, read once before sorting rather than at every comparison.

@@ -20,14 +20,6 @@ nonisolated struct ExpectationPaymentDraft {
     }
 }
 
-/// What Record payment made.
-nonisolated enum RecordedPayment {
-    /// A Reimbursement on the Expense, netted into its own wallet on its own day.
-    case onExpense(Reimbursement)
-    /// A transaction in another wallet, dated the day received, linked to the Expense (ADR-0010).
-    case inOtherWallet(Transaction)
-}
-
 extension ExpectedReimbursement {
     /// Checks a payment before anything is recorded: something must still be expected, the amount above zero, and the
     /// Expense able to take it in the wallet chosen (``Transaction/checkPayback(into:)``).
@@ -43,12 +35,11 @@ extension ExpectedReimbursement {
     /// excess follows the Reimbursement rule and counts as Other Income. An expectation with an amount closes itself
     /// once its payments cover it; an open amount stays open until closed by hand. In another wallet it is a real
     /// transaction there, with the Person in With (``Transaction/recordPaybackElsewhere(_:into:from:for:in:)``). Saves.
-    @discardableResult
-    func recordPayment(_ draft: ExpectationPaymentDraft, in context: ModelContext) throws -> RecordedPayment {
+    func recordPayment(_ draft: ExpectationPaymentDraft, in context: ModelContext) throws {
         try validate(draft)
         guard let expense else { throw ReimbursementRuleError.notAnExpense }
         let entry = ReimbursementDraft(amount: draft.amount, day: draft.day, note: draft.note)
-        return try expense.recordPayback(entry, into: draft.wallet, from: person, for: self, in: context)
+        try expense.recordPayback(entry, into: draft.wallet, from: person, for: self, in: context)
     }
 }
 
@@ -66,17 +57,15 @@ extension Transaction {
     /// Reimbursement on the Expense (ADR-0008); into another wallet it is a transaction there, linked to the Expense
     /// (``recordPaybackElsewhere(_:into:from:for:in:)``, ADR-0010). `person` paid it, against `expectation`, when
     /// someone owed it. Saves.
-    @discardableResult
     func recordPayback(
         _ draft: ReimbursementDraft, into wallet: Wallet?, from person: Person? = nil,
         for expectation: ExpectedReimbursement? = nil, in context: ModelContext
-    ) throws -> RecordedPayment {
-        guard isElsewhere(wallet), let wallet else {
-            return .onExpense(try Reimbursement.add(draft, to: self, for: expectation, in: context))
-        }
-        return .inOtherWallet(
+    ) throws {
+        if isElsewhere(wallet), let wallet {
             try recordPaybackElsewhere(draft, into: wallet, from: person, for: expectation, in: context)
-        )
+        } else {
+            try Reimbursement.add(draft, to: self, for: expectation, in: context)
+        }
     }
 
     /// Whether money received into `wallet` is paid back elsewhere: a transaction in that wallet (ADR-0010) rather than

@@ -11,7 +11,7 @@ import SwiftUI
 struct DebtsLoansView: View {
     @Query(DebtsAndLoans.transactions) private var transactions: [Transaction]
     @Query(ExpectedReimbursements.all) private var expectations: [ExpectedReimbursement]
-    @AppStorage(DebtsLoansGrouping.storageKey) private var grouping = DebtsLoansGrouping.default
+    @AppStorage(AppSettings.debtsLoansGroupingKey) private var grouping = AppSettings.debtsLoansGroupingDefault
     /// The message being texted, while Text them is open.
     @State private var texting: TextReminder?
 
@@ -197,5 +197,5 @@ extension LoanOrDebt: Identifiable {
     NavigationStack {
         DebtsLoansView()
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+    .modelContainer(try! StoreOpening.open(inMemory: true))
 }

@@ -34,11 +34,16 @@ final class ContactsInWith {
         await search("")
     }
 
-    /// Brings the people linked to a contact up to date with it. Nothing changes for a contact that can't be read.
+    /// Brings the people linked to a contact up to date with it. Nothing changes for a contact that can't be read, and
+    /// a save that fails leaves the people as they were, logged: the menu still lists them.
     func refreshPeople(in context: ModelContext) async {
         access = lookup.access
         guard access.showsContacts else { return }
-        try? await Person.refreshFromContacts(using: lookup, in: context)
+        do {
+            try await Person.refreshFromContacts(using: lookup, in: context)
+        } catch {
+            Log.store.failed("Bringing people up to date with their contacts", error)
+        }
     }
 
     /// Lists the contacts matching `typed`, a moment after the last keystroke. Reads off the main actor, so typing stays
@@ -48,6 +53,8 @@ final class ContactsInWith {
             results = []
             return
         }
+        // Waits out the typing, so each keystroke doesn't read every contact again. The sleep throws only when the next
+        // keystroke cancels this search, which the check after it ends.
         if !typed.isEmpty {
             try? await Task.sleep(for: .milliseconds(250))
             if Task.isCancelled { return }

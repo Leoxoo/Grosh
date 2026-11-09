@@ -25,10 +25,10 @@ struct ExpectedReimbursementDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .sheet(isPresented: $isRecordingPayment) {
-            ExpectationPaymentEditor(expectation: expectation, today: today)
+            ExpectationPaymentEditor(expectation: expectation)
         }
         .sheet(isPresented: $isForgiving) {
-            ExpectationForgiveSheet(expectation: expectation, today: today)
+            ExpectationForgiveSheet(expectation: expectation)
         }
         .errorAlert(Strings.OwesMe.couldntChange, message: $errorMessage)
     }

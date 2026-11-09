@@ -57,5 +57,5 @@ struct TransactionSearchView: View {
     NavigationStack {
         TransactionSearchView()
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+    .modelContainer(try! StoreOpening.open(inMemory: true))
 }

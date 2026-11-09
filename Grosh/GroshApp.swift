@@ -24,7 +24,7 @@ struct GroshApp: App {
                 return uiTestStore
             }
             #endif
-            return try GroshStore.makeSeededContainer()
+            return try StoreOpening.open()
         } catch {
             fatalError("Couldn't open the Grosh store: \(error)")
         }

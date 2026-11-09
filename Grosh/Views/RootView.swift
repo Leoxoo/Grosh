@@ -32,5 +32,5 @@ struct RootView: View {
 
 #Preview {
     RootView()
-        .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+        .modelContainer(try! StoreOpening.open(inMemory: true))
 }

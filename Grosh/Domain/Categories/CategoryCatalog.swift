@@ -275,26 +275,3 @@ struct CategoryCatalog {
     }
 }
 
-extension Category {
-    /// Hidden itself, or a subcategory of a hidden parent.
-    var isHiddenInTree: Bool { isHidden || parent?.isHidden == true }
-
-    /// Outgoing transfer or Incoming transfer: one half of a Transfer, which never carries a Card.
-    var isTransferHalf: Bool { lockedRole == .outgoingTransfer || lockedRole == .incomingTransfer }
-}
-
-nonisolated extension CategoryType {
-    /// Expense and Income categories are the user's own; Debt/Loan and system categories are fixed.
-    var isUserManaged: Bool { self == .expense || self == .income }
-}
-
-extension LockedRole {
-    /// Whether the user picks this category by hand. The rest are filed by their own flows: Transfer,
-    /// Record payment, and a new wallet's Starting balance.
-    var isOfferedInPicker: Bool {
-        switch self {
-        case .otherIncome, .otherExpense, .loan, .debt: true
-        case .outgoingTransfer, .incomingTransfer, .debtCollection, .repayment, .startingBalance, .reimbursement: false
-        }
-    }
-}

@@ -16,7 +16,7 @@ struct HomeMonthGraph: View {
     @Query(MonthGraphHistory.earliestCounted) private var earliest: [Transaction]
     @Query(MonthGraphHistory.forgiven) private var forgiven: [Transaction]
     @State private var side = SpentOrIncome.spent
-    @AppStorage(AppSettings.comparesWithLastYearKey) private var comparesWithLastYear = false
+    @AppStorage(AppSettings.comparesWithLastYearKey) private var comparesWithLastYear = AppSettings.comparesWithLastYearDefault
 
     var body: some View {
         OtherIncomeReader { otherIncome in
@@ -199,7 +199,7 @@ extension SpentOrIncome {
 
 #Preview {
     HomeMonthGraphPreview()
-        .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+        .modelContainer(try! StoreOpening.open(inMemory: true))
 }
 
 /// Home's Month graph on the month of the day the preview shows.

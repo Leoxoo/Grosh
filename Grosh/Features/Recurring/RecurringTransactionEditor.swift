@@ -276,5 +276,5 @@ private struct PastPrompt: Identifiable {
 
 #Preview {
     RecurringTransactionEditor(mode: .add)
-        .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+        .modelContainer(try! StoreOpening.open(inMemory: true))
 }

@@ -130,16 +130,15 @@ struct EditorRulesTests {
 
     @Test func moneyPaidBackIntoTheExpensesWalletIsKeptOnItAndIntoAnotherIsATransactionThere() throws {
         let dinner = try fixture.dinner(60_00)
-        let own = try dinner.recordPayback(
+        try dinner.recordPayback(
             ReimbursementDraft(amount: Money(cents: 10_00), day: day(2026, 10, 5)), into: fixture.checking, in: context
         )
-        let other = try dinner.recordPayback(
+        try dinner.recordPayback(
             ReimbursementDraft(amount: Money(cents: 5_00), day: day(2026, 10, 6)), into: fixture.cash, in: context
         )
 
-        guard case .onExpense = own else { Issue.record("Expected a Reimbursement on the Expense."); return }
-        guard case .inOtherWallet(let payback) = other else { Issue.record("Expected a transaction in Cash."); return }
-        #expect(payback.wallet === fixture.cash)
+        #expect(dinner.orderedReimbursements.map(\.amountCents) == [10_00])
+        #expect(dinner.paybacksElsewhere.map(\.wallet) == [fixture.cash])
     }
 
     @Test func aRowShowsTheNetOnlyOnceSomethingWasPaidBack() throws {

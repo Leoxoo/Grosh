@@ -27,7 +27,7 @@ struct MonthGraphLegend: View {
                         .disabled(!graph.isLastYearAvailable)
                 }
             }
-            if let expected = graph.expectedByMonthEnd {
+            if let expected = graph.expectedByPeriodEnd {
                 entry(Text(Strings.Home.scheduledExpectedBy(graph.endName, expected.formatted())), color: graph.side.color, dotted: true)
             }
         }

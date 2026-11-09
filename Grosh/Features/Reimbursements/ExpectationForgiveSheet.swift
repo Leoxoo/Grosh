@@ -6,12 +6,23 @@ import SwiftUI
 struct ExpectationForgiveSheet: View {
     let expectation: ExpectedReimbursement
 
+    @Environment(\.today) private var today
+
+    var body: some View {
+        ExpectationForgiveForm(expectation: expectation, today: today)
+    }
+}
+
+/// The form behind ``ExpectationForgiveSheet``, holding the day from the moment the sheet opens.
+private struct ExpectationForgiveForm: View {
+    let expectation: ExpectedReimbursement
+
     @Environment(\.dismiss) private var dismiss
     @State private var day: CalendarDay
     @State private var note = ""
     @State private var errorMessage: String?
 
-    /// `today` is the day it starts on, from the presenting screen's environment.
+    /// `today` is the day it starts on.
     init(expectation: ExpectedReimbursement, today: CalendarDay) {
         self.expectation = expectation
         _day = State(initialValue: today)

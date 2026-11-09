@@ -149,6 +149,8 @@ nonisolated enum RecentlyDeletedError: Error, Equatable {
     case deletedWithWallet
     /// A payment whose Loan or Debt was forgiven since it was deleted would be counted twice: un-forgive it first.
     case loanOrDebtIsForgiven
+    /// What the item is linked to couldn't be read, so whether it may come back is unknown, and it stays in the bin.
+    case couldntCheck
 }
 
 extension RecentlyDeletedError: LocalizedError {
@@ -158,23 +160,20 @@ extension RecentlyDeletedError: LocalizedError {
         case .walletIsDeleted: String(localized: Strings.RecentlyDeleted.walletIsDeleted)
         case .deletedWithWallet: String(localized: Strings.RecentlyDeleted.deletedWithWallet)
         case .loanOrDebtIsForgiven: String(localized: Strings.RecentlyDeleted.loanOrDebtIsForgiven)
+        case .couldntCheck: String(localized: Strings.RecentlyDeleted.couldntCheck)
         }
     }
 }
 
 extension Wallet {
-    /// Whether the wallet is in Recently Deleted.
-    var isInRecentlyDeleted: Bool { deletedAt != nil }
-
     /// Deletes the wallet: moves it, every transaction in it and its Recurring transactions to Recently Deleted as one
     /// item. Due Recurring transactions are made first, so no due day is lost. It leaves the Total, every list and every
     /// picker. A transfer's other half in another wallet stays where it is. Saves.
     func delete(at now: Date = .now) throws {
+        let context = try storeContext()
         let schedules = (recurringTransactions ?? []).filter { !$0.isInRecentlyDeleted }
-        if let context = modelContext {
-            for schedule in schedules {
-                schedule.makeDueTransactions(through: CalendarDay(now), in: context)
-            }
+        for schedule in schedules {
+            schedule.makeDueTransactions(through: CalendarDay(now), in: context)
         }
         deletedAt = now
         for transaction in (transactions ?? []).notDeleted {
@@ -185,7 +184,7 @@ extension Wallet {
             schedule.deletedAt = now
             schedule.deletedWithWallet = true
         }
-        try modelContext?.save()
+        try context.save()
     }
 
     /// The transactions that went to Recently Deleted with this wallet, newest first: what its item holds.
@@ -216,7 +215,7 @@ extension Wallet {
             schedule.skipOccurrences(through: today)
         }
         deletedAt = nil
-        try modelContext?.save()
+        try saveToStore()
     }
 
     /// Delete Forever: removes the wallet in Recently Deleted and every transaction in it for good, with the Cards
@@ -243,7 +242,7 @@ extension RecurringTransaction {
         if let restoreBlocker { throw restoreBlocker }
         skipOccurrences(through: today)
         deletedAt = nil
-        try modelContext?.save()
+        try saveToStore()
     }
 
     /// Delete Forever: removes a schedule deleted on its own for good. The transactions it made stay as ordinary ones.
@@ -267,36 +266,32 @@ extension Transaction {
         FetchDescriptor(predicate: #Predicate { $0.deletedAt == nil })
     }
 
-    /// Whether the transaction is in Recently Deleted.
-    var isInRecentlyDeleted: Bool { deletedAt != nil }
-
-    /// Why this transaction in Recently Deleted can't be restored on its own, or `nil` when it can.
-    var restoreBlocker: RecentlyDeletedError? {
-        guard isInRecentlyDeleted else { return .notDeleted }
+    /// Why this transaction in Recently Deleted can't be restored on its own, or `nil` when it can. One deleted with its
+    /// wallet comes back only with the wallet, one whose wallet is in the bin waits for the wallet, and a payment
+    /// whose Loan or Debt was forgiven since waits for it to be un-forgiven (``paysForgivenLoanOrDebt(in:)``). A payment
+    /// reads the store for that, so a screen asks once per row. When that read fails the answer is
+    /// ``RecentlyDeletedError/couldntCheck``: the transaction stays in the bin rather than risk counting twice.
+    func restoreBlocker() -> RecentlyDeletedError? {
+        guard isInRecentlyDeleted, let context = modelContext else { return .notDeleted }
         if deletedWithWallet { return .deletedWithWallet }
         if wallet?.isInRecentlyDeleted == true { return .walletIsDeleted }
-        if paysForgivenLoanOrDebt { return .loanOrDebtIsForgiven }
+        do {
+            if try paysForgivenLoanOrDebt(in: context) { return .loanOrDebtIsForgiven }
+        } catch {
+            Log.store.failed("Reading the transactions linked to a payment", error)
+            return .couldntCheck
+        }
         return nil
     }
 
-    /// Whether this is a Debt Collection or Repayment linked to a Loan or Debt that is forgiven.
-    private var paysForgivenLoanOrDebt: Bool {
-        guard let kind = paidLoanOrDebtKind, linkKind == .loanOrDebt, let context = modelContext else { return false }
-        let linkedTransactions = Log.store.attempt("Reading the transactions linked to a payment") {
-            try context.fetch(linkedTransactions)
-        } ?? []
-        return linkedTransactions.contains { $0.isForgiven && $0.loanOrDebtKind == kind }
-    }
-
-    /// Brings a transaction deleted on its own back from Recently Deleted, linked as before. One deleted with its
-    /// wallet comes back only with the wallet, one whose wallet is in the bin waits for the wallet, and a payment
-    /// whose Loan or Debt was forgiven since waits for it to be un-forgiven. A deposit moved into an Expense takes its
-    /// Reimbursement back off the Expense (``takeBackMovedInReimbursements()``). Saves.
+    /// Brings a transaction deleted on its own back from Recently Deleted, linked as before, unless its
+    /// ``restoreBlocker()`` says why not. A deposit moved into an Expense takes its Reimbursement back off the Expense
+    /// (``takeBackMovedInReimbursements()``). Saves.
     func restore() throws {
-        if let restoreBlocker { throw restoreBlocker }
+        if let blocker = restoreBlocker() { throw blocker }
         deletedAt = nil
-        takeBackMovedInReimbursements()
-        try modelContext?.save()
+        try takeBackMovedInReimbursements()
+        try saveToStore()
     }
 
     /// Delete Forever: removes a transaction deleted on its own for good. Saves.

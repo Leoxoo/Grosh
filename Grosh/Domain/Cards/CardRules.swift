@@ -155,7 +155,7 @@ extension Card {
             throw CardRuleError.payingWalletHasTransactions
         }
         apply(draft)
-        try modelContext?.save()
+        try saveToStore()
     }
 
     private func apply(_ draft: CardDraft) {
@@ -194,13 +194,13 @@ extension Card {
     /// Retires the Card: it leaves every picker but stays on the transactions it paid for. Saves.
     func archive() throws {
         isArchived = true
-        try modelContext?.save()
+        try saveToStore()
     }
 
     /// Brings an archived Card back into the pickers. Saves.
     func unarchive() throws {
         isArchived = false
-        try modelContext?.save()
+        try saveToStore()
     }
 
     /// The Cards this one can be merged into: the other unarchived Cards paid from the same wallet, in the
@@ -235,11 +235,5 @@ extension Card {
         guard !hasTransactions else { throw CardRuleError.hasTransactions }
         context.delete(self)
         try context.save()
-    }
-
-    /// The day this Credit card's statement closes in the given month, or `nil` when it has no statement date.
-    /// A statement date past the month's end (the 31st in April) falls on the month's last day.
-    func statementClosingDay(year: Int, month: Int) -> CalendarDay? {
-        statementDay.map { CalendarMonth(year: year, month: month).statementClosingDay($0) }
     }
 }

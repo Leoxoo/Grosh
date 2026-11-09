@@ -25,7 +25,7 @@ struct MoneyLoverImportTests {
 
     @discardableResult
     private func importing(_ csv: String) throws -> MoneyLoverImportSummary {
-        try MoneyLoverImport.replaceAllData(with: MoneyLoverCSV.read(csv), in: context)
+        try MoneyLoverImport.replaceAllData(with: MoneyLoverCSV.read(csv), cards: .ownersCards, in: context)
     }
 
     private func wallet(_ name: String) throws -> Wallet {
@@ -272,7 +272,7 @@ struct MoneyLoverImportTests {
             let original = loanOrDebt.original
             return "\(original.wallet?.name ?? "") \(original.day.month)/\(original.day.day) \(original.amountCents)"
         }
-        let all = try DebtsAndLoans(in: context)
+        let all = DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions))
         return (Set(all.open.map { describe($0) }), Set(all.settled.map { describe($0) }))
     }
 
@@ -454,7 +454,9 @@ struct MoneyLoverImportTests {
         try addExistingData()
 
         #expect(throws: MoneyLoverImportError.noTransactions) {
-            try MoneyLoverImport.replaceAllData(with: MoneyLoverExport(rows: [], isGroshExport: false), in: context)
+            try MoneyLoverImport.replaceAllData(
+                with: MoneyLoverExport(rows: [], isGroshExport: false), cards: .none, in: context
+            )
         }
 
         #expect(try context.fetch(FetchDescriptor<Wallet>()).map(\.name) == ["Old wallet"])
@@ -539,7 +541,7 @@ struct MoneyLoverImportTests {
                 "1,10/05/2026,Café,-3.00,USD,Checking,First,Sam,,,",
                 "2,10/04/2026,Café,-4.00,USD,Checking,Second,Kim,,,"
             )),
-            in: context, now: now
+            cards: .none, in: context, now: now
         )
 
         let people = try context.fetch(Person.previous)

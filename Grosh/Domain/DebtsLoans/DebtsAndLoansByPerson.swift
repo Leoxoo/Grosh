@@ -6,11 +6,6 @@ import SwiftData
 nonisolated enum DebtsLoansGrouping: String, Hashable, Sendable {
     case people
     case loanOrDebt
-
-    /// Where the choice is kept.
-    static let storageKey = "debtsLoans.grouping"
-    /// The list as it was before Show by people existed.
-    static let `default` = DebtsLoansGrouping.loanOrDebt
 }
 
 /// One Person in Show by people: their Loans, Debts and Expected reimbursements, and what they come to (ADR-0009,
@@ -104,15 +99,5 @@ struct DebtsAndLoansByPerson {
         .sorted { $0.person.name.localizedStandardCompare($1.person.name) == .orderedAscending }
         open = listed.filter { !$0.isSettled }
         settled = listed.filter(\.isSettled)
-    }
-
-    /// Everything Show by people lists, in `context`.
-    init(in context: ModelContext) throws {
-        self.init(try DebtsAndLoans(in: context), try ExpectedReimbursements(in: context))
-    }
-
-    /// `person`'s entry, or `nil` when they are not listed.
-    func entry(for person: Person) -> PersonDebtsAndLoans? {
-        (open + settled).first { $0.person === person }
     }
 }
