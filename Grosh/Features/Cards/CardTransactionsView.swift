@@ -48,14 +48,15 @@ struct CardTransactionsView: View {
     /// The period being shown, its count and total, then its transactions by day and its lead-in transactions.
     private var periodList: some View {
         let period = card.period(containing: today).adding(-periodsBack)
-        let shown = card.transactions(in: period)
-        let leadIns = card.leadInTransactions(in: period)
+        let statement = card.statement(for: period, today: today)
+        let shown = statement.transactions
+        let leadIns = statement.leadIns
         let added = leadIns.filter { addedLeadIns.contains($0) }
 
         return List {
             Section {
                 CardPeriodStepper(
-                    period: period, periods: card.periods(today: today), today: today, periodsBack: $periodsBack
+                    period: period, periods: statement.periods, today: today, periodsBack: $periodsBack
                 )
                 LabeledContent(Strings.Common.transactions) {
                     Text(shown.count.formatted())

@@ -4,16 +4,11 @@ import SwiftUI
 /// Account → Cards: every Card in the order it was added. Tap to see its transactions by statement period or month,
 /// swipe to archive.
 struct CardListView: View {
-    @Query(Card.unarchived) private var unarchivedCards: [Card]
-    @Query(Card.archived) private var allArchivedCards: [Card]
+    @Query(Card.unarchived) private var cards: [Card]
+    @Query(Card.archived) private var archivedCards: [Card]
     @State private var editorMode: EditorMode<Card>?
     @State private var mergeSource: Card?
     @State private var errorMessage: String?
-
-    /// The unarchived Cards, leaving out those whose paying wallet is in Recently Deleted.
-    private var cards: [Card] { unarchivedCards.filter { !$0.isPaidFromDeletedWallet } }
-    /// The archived Cards, leaving out those whose paying wallet is in Recently Deleted.
-    private var archivedCards: [Card] { allArchivedCards.filter { !$0.isPaidFromDeletedWallet } }
 
     var body: some View {
         List {

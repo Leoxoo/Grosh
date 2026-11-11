@@ -96,24 +96,45 @@ extension Card {
         CardPeriod(containing: day, statementDay: kind == .credit ? statementDay : nil)
     }
 
+    /// What the Card's statement screen shows for `period` on `today`, read in one pass over the Card's transactions.
+    func statement(for period: CardPeriod, today: CalendarDay) -> CardStatement {
+        CardStatement(of: self, for: period, today: today)
+    }
+}
+
+/// What a Card's statement screen shows for one period: the periods ‹ › step through, the transactions paid with the
+/// Card in the period, and its lead-in transactions. The Card's transactions are read once for all three, rather than
+/// once for each: a main Card pays for thousands.
+nonisolated struct CardStatement {
     /// The periods ‹ › step through, oldest first: from the one holding the Card's first transaction through the one
     /// holding `today`, or its last transaction when that is dated later.
-    func periods(today: CalendarDay) -> ClosedRange<CardPeriod> {
-        let days = (transactions ?? []).notDeleted.map(\.day)
-        return period(containing: min(days.min() ?? today, today))...period(containing: max(days.max() ?? today, today))
-    }
-
-    /// The transactions paid with this Card in `period`. Their `net` is the period's total: every one counts,
+    let periods: ClosedRange<CardPeriod>
+    /// The transactions paid with the Card in the period. Their `net` is the period's total: every one counts,
     /// excluded from report or not, as on the card's statement.
-    func transactions(in period: CardPeriod) -> [Transaction] {
-        (transactions ?? []).notDeleted.filter { period.contains($0.day) }
-    }
+    let transactions: [Transaction]
+    /// The lead-in transactions: those paid with the Card in the two days before a statement period begins, since
+    /// entries aren't always dated exactly as on the statement. They belong to the previous statement and never count
+    /// in this one's total unless the user adds one for the moment. None for a calendar month.
+    let leadIns: [Transaction]
 
-    /// The lead-in transactions of `period`: those paid with this Card in the two days before a statement period
-    /// begins, since entries aren't always dated exactly as on the statement. They belong to the previous statement
-    /// and never count in this one's total unless the user adds one for the moment. None for a calendar month.
-    func leadInTransactions(in period: CardPeriod) -> [Transaction] {
-        guard let days = period.leadInDays else { return [] }
-        return (transactions ?? []).notDeleted.filter { days.contains($0.day) }
+    init(of card: Card, for period: CardPeriod, today: CalendarDay) {
+        let leadInDays = period.leadInDays
+        var first = today
+        var last = today
+        var transactions: [Transaction] = []
+        var leadIns: [Transaction] = []
+        for transaction in card.transactions ?? [] where !transaction.isInRecentlyDeleted {
+            let day = transaction.day
+            first = min(first, day)
+            last = max(last, day)
+            if period.contains(day) {
+                transactions.append(transaction)
+            } else if leadInDays?.contains(day) == true {
+                leadIns.append(transaction)
+            }
+        }
+        periods = card.period(containing: first)...card.period(containing: last)
+        self.transactions = transactions
+        self.leadIns = leadIns
     }
 }

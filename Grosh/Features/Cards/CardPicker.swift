@@ -14,7 +14,7 @@ struct CardPicker: View {
     /// The first choice, which picks no Card.
     private let noneTitle: LocalizedStringResource
 
-    @Query(sort: Card.userOrder) private var allCards: [Card]
+    @Query(Card.listed) private var listedCards: [Card]
     @Environment(\.displayScale) private var displayScale
 
     private enum Offered {
@@ -55,7 +55,7 @@ struct CardPicker: View {
     private var choices: [Card] {
         switch offered {
         case .paidFrom(let wallet): Card.pickerChoices(for: wallet, keeping: selection)
-        case .every: allCards.filter { !$0.isPaidFromDeletedWallet }
+        case .every: listedCards
         }
     }
 

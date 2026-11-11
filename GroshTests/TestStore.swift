@@ -224,6 +224,14 @@ func walletBalance(_ wallet: Wallet, asOf today: CalendarDay) -> Money {
     WalletBalances(of: [wallet], asOf: today).balance(of: wallet)
 }
 
+/// A balance adjustment's recorded and actual balance, as the transaction detail adds them up from the ledger entries
+/// of every transaction outside Recently Deleted (``Transaction/balanceChange(in:)``).
+@MainActor
+func balanceChange(of transaction: Transaction) throws -> (recorded: Money, actual: Money)? {
+    let context = try transaction.storeContext()
+    return transaction.balanceChange(in: try context.fetch(Transaction.notDeleted).map(LedgerEntry.init))
+}
+
 /// The Total of `wallets` on `today`, per currency, as ``WalletBalances/total(of:)`` adds it up.
 @MainActor
 func walletTotal(_ wallets: [Wallet], asOf today: CalendarDay) -> [Money] {

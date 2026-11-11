@@ -186,12 +186,16 @@ extension Transaction {
 
     /// For a balance adjustment, its wallet's balance just before it (what was recorded) and just after (the
     /// actual balance), taking the wallet's transactions in list order: what is entered later the same day
-    /// comes after it. `nil` for any other transaction.
-    var balanceChange: (recorded: Money, actual: Money)? {
+    /// comes after it. `nil` for any other transaction. Added up from `ledger`, the ledger entries of every
+    /// transaction outside Recently Deleted; only the few entered on the adjustment's own day are read for their order.
+    func balanceChange(in ledger: some Sequence<LedgerEntry>) -> (recorded: Money, actual: Money)? {
         guard isBalanceAdjustment, let wallet else { return nil }
-        let recordedCents = (wallet.transactions ?? []).notDeleted
-            .filter { $0 != self && isListed(before: $0) }
-            .reduce(0) { $0 + $1.netCents }
+        let day = dayRaw
+        let recordedCents = ledger.reduce(0) { cents, entry in
+            guard entry.wallet === wallet, entry.dayRaw <= day, entry.transaction != self else { return cents }
+            let isEarlier = entry.dayRaw < day || isListed(before: entry.transaction)
+            return isEarlier ? cents + entry.netCents : cents
+        }
         return (
             recorded: Money(cents: recordedCents, currencyCode: wallet.currencyCode),
             actual: Money(cents: recordedCents + amountCents, currencyCode: wallet.currencyCode)

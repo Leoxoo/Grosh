@@ -185,10 +185,12 @@ struct RecentlyDeletedTests {
         coffee.card = chase
 
         try checking.delete(at: deletedAt)
-        #expect(chase.isPaidFromDeletedWallet)
+        #expect(try !context.fetch(Card.unarchived).contains(chase))
+        #expect(try !context.fetch(Card.listed).contains(chase))
 
         try checking.restore(today: today)
-        #expect(!chase.isPaidFromDeletedWallet)
+        #expect(try context.fetch(Card.unarchived).contains(chase))
+        #expect(try context.fetch(Card.listed).contains(chase))
 
         try checking.delete(at: deletedAt)
         try checking.deleteForever(in: context)
