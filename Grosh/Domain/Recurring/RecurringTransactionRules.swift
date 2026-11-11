@@ -282,51 +282,44 @@ extension RecurringTransaction {
         guard isActive, wallet != nil, category != nil else { return }
         let due = schedule.occurrences(after: handledThrough, through: today)
         guard !due.isEmpty else { return }
-        let history = estimateHistory
+        let estimate = currentEstimateCents()
         for day in due {
-            makeTransaction(on: day, history: history, in: context)
+            makeTransaction(on: day, estimateCents: estimate, in: context)
         }
         if let last = due.last {
             handledThrough = last
         }
     }
 
-    /// The estimate a varying Bill's transactions start at now: the average ``AmountEstimate`` gives over `history`
-    /// for its category and wallet currency. `nil` for other Kinds, and when there is nothing to average.
-    func estimateCents(among history: [Transaction]) -> Int? {
+    /// The estimate a varying Bill's transactions start at now: the average ``AmountEstimate`` gives for its category
+    /// and wallet currency, read from the store. `nil` for other Kinds, and when there is nothing to average.
+    func currentEstimateCents() -> Int? {
         guard estimatesAmount, let category = self.category, let wallet = self.wallet else { return nil }
-        return AmountEstimate.cents(among: history, for: category, currencyCode: wallet.currencyCode)
+        return AmountEstimate.cents(for: category, currencyCode: wallet.currencyCode)
     }
 
-    /// What each transaction it makes now is for, signed by its category: the estimate when there is one, otherwise the
-    /// typed amount. Making a transaction and showing the schedule both use it, so a varying Bill's rows show the amount
-    /// its transactions will hold.
-    func startingAmount(among history: [Transaction]) -> Money {
-        Money(
-            cents: (estimateCents(among: history) ?? amountCents) * (category?.sign ?? -1),
-            currencyCode: currencyCode
-        )
+    /// What each transaction it makes is for, signed by its category: `estimateCents` (``currentEstimateCents()``)
+    /// when there is one, otherwise the typed amount. Making a transaction and showing the schedule both use it, so a
+    /// varying Bill's rows show the amount its transactions will hold.
+    func startingAmount(estimateCents: Int?) -> Money {
+        Money(cents: (estimateCents ?? amountCents) * (category?.sign ?? -1), currencyCode: currencyCode)
     }
 
-    /// What its transactions start at now, as ``startingAmount(among:)`` works it out from ``estimateHistory``.
-    var startingAmount: Money { startingAmount(among: estimateHistory) }
-
-    /// The transactions a varying Bill's estimate is averaged over: those filed under its category or its
-    /// subcategories (``AmountEstimate/history(for:)``). Other Kinds read nothing.
-    var estimateHistory: [Transaction] {
-        guard estimatesAmount, let category else { return [] }
-        return AmountEstimate.history(for: category)
+    /// What its transactions start at now, a varying Bill's estimate read from the store. A screen showing many
+    /// schedules reads them once through ``RecurringFigures``.
+    func currentStartingAmount() -> Money {
+        startingAmount(estimateCents: currentEstimateCents())
     }
 
     /// Makes the transaction for the occurrence on `day`, attached to this schedule, and inserts it. A Bill whose amount
-    /// varies starts Estimated, at the average of `history`. Nothing is made without a wallet and a category, which the
-    /// schedule can lose when they are deleted.
+    /// varies starts Estimated, at `estimateCents` (``currentEstimateCents()``). Nothing is made without a wallet and a
+    /// category, which the schedule can lose when they are deleted.
     @discardableResult
-    func makeTransaction(on day: CalendarDay, history: [Transaction], in context: ModelContext) -> Transaction? {
+    func makeTransaction(on day: CalendarDay, estimateCents: Int?, in context: ModelContext) -> Transaction? {
         guard let wallet = self.wallet, let category = self.category else { return nil }
         let transaction = Transaction.insert(
-            startingAmount(among: history), on: day, wallet: wallet, category: category, card: card, note: note,
-            in: context
+            startingAmount(estimateCents: estimateCents), on: day, wallet: wallet, category: category, card: card,
+            note: note, in: context
         )
         transaction.recurring = self
         if estimatesAmount {
@@ -347,9 +340,9 @@ extension RecurringTransaction {
     /// Makes a transaction on each of `days`, the occurrences the user picked from the start-date prompt, and saves.
     /// Nothing is made for an empty list.
     func makeTransactions(on days: [CalendarDay], in context: ModelContext) throws {
-        let history = estimateHistory
+        let estimate = currentEstimateCents()
         for day in days {
-            makeTransaction(on: day, history: history, in: context)
+            makeTransaction(on: day, estimateCents: estimate, in: context)
         }
         try context.save()
     }
@@ -371,7 +364,7 @@ extension RecurringTransaction {
     @MainActor
     func addTransactionNow(today: CalendarDay, in context: ModelContext) throws {
         if let addBlocker { throw addBlocker }
-        makeTransaction(on: today, history: estimateHistory, in: context)
+        makeTransaction(on: today, estimateCents: currentEstimateCents(), in: context)
         try context.save()
     }
 

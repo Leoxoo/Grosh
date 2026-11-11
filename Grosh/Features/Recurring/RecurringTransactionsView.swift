@@ -18,6 +18,8 @@ struct RecurringTransactionsView: View {
     }
 
     var body: some View {
+        let groups = self.groups
+        let figures = RecurringFigures(groups.flatMap(\.items))
         List {
             ForEach(groups) { group in
                 Section(group.kind.sectionTitle) {
@@ -25,7 +27,10 @@ struct RecurringTransactionsView: View {
                         NavigationLink {
                             RecurringTransactionDetailView(recurring: item)
                         } label: {
-                            RecurringTransactionRow(recurring: item)
+                            RecurringTransactionRow(
+                                recurring: item, startingAmount: figures.startingAmount(of: item),
+                                progress: figures.purchaseProgress(of: item)
+                            )
                         }
                         .swipeActions(edge: .trailing) {
                             Button(Strings.Common.duplicate, systemImage: "doc.on.doc") {
@@ -87,6 +92,10 @@ struct RecurringTransactionsView: View {
 /// estimate while it has one, as the transactions it makes will.
 struct RecurringTransactionRow: View {
     let recurring: RecurringTransaction
+    /// What its transactions start at now, its estimate for a varying Bill (``RecurringFigures``).
+    let startingAmount: Money
+    /// A Purchase's progress, or `nil` for any other Kind.
+    let progress: PurchaseProgress?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -103,7 +112,7 @@ struct RecurringTransactionRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                if let progress = recurring.purchaseProgress {
+                if let progress {
                     Text(progress.summary)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -111,7 +120,7 @@ struct RecurringTransactionRow: View {
                 }
             }
             Spacer(minLength: 8)
-            AmountText(amount: recurring.startingAmount)
+            AmountText(amount: startingAmount)
         }
         .contentShape(Rectangle())
         .opacity(recurring.isPaused ? 0.5 : 1)

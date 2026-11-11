@@ -21,7 +21,7 @@ extension RecurringTransaction {
     /// progress never changes the schedule. `nil` for every other Kind.
     var purchaseProgress: PurchaseProgress? {
         guard kind == .purchase else { return nil }
-        let paidCents = attachedTransactions.reduce(0) { $0 + abs($1.amountCents) }
+        let paidCents = (transactions ?? []).notDeleted.reduce(0) { $0 + abs($1.amountCents) }
         return PurchaseProgress(
             paid: Money(cents: paidCents, currencyCode: currencyCode),
             total: totalCents.map { Money(cents: $0, currencyCode: currencyCode) }

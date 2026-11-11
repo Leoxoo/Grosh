@@ -34,7 +34,8 @@ struct RecurringTransactionDetailView: View {
     }
 
     private var details: some View {
-        List {
+        let figures = RecurringFigures([recurring])
+        return List {
             Section {
                 HStack(spacing: 12) {
                     CategoryIcon(category: recurring.category, subscriptionIcon: recurring.subscriptionIcon, size: 44)
@@ -42,7 +43,7 @@ struct RecurringTransactionDetailView: View {
                         Text(recurring.name)
                             .font(.title3.weight(.semibold))
                         HStack(spacing: 6) {
-                            AmountText(amount: recurring.startingAmount)
+                            AmountText(amount: figures.startingAmount(of: recurring))
                             if recurring.estimatesAmount {
                                 EstimatedBadge()
                             }
@@ -73,7 +74,7 @@ struct RecurringTransactionDetailView: View {
                         Text(Strings.Recurring.ended)
                     }
                 }
-                if let progress = recurring.purchaseProgress {
+                if let progress = figures.purchaseProgress(of: recurring) {
                     LabeledContent(Strings.Recurring.progress) {
                         Text(progress.summary)
                             .multilineTextAlignment(.trailing)

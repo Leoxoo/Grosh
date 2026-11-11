@@ -8,6 +8,8 @@ struct PastOccurrencesView: View {
     let recurring: RecurringTransaction
     /// The days offered, in order.
     let days: [CalendarDay]
+    /// What each picked day's transaction is for, a varying Bill's estimate read once when the prompt opens.
+    private let startingAmount: Money
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
@@ -17,6 +19,7 @@ struct PastOccurrencesView: View {
     init(recurring: RecurringTransaction, days: [CalendarDay]) {
         self.recurring = recurring
         self.days = days
+        startingAmount = recurring.currentStartingAmount()
     }
 
     var body: some View {
@@ -71,7 +74,7 @@ struct PastOccurrencesView: View {
                 if recurring.estimatesAmount {
                     EstimatedBadge()
                 }
-                AmountText(amount: recurring.startingAmount)
+                AmountText(amount: startingAmount)
             }
             .contentShape(Rectangle())
         }
