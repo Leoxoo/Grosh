@@ -8,7 +8,7 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct PersonSearchTests {
-    private let fixture: CategoryFixture
+    private let fixture: TestStore
     private var context: ModelContext { fixture.context }
     private let anna: Person
     private let ivan: Person
@@ -19,18 +19,14 @@ struct PersonSearchTests {
     private let taxi: Transaction
 
     init() throws {
-        let fixture = try CategoryFixture()
+        let fixture = try TestStore()
         let context = fixture.context
-        let wallet = fixture.wallet
+        let wallet = fixture.checking
         let anna = try Person.add(named: "Anna", in: context)
         let ivan = try Person.add(named: "Ivan", in: context)
         let olga = try Person.add(named: "Olga", in: context)
         func record(_ note: String, with people: [Person]) -> Transaction {
-            let transaction = Transaction.insert(
-                Money(cents: -10_00), on: CalendarDay(year: 2026, month: 10, day: 1), wallet: nil, category: nil,
-                note: note, in: context
-            )
-            transaction.wallet = wallet
+            let transaction = context.record(-10_00, on: day(2026, 10, 1), in: wallet, note: note)
             transaction.setPeople(people)
             return transaction
         }

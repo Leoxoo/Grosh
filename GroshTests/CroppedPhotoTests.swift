@@ -140,12 +140,12 @@ struct CroppedPhotoTests {
     }
 
     @Test func theIconIsSavedWithTheRecurringTransactionAndReplacedOrRemovedByEdits() throws {
-        let store = try CategoryFixture()
-        let today = CalendarDay(year: 2026, month: 10, day: 9)
+        let store = try TestStore()
+        let today = TestStore.today
         var draft = RecurringDraft(startDay: CalendarDay(year: 2026, month: 10, day: 12))
         draft.name = "Streaming"
         draft.amount = Money(cents: 1599)
-        draft.wallet = store.wallet
+        draft.wallet = store.checking
         draft.category = try store.category("Entertainment")
         draft.kind = .subscription
         draft.iconData = Data([1, 2, 3])

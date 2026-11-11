@@ -17,14 +17,9 @@ struct ReimbursementCountingTests {
         store = try MonthGraphFixture()
     }
 
-    /// A dinner of $60 on the 3rd, the Expense most tests pay back.
-    private func dinner() throws -> Transaction {
-        try store.record(-60_00, "Restaurants", on: day(2026, 10, 3))
-    }
-
     @discardableResult
     private func payBack(_ cents: Int, on paidOn: CalendarDay? = nil, to expense: Transaction) throws -> Reimbursement {
-        try Reimbursement.add(ReimbursementDraft(amount: Money(cents: cents), day: paidOn ?? today), to: expense, in: context)
+        try context.payBack(cents, on: paidOn ?? today, to: expense)
     }
 
     /// What counts for `selection`, as the Report counts it.
@@ -40,7 +35,7 @@ struct ReimbursementCountingTests {
     // MARK: What an Expense counts
 
     @Test func aPartiallyReimbursedExpenseCountsItsNetAsSpentUnderItsOwnCategoryOnItsOwnDay() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         try payBack(20_00, on: day(2026, 10, 8), to: dinner)
 
         let counted = try #require(dinner.countedAmount(otherIncome: store.otherIncome()))
@@ -52,7 +47,7 @@ struct ReimbursementCountingTests {
     }
 
     @Test func anExactlyReimbursedExpenseCountsNothing() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         try payBack(60_00, to: dinner)
 
         #expect(dinner.countedAmount(otherIncome: try store.otherIncome()) == nil)
@@ -60,7 +55,7 @@ struct ReimbursementCountingTests {
     }
 
     @Test func anOverReimbursedExpenseCountsTheExtraAsIncomeUnderOtherIncomeOnItsOwnDay() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         try payBack(100_00, on: day(2026, 10, 8), to: dinner)
 
         let counted = try #require(dinner.countedAmount(otherIncome: store.otherIncome()))
@@ -73,7 +68,7 @@ struct ReimbursementCountingTests {
     }
 
     @Test func anOverReimbursedExpenseFilesItsExtraUnderTheOtherIncomeTheReportHandsIt() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         try payBack(100_00, to: dinner)
         let readOnce = try store.category("Tips", .income)
 
@@ -81,7 +76,7 @@ struct ReimbursementCountingTests {
     }
 
     @Test func severalReimbursementsCountTogether() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         try payBack(20_00, to: dinner)
         try payBack(15_00, to: dinner)
 
@@ -95,7 +90,7 @@ struct ReimbursementCountingTests {
     }
 
     @Test func removingAReimbursementCountsTheExpenseAgain() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         let entry = try payBack(60_00, to: dinner)
         #expect(dinner.countedAmount(otherIncome: try store.otherIncome()) == nil)
 
@@ -106,7 +101,7 @@ struct ReimbursementCountingTests {
     }
 
     @Test func anExpenseWithoutReimbursementsCountsAsBefore() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         let refund = try store.record(30_00, "Clothing", on: day(2026, 10, 6))
 
         #expect(dinner.countedAmount(otherIncome: try store.otherIncome())?.amount == Money(cents: 60_00))
@@ -115,7 +110,7 @@ struct ReimbursementCountingTests {
     }
 
     @Test func aReimbursedExpenseExcludedFromReportCountsInNeither() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         try payBack(100_00, to: dinner)
         dinner.isExcludedFromReport = true
 
@@ -134,9 +129,8 @@ struct ReimbursementCountingTests {
     // MARK: Where it counts
 
     @Test func aWalletCountsTheNetOfItsOwnExpensesOnly() throws {
-        let savings = Wallet(name: "Savings")
-        context.insert(savings)
-        let dinner = try dinner()
+        let savings = context.addWallet("Savings")
+        let dinner = try store.dinner()
         let lunch = try store.record(-30_00, "Restaurants", on: day(2026, 10, 4), in: savings)
         try payBack(20_00, to: dinner)
         try payBack(30_00, to: lunch)
@@ -147,7 +141,7 @@ struct ReimbursementCountingTests {
     }
 
     @Test func theReportAndTheMonthGraphCountTheNet() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         try store.record(-10_00, "Café", on: day(2026, 10, 4))
         try payBack(20_00, to: dinner)
 
@@ -158,7 +152,7 @@ struct ReimbursementCountingTests {
     }
 
     @Test func anOverReimbursedExpenseAddsToTheMonthGraphsIncome() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         try payBack(100_00, to: dinner)
 
         #expect(try store.graph(.income).headline == Money(cents: 40_00))
@@ -167,7 +161,7 @@ struct ReimbursementCountingTests {
     }
 
     @Test func theCategoryReportFilesTheNetUnderTheExpensesCategoryAndTheExtraUnderOtherIncome() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         let lunch = try store.record(-30_00, "Café", on: day(2026, 10, 4))
         try payBack(20_00, to: dinner)
         try payBack(50_00, to: lunch)
@@ -183,7 +177,7 @@ struct ReimbursementCountingTests {
     }
 
     @Test func aBreakdownRowListsTheExpenseWhereItsNetCounts() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         try payBack(100_00, to: dinner)
         let otherIncome = try context.lockedCategory(.otherIncome)
         let days = DayRange(first: day(2026, 10, 1), last: today)
@@ -200,7 +194,7 @@ struct ReimbursementCountingTests {
     }
 
     @Test func aStepListsTheNetItCounts() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         try payBack(20_00, to: dinner)
 
         let step = ReportTransactions(
@@ -212,7 +206,7 @@ struct ReimbursementCountingTests {
     }
 
     @Test func theDailyAverageIsOfTheNet() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         try payBack(20_00, to: dinner)
         let days = DayRange(first: day(2026, 10, 1), last: day(2026, 10, 10))
 

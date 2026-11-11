@@ -126,11 +126,4 @@ struct StepTests {
             #expect(later.first == earlier.last.adding(days: 1))
         }
     }
-
-    /// A Step is never cut past today, even when the span reaches beyond it.
-    @Test func noStepReachesPastToday() {
-        let span = DayRange(first: day(2026, 10, 1), last: day(2026, 10, 31))
-        let steps = Step.steps(for: .month, over: span, today: day(2026, 10, 16), firstWeekday: monday)
-        #expect(steps.allSatisfy { $0.last <= day(2026, 10, 16) })
-    }
 }

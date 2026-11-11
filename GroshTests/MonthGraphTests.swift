@@ -17,32 +17,6 @@ struct MonthGraphTests {
         store = try MonthGraphFixture()
     }
 
-    /// A Loan (you lent) or Debt (you borrowed) of `cents`, saved through a draft made as Debt/Loan from the start. It
-    /// skips the Add sheet's switch to the Debt/Loan tab, which is what turns Exclude from report on, so it is left in
-    /// the report and only its category keeps it off the cards.
-    @discardableResult
-    private func record(_ role: LockedRole, _ cents: Int, on day: CalendarDay) throws -> Transaction {
-        var draft = TransactionDraft(type: .debtLoan, day: day)
-        draft.wallet = checking
-        draft.amount = Money(cents: cents)
-        draft.category = try context.lockedCategory(role)
-        draft.people = [try Person.add(named: "Pasha", in: context)]
-        return try Transaction.create(draft, in: context)
-    }
-
-    /// Records a payment of `cents` on `loanOrDebt` through Record payment's draft.
-    @discardableResult
-    private func pay(_ cents: Int, on loanOrDebt: Transaction) throws -> Transaction {
-        var draft = try DebtPaymentDraft(settling: loanOrDebt, on: day(2026, 10, 8), in: context)
-        draft.amount = Money(cents: cents)
-        return try DebtPayment.record(draft, in: context).payment
-    }
-
-    /// Forgives what is outstanding on `loanOrDebt` on `day`, under Other Expense for a Loan or Other Income for a Debt.
-    private func forgive(_ loanOrDebt: Transaction, on day: CalendarDay) throws {
-        try Forgiveness.record(ForgiveDraft(forgiving: loanOrDebt, on: day, in: context), in: context)
-    }
-
     // MARK: What counts
 
     @Test func anExpenseCountsAsSpentAndAnIncomeAsIncome() throws {
@@ -73,8 +47,7 @@ struct MonthGraphTests {
 
     /// A transfer's halves are filed under an Expense and an Income category, and neither is excluded from report.
     @Test func aTransferCountsInNeither() throws {
-        let savings = Wallet(name: "Savings")
-        context.insert(savings)
+        let savings = context.addWallet("Savings")
         var draft = TransferDraft(day: day(2026, 10, 4))
         draft.from = checking
         draft.to = savings
@@ -96,10 +69,10 @@ struct MonthGraphTests {
 
     /// Payments are recorded excluded from report; an import may leave them in, as it may a Loan or Debt.
     @Test func loansDebtsAndTheirPaymentsCountInNeither() throws {
-        let loan = try record(.loan, 100_00, on: day(2026, 10, 2))
-        let debt = try record(.debt, 250_00, on: day(2026, 10, 3))
-        let collection = try pay(40_00, on: loan)
-        let repayment = try pay(50_00, on: debt)
+        let loan = try store.lendOrBorrow(.loan, 100_00, on: day(2026, 10, 2))
+        let debt = try store.lendOrBorrow(.debt, 250_00, on: day(2026, 10, 3))
+        let collection = try context.pay(40_00, on: loan, on: day(2026, 10, 8)).payment
+        let repayment = try context.pay(50_00, on: debt, on: day(2026, 10, 8)).payment
         collection.isExcludedFromReport = false
         repayment.isExcludedFromReport = false
 
@@ -110,12 +83,12 @@ struct MonthGraphTests {
     /// Lent and borrowed last month, and excluded from report as the Add sheet would save them: only what is forgiven
     /// counts, whatever their own flag says.
     @Test func aForgivenLoanCountsAsSpentAndAForgivenDebtAsIncomeOnTheDayTheyWereForgiven() throws {
-        let loan = try record(.loan, 100_00, on: day(2026, 9, 20))
-        let debt = try record(.debt, 250_00, on: day(2026, 9, 25))
+        let loan = try store.lendOrBorrow(.loan, 100_00, on: day(2026, 9, 20))
+        let debt = try store.lendOrBorrow(.debt, 250_00, on: day(2026, 9, 25))
         loan.isExcludedFromReport = true
         debt.isExcludedFromReport = true
-        try forgive(loan, on: day(2026, 10, 5))
-        try forgive(debt, on: day(2026, 10, 7))
+        try context.forgive(loan, on: day(2026, 10, 5))
+        try context.forgive(debt, on: day(2026, 10, 7))
 
         let spent = try store.graph(.spent)
         let income = try store.graph(.income)
@@ -142,8 +115,8 @@ struct MonthGraphTests {
     @Test func nothingInRecentlyDeletedCounts() throws {
         let coffee = try store.record(-4_50, "Café", on: day(2026, 10, 3))
         let salary = try store.record(1_500_00, "Salary", .income, on: day(2026, 10, 5))
-        let loan = try record(.loan, 100_00, on: day(2026, 9, 20))
-        try forgive(loan, on: day(2026, 10, 6))
+        let loan = try store.lendOrBorrow(.loan, 100_00, on: day(2026, 9, 20))
+        try context.forgive(loan, on: day(2026, 10, 6))
 
         try [coffee, salary, loan].delete(.onlySelected, in: context)
 
@@ -152,14 +125,10 @@ struct MonthGraphTests {
     }
 
     @Test func onlyTheWalletsCountedInTheTotalCount() throws {
-        let brokerage = Wallet(name: "Brokerage")
-        brokerage.includeInTotal = false
-        let oldBank = Wallet(name: "Old bank")
+        let brokerage = context.addWallet("Brokerage", includeInTotal: false)
+        let oldBank = context.addWallet("Old bank")
         oldBank.isArchived = true
-        let cash = Wallet(name: "Cash")
-        for wallet in [brokerage, oldBank, cash] {
-            context.insert(wallet)
-        }
+        let cash = context.addWallet("Cash")
         try store.record(-40_00, "Café", on: day(2026, 10, 3))
         try store.record(-500_00, "Investment", on: day(2026, 10, 3), in: brokerage)
         try store.record(900_00, "Salary", .income, on: day(2026, 10, 4), in: oldBank)

@@ -9,21 +9,16 @@ import Testing
 struct RecentTransactionsTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
     private let checking: Wallet
 
     init() throws {
         container = try GroshStore.makeContainer(inMemory: true)
-        checking = Wallet(name: "Checking")
-        container.mainContext.insert(checking)
+        checking = container.mainContext.addWallet("Checking")
     }
 
     private func record(_ note: String, on day: CalendarDay, enteredAt seconds: Double) {
-        let transaction = Transaction.insert(
-            Money(cents: -1_00), on: day, wallet: nil, category: nil, note: note, in: context
-        )
-        transaction.wallet = checking
-        transaction.createdAt = Date(timeIntervalSinceReferenceDate: 800_000_000 + seconds)
+        context.record(-1_00, on: day, in: checking, note: note, enteredAt: seconds)
     }
 
     @Test func recentTransactionsAreTheLatestDatedTodayOrEarlierNewestFirst() throws {

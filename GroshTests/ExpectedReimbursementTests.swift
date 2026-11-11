@@ -95,7 +95,7 @@ struct ExpectedReimbursementTests {
 
         #expect(totals.outstanding == [Money(cents: 35_00)])
         #expect(totals.openAmountCount == 1)
-        #expect(totals.summary == "\(Money(cents: 35_00).formatted()) · +1 open")
+        #expect(totals.summary == "$35.00 · +1 open")
     }
 
     @Test func theExpectationsOfEachPersonAreGroupedForShowByPeople() throws {
@@ -121,7 +121,7 @@ struct ExpectedReimbursementTests {
     @Test func owesMeChangesNoBalanceListTotalOrReport() throws {
         let alex = try fixture.person("Alex")
         let plain = try fixture.dinner()
-        let balanceBefore = fixture.checking.balance(asOf: today)
+        let balanceBefore = walletBalance(fixture.checking, asOf: today)
         let totalsBefore = try fixture.totals()
         let graphBefore = try fixture.store.graph(.spent).headline
 
@@ -130,7 +130,7 @@ struct ExpectedReimbursementTests {
         draft.addOwes(alex)
         try plain.update(with: draft)
 
-        #expect(fixture.checking.balance(asOf: today) == balanceBefore)
+        #expect(walletBalance(fixture.checking, asOf: today) == balanceBefore)
         #expect(plain.netCents == -60_00)
         #expect([plain].net == Money(cents: -60_00))
         #expect(try fixture.totals() == totalsBefore)
@@ -141,14 +141,14 @@ struct ExpectedReimbursementTests {
     @Test func editingAndRemovingAnExpectationChangesNoBalanceOrReport() throws {
         let alex = try fixture.person("Alex")
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
-        let balanceBefore = fixture.checking.balance(asOf: today)
+        let balanceBefore = walletBalance(fixture.checking, asOf: today)
         let totalsBefore = try fixture.totals()
 
         var draft = TransactionDraft(editing: dinner)
         draft.owes[0].amount = Money(cents: 10_00)
         try dinner.update(with: draft)
         #expect(try fixture.expectation(of: alex, on: dinner).expected == Money(cents: 10_00))
-        #expect(fixture.checking.balance(asOf: today) == balanceBefore)
+        #expect(walletBalance(fixture.checking, asOf: today) == balanceBefore)
         #expect(try fixture.totals() == totalsBefore)
 
         var removing = TransactionDraft(editing: dinner)
@@ -156,7 +156,7 @@ struct ExpectedReimbursementTests {
         try dinner.update(with: removing)
         #expect(dinner.orderedExpectations.isEmpty)
         #expect(try context.fetchCount(FetchDescriptor<ExpectedReimbursement>()) == 0)
-        #expect(fixture.checking.balance(asOf: today) == balanceBefore)
+        #expect(walletBalance(fixture.checking, asOf: today) == balanceBefore)
         #expect(try fixture.totals() == totalsBefore)
     }
 

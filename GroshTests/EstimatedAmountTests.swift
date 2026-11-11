@@ -8,32 +8,18 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct EstimatedAmountTests {
-    private let store: CategoryFixture
+    private let store: TestStore
     private var context: ModelContext { store.context }
     /// The day the schedules are saved on: occurrences dated on or before it aren't made.
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
 
     init() throws {
-        store = try CategoryFixture()
-    }
-
-    /// The instant at `hour` o'clock on `when`, in the UTC calendar the reminders are tested on.
-    private func at(_ when: CalendarDay, hour: Int) -> Date {
-        Calendar.utcGregorian.date(from: DateComponents(year: when.year, month: when.month, day: when.day, hour: hour))
-            ?? .distantPast
-    }
-
-    private func category(_ name: String) -> Grosh.Category {
-        let category = Grosh.Category(name: name, type: .expense, symbolName: "bolt", color: .purple)
-        context.insert(category)
-        return category
+        store = try TestStore()
     }
 
     /// Records a September expense of `cents` under `category`, so there is history for an estimate to average.
     private func record(_ cents: Int, under category: Grosh.Category) throws {
-        let transaction = Transaction.insert(
-            Money(cents: -cents), on: day(2026, 9, 1), wallet: store.wallet, category: category, in: context
-        )
+        context.record(-cents, on: day(2026, 9, 1), in: store.checking, under: category)
         try context.save()
     }
 
@@ -44,7 +30,7 @@ struct EstimatedAmountTests {
         var draft = RecurringDraft(startDay: day(2026, 10, 12))
         draft.name = "Electricity"
         draft.amount = Money(cents: 2_500)
-        draft.wallet = store.wallet
+        draft.wallet = store.checking
         draft.category = category
         draft.kind = .bill
         draft.amountVaries = varies
@@ -54,14 +40,14 @@ struct EstimatedAmountTests {
 
     /// The October 12 transaction a varying electricity Bill makes, with no history to average.
     private func estimatedElectricity() throws -> Transaction {
-        let utilities = category("Utilities")
+        let utilities = context.addCategory("Utilities")
         let recurring = try RecurringTransaction.create(electricity(under: utilities), today: today, in: context)
         try RecurringTransaction.catchUp(through: day(2026, 10, 12), in: context)
         return try #require(recurring.attachedTransactions.first)
     }
 
     @Test func aVaryingBillMakesAnEstimatedTransactionAtTheAverageOfItsCategory() throws {
-        let utilities = category("Utilities")
+        let utilities = context.addCategory("Utilities")
         try record(1_000, under: utilities)
         try record(3_000, under: utilities)
         let recurring = try RecurringTransaction.create(electricity(under: utilities), today: today, in: context)
@@ -82,7 +68,7 @@ struct EstimatedAmountTests {
     }
 
     @Test func aVaryingBillNeedsNoTypedAmountWhenItsCategoryHasAnEstimate() throws {
-        let water = category("Water")
+        let water = context.addCategory("Water")
         try record(5_000, under: water)
         try record(5_000, under: water)
         var draft = electricity(under: water)
@@ -101,13 +87,13 @@ struct EstimatedAmountTests {
     }
 
     @Test func aVaryingBillWithNoEstimateAndNoAmountCannotBeSaved() {
-        var draft = electricity(under: category("Water"))
+        var draft = electricity(under: context.addCategory("Water"))
         draft.amount = Money(cents: 0)
         #expect(!draft.canSave)
     }
 
     @Test func aFixedBillNeedsItsAmountEvenWhenItsCategoryHasHistory() throws {
-        let water = category("Water")
+        let water = context.addCategory("Water")
         try record(5_000, under: water)
         var draft = electricity(under: water, varies: false)
         draft.amount = Money(cents: 0)
@@ -117,8 +103,8 @@ struct EstimatedAmountTests {
     }
 
     @Test func theEstimateFollowsTheCategoryAndWhetherTheAmountVaries() throws {
-        let water = category("Water")
-        let gas = category("Gas")
+        let water = context.addCategory("Water")
+        let gas = context.addCategory("Gas")
         try record(5_000, under: water)
         try record(1_000, under: gas)
         var draft = electricity(under: water)
@@ -136,7 +122,7 @@ struct EstimatedAmountTests {
     }
 
     @Test func aRowShowsTheEstimateOnceThereIsHistoryAndTheTypedAmountUntilThen() throws {
-        let utilities = category("Utilities")
+        let utilities = context.addCategory("Utilities")
         let varying = try RecurringTransaction.create(electricity(under: utilities), today: today, in: context)
         let fixed = try RecurringTransaction.create(
             electricity(under: utilities, varies: false), today: today, in: context
@@ -151,7 +137,7 @@ struct EstimatedAmountTests {
     }
 
     @Test func theReminderComesTheChosenNumberOfDaysAfterTheOccurrence() throws {
-        let utilities = category("Utilities")
+        let utilities = context.addCategory("Utilities")
         let recurring = try RecurringTransaction.create(
             electricity(under: utilities, remindAfter: 5), today: today, in: context
         )
@@ -163,7 +149,7 @@ struct EstimatedAmountTests {
     }
 
     @Test func aFixedBillMakesItsTypedAmountWithNoEstimate() throws {
-        let utilities = category("Utilities")
+        let utilities = context.addCategory("Utilities")
         try record(1_000, under: utilities)
         let recurring = try RecurringTransaction.create(
             electricity(under: utilities, varies: false), today: today, in: context
@@ -178,7 +164,7 @@ struct EstimatedAmountTests {
     }
 
     @Test func aSubscriptionIgnoresAmountVaries() throws {
-        let utilities = category("Utilities")
+        let utilities = context.addCategory("Utilities")
         var draft = electricity(under: utilities)
         draft.kind = .subscription
         let recurring = try RecurringTransaction.create(draft, today: today, in: context)
@@ -245,13 +231,13 @@ struct EstimatedAmountTests {
         let estimates = EstimatedAmounts([made])
         let reminderDay = day(2026, 10, 14)
 
-        let beforeNine = estimates.reminders(at: at(reminderDay, hour: 8), calendar: .utcGregorian, after: [])
+        let beforeNine = estimates.reminders(at: moment(reminderDay, at: 8), calendar: .utcGregorian, after: [])
         #expect(beforeNine.map(\.arrival) == [.onItsDay])
 
-        let afterNine = estimates.reminders(at: at(reminderDay, hour: 14), calendar: .utcGregorian, after: [])
+        let afterNine = estimates.reminders(at: moment(reminderDay, at: 14), calendar: .utcGregorian, after: [])
         #expect(afterNine.map(\.arrival) == [.rightAway])
 
-        let handedOver = estimates.reminders(at: at(reminderDay, hour: 15), calendar: .utcGregorian, after: afterNine)
+        let handedOver = estimates.reminders(at: moment(reminderDay, at: 15), calendar: .utcGregorian, after: afterNine)
         #expect(handedOver.isEmpty)
     }
 
@@ -260,7 +246,7 @@ struct EstimatedAmountTests {
         let scheduler = RecordingReminderScheduler<EstimateReminder>()
 
         await EstimatedAmounts([made]).reschedule(
-            at: at(day(2026, 10, 14), hour: 8), calendar: .utcGregorian, after: nil, using: scheduler
+            at: moment(day(2026, 10, 14), at: 8), calendar: .utcGregorian, after: nil, using: scheduler
         )
 
         #expect(scheduler.calls == [
@@ -279,7 +265,7 @@ struct EstimatedAmountTests {
         let scheduler = RecordingReminderScheduler<EstimateReminder>()
 
         await EstimatedAmounts(none).reschedule(
-            at: at(day(2026, 10, 14), hour: 8), calendar: .utcGregorian, after: nil, using: scheduler
+            at: moment(day(2026, 10, 14), at: 8), calendar: .utcGregorian, after: nil, using: scheduler
         )
 
         #expect(scheduler.calls == [.replacePending([])])

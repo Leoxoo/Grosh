@@ -9,15 +9,14 @@ import Testing
 struct StoreContextTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
 
     init() throws {
         container = try StoreOpening.open(inMemory: true)
     }
 
     @Test func aWalletRemovedForGoodCantBeArchived() throws {
-        let wallet = Wallet(name: "Checking")
-        context.insert(wallet)
+        let wallet = context.addWallet("Checking")
         try context.save()
         context.delete(wallet)
         try context.save()
@@ -32,8 +31,7 @@ struct StoreContextTests {
     }
 
     @Test func aWalletInTheStoreSavesAsBefore() throws {
-        let wallet = Wallet(name: "Checking")
-        context.insert(wallet)
+        let wallet = context.addWallet("Checking")
 
         try wallet.archive(today: today)
 

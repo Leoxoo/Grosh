@@ -7,11 +7,11 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct CategoryChoiceOrderTests {
-    private let fixture: CategoryFixture
+    private let fixture: TestStore
     private let today = CalendarDay(year: 2026, month: 10, day: 16)
 
     init() throws {
-        fixture = try CategoryFixture()
+        fixture = try TestStore()
     }
 
     private var expenseTree: [Grosh.Category] {
@@ -25,10 +25,7 @@ struct CategoryChoiceOrderTests {
     ) throws -> [Transaction] {
         let category = try fixture.category(name)
         return (0..<count).map { _ in
-            let transaction = Transaction.insert(
-                Money(cents: -10_00), on: day ?? today, wallet: fixture.wallet, category: category, in: fixture.context
-            )
-            return transaction
+            fixture.context.record(-10_00, on: day ?? today, in: fixture.checking, under: category)
         }
     }
 

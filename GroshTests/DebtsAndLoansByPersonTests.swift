@@ -24,19 +24,12 @@ struct DebtsAndLoansByPersonTests {
     private func record(
         _ role: LockedRole, _ cents: Int, with person: Person, in wallet: Wallet? = nil
     ) throws -> Transaction {
-        var draft = TransactionDraft(type: .debtLoan, day: lentOn)
-        draft.wallet = wallet ?? fixture.checking
-        draft.amount = Money(cents: cents)
-        draft.category = try context.lockedCategory(role)
-        draft.people = [person]
-        return try Transaction.create(draft, in: context)
+        try context.recordLoanOrDebt(role, cents, with: person, on: lentOn, in: wallet ?? fixture.checking)
     }
 
     private func settle(_ original: Transaction) throws {
         let outstanding = try #require(try LoanOrDebt(original, in: context)).outstanding
-        var draft = try DebtPaymentDraft(settling: original, on: day(2026, 6, 15), in: context)
-        draft.amount = outstanding
-        try DebtPayment.record(draft, in: context)
+        try context.pay(outstanding.cents, on: original, on: day(2026, 6, 15))
     }
 
     private func listing() throws -> DebtsAndLoansByPerson {
@@ -47,9 +40,8 @@ struct DebtsAndLoansByPersonTests {
     }
 
     private func euroWallet() -> Wallet {
-        let wallet = Wallet(name: "Euro")
+        let wallet = context.addWallet("Euro")
         wallet.currencyCode = "EUR"
-        context.insert(wallet)
         return wallet
     }
 
@@ -137,9 +129,7 @@ struct DebtsAndLoansByPersonTests {
     @Test func figuresCountWhatIsStillOutstandingAfterPayments() throws {
         let alex = try fixture.person("Alex")
         let loan = try record(.loan, 100_00, with: alex)
-        var payment = try DebtPaymentDraft(settling: loan, on: day(2026, 6, 15), in: context)
-        payment.amount = Money(cents: 60_00)
-        try DebtPayment.record(payment, in: context)
+        try context.pay(60_00, on: loan, on: day(2026, 6, 15))
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
         try fixture.pay(10_00, on: try fixture.expectation(of: alex, on: dinner))
 
@@ -274,10 +264,11 @@ struct DebtsAndLoansByPersonTests {
 
     // MARK: The remembered choice
 
-    @Test func showByLoanOrDebtIsTodaysListAndTheChoiceIsKeptByItsRawValue() {
+    /// The choice is kept in the user's settings by these names, so renaming a case would forget it.
+    @Test func showByLoanOrDebtIsTodaysListAndTheChoiceIsKeptByItsStoredName() {
         #expect(AppSettings.debtsLoansGroupingDefault == .loanOrDebt)
-        #expect(DebtsLoansGrouping(rawValue: DebtsLoansGrouping.people.rawValue) == .people)
-        #expect(DebtsLoansGrouping(rawValue: DebtsLoansGrouping.loanOrDebt.rawValue) == .loanOrDebt)
+        #expect(DebtsLoansGrouping(rawValue: "people") == .people)
+        #expect(DebtsLoansGrouping(rawValue: "loanOrDebt") == .loanOrDebt)
         #expect(DebtsLoansGrouping(rawValue: "something else") == nil)
     }
 }

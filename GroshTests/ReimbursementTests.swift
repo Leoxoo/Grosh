@@ -16,28 +16,17 @@ struct ReimbursementTests {
         store = try MonthGraphFixture()
     }
 
-    /// A dinner of $60 on the 3rd, the Expense most tests pay back.
-    private func dinner() throws -> Transaction {
-        try store.record(-60_00, "Restaurants", on: day(2026, 10, 3))
-    }
-
     @discardableResult
     private func payBack(
         _ cents: Int, on paidOn: CalendarDay? = nil, note: String = "", to expense: Transaction
     ) throws -> Reimbursement {
-        try Reimbursement.add(
-            ReimbursementDraft(amount: Money(cents: cents), day: paidOn ?? today, note: note), to: expense, in: context
-        )
-    }
-
-    private func storedTransactionCount() throws -> Int {
-        try context.fetchCount(FetchDescriptor<Transaction>())
+        try context.payBack(cents, on: paidOn ?? today, note: note, to: expense)
     }
 
     // MARK: The net
 
     @Test func anExpenseWithoutReimbursementsNetsItsOwnAmount() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
 
         #expect(dinner.reimbursedCents == 0)
         #expect(dinner.netCents == -60_00)
@@ -46,7 +35,7 @@ struct ReimbursementTests {
     }
 
     @Test func aPartialReimbursementLeavesTheRestOfTheExpense() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
 
         try payBack(20_00, to: dinner)
 
@@ -56,7 +45,7 @@ struct ReimbursementTests {
     }
 
     @Test func anExactReimbursementNetsToZero() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
 
         try payBack(60_00, to: dinner)
 
@@ -64,7 +53,7 @@ struct ReimbursementTests {
     }
 
     @Test func anOverReimbursementNetsAboveZero() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
 
         try payBack(100_00, to: dinner)
 
@@ -72,7 +61,7 @@ struct ReimbursementTests {
     }
 
     @Test func anExpenseCanHaveAnyNumberOfReimbursements() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
 
         try payBack(20_00, on: day(2026, 10, 5), to: dinner)
         try payBack(15_00, on: day(2026, 10, 4), note: "Sam's share", to: dinner)
@@ -85,11 +74,11 @@ struct ReimbursementTests {
     }
 
     @Test func aReimbursementIsAnEntryOnTheExpenseNotATransaction() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
 
         let entry = try payBack(20_00, on: day(2026, 10, 5), note: "  Sam  ", to: dinner)
 
-        #expect(try storedTransactionCount() == 1)
+        #expect(try context.transactionCount() == 1)
         #expect(entry.expense === dinner)
         #expect(entry.amount == Money(cents: 20_00))
         #expect(entry.day == day(2026, 10, 5))
@@ -97,19 +86,19 @@ struct ReimbursementTests {
     }
 
     @Test func theNetLandsInTheExpensesOwnWalletOnItsOwnDay() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
 
         try payBack(20_00, on: day(2026, 10, 8), to: dinner)
 
         // The Expense's day, 10/3, already holds the net, whatever day the money was paid back on.
-        #expect(store.checking.balance(asOf: day(2026, 10, 3)) == Money(cents: -40_00))
-        #expect(store.checking.balance(asOf: day(2026, 10, 2)) == Money(cents: 0))
+        #expect(walletBalance(store.checking, asOf: day(2026, 10, 3)) == Money(cents: -40_00))
+        #expect(walletBalance(store.checking, asOf: day(2026, 10, 2)) == Money(cents: 0))
     }
 
     // MARK: Editing and deleting an entry
 
     @Test func editingAnEntryChangesTheNet() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         let entry = try payBack(20_00, to: dinner)
 
         var draft = ReimbursementDraft(editing: entry)
@@ -126,7 +115,7 @@ struct ReimbursementTests {
     }
 
     @Test func aDraftStartsFromTheEntryItEdits() throws {
-        let entry = try payBack(20_00, on: day(2026, 10, 6), note: "Sam", to: try dinner())
+        let entry = try payBack(20_00, on: day(2026, 10, 6), note: "Sam", to: try store.dinner())
 
         let draft = ReimbursementDraft(editing: entry)
 
@@ -136,7 +125,7 @@ struct ReimbursementTests {
     }
 
     @Test func anEditThatBreaksTheRulesChangesNothing() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         let entry = try payBack(20_00, to: dinner)
 
         var draft = ReimbursementDraft(editing: entry)
@@ -150,7 +139,7 @@ struct ReimbursementTests {
     }
 
     @Test func deletingAnEntryBringsTheNetBackUp() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         let first = try payBack(20_00, to: dinner)
         let second = try payBack(10_00, to: dinner)
 
@@ -165,13 +154,13 @@ struct ReimbursementTests {
         #expect(dinner.reimbursedCents == 0)
         #expect(dinner.netCents == -60_00)
         #expect(try context.fetchCount(FetchDescriptor<Reimbursement>()) == 0)
-        #expect(try storedTransactionCount() == 1)
+        #expect(try context.transactionCount() == 1)
     }
 
     // MARK: Which transactions
 
     @Test func anAmountPaidBackMustBeAboveZero() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
 
         #expect(throws: ReimbursementRuleError.missingAmount) { try payBack(0, to: dinner) }
         #expect(throws: ReimbursementRuleError.missingAmount) { try payBack(-5_00, to: dinner) }
@@ -184,8 +173,7 @@ struct ReimbursementTests {
         let refund = try store.record(30_00, "Clothing", on: day(2026, 10, 6))
         var transfer = TransferDraft(day: day(2026, 10, 4))
         transfer.from = store.checking
-        let savings = Wallet(name: "Savings")
-        context.insert(savings)
+        let savings = context.addWallet("Savings")
         transfer.to = savings
         transfer.amount = Money(cents: 100_00)
         let made = try Transfer.create(transfer, in: context)
@@ -194,7 +182,7 @@ struct ReimbursementTests {
             #expect(!notAnExpense.canBeReimbursed)
             #expect(throws: ReimbursementRuleError.notAnExpense) { try payBack(10_00, to: notAnExpense) }
         }
-        #expect(try dinner().canBeReimbursed)
+        #expect(try store.dinner().canBeReimbursed)
         #expect(try context.fetchCount(FetchDescriptor<Reimbursement>()) == 0)
     }
 }

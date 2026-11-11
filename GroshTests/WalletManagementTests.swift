@@ -7,7 +7,7 @@ import Testing
 struct WalletManagementTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
 
     init() throws {
         container = try GroshStore.makeContainer(inMemory: true)
@@ -36,7 +36,7 @@ struct WalletManagementTests {
         #expect(starting.category?.name == "Starting balance")
         #expect(starting.category?.lockedRole == .startingBalance)
         #expect(starting.isExcludedFromReport)
-        #expect(savings.balance(asOf: today) == Money(cents: 1_250_00))
+        #expect(walletBalance(savings, asOf: today) == Money(cents: 1_250_00))
     }
 
     @Test func aNewWalletStartsInTheCurrencyItsDraftHasAndEditingKeepsIt() throws {
@@ -74,7 +74,7 @@ struct WalletManagementTests {
         #expect(cash.symbolName == "banknote.fill")
         #expect(cash.color == .orange)
         #expect(!cash.includeInTotal)
-        #expect(cash.balance(asOf: today) == Money(cents: 40_00))
+        #expect(walletBalance(cash, asOf: today) == Money(cents: 40_00))
 
         draft.name = ""
         #expect(throws: WalletRuleError.missingName) { try cash.update(with: draft) }
@@ -97,11 +97,11 @@ struct WalletManagementTests {
         #expect(starting.note == "Balance on the September statement")
         #expect(starting.category?.lockedRole == .startingBalance)
         #expect(starting.isExcludedFromReport)
-        #expect(creditLine.balance(asOf: today) == Money(cents: -300_00))
+        #expect(walletBalance(creditLine, asOf: today) == Money(cents: -300_00))
 
         edit.amount = Money(cents: 1_000_00)
         try starting.update(with: edit)
-        #expect(creditLine.balance(asOf: today) == Money(cents: 1_000_00))
+        #expect(walletBalance(creditLine, asOf: today) == Money(cents: 1_000_00))
     }
 
     @Test func onlyAStartingBalanceTakesAStartingBalanceEdit() throws {
@@ -158,9 +158,9 @@ struct WalletManagementTests {
         try oldBank.archive(today: today)
 
         #expect(try unarchivedNames() == ["Checking"])
-        #expect(Wallet.total(of: try context.fetch(FetchDescriptor<Wallet>()), asOf: today) == [Money(cents: 100_00)])
+        #expect(walletTotal(try context.fetch(FetchDescriptor<Wallet>()), asOf: today) == [Money(cents: 100_00)])
         #expect(oldBank.transactions?.count == 1)
-        #expect(oldBank.balance(asOf: today) == Money(cents: 300_00))
+        #expect(walletBalance(oldBank, asOf: today) == Money(cents: 300_00))
         #expect(checking.isArchived == false)
     }
 
@@ -173,6 +173,6 @@ struct WalletManagementTests {
         try oldBank.unarchive(today: today)
 
         #expect(try unarchivedNames() == ["Checking", "Old bank", "Cash"])
-        #expect(Wallet.total(of: try context.fetch(Wallet.unarchived), asOf: today) == [Money(cents: 300_00)])
+        #expect(walletTotal(try context.fetch(Wallet.unarchived), asOf: today) == [Money(cents: 300_00)])
     }
 }

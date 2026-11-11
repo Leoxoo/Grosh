@@ -8,40 +8,30 @@ import Testing
 struct WalletSelectionTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
 
     init() throws {
         container = try GroshStore.makeContainer(inMemory: true)
     }
 
-    private func wallet(_ name: String) -> Wallet {
-        let wallet = Wallet(name: name)
-        context.insert(wallet)
-        return wallet
-    }
-
     @discardableResult
     private func record(_ note: String, _ cents: Int, in wallet: Wallet, on day: CalendarDay? = nil) -> Transaction {
-        let transaction = Transaction.insert(
-            Money(cents: cents), on: day ?? today, wallet: nil, category: nil, note: note, in: context
-        )
-        transaction.wallet = wallet
-        return transaction
+        context.record(cents, on: day ?? today, in: wallet, note: note)
     }
 
     @Test func oneWalletShowsOnlyItsOwnTransactions() {
-        let checking = wallet("Checking")
-        let cash = wallet("Cash")
+        let checking = context.addWallet("Checking")
+        let cash = context.addWallet("Cash")
         let all = [record("rent", -900_00, in: checking), record("tip", 5_00, in: cash)]
 
         #expect(all.filter(WalletSelection.wallet(checking).includes).map(\.note) == ["rent"])
     }
 
     @Test func theTotalShowsTheTransactionsOfWalletsCountedInTheTotal() throws {
-        let checking = wallet("Checking")
-        let brokerage = wallet("Brokerage")
+        let checking = context.addWallet("Checking")
+        let brokerage = context.addWallet("Brokerage")
         brokerage.includeInTotal = false
-        let oldBank = wallet("Old bank")
+        let oldBank = context.addWallet("Old bank")
         try oldBank.archive(today: today)
         let all = [
             record("rent", -900_00, in: checking),
@@ -53,15 +43,16 @@ struct WalletSelectionTests {
     }
 
     @Test func theHeaderShowsTheSelectionsBalanceToday() {
-        let checking = wallet("Checking")
-        let brokerage = wallet("Brokerage")
+        let checking = context.addWallet("Checking")
+        let brokerage = context.addWallet("Brokerage")
         brokerage.includeInTotal = false
         record("salary", 100_00, in: checking)
         record("rent due", -900_00, in: checking, on: CalendarDay(year: 2026, month: 11, day: 1))
         record("stock sold", 300_00, in: brokerage)
         let wallets = [checking, brokerage]
 
-        #expect(Wallet.balances(of: wallets, asOf: today).balance(of: WalletSelection.total, wallets: wallets) == [Money(cents: 100_00)])
-        #expect(Wallet.balances(of: wallets, asOf: today).balance(of: WalletSelection.wallet(brokerage), wallets: wallets) == [Money(cents: 300_00)])
+        let balances = WalletBalances(of: wallets, asOf: today)
+        #expect(balances.balance(of: WalletSelection.total, wallets: wallets) == [Money(cents: 100_00)])
+        #expect(balances.balance(of: WalletSelection.wallet(brokerage), wallets: wallets) == [Money(cents: 300_00)])
     }
 }

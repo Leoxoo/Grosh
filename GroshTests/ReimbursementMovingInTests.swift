@@ -17,20 +17,10 @@ struct ReimbursementMovingInTests {
         store = try MonthGraphFixture()
     }
 
-    /// A dinner of $60 on the 3rd, the Expense a deposit is moved into.
-    private func dinner() throws -> Transaction {
-        try store.record(-60_00, "Restaurants", on: day(2026, 10, 3))
-    }
-
     private func deposit(_ cents: Int = 25_00, note: String = "") throws -> Transaction {
         let deposit = try store.record(cents, "Tips", .income, on: day(2026, 10, 5))
         deposit.note = note
         return deposit
-    }
-
-    @discardableResult
-    private func payBack(_ cents: Int, on paidOn: CalendarDay, to expense: Transaction) throws -> Reimbursement {
-        try Reimbursement.add(ReimbursementDraft(amount: Money(cents: cents), day: paidOn), to: expense, in: context)
     }
 
     // MARK: Moving in
@@ -44,7 +34,7 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func movingADepositInMakesAReimbursementOfItsAmountDayAndNote() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
 
         let entry = try Reimbursement.moveIn(try deposit(note: "Sam's share"), to: dinner, in: context)
 
@@ -58,7 +48,7 @@ struct ReimbursementMovingInTests {
     @Test func movingADepositInSendsItToRecentlyDeleted() throws {
         let deposit = try deposit()
 
-        try Reimbursement.moveIn(deposit, to: try dinner(), in: context, at: deletedAt)
+        try Reimbursement.moveIn(deposit, to: try store.dinner(), in: context, at: deletedAt)
 
         #expect(deposit.isInRecentlyDeleted)
         #expect(deposit.deletedAt == deletedAt)
@@ -66,21 +56,21 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func theMovedDepositCountsOnceInTheBalance() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         let deposit = try deposit()
         let today = store.today
         try context.save()
-        #expect(store.checking.balance(asOf: today) == Money(cents: -35_00))
+        #expect(walletBalance(store.checking, asOf: today) == Money(cents: -35_00))
 
         try Reimbursement.moveIn(deposit, to: dinner, in: context)
 
-        #expect(store.checking.balance(asOf: today) == Money(cents: -35_00))
+        #expect(walletBalance(store.checking, asOf: today) == Money(cents: -35_00))
     }
 
     @Test func restoringTheDepositUndoesTheMoveSoItCountsOnce() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         let deposit = try deposit()
-        let kept = try payBack(10_00, on: day(2026, 10, 4), to: dinner)
+        let kept = try context.payBack(10_00, on: day(2026, 10, 4), to: dinner)
         try Reimbursement.moveIn(deposit, to: dinner, in: context, at: deletedAt)
 
         try deposit.restore()
@@ -88,12 +78,12 @@ struct ReimbursementMovingInTests {
         #expect(!deposit.isInRecentlyDeleted)
         #expect(dinner.orderedReimbursements == [kept])
         #expect(dinner.netCents == -50_00)
-        #expect(store.checking.balance(asOf: store.today) == Money(cents: -25_00))
+        #expect(walletBalance(store.checking, asOf: store.today) == Money(cents: -25_00))
         #expect(try context.fetchCount(FetchDescriptor<Reimbursement>()) == 1)
     }
 
     @Test func restoringTheDepositUndoesTheMoveEvenAfterTheEntryWasEdited() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         let deposit = try deposit()
         let entry = try Reimbursement.moveIn(deposit, to: dinner, in: context, at: deletedAt)
         try entry.update(with: ReimbursementDraft(amount: Money(cents: 30_00), day: day(2026, 10, 6)))
@@ -105,7 +95,7 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func restoringTheDepositOfAnExpenseInRecentlyDeletedTakesItsEntryOffToo() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         let deposit = try deposit()
         try Reimbursement.moveIn(deposit, to: dinner, in: context, at: deletedAt)
         try dinner.delete(.onlySelected, in: context, at: deletedAt)
@@ -114,11 +104,11 @@ struct ReimbursementMovingInTests {
         try dinner.restore()
 
         #expect(dinner.orderedReimbursements.isEmpty)
-        #expect(store.checking.balance(asOf: store.today) == Money(cents: -35_00))
+        #expect(walletBalance(store.checking, asOf: store.today) == Money(cents: -35_00))
     }
 
     @Test func removingTheMovedDepositForGoodKeepsItsEntry() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         let deposit = try deposit()
         try Reimbursement.moveIn(deposit, to: dinner, in: context, at: deletedAt)
 
@@ -129,8 +119,8 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func aDepositCanBeMovedInAfterOtherEntries() throws {
-        let dinner = try dinner()
-        try payBack(20_00, on: day(2026, 10, 4), to: dinner)
+        let dinner = try store.dinner()
+        try context.payBack(20_00, on: day(2026, 10, 4), to: dinner)
 
         try Reimbursement.moveIn(try deposit(10_00), to: dinner, in: context)
 
@@ -139,7 +129,7 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func aDepositAboveTheExpenseMovesInAsAnOverReimbursement() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
 
         try Reimbursement.moveIn(try deposit(100_00), to: dinner, in: context)
 
@@ -149,7 +139,7 @@ struct ReimbursementMovingInTests {
     // MARK: What can't move in
 
     @Test func onlyMoneyThatCameInUnderAnIncomeCategoryCanMoveIn() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         let salary = try deposit()
         let expense = try store.record(-15_00, "Restaurants", on: day(2026, 10, 4))
         let adjustment = try deposit()
@@ -168,9 +158,8 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func aDepositInAnotherWalletCantMoveInAndNothingChanges() throws {
-        let dinner = try dinner()
-        let savings = Wallet(name: "Savings")
-        context.insert(savings)
+        let dinner = try store.dinner()
+        let savings = context.addWallet("Savings")
         let elsewhere = try store.record(25_00, "Tips", .income, on: day(2026, 10, 5), in: savings)
 
         #expect(!elsewhere.canBeMovedIntoReimbursement(of: dinner))
@@ -182,11 +171,9 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func whatAnOverpaidLoanBringsInCantMoveIn() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         let loan = try store.lendOrBorrow(.loan, 100_00, on: day(2026, 10, 1))
-        var collection = try DebtPaymentDraft(settling: loan, on: day(2026, 10, 5), in: context)
-        collection.amount = Money(cents: 120_00)
-        let overpaid = try #require(try DebtPayment.record(collection, in: context).overpayment)
+        let overpaid = try #require(try context.pay(120_00, on: loan, on: day(2026, 10, 5)).overpayment)
         #expect(overpaid.category?.type == .income)
 
         #expect(!overpaid.canBeMovedIntoReimbursement(of: dinner))
@@ -197,7 +184,7 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func aTransactionThatIsntADepositIsRefusedAndNothingChanges() throws {
-        let dinner = try dinner()
+        let dinner = try store.dinner()
         let lunch = try store.record(-15_00, "Restaurants", on: day(2026, 10, 4))
 
         #expect(throws: ReimbursementRuleError.notADeposit) {
@@ -223,14 +210,14 @@ struct ReimbursementMovingInTests {
     // MARK: The row's list of entries
 
     @Test func anExpenseWithoutReimbursementsHasNoSummary() throws {
-        #expect(try dinner().reimbursementSummary(locale: unitedStates) == "")
+        #expect(try store.dinner().reimbursementSummary(locale: unitedStates) == "")
     }
 
     @Test func theSummaryListsEntriesEarliestFirstAndDropsWholeCents() throws {
-        let dinner = try dinner()
-        try payBack(10_00, on: day(2026, 10, 6), to: dinner)
-        try payBack(20_00, on: day(2026, 10, 4), to: dinner)
-        try payBack(3_50, on: day(2026, 10, 9), to: dinner)
+        let dinner = try store.dinner()
+        try context.payBack(10_00, on: day(2026, 10, 6), to: dinner)
+        try context.payBack(20_00, on: day(2026, 10, 4), to: dinner)
+        try context.payBack(3_50, on: day(2026, 10, 9), to: dinner)
 
         #expect(dinner.reimbursementSummary(locale: unitedStates) == "+20, +10, +3.50")
     }

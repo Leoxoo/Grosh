@@ -21,18 +21,9 @@ struct ReimbursementBalanceTests {
     @discardableResult
     private func reimbursedDinner() throws -> Transaction {
         try store.record(1_000_00, "Salary", .income, on: day(2026, 9, 1))
-        let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 10, 3))
-        try payBack(20_00, to: dinner)
+        let dinner = try store.dinner()
+        try context.payBack(20_00, on: today, to: dinner)
         return dinner
-    }
-
-    @discardableResult
-    private func payBack(_ cents: Int, to expense: Transaction) throws -> Reimbursement {
-        try Reimbursement.add(ReimbursementDraft(amount: Money(cents: cents), day: today), to: expense, in: context)
-    }
-
-    private func addCard(statementDay: Int? = nil) throws -> Card {
-        try Card.create(CardDraft(name: "Chase", kind: .credit, payingWallet: checking, statementDay: statementDay), in: context)
     }
 
     // MARK: Balances
@@ -40,15 +31,16 @@ struct ReimbursementBalanceTests {
     @Test func aWalletsBalanceCountsTheNet() throws {
         try reimbursedDinner()
 
-        #expect(checking.balance(asOf: today) == Money(cents: 960_00))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: 960_00))
     }
 
     @Test func theTotalAndTheWalletSelectorCountTheNet() throws {
         try reimbursedDinner()
 
-        #expect(Wallet.total(of: [checking], asOf: today) == [Money(cents: 960_00)])
-        #expect(Wallet.balances(of: [checking], asOf: today).balance(of: WalletSelection.total, wallets: [checking]) == [Money(cents: 960_00)])
-        #expect(Wallet.balances(of: [checking], asOf: today).balance(of: WalletSelection.wallet(checking), wallets: [checking]) == [Money(cents: 960_00)])
+        #expect(walletTotal([checking], asOf: today) == [Money(cents: 960_00)])
+        let balances = WalletBalances(of: [checking], asOf: today)
+        #expect(balances.balance(of: WalletSelection.total, wallets: [checking]) == [Money(cents: 960_00)])
+        #expect(balances.balance(of: WalletSelection.wallet(checking), wallets: [checking]) == [Money(cents: 960_00)])
     }
 
     @Test func theBalancesAddedUpFromLedgerEntriesCountTheNet() throws {
@@ -64,15 +56,15 @@ struct ReimbursementBalanceTests {
     @Test func aTransactionDatedAfterTodayCountsItsNetOnceItsDayArrives() throws {
         let tomorrow = day(2026, 10, 13)
         let dinner = try store.record(-60_00, "Restaurants", on: tomorrow)
-        try payBack(20_00, to: dinner)
+        try context.payBack(20_00, on: today, to: dinner)
 
-        #expect(checking.balance(asOf: today) == Money(cents: 0))
-        #expect(checking.balance(asOf: tomorrow) == Money(cents: -40_00))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: 0))
+        #expect(walletBalance(checking, asOf: tomorrow) == Money(cents: -40_00))
     }
 
     @Test func aBalanceAdjustmentSeesTheNetInTheRecordedBalance() throws {
-        let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 10, 3))
-        try payBack(20_00, to: dinner)
+        let dinner = try store.dinner()
+        try context.payBack(20_00, on: today, to: dinner)
         let adjustment = try store.record(5_00, "Collect Interest", .income, on: today)
         adjustment.isBalanceAdjustment = true
 
@@ -83,7 +75,7 @@ struct ReimbursementBalanceTests {
     // MARK: Opening and Ending balance, the list
 
     @Test func openingAndEndingBalancesCountTheNet() throws {
-        let dinner = try reimbursedDinner()
+        try reimbursedDinner()
         let october = Period.month(CalendarMonth(today))
         let transactions = try context.fetch(Transaction.notDeleted)
 
@@ -93,7 +85,7 @@ struct ReimbursementBalanceTests {
         ] {
             #expect(summary.openingBalance == Money(cents: 1_000_00))
             #expect(summary.endingBalance == Money(cents: 960_00))
-            #expect(summary.difference == dinner.net)
+            #expect(summary.difference == Money(cents: -40_00))
         }
     }
 
@@ -118,7 +110,7 @@ struct ReimbursementBalanceTests {
     }
 
     @Test func aRowsLedgerEntryIsReadAgainWhenItsReimbursementsChange() throws {
-        let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 10, 3))
+        let dinner = try store.dinner()
         try context.save()
         let shared = NotDeletedTransactions.Store.of(context)
         func entry() throws -> LedgerEntry {
@@ -126,7 +118,7 @@ struct ReimbursementBalanceTests {
         }
         #expect(try entry().netCents == -60_00)
 
-        let reimbursement = try payBack(20_00, to: dinner)
+        let reimbursement = try context.payBack(20_00, on: today, to: dinner)
         #expect(try entry().netCents == -40_00)
 
         var draft = ReimbursementDraft(editing: reimbursement)
@@ -138,11 +130,13 @@ struct ReimbursementBalanceTests {
         #expect(try entry().netCents == -60_00)
     }
 
-    /// Loading every transaction for the balances reads each one's net without reading its Reimbursements, which would
-    /// fault them in one transaction at a time: what they add up to is stored on the transaction itself.
+    /// Performance contract (the 16k store, `docs/agents/architecture.md`), not a behaviour: loading every transaction
+    /// for the balances reads each one's net without reading its Reimbursements, which would fault them in one
+    /// transaction at a time, so what they add up to is stored on the transaction itself. The behaviour is
+    /// `aRowsLedgerEntryIsReadAgainWhenItsReimbursementsChange`.
     @Test func whatTheReimbursementsAddUpToIsStoredOnTheTransaction() throws {
         let dinner = try reimbursedDinner()
-        let entry = try payBack(15_00, to: dinner)
+        let entry = try context.payBack(15_00, on: today, to: dinner)
         let reimbursedBy35 = FetchDescriptor<Transaction>(predicate: #Predicate { $0.reimbursedCents == 35_00 })
 
         #expect(try context.fetch(reimbursedBy35) == [dinner])
@@ -155,25 +149,25 @@ struct ReimbursementBalanceTests {
     // MARK: Cards
 
     @Test func aCardStatementTotalIgnoresReimbursementsWhileTheWalletBalanceDoesNot() throws {
-        let chase = try addCard()
-        let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 10, 3))
+        let chase = try context.addCard("Chase", paidFrom: checking)
+        let dinner = try store.dinner()
         dinner.card = chase
-        try payBack(20_00, to: dinner)
+        try context.payBack(20_00, on: today, to: dinner)
         let shown = chase.transactions(in: chase.period(containing: today))
 
         #expect(shown == [dinner])
         #expect(shown.charged == Money(cents: -60_00))
         #expect(shown.net == Money(cents: -40_00))
-        #expect(checking.balance(asOf: today) == Money(cents: -40_00))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: -40_00))
     }
 
     @Test func aCardStatementsDayTotalsKeepWhatTheCardWasChargedWhileOtherListsCountTheNet() throws {
-        let chase = try addCard()
-        let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 10, 3))
+        let chase = try context.addCard("Chase", paidFrom: checking)
+        let dinner = try store.dinner()
         let coffee = try store.record(-4_00, "Café", on: day(2026, 10, 3))
         dinner.card = chase
         coffee.card = chase
-        try payBack(20_00, to: dinner)
+        try context.payBack(20_00, on: today, to: dinner)
 
         let days = TransactionDay.days(of: chase.transactions(in: chase.period(containing: today)))
 
@@ -183,10 +177,10 @@ struct ReimbursementBalanceTests {
     }
 
     @Test func aStatementPeriodsLeadInTransactionsKeepTheirOriginalAmount() throws {
-        let chase = try addCard(statementDay: 15)
+        let chase = try context.addCard("Chase", paidFrom: checking, statementDay: 15)
         let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 9, 15))
         dinner.card = chase
-        try payBack(20_00, to: dinner)
+        try context.payBack(20_00, on: today, to: dinner)
         let current = chase.period(containing: today)
         let leadIns = chase.leadInTransactions(in: current)
 
@@ -195,11 +189,11 @@ struct ReimbursementBalanceTests {
     }
 
     @Test func theCardFiltersTotalIgnoresReimbursements() throws {
-        let chase = try addCard()
-        let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 10, 3))
+        let chase = try context.addCard("Chase", paidFrom: checking)
+        let dinner = try store.dinner()
         dinner.card = chase
         let lunch = try store.record(-30_00, "Restaurants", on: day(2026, 10, 4))
-        try payBack(20_00, to: dinner)
+        try context.payBack(20_00, on: today, to: dinner)
 
         let october = Period.month(CalendarMonth(today)).days(today: today)
         func listing(_ filter: TransactionFilter) -> TransactionListing {

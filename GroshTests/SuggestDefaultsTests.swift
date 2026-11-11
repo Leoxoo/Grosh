@@ -9,7 +9,7 @@ import Testing
 struct SuggestDefaultsTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
 
     init() throws {
         container = try GroshStore.makeContainer(inMemory: true)

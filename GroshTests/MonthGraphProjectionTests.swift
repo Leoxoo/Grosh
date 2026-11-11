@@ -118,13 +118,9 @@ struct MonthGraphProjectionTests {
 
     /// A schedule in an archived wallet is paused. A wallet left out of the Total doesn't count on the cards either.
     @Test func aScheduleInAnArchivedOrDeletedWalletOrOneOutsideTheTotalAddsNothing() throws {
-        let oldBank = Wallet(name: "Old bank")
-        let cash = Wallet(name: "Cash")
-        let savings = Wallet(name: "Savings")
-        savings.includeInTotal = false
-        for wallet in [oldBank, cash, savings] {
-            context.insert(wallet)
-        }
+        let oldBank = context.addWallet("Old bank")
+        let cash = context.addWallet("Cash")
+        let savings = context.addWallet("Savings", includeInTotal: false)
         try schedule("Rent", 900_00, "Rentals", starting: day(2026, 10, 15), wallet: oldBank)
         try schedule("Tips", 20_00, "Tips", .income, starting: day(2026, 10, 16), wallet: cash)
         try schedule("Interest", 5_00, "Collect Interest", .income, starting: day(2026, 10, 17), wallet: savings)

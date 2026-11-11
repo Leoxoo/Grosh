@@ -16,7 +16,7 @@ Design every change for **the 16k store**: about 16,000 transactions over six ye
 | `Grosh/Views/` | SwiftUI pieces every area shares: `@NotDeletedTransactions`, `Today`, colors, pickers, the photo cropper. | Like `Features/`, no rules of their own. |
 | `Grosh/Logging/` | `Log`, one `os.Logger` per area, and `Signpost`, the intervals Instruments shows. | A message names what failed and the error, never the data (`docs/agents/logging.md`). |
 | `Grosh/Debug/` | The 16k store generator and the UI test launch hook. | Wrapped in `#if DEBUG`, so the shipped app never carries them. |
-| `GroshTests/` | Swift Testing suites, one per behaviour, each with its own in-memory container (`GroshStore.makeContainer(inMemory: true)`), plus shared fixtures (`*Fixture.swift`). | A Domain rule ships with tests written first. |
+| `GroshTests/` | Swift Testing suites, one per behaviour, each with its own in-memory container (`GroshStore.makeContainer(inMemory: true)`), plus shared fixtures: `TestStore.swift` (the seeded store, its day, and the helpers that make wallets, transactions, Loans, payments and paybacks the way the app does) and the `*Fixture.swift` built on it. | A Domain rule ships with tests written first. |
 
 The app, the UI test store and every preview open the store through `StoreOpening.open` (or `StoreOpening.prepare` on a container opened elsewhere), so each starts from the same seeded, migrated store. Startup work runs in `GroshApp` on `scenePhase == .active`: `RecentlyDeleted.purgeExpired` and `RecurringTransaction.catchUp`. Both are on the launch benchmark.
 

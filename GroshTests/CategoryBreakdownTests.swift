@@ -137,7 +137,7 @@ struct CategoryBreakdownTests {
     /// The category a forgiven Loan is filed under gets its amount, as the Month graph counts it.
     @Test func aForgivenLoanCountsUnderTheCategoryItsAmountIsFiledUnder() throws {
         let loan = try store.lendOrBorrow(.loan, 250_00, on: day(2026, 9, 20))
-        try store.forgive(loan, on: day(2026, 10, 5))
+        try store.context.forgive(loan, on: day(2026, 10, 5))
 
         let spent = try breakdown(.spent)
         #expect(spent.categories.map(\.category.name) == ["Other Expense"])
@@ -147,7 +147,7 @@ struct CategoryBreakdownTests {
     /// A Debt forgiven counts as income under the category its forgiven amount is filed under, Other Income.
     @Test func aForgivenDebtCountsAsIncomeUnderOtherIncome() throws {
         let debt = try store.lendOrBorrow(.debt, 80_00, on: day(2026, 9, 25))
-        try store.forgive(debt, on: day(2026, 10, 7))
+        try store.context.forgive(debt, on: day(2026, 10, 7))
 
         let income = try breakdown(.income)
         #expect(income.categories.map(\.category.name) == ["Other Income"])

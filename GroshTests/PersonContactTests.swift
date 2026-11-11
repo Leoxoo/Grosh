@@ -9,49 +9,18 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct PersonContactTests {
-    private let store: CategoryFixture
+    private let store: TestStore
     private var context: ModelContext { store.context }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
 
     private let pasha = Contact(identifier: "c-pasha", name: "Pasha", phoneNumbers: ["+1 555 0100"])
     private let anna = Contact(identifier: "c-anna", name: "Anna Lee", phoneNumbers: ["+1 555 0101", "+1 555 0102"])
     private let cafe = Contact(identifier: "c-cafe", name: "Café Roma")
 
     init() throws {
-        store = try CategoryFixture()
-    }
-
-    private func everyone() throws -> [Person] {
-        try context.fetch(FetchDescriptor<Person>(sortBy: [SortDescriptor(\.name)]))
-    }
-
-    @discardableResult
-    private func person(_ name: String, phone: String? = nil) throws -> Person {
-        let person = Person(name: name, phone: phone)
-        context.insert(person)
-        try context.save()
-        return person
-    }
-
-    /// An Expense with `people`, saved through the Add sheet's draft.
-    @discardableResult
-    private func eat(with people: [Person]) throws -> Transaction {
-        var draft = TransactionDraft(type: .expense, day: today)
-        draft.wallet = store.wallet
-        draft.amount = Money(cents: 30_00)
-        draft.category = try store.category("Restaurants")
-        draft.people = people
-        return try Transaction.create(draft, in: context)
+        store = try TestStore()
     }
 
     // MARK: Reading the contacts, and access
-
-    @Test func contactsAreNotTouchedUntilTheMenuNeedsThem() {
-        let contacts = RecordingContactLookup([pasha], access: .notDetermined)
-
-        #expect(contacts.access == .notDetermined)
-        #expect(contacts.calls.isEmpty)
-    }
 
     @Test func openingTheMenuAsksForAccessOnlyWhileTheUserHasNotAnswered() async {
         let contacts = RecordingContactLookup([pasha], access: .notDetermined, answer: .authorized)
@@ -86,43 +55,29 @@ struct PersonContactTests {
         #expect(!ContactsAccess.denied.offersToShareMore)
     }
 
-    @Test func searchMatchesNamesIgnoringCaseAndAccents() async {
-        let contacts = RecordingContactLookup([pasha, anna, cafe])
+    /// How the Contacts section searches what the lookup reads (``SystemContacts/search(_:)``).
+    @Test func searchMatchesNamesIgnoringCaseAndAccents() {
+        let book = [pasha, anna, cafe]
 
-        #expect(await contacts.search("anna") == [anna])
-        #expect(await contacts.search("CAFE") == [cafe])
-        #expect(await contacts.search("  lee ") == [anna])
-        #expect(await contacts.search("nobody").isEmpty)
+        #expect(book.filter(nameContaining: "anna", name: \.name) == [anna])
+        #expect(book.filter(nameContaining: "CAFE", name: \.name) == [cafe])
+        #expect(book.filter(nameContaining: "  lee ", name: \.name) == [anna])
+        #expect(book.filter(nameContaining: "nobody", name: \.name).isEmpty)
     }
 
-    @Test func searchWithNothingTypedListsEveryContact() async {
-        let contacts = RecordingContactLookup([pasha, anna, cafe])
+    @Test func searchWithNothingTypedListsEveryContact() {
+        let book = [pasha, anna, cafe]
 
-        #expect(await contacts.search("") == [pasha, anna, cafe])
-        #expect(await contacts.search("   ") == [pasha, anna, cafe])
+        #expect(book.filter(nameContaining: "", name: \.name) == [pasha, anna, cafe])
+        #expect(book.filter(nameContaining: "   ", name: \.name) == [pasha, anna, cafe])
     }
 
-    @Test func withAccessDeniedNothingIsListedAndTheMenuStillWorksFromPrevious() async throws {
-        let contacts = RecordingContactLookup([pasha], access: .denied)
-        let known = try person("Anna")
+    @Test func withAccessDeniedTheMenuStillWorksFromPrevious() throws {
+        let known = try context.insertPerson("Anna")
 
-        #expect(await contacts.search("").isEmpty)
-        #expect(await contacts.search("Pasha").isEmpty)
         #expect(PreviousPeople([known], typed: "ann").people == [known])
         #expect(PreviousPeople([known], typed: "Pasha").addableName == "Pasha")
         #expect(try Person.add(named: "Pasha", in: context).contactIdentifier == nil)
-    }
-
-    @Test func underLimitedAccessOnlyTheSharedContactsAreListed() async {
-        // The stand-in holds what the user shared; anna is in their address book but not shared.
-        let contacts = RecordingContactLookup([pasha], access: .limited)
-
-        #expect(await contacts.search("") == [pasha])
-        #expect(await contacts.search("anna").isEmpty)
-
-        contacts.book.append(anna)
-
-        #expect(await contacts.search("anna") == [anna])
     }
 
     @Test func anIdentifierResolvesToTheContactsCurrentPhone() async {
@@ -151,11 +106,11 @@ struct PersonContactTests {
         #expect(person.contactIdentifier == "c-pasha")
         #expect(person.name == "Pasha")
         #expect(person.phone == "+1 555 0100")
-        #expect(try everyone().count == 1)
+        #expect(try context.everyone().count == 1)
     }
 
     @Test func pickingAContactMakesThemTheMostRecentPerson() throws {
-        let earlier = try person("Anna")
+        let earlier = try context.insertPerson("Anna")
         earlier.lastUsedAt = Date.now.addingTimeInterval(-3600)
 
         try Person.add(pasha, in: context)
@@ -174,7 +129,7 @@ struct PersonContactTests {
     }
 
     @Test func aContactWithNoNumberLeavesThePersonsOwnWhenPicked() throws {
-        let known = try person("Café Roma", phone: "555 0000")
+        let known = try context.insertPerson("Café Roma", phone: "555 0000")
 
         let picked = try Person.add(cafe, in: context)
 
@@ -190,13 +145,13 @@ struct PersonContactTests {
     }
 
     @Test func aContactMatchingAPersonByNameAttachesToThemIgnoringCase() throws {
-        let existing = try person("pasha", phone: "old number")
-        let eaten = try eat(with: [existing])
+        let existing = try context.insertPerson("pasha", phone: "old number")
+        let eaten = try store.eat(with: [existing])
 
         let picked = try Person.add(pasha, in: context)
 
         #expect(picked === existing)
-        #expect(try everyone().count == 1)
+        #expect(try context.everyone().count == 1)
         #expect(picked.contactIdentifier == "c-pasha")
         #expect(picked.name == "Pasha")
         #expect(picked.phone == "+1 555 0100")
@@ -204,7 +159,7 @@ struct PersonContactTests {
     }
 
     @Test func aContactMatchingAHiddenPersonBringsThemBack() throws {
-        let hidden = try person("Pasha")
+        let hidden = try context.insertPerson("Pasha")
         try hidden.hide()
 
         let picked = try Person.add(pasha, in: context)
@@ -219,7 +174,7 @@ struct PersonContactTests {
         let second = try Person.add(pasha, in: context)
 
         #expect(first === second)
-        #expect(try everyone().count == 1)
+        #expect(try context.everyone().count == 1)
     }
 
     @Test func aContactRenamedSincePickedAttachesToItsPersonByIdentifier() throws {
@@ -230,7 +185,7 @@ struct PersonContactTests {
 
         #expect(picked === linked)
         #expect(picked.name == "Pavel")
-        #expect(try everyone().count == 1)
+        #expect(try context.everyone().count == 1)
     }
 
     @Test func aContactWithoutANameIsRefused() {
@@ -252,13 +207,13 @@ struct PersonContactTests {
         #expect(linked.name == "Pavel")
         #expect(linked.phone == "+1 555 0188")
         #expect(linked.contactIdentifier == "c-pasha")
-        #expect(try everyone().count == 1)
+        #expect(try context.everyone().count == 1)
     }
 
     @Test func aRenamedContactRenamesTheWithOfEveryTransactionThePersonIsIn() async throws {
         let linked = try Person.add(pasha, in: context)
-        let dinner = try eat(with: [linked, try person("Anna")])
-        let deleted = try eat(with: [linked])
+        let dinner = try store.eat(with: [linked, try context.insertPerson("Anna")])
+        let deleted = try store.eat(with: [linked])
         deleted.deletedAt = .now
         try context.save()
         let contacts = RecordingContactLookup([Contact(identifier: "c-pasha", name: "Pavel")])
@@ -290,7 +245,7 @@ struct PersonContactTests {
     }
 
     @Test func aContactRenamedToAnotherPersonsNameKeepsTheStoredNameButRefreshesThePhone() async throws {
-        let taken = try person("Pavel")
+        let taken = try context.insertPerson("Pavel")
         let linked = try Person.add(pasha, in: context)
         let contacts = RecordingContactLookup([
             Contact(identifier: "c-pasha", name: "pavel", phoneNumbers: ["+1 555 0188"]),
@@ -305,7 +260,7 @@ struct PersonContactTests {
 
     @Test func aDeletedContactLeavesTheStoredNameAndPhone() async throws {
         let linked = try Person.add(pasha, in: context)
-        let dinner = try eat(with: [linked])
+        let dinner = try store.eat(with: [linked])
         let contacts = RecordingContactLookup([])
 
         try await Person.refreshFromContacts(using: contacts, in: context)
@@ -349,7 +304,7 @@ struct PersonContactTests {
     }
 
     @Test func peopleWithoutALinkAreNeverRefreshedAndWithNoneLinkedContactsIsNotAsked() async throws {
-        let plain = try person("Pasha", phone: "555 0000")
+        let plain = try context.insertPerson("Pasha", phone: "555 0000")
         let contacts = RecordingContactLookup([pasha])
 
         try await Person.refreshFromContacts(using: contacts, in: context)
@@ -361,7 +316,7 @@ struct PersonContactTests {
 
     @Test func refreshingOnlyAsksForTheLinkedPeoplesIdentifiers() async throws {
         try Person.add(pasha, in: context)
-        try person("Anna")
+        try context.insertPerson("Anna")
         let contacts = RecordingContactLookup([pasha, anna])
 
         try await Person.refreshFromContacts(using: contacts, in: context)

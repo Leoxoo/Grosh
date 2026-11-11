@@ -42,10 +42,8 @@ struct LinkKindTests {
 
     @Test func aLoanItsPaymentsAndWhatItWritesOffAreOnTheLoansLink() throws {
         let loan = try fixture.store.lendOrBorrow(.loan, 100_00, on: today)
-        var draft = try DebtPaymentDraft(settling: loan, on: today, in: context)
-        draft.amount = Money(cents: 120_00)
 
-        let recorded = try DebtPayment.record(draft, in: context)
+        let recorded = try context.pay(120_00, on: loan, on: today)
         let overpayment = try #require(recorded.overpayment)
 
         #expect([loan, recorded.payment, overpayment].allSatisfy { $0.linkKind == .loanOrDebt })

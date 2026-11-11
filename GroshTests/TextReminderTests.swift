@@ -29,17 +29,9 @@ struct TextReminderTests {
 
     /// A Loan or Debt of `cents` with `person`, reminding on `reminderDay`.
     private func remind(_ role: LockedRole, _ cents: Int, with person: Person, on reminderDay: CalendarDay) throws {
-        var draft = TransactionDraft(type: .debtLoan, day: day(2026, 5, 27))
-        draft.wallet = fixture.checking
-        draft.amount = Money(cents: cents)
-        draft.category = try context.lockedCategory(role)
-        draft.people = [person]
-        draft.reminderDay = reminderDay
-        _ = try Transaction.create(draft, in: context)
-    }
-
-    private func dollars(_ cents: Int) -> String {
-        Money(cents: cents).formatted()
+        try context.recordLoanOrDebt(
+            role, cents, with: person, on: day(2026, 5, 27), in: fixture.checking, remindOn: reminderDay
+        )
     }
 
     // MARK: Wording
@@ -47,27 +39,26 @@ struct TextReminderTests {
     @Test func theMessageNamesWhatThePersonOwesYouWithTheAppsMoneyFormatting() {
         let message = text(owesYou: [Money(cents: 130_00)])
 
-        #expect(message.body == "Hi Alex, a reminder that you owe me \(dollars(130_00)).")
+        #expect(message.body == "Hi Alex, a reminder that you owe me $130.00.")
     }
 
     @Test func theMessageNamesWhatYouOweThemWhenItIsOnlyADebt() {
         let message = text("Anna", youOwe: [Money(cents: 50_00)])
 
-        #expect(message.body == "Hi Anna, I owe you \(dollars(50_00)).")
+        #expect(message.body == "Hi Anna, I owe you $50.00.")
     }
 
     @Test func theMessageKeepsWhatTheyOweYouApartFromWhatYouOweThem() {
         let message = text(owesYou: [Money(cents: 100_00)], youOwe: [Money(cents: 40_00)])
 
-        #expect(message.body == "Hi Alex, you owe me \(dollars(100_00)), and I owe you \(dollars(40_00)).")
+        #expect(message.body == "Hi Alex, you owe me $100.00, and I owe you $40.00.")
     }
 
     @Test func everyCurrencyOwedIsNamedOnceWithoutAddingThemUp() {
         let euros = Money(cents: 25_00, currencyCode: "EUR")
         let message = text(owesYou: [euros, Money(cents: 130_00)])
 
-        #expect(message.body.contains(euros.formatted()))
-        #expect(message.body.contains(dollars(130_00)))
+        #expect(message.body == "Hi Alex, a reminder that you owe me €25.00 and $130.00.")
     }
 
     @Test func aPersonsRowTextsWhatTheyOweAndWhatYouOweThem() throws {
@@ -84,7 +75,7 @@ struct TextReminderTests {
         #expect(message.personName == "Alex")
         #expect(message.storedPhone == "555 0100")
         #expect(message.owesYou == [Money(cents: 30_00)])
-        #expect(message.body == "Hi Alex, a reminder that you owe me \(dollars(30_00)).")
+        #expect(message.body == "Hi Alex, a reminder that you owe me $30.00.")
     }
 
     // MARK: From a notification
@@ -109,7 +100,7 @@ struct TextReminderTests {
 
         #expect(message.personName == "Alex")
         #expect(message.storedPhone == "555 0100")
-        #expect(message.body == "Hi Alex, a reminder that you owe me \(dollars(30_00)) for Dinner.")
+        #expect(message.body == "Hi Alex, a reminder that you owe me $30.00 for Dinner.")
     }
 
     @Test func anOpenAmountNotificationNamesTheExpenseAlone() throws {
@@ -137,11 +128,10 @@ struct TextReminderTests {
         let debt = try #require(reminders.first { $0.withName == "Anna" })
         let textLoan = try #require(try tapTextThem(on: loan))
         let textDebt = try #require(try tapTextThem(on: debt))
-        #expect(DebtReminder.categoryIdentifier == "grosh.debt")
         #expect(textLoan.storedPhone == "555 0111")
-        #expect(textLoan.body == "Hi Pasha, a reminder that you owe me \(dollars(40_00)).")
+        #expect(textLoan.body == "Hi Pasha, a reminder that you owe me $40.00.")
         #expect(textDebt.storedPhone == nil)
-        #expect(textDebt.body == "Hi Anna, I owe you \(dollars(50_00)).")
+        #expect(textDebt.body == "Hi Anna, I owe you $50.00.")
     }
 
     @Test func bothReminderSortsOfferTheActionInTheirOwnCategory() {

@@ -46,7 +46,7 @@ struct ExpectedReimbursementPaymentTests {
         try fixture.pay(20_00, on: fixture.expectation(of: alex, on: dinner), day: today)
 
         #expect(dinner.netCents == -40_00)
-        #expect(checking.balance(asOf: day(2026, 10, 3)) == Money(cents: -40_00))
+        #expect(walletBalance(checking, asOf: day(2026, 10, 3)) == Money(cents: -40_00))
         #expect([dinner].net == Money(cents: -40_00))
         #expect(try fixture.totals().spent == Money(cents: 40_00))
         #expect(try fixture.store.graph(.spent).headline == Money(cents: 40_00))

@@ -17,12 +17,6 @@ struct GroshCSVExportTests {
         try CategorySeeder.seedIfNeeded(in: container.mainContext)
     }
 
-    /// A MoneyLover export holding `rows`, each written as MoneyLover does after its header.
-    private func moneyLoverExport(_ rows: String...) -> String {
-        (["Id,Date,Category,Amount,Currency,Wallet,Note,With,Event,Exclude from report,Members"] + rows)
-            .joined(separator: "\r\n") + "\r\n"
-    }
-
     /// A Grosh export's header, written out so a renamed, moved or dropped column shows.
     private static let groshHeader = "Id,Date,Category,Amount,Currency,Wallet,Note,With,Event,Exclude from report,Members,"
         + "Card,Linked,Forgiven,Forgiven date,Forgiven category,Forgiven note,Split from,Reimbursement"
@@ -30,11 +24,6 @@ struct GroshCSVExportTests {
     /// A Grosh export holding `rows` after its header.
     private func groshExport(_ rows: String...) -> String {
         ([Self.groshHeader] + rows).map { $0 + "\r\n" }.joined()
-    }
-
-    @discardableResult
-    private func importing(_ csv: String) throws -> MoneyLoverImportSummary {
-        try MoneyLoverImport.replaceAllData(with: MoneyLoverCSV.read(csv), cards: .ownersCards, in: context)
     }
 
     private func exported() throws -> String {
@@ -53,10 +42,6 @@ struct GroshCSVExportTests {
         try #require(try context.fetch(Transaction.notDeleted).first { $0.note == note })
     }
 
-    private func wallet(_ name: String) throws -> Wallet {
-        try #require(try context.fetch(FetchDescriptor<Wallet>()).first { $0.name == name })
-    }
-
     private func cards() throws -> [Card] {
         try context.fetch(FetchDescriptor<Card>(sortBy: [SortDescriptor(\.sortOrder)]))
     }
@@ -64,7 +49,7 @@ struct GroshCSVExportTests {
     // MARK: Export
 
     @Test func everyTransactionIsListedAsMoneyLoverDoesWithItsCardAndLink() throws {
-        try importing(moneyLoverExport(
+        try context.importMoneyLover(moneyLoverExport(
             "1,10/06/2026,Outgoing transfer,-250,USD,Checking (Navy Federal),To savings,,,✅,",
             "2,10/06/2026,Incoming transfer,250,USD,Savings,To savings,,,✅,",
             "3,10/05/2026,Café,-3.5,USD,Checking (Navy Federal),\"Coffee, large #chase\",Sam,Road trip,,"
@@ -80,7 +65,7 @@ struct GroshCSVExportTests {
     }
 
     @Test func linksAreNumberedInTheOrderTheFileFirstListsThem() throws {
-        try importing(moneyLoverExport(
+        try context.importMoneyLover(moneyLoverExport(
             "1,10/08/2026,Debt Collection,50,USD,Cash,,Sam,,,",
             "2,10/06/2026,Outgoing transfer,-250,USD,Checking,,,,,",
             "3,10/06/2026,Incoming transfer,250,USD,Savings,,,,,",
@@ -93,7 +78,7 @@ struct GroshCSVExportTests {
     }
 
     @Test func everyPartOfASplitNamesTheRowOfTheOriginalItWasSplitFrom() throws {
-        try importing(moneyLoverExport("1,10/05/2026,Café,-60,USD,Checking,Dinner,,,,"))
+        try context.importMoneyLover(moneyLoverExport("1,10/05/2026,Café,-60,USD,Checking,Dinner,,,,"))
         let dinner = try transaction(noted: "Dinner")
         var draft = SplitDraft(splitting: dinner)
         for cents in [20_00, 10_00] {
@@ -113,7 +98,7 @@ struct GroshCSVExportTests {
     }
 
     @Test func aLinkThatIsNotASplitHasNoSplitFrom() throws {
-        try importing(moneyLoverExport(
+        try context.importMoneyLover(moneyLoverExport(
             "1,10/08/2026,Debt Collection,50,USD,Cash,,Sam,,,",
             "2,10/06/2026,Outgoing transfer,-250,USD,Checking,,,,,",
             "3,10/06/2026,Incoming transfer,250,USD,Savings,,,,,",
@@ -124,7 +109,7 @@ struct GroshCSVExportTests {
     }
 
     @Test func anExpensesReimbursementsAreListedByDayWithoutChangingItsAmount() throws {
-        try importing(moneyLoverExport(
+        try context.importMoneyLover(moneyLoverExport(
             "1,10/03/2026,Café,-60,USD,Checking,Dinner,,,,",
             "2,10/03/2026,Café,-4,USD,Checking,Coffee,,,,"
         ))
@@ -143,7 +128,7 @@ struct GroshCSVExportTests {
     }
 
     @Test func fieldsHoldingCommasQuotesOrLineBreaksAreQuoted() throws {
-        try importing(moneyLoverExport("1,10/05/2026,Café,-3.00,USD,Cash,\"Two \"\"flat\"\" whites,\nto go\",,,,"))
+        try context.importMoneyLover(moneyLoverExport("1,10/05/2026,Café,-3.00,USD,Cash,\"Two \"\"flat\"\" whites,\nto go\",,,,"))
 
         #expect(try exported().contains(",Cash,\"Two \"\"flat\"\" whites,\nto go\","))
     }
@@ -161,7 +146,7 @@ struct GroshCSVExportTests {
     // MARK: Restore
 
     @Test func exportImportExportGivesTheSameFile() throws {
-        try importing(moneyLoverExport(
+        try context.importMoneyLover(moneyLoverExport(
             "1,10/12/2026,Rent,-900,USD,Checking (Navy Federal),Next month,,,,",
             "2,10/08/2026,Debt Collection,50,USD,Cash,Paid back,Sam,,✅,",
             "3,10/06/2026,Outgoing transfer,-250,USD,Checking (Navy Federal),To savings,,,✅,",
@@ -174,7 +159,7 @@ struct GroshCSVExportTests {
         ))
         let first = try exported()
 
-        try importing(first)
+        try context.importMoneyLover(first)
 
         #expect(try exported() == first)
     }
@@ -189,7 +174,7 @@ struct GroshCSVExportTests {
             "6,10/05/2026,Starting balance,1000.00,USD,Checking,,,,1,,,,,,,,,"
         )
 
-        let summary = try importing(export)
+        let summary = try context.importMoneyLover(export)
 
         #expect(try exported() == export)
         #expect(summary.wallets.map(\.name) == ["Checking", "Savings"])
@@ -205,7 +190,7 @@ struct GroshCSVExportTests {
             "3,10/05/2026,Starting balance,100.00,USD,Cash,,,,1,,,,,,,,,"
         )
 
-        try importing(export)
+        try context.importMoneyLover(export)
 
         #expect(try exported() == export)
         let loan = try #require(try context.fetch(DebtsAndLoans.transactions).first { $0.isLoanOrDebt })
@@ -219,28 +204,28 @@ struct GroshCSVExportTests {
     }
 
     @Test func aWalletsStartingBalanceIsTheFilesOwnRow() throws {
-        try importing(groshExport(
+        try context.importMoneyLover(groshExport(
             "1,10/05/2026,Café,-3.50,USD,Checking,,,,,,,",
             "2,10/05/2026,Starting balance,1000.00,USD,Checking,Opened,,,1,,,"
         ))
 
-        let checking = try wallet("Checking")
+        let checking = try context.wallet(named: "Checking")
         let starting = (checking.transactions ?? []).filter { $0.category?.lockedRole == .startingBalance }
         #expect(starting.map(\.amountCents) == [1_000_00])
         #expect(starting.map(\.note) == ["Opened"])
         #expect(starting.allSatisfy { $0.isExcludedFromReport })
-        #expect(checking.balance(asOf: today) == Money(cents: 996_50))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: 996_50))
     }
 
     @Test func aWalletWithoutAStartingBalanceRowGetsAZeroOne() throws {
-        try importing(groshExport("1,10/05/2026,Café,-3.50,USD,Cash,,,,,,,"))
+        try context.importMoneyLover(groshExport("1,10/05/2026,Café,-3.50,USD,Cash,,,,,,,"))
 
-        let starting = try (wallet("Cash").transactions ?? []).filter { $0.category?.lockedRole == .startingBalance }
+        let starting = try (context.wallet(named: "Cash").transactions ?? []).filter { $0.category?.lockedRole == .startingBalance }
         #expect(starting.map(\.amountCents) == [0])
     }
 
     @Test func cardsComeFromTheCardColumnAndHashtagsStayInTheNote() throws {
-        try importing(groshExport(
+        try context.importMoneyLover(groshExport(
             "1,10/05/2026,Café,-3.50,USD,Checking,#citi coffee,,,,,Chase,",
             "2,10/05/2026,Café,-2.00,USD,Checking,#chase espresso,,,,,,",
             "3,10/04/2026,Café,-5.00,USD,Cash,,,,,,Corner Shop Card,"
@@ -255,11 +240,11 @@ struct GroshCSVExportTests {
         #expect(cards.map(\.name) == ["Chase", "Corner Shop Card"])
         #expect(cards.map(\.kind) == [.credit, .credit])
         #expect(cards.map(\.color) == [.purple, .blue])
-        #expect(cards.map(\.payingWallet) == [try wallet("Checking"), try wallet("Cash")])
+        #expect(cards.map(\.payingWallet) == [try context.wallet(named: "Checking"), try context.wallet(named: "Cash")])
     }
 
     @Test func rowsSharingALinkAreLinkedWithoutMatchingTheirAmounts() throws {
-        try importing(groshExport(
+        try context.importMoneyLover(groshExport(
             "1,10/08/2026,Debt Collection,20.00,USD,Cash,,Sam,,,,,1",
             "2,10/06/2026,Outgoing transfer,-250.00,USD,Checking,,,,,,,2",
             "3,10/05/2026,Incoming transfer,240.00,USD,Savings,,,,,,,2",
@@ -281,7 +266,7 @@ struct GroshCSVExportTests {
     // MARK: People in With
 
     @Test func theWithColumnJoinsTheNamesOfEveryPersonWithASemicolon() throws {
-        try importing(moneyLoverExport(
+        try context.importMoneyLover(moneyLoverExport(
             "1,10/05/2026,Restaurants,-30.00,USD,Checking,Dinner,Sam,,,",
             "2,10/05/2026,Café,-3.00,USD,Checking,Coffee,Kim,,,",
             "3,10/05/2026,Taxi,-9.00,USD,Checking,Ride,,,,"
@@ -298,13 +283,13 @@ struct GroshCSVExportTests {
     }
 
     @Test func severalPeopleInAnExportComeBackAsSeveralPeople() throws {
-        try importing(moneyLoverExport("1,10/05/2026,Restaurants,-30.00,USD,Checking,Dinner,Sam,,,"))
+        try context.importMoneyLover(moneyLoverExport("1,10/05/2026,Restaurants,-30.00,USD,Checking,Dinner,Sam,,,"))
         try transaction(noted: "Dinner").setPeople([
             try Person.add(named: "Sam", in: context), try Person.add(named: "Anna", in: context),
         ])
         let file = try exported()
 
-        try importing(file)
+        try context.importMoneyLover(file)
 
         #expect(try transaction(noted: "Dinner").orderedPeople.map(\.name) == ["Anna", "Sam"])
         #expect(try context.fetch(FetchDescriptor<Person>()).count == 2)

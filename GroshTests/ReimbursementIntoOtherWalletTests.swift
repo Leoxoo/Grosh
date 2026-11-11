@@ -107,9 +107,8 @@ struct ReimbursementIntoOtherWalletTests {
         let alex = try fixture.person("Alex")
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
         let owed = try fixture.expectation(of: alex, on: dinner)
-        let euros = Wallet(name: "Euros")
+        let euros = context.addWallet("Euros")
         euros.currencyCode = "EUR"
-        context.insert(euros)
 
         #expect(throws: ExpectedReimbursementRuleError.otherCurrency) {
             try fixture.pay(20_00, on: owed, into: euros)
@@ -124,9 +123,9 @@ struct ReimbursementIntoOtherWalletTests {
     @Test func thePaybackCountsInItsWalletAndTheExpenseKeepsItsFullAmountInItsOwn() throws {
         let (dinner, _, _) = try paidBackIntoCash()
 
-        #expect(checking.balance(asOf: today) == Money(cents: -60_00))
-        #expect(cash.balance(asOf: today) == Money(cents: 20_00))
-        #expect(Wallet.total(of: [checking, cash], asOf: today) == [Money(cents: -40_00)])
+        #expect(walletBalance(checking, asOf: today) == Money(cents: -60_00))
+        #expect(walletBalance(cash, asOf: today) == Money(cents: 20_00))
+        #expect(walletTotal([checking, cash], asOf: today) == [Money(cents: -40_00)])
         #expect(dinner.netCents == -60_00)
         let entries = try context.fetch(Transaction.notDeleted).map(LedgerEntry.init)
         let balances = WalletBalances(entries, asOf: today)
@@ -201,7 +200,7 @@ struct ReimbursementIntoOtherWalletTests {
         let (dinner, _, _) = try paidBackIntoCash()
 
         #expect(dinner.totalViewNetCents == -60_00)
-        #expect(Wallet.total(of: [checking, cash], asOf: today) == [Money(cents: -60_00)])
+        #expect(walletTotal([checking, cash], asOf: today) == [Money(cents: -60_00)])
         #expect(try listed(in: .total) == [dinner])
         #expect(try fixture.totals(in: .total).spent == Money(cents: 60_00))
         #expect(try listed(in: .wallet(cash)).count == 1)
@@ -213,7 +212,7 @@ struct ReimbursementIntoOtherWalletTests {
 
         #expect(!payback.isHiddenInTotal)
         #expect(try listed(in: .total) == [payback])
-        #expect(Wallet.total(of: [checking, cash], asOf: today) == [Money(cents: 20_00)])
+        #expect(walletTotal([checking, cash], asOf: today) == [Money(cents: 20_00)])
     }
 
     // MARK: Reports
@@ -260,8 +259,8 @@ struct ReimbursementIntoOtherWalletTests {
 
         #expect(dinner.isInRecentlyDeleted)
         #expect(payback.isInRecentlyDeleted)
-        #expect(checking.balance(asOf: today) == Money(cents: 0))
-        #expect(cash.balance(asOf: today) == Money(cents: 0))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: 0))
+        #expect(walletBalance(cash, asOf: today) == Money(cents: 0))
         #expect(try fixture.totals(in: .total) == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
         #expect(try listed(in: .total).isEmpty)
     }
@@ -275,8 +274,8 @@ struct ReimbursementIntoOtherWalletTests {
 
         #expect(!dinner.isInRecentlyDeleted)
         #expect(!payback.isInRecentlyDeleted)
-        #expect(checking.balance(asOf: today) == Money(cents: -60_00))
-        #expect(cash.balance(asOf: today) == Money(cents: 20_00))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: -60_00))
+        #expect(walletBalance(cash, asOf: today) == Money(cents: 20_00))
         #expect(dinner.totalViewNetCents == -40_00)
         #expect(owed.paid == Money(cents: 20_00))
         #expect(try listed(in: .total) == [dinner])
@@ -288,7 +287,7 @@ struct ReimbursementIntoOtherWalletTests {
         try payback.delete(.onlySelected, in: context, at: deletedAt)
 
         #expect(dinner.totalViewNetCents == -60_00)
-        #expect(cash.balance(asOf: today) == Money(cents: 0))
+        #expect(walletBalance(cash, asOf: today) == Money(cents: 0))
         #expect(owed.paid == Money(cents: 0))
         #expect(owed.isOpen)
         #expect(try fixture.totals(in: .total).spent == Money(cents: 60_00))
@@ -296,7 +295,7 @@ struct ReimbursementIntoOtherWalletTests {
         try payback.restore()
 
         #expect(dinner.totalViewNetCents == -40_00)
-        #expect(cash.balance(asOf: today) == Money(cents: 20_00))
+        #expect(walletBalance(cash, asOf: today) == Money(cents: 20_00))
         #expect(owed.paid == Money(cents: 20_00))
     }
 
@@ -371,14 +370,13 @@ struct ReimbursementIntoOtherWalletTests {
         #expect(try payback.related(in: context) == [dinner])
         #expect(try listed(in: .total) == [dinner])
         #expect(dinner.totalViewNetCents == -40_00)
-        #expect(cash.balance(asOf: today) == Money(cents: 20_00))
+        #expect(walletBalance(cash, asOf: today) == Money(cents: 20_00))
     }
 
     @Test func someonePaidMeBackIntoAWalletInAnotherCurrencyIsRefused() throws {
         let dinner = try fixture.dinner()
-        let euros = Wallet(name: "Euros")
+        let euros = context.addWallet("Euros")
         euros.currencyCode = "EUR"
-        context.insert(euros)
         let draft = ReimbursementDraft(amount: Money(cents: 20_00), day: receivedDay)
 
         #expect(throws: ExpectedReimbursementRuleError.otherCurrency) {

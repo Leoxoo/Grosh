@@ -8,19 +8,13 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct PurchaseProgressTests {
-    private let store: CategoryFixture
+    private let store: TestStore
     private var context: ModelContext { store.context }
     /// The day the schedules are saved on: occurrences dated on or before it aren't made.
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
 
     init() throws {
-        store = try CategoryFixture()
-    }
-
-    private func category(_ name: String, _ type: CategoryType) -> Grosh.Category {
-        let category = Grosh.Category(name: name, type: type, symbolName: "repeat", color: .purple)
-        context.insert(category)
-        return category
+        store = try TestStore()
     }
 
     /// A laptop paid for in monthly payments of 100.00 from `start`, with `total` as its price (`nil` for none).
@@ -30,8 +24,8 @@ struct PurchaseProgressTests {
         var draft = RecurringDraft(startDay: start)
         draft.name = "Laptop"
         draft.amount = Money(cents: 10_000)
-        draft.wallet = store.wallet
-        draft.category = category("Shopping", .expense)
+        draft.wallet = store.checking
+        draft.category = context.addCategory("Shopping", .expense)
         draft.kind = .purchase
         draft.total = total.map { Money(cents: $0) }
         return draft
@@ -41,7 +35,7 @@ struct PurchaseProgressTests {
     @discardableResult
     private func attachPayment(_ cents: Int, dated: CalendarDay, to recurring: RecurringTransaction) throws -> Transaction {
         let payment = Transaction.insert(
-            Money(cents: -cents), on: dated, wallet: store.wallet, category: nil, in: context
+            Money(cents: -cents), on: dated, wallet: store.checking, category: nil, in: context
         )
         try recurring.attach(payment, in: context)
         return payment
@@ -131,7 +125,7 @@ struct PurchaseProgressTests {
         let draft = TransactionDraft(paymentFor: recurring, on: today)
 
         #expect(draft.amount.cents == 10_000)
-        #expect(draft.wallet == store.wallet)
+        #expect(draft.wallet == store.checking)
         #expect(draft.category == recurring.category)
         #expect(draft.type == .expense)
         #expect(draft.day == today)

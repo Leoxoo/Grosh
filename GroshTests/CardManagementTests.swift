@@ -8,7 +8,7 @@ import Testing
 struct CardManagementTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
     private let checking: Wallet
 
     init() throws {
@@ -118,17 +118,12 @@ struct CardManagementTests {
         #expect(card.name == "Discover")
     }
 
-    @discardableResult
-    private func addCard(_ name: String, kind: CardKind = .credit, paidFrom wallet: Wallet? = nil) throws -> Card {
-        try Card.create(CardDraft(name: name, kind: kind, payingWallet: wallet ?? checking), in: context)
-    }
-
     @Test func thePickerOffersOnlyCardsPaidFromTheTransactionsWalletInTheOrderTheyWereAdded() throws {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
-        try addCard("Wells Fargo")
-        try addCard("Savings Debit", kind: .debit, paidFrom: savings)
-        try addCard("Navy Federal Debit", kind: .debit)
-        try addCard("Apple Card")
+        try context.addCard("Wells Fargo", paidFrom: checking)
+        try context.addCard("Savings Debit", kind: .debit, paidFrom: savings)
+        try context.addCard("Navy Federal Debit", kind: .debit, paidFrom: checking)
+        try context.addCard("Apple Card", paidFrom: checking)
 
         #expect(Card.pickerChoices(for: checking, keeping: nil).map(\.name) == ["Wells Fargo", "Navy Federal Debit", "Apple Card"])
         #expect(Card.pickerChoices(for: savings, keeping: nil).map(\.name) == ["Savings Debit"])
@@ -146,8 +141,8 @@ struct CardManagementTests {
     }
 
     @Test func anArchivedCardLeavesThePickerButStaysVisibleOnPastTransactions() throws {
-        let navyFederal = try addCard("Navy Federal")
-        let appleCard = try addCard("Apple Card")
+        let navyFederal = try context.addCard("Navy Federal", paidFrom: checking)
+        let appleCard = try context.addCard("Apple Card", paidFrom: checking)
         let lunch = try addExpense(12_76, paidWith: navyFederal)
 
         try navyFederal.archive()
@@ -161,8 +156,8 @@ struct CardManagementTests {
     }
 
     @Test func anUnarchivedCardReturnsToThePickerInItsPlace() throws {
-        let navyFederal = try addCard("Navy Federal")
-        try addCard("Apple Card")
+        let navyFederal = try context.addCard("Navy Federal", paidFrom: checking)
+        try context.addCard("Apple Card", paidFrom: checking)
         try navyFederal.archive()
 
         try navyFederal.unarchive()
@@ -171,8 +166,8 @@ struct CardManagementTests {
     }
 
     @Test func mergingMovesEveryTransactionToTheTargetCardAndRemovesTheSource() throws {
-        let nfcu = try addCard("NFCU")
-        let navyFederal = try addCard("Navy Federal")
+        let nfcu = try context.addCard("NFCU", paidFrom: checking)
+        let navyFederal = try context.addCard("Navy Federal", paidFrom: checking)
         let lunch = try addExpense(12_76, paidWith: nfcu)
         let groceries = try addExpense(84_10, paidWith: nfcu, on: CalendarDay(year: 2026, month: 9, day: 30))
         let petrol = try addExpense(40_00, paidWith: navyFederal)
@@ -184,12 +179,12 @@ struct CardManagementTests {
         #expect(petrol.card == navyFederal)
         #expect(Set(navyFederal.transactions ?? []) == [lunch, groceries, petrol])
         #expect(try allCards().map(\.name) == ["Navy Federal"])
-        #expect(checking.balance(asOf: today) == Money(cents: -136_86))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: -136_86))
     }
 
     @Test func mergingKeepsTheImageOfTheCardMergedInto() throws {
-        let nfcu = try addCard("NFCU")
-        let navyFederal = try addCard("Navy Federal")
+        let nfcu = try context.addCard("NFCU", paidFrom: checking)
+        let navyFederal = try context.addCard("Navy Federal", paidFrom: checking)
         nfcu.imageData = Data([4, 5, 6])
         navyFederal.imageData = Data([1, 2, 3])
 
@@ -200,19 +195,19 @@ struct CardManagementTests {
 
     @Test func aCardMergesOnlyIntoTheOtherUnarchivedCardsPaidFromTheSameWallet() throws {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
-        let nfcu = try addCard("NFCU")
-        try addCard("Savings Debit", kind: .debit, paidFrom: savings)
-        try addCard("Navy Federal")
-        try addCard("Old Amex").archive()
-        try addCard("Apple Card")
+        let nfcu = try context.addCard("NFCU", paidFrom: checking)
+        try context.addCard("Savings Debit", kind: .debit, paidFrom: savings)
+        try context.addCard("Navy Federal", paidFrom: checking)
+        try context.addCard("Old Amex", paidFrom: checking).archive()
+        try context.addCard("Apple Card", paidFrom: checking)
 
         #expect(nfcu.mergeTargets.map(\.name) == ["Navy Federal", "Apple Card"])
     }
 
     @Test func mergingIntoACardPaidFromAnotherWalletIsRefusedAndMovesNothing() throws {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
-        let nfcu = try addCard("NFCU")
-        let savingsDebit = try addCard("Savings Debit", kind: .debit, paidFrom: savings)
+        let nfcu = try context.addCard("NFCU", paidFrom: checking)
+        let savingsDebit = try context.addCard("Savings Debit", kind: .debit, paidFrom: savings)
         let lunch = try addExpense(12_76, paidWith: nfcu)
 
         #expect(throws: CardRuleError.mergeIntoAnotherWallet) { try nfcu.merge(into: savingsDebit, in: context) }
@@ -221,8 +216,8 @@ struct CardManagementTests {
     }
 
     @Test func mergingIntoAnArchivedCardIsRefused() throws {
-        let nfcu = try addCard("NFCU")
-        let oldAmex = try addCard("Old Amex")
+        let nfcu = try context.addCard("NFCU", paidFrom: checking)
+        let oldAmex = try context.addCard("Old Amex", paidFrom: checking)
         try oldAmex.archive()
         let lunch = try addExpense(12_76, paidWith: nfcu)
 
@@ -232,7 +227,7 @@ struct CardManagementTests {
 
     @Test func aCardThatPaidForTransactionsKeepsItsPayingWallet() throws {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
-        let nfcu = try addCard("NFCU")
+        let nfcu = try context.addCard("NFCU", paidFrom: checking)
         _ = try addExpense(12_76, paidWith: nfcu)
         var details = CardDraft(nfcu)
         details.payingWallet = savings
@@ -245,7 +240,7 @@ struct CardManagementTests {
 
     @Test func aCardWithoutTransactionsCanMoveToAnotherPayingWallet() throws {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
-        let unused = try addCard("PayPal")
+        let unused = try context.addCard("PayPal", paidFrom: checking)
         var details = CardDraft(unused)
         details.payingWallet = savings
 
@@ -255,7 +250,7 @@ struct CardManagementTests {
     }
 
     @Test func aCardCannotBeMergedIntoItself() throws {
-        let amex = try addCard("Amex")
+        let amex = try context.addCard("Amex", paidFrom: checking)
         let dinner = try addExpense(55_00, paidWith: amex)
 
         #expect(throws: CardRuleError.mergeIntoItself) { try amex.merge(into: amex, in: context) }
@@ -264,9 +259,9 @@ struct CardManagementTests {
     }
 
     @Test func deletingACardThatHasTransactionsRequiresMergingFirst() throws {
-        let boa = try addCard("Bank of America")
-        let citi = try addCard("Citi")
-        let unused = try addCard("PayPal")
+        let boa = try context.addCard("Bank of America", paidFrom: checking)
+        let citi = try context.addCard("Citi", paidFrom: checking)
+        let unused = try context.addCard("PayPal", paidFrom: checking)
         let dinner = try addExpense(55_00, paidWith: boa)
 
         #expect(throws: CardRuleError.hasTransactions) { try boa.delete(in: context) }

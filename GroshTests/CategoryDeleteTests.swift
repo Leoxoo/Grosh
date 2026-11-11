@@ -4,11 +4,11 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct CategoryDeleteTests {
-    private let store: CategoryFixture
+    private let store: TestStore
     private var catalog: CategoryCatalog { store.catalog }
 
     init() throws {
-        store = try CategoryFixture()
+        store = try TestStore()
     }
 
     @Test func aCategoryWithoutTransactionsCanBeDeleted() throws {

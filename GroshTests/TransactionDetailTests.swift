@@ -9,16 +9,14 @@ import Testing
 struct TransactionDetailTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
     private let checking: Wallet
     private let savings: Wallet
 
     init() throws {
         container = try GroshStore.makeContainer(inMemory: true)
-        checking = Wallet(name: "Checking")
-        savings = Wallet(name: "Savings")
-        container.mainContext.insert(checking)
-        container.mainContext.insert(savings)
+        checking = container.mainContext.addWallet("Checking")
+        savings = container.mainContext.addWallet("Savings")
     }
 
     @discardableResult
@@ -26,17 +24,9 @@ struct TransactionDetailTests {
         _ note: String, _ cents: Int, in wallet: Wallet, link: UUID? = nil, kind: LinkKind = .transfer,
         enteredAt seconds: Double = 0
     ) -> Transaction {
-        let transaction = Transaction.insert(
-            Money(cents: cents), on: today, wallet: nil, category: nil, note: note, in: context
-        )
-        transaction.wallet = wallet
+        let transaction = context.record(cents, on: today, in: wallet, note: note, enteredAt: seconds)
         transaction.joinTestLink(link, as: kind)
-        transaction.createdAt = Date(timeIntervalSinceReferenceDate: 800_000_000 + seconds)
         return transaction
-    }
-
-    private func notes() throws -> Set<String> {
-        Set(try context.fetch(Transaction.notDeleted).map(\.note))
     }
 
     // MARK: Related transactions
@@ -115,16 +105,6 @@ struct TransactionDetailTests {
 
     // MARK: Deleting
 
-    @Test func deletingATransactionTakesItOutOfItsWalletsBalance() throws {
-        record("salary", 100_00, in: checking)
-        let coffee = record("coffee", -4_50, in: checking)
-
-        try coffee.delete(.onlySelected, in: context)
-
-        #expect(try notes() == ["salary"])
-        #expect(checking.balance(asOf: today) == Money(cents: 100_00))
-    }
-
     @Test func deletingOnlyThisOneKeepsTheRelatedTransactions() throws {
         let loan = UUID()
         let lent = record("lent to Pasha", -100_00, in: checking, link: loan, kind: .loanOrDebt)
@@ -133,7 +113,7 @@ struct TransactionDetailTests {
 
         try lent.delete(.onlySelected, in: context)
 
-        #expect(try notes() == ["Pasha paid 60", "Pasha paid 40"])
+        #expect(try context.notDeletedNotes() == ["Pasha paid 60", "Pasha paid 40"])
     }
 
     @Test func deletingWithRelatedDeletesEveryLinkedTransaction() throws {
@@ -145,8 +125,8 @@ struct TransactionDetailTests {
 
         try outgoing.delete(.withRelated, in: context)
 
-        #expect(try notes() == ["coffee", "another transfer"])
-        #expect(savings.balance(asOf: today) == Money(cents: 0))
+        #expect(try context.notDeletedNotes() == ["coffee", "another transfer"])
+        #expect(walletBalance(savings, asOf: today) == Money(cents: 0))
     }
 
     @Test func aTransactionWithNothingRelatedIsDeletedOnItsOwn() throws {

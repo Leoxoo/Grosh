@@ -4,11 +4,11 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct CategoryVisibilityTests {
-    private let store: CategoryFixture
+    private let store: TestStore
     private var catalog: CategoryCatalog { store.catalog }
 
     init() throws {
-        store = try CategoryFixture()
+        store = try TestStore()
     }
 
     @Test func aHiddenCategoryStaysOnItsTransactionsButLeavesThePicker() throws {
@@ -53,10 +53,8 @@ struct CategoryVisibilityTests {
         let shown = try catalog.categories(of: .expense, includingHidden: false).map(\.name)
         let all = try catalog.categories(of: .expense, includingHidden: true).map(\.name)
 
-        #expect(shown.count == 60)
-        #expect(!shown.contains("Café"))
-        #expect(!shown.contains("Pets"))
-        #expect(all.count == 64)
+        #expect(Set(all).subtracting(shown) == ["Food & Beverage", "Café", "Restaurants", "Pets"])
+        #expect(shown.allSatisfy(all.contains))
         #expect(Array(all.prefix(3)) == ["Food & Beverage", "Café", "Restaurants"])
     }
 

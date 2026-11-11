@@ -9,24 +9,12 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct PersonTests {
-    private let store: CategoryFixture
+    private let store: TestStore
     private var context: ModelContext { store.context }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
 
     init() throws {
-        store = try CategoryFixture()
-    }
-
-    private func everyone() throws -> [Person] {
-        try context.fetch(FetchDescriptor<Person>(sortBy: [SortDescriptor(\.name)]))
-    }
-
-    @discardableResult
-    private func person(_ name: String, lastUsed: Date = .now) throws -> Person {
-        let person = Person(name: name, lastUsedAt: lastUsed)
-        context.insert(person)
-        try context.save()
-        return person
+        store = try TestStore()
     }
 
     /// The names of the people the With menu lists in Previous.
@@ -34,21 +22,10 @@ struct PersonTests {
         try context.fetch(Person.previous).map(\.name)
     }
 
-    /// An Expense with `people`, saved through the Add sheet's draft.
-    @discardableResult
-    private func eat(with people: [Person]) throws -> Transaction {
-        var draft = TransactionDraft(type: .expense, day: today)
-        draft.wallet = store.wallet
-        draft.amount = Money(cents: 30_00)
-        draft.category = try store.category("Restaurants")
-        draft.people = people
-        return try Transaction.create(draft, in: context)
-    }
-
     /// A draft for a Loan of 100.00, with `people`.
     private func loanDraft(with people: [Person]) throws -> TransactionDraft {
         var draft = TransactionDraft(type: .debtLoan, day: today)
-        draft.wallet = store.wallet
+        draft.wallet = store.checking
         draft.amount = Money(cents: 100_00)
         draft.category = try context.lockedCategory(.loan)
         draft.people = people
@@ -69,27 +46,13 @@ struct PersonTests {
         #expect(abs(anna.lastUsedAt.timeIntervalSinceNow) < 60)
     }
 
-    @Test func aPersonIsSavedWithItsPhoneHiddenFlagAndLastUsedDate() throws {
-        let lastUsed = Date(timeIntervalSince1970: 1_700_000_000)
-        let anna = Person(name: "Anna", phone: "555-0100", lastUsedAt: lastUsed)
-        anna.isHidden = true
-        context.insert(anna)
-        try context.save()
-
-        let saved = try #require(try everyone().first)
-        #expect(saved.name == "Anna")
-        #expect(saved.phone == "555-0100")
-        #expect(saved.isHidden)
-        #expect(saved.lastUsedAt == lastUsed)
-    }
-
     // MARK: Typing a name
 
     @Test func typingANewNameMakesAPerson() throws {
         let anna = try Person.add(named: "  Anna ", in: context)
 
         #expect(anna.name == "Anna")
-        #expect(try everyone().map(\.name) == ["Anna"])
+        #expect(try context.everyone().map(\.name) == ["Anna"])
         #expect(!context.hasChanges)
     }
 
@@ -99,13 +62,13 @@ struct PersonTests {
         let again = try Person.add(named: " pASHA", in: context)
 
         #expect(again === pasha)
-        #expect(try everyone().map(\.name) == ["Pasha"])
+        #expect(try context.everyone().map(\.name) == ["Pasha"])
     }
 
     @Test(arguments: ["", "   ", "\n"])
     func aNameOfNothingIsRefused(name: String) throws {
         #expect(throws: PersonRuleError.missingName) { try Person.add(named: name, in: context) }
-        #expect(try everyone().isEmpty)
+        #expect(try context.everyone().isEmpty)
     }
 
     @Test func aNewPersonKeepsThePhoneAddedWithThem() throws {
@@ -135,7 +98,7 @@ struct PersonTests {
         let anna = try Person.add(named: "Anna", in: context)
         let ivan = try Person.add(named: "Ivan", in: context)
 
-        let dinner = try eat(with: [ivan, anna])
+        let dinner = try store.eat(with: [ivan, anna])
 
         #expect(dinner.orderedPeople.map(\.name) == ["Anna", "Ivan"])
         #expect(dinner.withName == "Anna; Ivan")
@@ -146,7 +109,7 @@ struct PersonTests {
     @Test func aPersonChosenTwiceIsInWithOnce() throws {
         let anna = try Person.add(named: "Anna", in: context)
 
-        let dinner = try eat(with: [anna, anna])
+        let dinner = try store.eat(with: [anna, anna])
 
         #expect(dinner.orderedPeople.count == 1)
         #expect(dinner.withName == "Anna")
@@ -156,7 +119,7 @@ struct PersonTests {
         let anna = try Person.add(named: "Anna", in: context)
         let ivan = try Person.add(named: "Ivan", in: context)
         let olga = try Person.add(named: "Olga", in: context)
-        let dinner = try eat(with: [anna, ivan])
+        let dinner = try store.eat(with: [anna, ivan])
 
         var editing = TransactionDraft(editing: dinner)
         #expect(Set(editing.people.map(\.name)) == ["Anna", "Ivan"])
@@ -171,7 +134,7 @@ struct PersonTests {
     @Test func duplicatingATransactionKeepsItsPeople() throws {
         let anna = try Person.add(named: "Anna", in: context)
         let ivan = try Person.add(named: "Ivan", in: context)
-        let dinner = try eat(with: [anna, ivan])
+        let dinner = try store.eat(with: [anna, ivan])
 
         let copy = try Transaction.create(TransactionDraft(duplicating: dinner, on: today), in: context)
 
@@ -181,12 +144,12 @@ struct PersonTests {
 
     @Test func deletingATransactionLeavesItsPeople() throws {
         let anna = try Person.add(named: "Anna", in: context)
-        let dinner = try eat(with: [anna])
+        let dinner = try store.eat(with: [anna])
 
         context.delete(dinner)
         try context.save()
 
-        #expect(try everyone().map(\.name) == ["Anna"])
+        #expect(try context.everyone().map(\.name) == ["Anna"])
     }
 
     // MARK: A Loan or Debt is with one Person
@@ -219,7 +182,7 @@ struct PersonTests {
 
     @Test func anExpenseNeedsNoPerson() throws {
         var draft = TransactionDraft(type: .expense, day: today)
-        draft.wallet = store.wallet
+        draft.wallet = store.checking
         draft.amount = Money(cents: 30_00)
         draft.category = try store.category("Restaurants")
 
@@ -262,10 +225,10 @@ struct PersonTests {
 
     @Test func choosingAPersonOnATransactionMakesThemTheMostRecentlyUsed() throws {
         let longAgo = Date(timeIntervalSince1970: 1_000_000_000)
-        let anna = try person("Anna", lastUsed: longAgo)
-        let ivan = try person("Ivan", lastUsed: longAgo)
+        let anna = try context.insertPerson("Anna", lastUsed: longAgo)
+        let ivan = try context.insertPerson("Ivan", lastUsed: longAgo)
 
-        try eat(with: [anna])
+        try store.eat(with: [anna])
 
         #expect(abs(anna.lastUsedAt.timeIntervalSinceNow) < 60)
         #expect(ivan.lastUsedAt == longAgo)
@@ -273,7 +236,7 @@ struct PersonTests {
 
     @Test func addingAPersonByNameMakesThemTheMostRecentlyUsed() throws {
         let longAgo = Date(timeIntervalSince1970: 1_000_000_000)
-        let anna = try person("Anna", lastUsed: longAgo)
+        let anna = try context.insertPerson("Anna", lastUsed: longAgo)
 
         try Person.add(named: "anna", in: context)
 
@@ -282,7 +245,7 @@ struct PersonTests {
 
     @Test func aPersonIsNeverMadeLessRecentByAnOlderUse() throws {
         let recent = Date(timeIntervalSince1970: 1_700_000_000)
-        let anna = try person("Anna", lastUsed: recent)
+        let anna = try context.insertPerson("Anna", lastUsed: recent)
 
         anna.markUsed(at: recent.addingTimeInterval(-86_400))
         #expect(anna.lastUsedAt == recent)
@@ -295,10 +258,10 @@ struct PersonTests {
 
     @Test func previousListsEveryoneWhoIsntHiddenMostRecentlyUsedFirst() throws {
         let now = Date.now
-        try person("Anna", lastUsed: now.addingTimeInterval(-300))
-        try person("Ivan", lastUsed: now.addingTimeInterval(-100))
-        try person("Olga", lastUsed: now.addingTimeInterval(-200))
-        let pasha = try person("Pasha", lastUsed: now)
+        try context.insertPerson("Anna", lastUsed: now.addingTimeInterval(-300))
+        try context.insertPerson("Ivan", lastUsed: now.addingTimeInterval(-100))
+        try context.insertPerson("Olga", lastUsed: now.addingTimeInterval(-200))
+        let pasha = try context.insertPerson("Pasha", lastUsed: now)
         try context.save()
         try pasha.hide()
 
@@ -307,9 +270,9 @@ struct PersonTests {
 
     @Test func peopleUsedAtTheSameTimeAreListedByName() throws {
         let now = Date.now
-        try person("Olga", lastUsed: now)
-        try person("Anna", lastUsed: now)
-        try person("Ivan", lastUsed: now)
+        try context.insertPerson("Olga", lastUsed: now)
+        try context.insertPerson("Anna", lastUsed: now)
+        try context.insertPerson("Ivan", lastUsed: now)
         try context.save()
 
         #expect(try previousNames() == ["Anna", "Ivan", "Olga"])
@@ -318,9 +281,9 @@ struct PersonTests {
     @Test func searchingNarrowsPreviousToNamesContainingWhatWasTyped() throws {
         let now = Date.now
         let people = [
-            try person("Anna", lastUsed: now.addingTimeInterval(-3)),
-            try person("Ivan", lastUsed: now.addingTimeInterval(-2)),
-            try person("José", lastUsed: now.addingTimeInterval(-1)),
+            try context.insertPerson("Anna", lastUsed: now.addingTimeInterval(-3)),
+            try context.insertPerson("Ivan", lastUsed: now.addingTimeInterval(-2)),
+            try context.insertPerson("José", lastUsed: now.addingTimeInterval(-1)),
         ]
 
         #expect(PreviousPeople(people, typed: "").people.map(\.name) == ["Anna", "Ivan", "José"])
@@ -330,7 +293,7 @@ struct PersonTests {
     }
 
     @Test func theMenuOffersToAddWhatWasTypedUnlessAPersonHasExactlyThatName() throws {
-        let people = [try person("Anna"), try person("Ivan")]
+        let people = [try context.insertPerson("Anna"), try context.insertPerson("Ivan")]
 
         #expect(PreviousPeople(people, typed: "").addableName == nil)
         #expect(PreviousPeople(people, typed: "   ").addableName == nil)
@@ -355,7 +318,7 @@ struct PersonTests {
     @Test func aHiddenPersonLeavesPreviousButKeepsTheirNameAndHistory() throws {
         let anna = try Person.add(named: "Anna", in: context)
         let ivan = try Person.add(named: "Ivan", in: context)
-        let dinner = try eat(with: [anna, ivan])
+        let dinner = try store.eat(with: [anna, ivan])
 
         try anna.hide()
 
@@ -386,12 +349,12 @@ struct PersonTests {
         #expect(again === anna)
         #expect(!anna.isHidden)
         #expect(try previousNames() == ["Anna"])
-        #expect(try everyone().count == 1)
+        #expect(try context.everyone().count == 1)
     }
 
     @Test func aHiddenPersonKeepsAPlaceOnTheTransactionsEditedAfterwards() throws {
         let anna = try Person.add(named: "Anna", in: context)
-        let dinner = try eat(with: [anna])
+        let dinner = try store.eat(with: [anna])
         try anna.hide()
 
         var editing = TransactionDraft(editing: dinner)

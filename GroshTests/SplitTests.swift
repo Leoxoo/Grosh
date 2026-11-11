@@ -8,13 +8,13 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct SplitTests {
-    private let store: CategoryFixture
+    private let store: TestStore
     private var context: ModelContext { store.context }
-    private var checking: Wallet { store.wallet }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private var checking: Wallet { store.checking }
+    private let today = TestStore.today
 
     init() throws {
-        store = try CategoryFixture()
+        store = try TestStore()
     }
 
     /// An Expense (unless `type` says Income) of `cents` under `categoryName`, dated today in Checking, saved through
@@ -29,12 +29,6 @@ struct SplitTests {
         draft.category = try store.category(categoryName, type)
         draft.card = card
         return try Transaction.create(draft, in: context)
-    }
-
-    /// Adds a Reimbursement of `cents` to `expense`.
-    @discardableResult
-    private func payBack(_ cents: Int, to expense: Transaction) throws -> Reimbursement {
-        try Reimbursement.add(ReimbursementDraft(amount: Money(cents: cents), day: today), to: expense, in: context)
     }
 
     /// Assigns `reimbursement` to `part` in `draft`.
@@ -70,7 +64,7 @@ struct SplitTests {
         return try transaction.split(draft, in: context)
     }
 
-    private func balance() -> Money { checking.balance(asOf: today) }
+    private func balance() -> Money { walletBalance(checking, asOf: today) }
 
     private func allTransactions() throws -> [Transaction] { try context.fetch(Transaction.notDeleted) }
 
@@ -112,15 +106,10 @@ struct SplitTests {
 
     @Test(arguments: [LockedRole.loan, .debt])
     func aLoanOrDebtAndItsPaymentsCannotBeSplit(role: LockedRole) throws {
-        var draft = TransactionDraft(type: .debtLoan, day: today)
-        draft.wallet = checking
-        draft.amount = Money(cents: 100_00)
-        draft.category = try context.lockedCategory(role)
-        draft.people = [try Person.add(named: "Pasha", in: context)]
-        let original = try Transaction.create(draft, in: context)
-        var payment = try DebtPaymentDraft(settling: original, on: today, in: context)
-        payment.amount = Money(cents: 120_00)
-        let recorded = try DebtPayment.record(payment, in: context)
+        let original = try context.recordLoanOrDebt(
+            role, 100_00, with: context.person("Pasha"), on: today, in: checking
+        )
+        let recorded = try context.pay(120_00, on: original, on: today)
 
         let overpayment = try #require(recorded.overpayment)
 
@@ -130,14 +119,10 @@ struct SplitTests {
     }
 
     @Test func aForgivenLoanCannotBeSplit() throws {
-        var draft = TransactionDraft(type: .debtLoan, day: today)
-        draft.wallet = checking
-        draft.amount = Money(cents: 50_00)
-        draft.category = try context.lockedCategory(.loan)
-        draft.people = [try Person.add(named: "Pasha", in: context)]
-        let loan = try Transaction.create(draft, in: context)
-        let forgiveness = try ForgiveDraft(forgiving: loan, on: today, in: context)
-        try Forgiveness.record(forgiveness, in: context)
+        let loan = try context.recordLoanOrDebt(
+            .loan, 50_00, with: context.person("Pasha"), on: today, in: checking
+        )
+        try context.forgive(loan, on: today)
 
         #expect(!loan.canBeSplit)
     }
@@ -496,15 +481,10 @@ struct SplitTests {
     }
 
     @Test func whatAnOverpaymentWritesOffIsStillNotASplitPart() throws {
-        var draft = TransactionDraft(type: .debtLoan, day: today)
-        draft.wallet = checking
-        draft.amount = Money(cents: 100_00)
-        draft.category = try context.lockedCategory(.debt)
-        draft.people = [try Person.add(named: "Anna", in: context)]
-        let debt = try Transaction.create(draft, in: context)
-        var payment = try DebtPaymentDraft(settling: debt, on: today, in: context)
-        payment.amount = Money(cents: 120_00)
-        let overpaid = try #require(try DebtPayment.record(payment, in: context).overpayment)
+        let debt = try context.recordLoanOrDebt(
+            .debt, 100_00, with: context.person("Anna"), on: today, in: checking
+        )
+        let overpaid = try #require(try context.pay(120_00, on: debt, on: today).overpayment)
 
         #expect(overpaid.isDebtWriteOff)
         #expect(!overpaid.isSplitPart)
@@ -512,15 +492,10 @@ struct SplitTests {
     }
 
     @Test func theStoredLinkKindTellsPartsFromWriteOffs() throws {
-        var draft = TransactionDraft(type: .debtLoan, day: today)
-        draft.wallet = checking
-        draft.amount = Money(cents: 100_00)
-        draft.category = try context.lockedCategory(.debt)
-        draft.people = [try Person.add(named: "Anna", in: context)]
-        let debt = try Transaction.create(draft, in: context)
-        var payment = try DebtPaymentDraft(settling: debt, on: today, in: context)
-        payment.amount = Money(cents: 120_00)
-        let overpaid = try #require(try DebtPayment.record(payment, in: context).overpayment)
+        let debt = try context.recordLoanOrDebt(
+            .debt, 100_00, with: context.person("Anna"), on: today, in: checking
+        )
+        let overpaid = try #require(try context.pay(120_00, on: debt, on: today).overpayment)
         let coffee = try record(25_00)
         let part = try #require(try split(coffee, off: [10_00]).first)
         // A Debt in Recently Deleted still holds its link.
@@ -684,8 +659,8 @@ struct SplitTests {
 
     @Test func saveWaitsUntilEveryReimbursementIsAssignedToAPart() throws {
         let coffee = try record(25_00)
-        let first = try payBack(5_00, to: coffee)
-        let second = try payBack(3_00, to: coffee)
+        let first = try context.payBack(5_00, on: today, to: coffee)
+        let second = try context.payBack(3_00, on: today, to: coffee)
         var draft = SplitDraft(splitting: coffee)
         var part = draft.newPart()
         part.amount = Money(cents: 10_00)
@@ -705,9 +680,9 @@ struct SplitTests {
 
     @Test func splittingSendsEachReimbursementToThePartItWasAssignedTo() throws {
         let coffee = try record(25_00)
-        let first = try payBack(5_00, to: coffee)
-        let second = try payBack(3_00, to: coffee)
-        let third = try payBack(2_00, to: coffee)
+        let first = try context.payBack(5_00, on: today, to: coffee)
+        let second = try context.payBack(3_00, on: today, to: coffee)
+        let third = try context.payBack(2_00, on: today, to: coffee)
         let balanceBefore = balance()
 
         let parts = try split(
@@ -727,10 +702,10 @@ struct SplitTests {
 
     @Test func removingAPartUnassignsItsReimbursementsAndKeepsTheOthersOnTheirParts() throws {
         let coffee = try record(25_00)
-        let onFirst = try payBack(1_00, to: coffee)
-        let onSecond = try payBack(2_00, to: coffee)
-        let onThird = try payBack(3_00, to: coffee)
-        let onOriginal = try payBack(4_00, to: coffee)
+        let onFirst = try context.payBack(1_00, on: today, to: coffee)
+        let onSecond = try context.payBack(2_00, on: today, to: coffee)
+        let onThird = try context.payBack(3_00, on: today, to: coffee)
+        let onOriginal = try context.payBack(4_00, on: today, to: coffee)
         var draft = SplitDraft(splitting: coffee)
         for cents in [10_00, 5_00, 3_00] {
             var part = draft.newPart()
@@ -754,9 +729,9 @@ struct SplitTests {
 
     @Test func undoSplitMovesEveryPartsReimbursementsBackOntoTheOriginal() throws {
         let coffee = try record(25_00)
-        let first = try payBack(5_00, to: coffee)
-        let second = try payBack(3_00, to: coffee)
-        let third = try payBack(2_00, to: coffee)
+        let first = try context.payBack(5_00, on: today, to: coffee)
+        let second = try context.payBack(3_00, on: today, to: coffee)
+        let third = try context.payBack(2_00, on: today, to: coffee)
         let balanceBefore = balance()
         let parts = try split(
             coffee, off: [10_00, 5_00], sending: [(first, .part(0)), (second, .part(1)), (third, .original)]
@@ -773,7 +748,7 @@ struct SplitTests {
 
     @Test func aPartSplitAgainSendsItsReimbursementsToTheNewPart() throws {
         let coffee = try record(25_00)
-        let reimbursement = try payBack(5_00, to: coffee)
+        let reimbursement = try context.payBack(5_00, on: today, to: coffee)
         let first = try #require(try split(coffee, off: [10_00], sending: [(reimbursement, .part(0))]).first)
 
         let second = try #require(try split(first, off: [4_00], sending: [(reimbursement, .part(0))]).first)

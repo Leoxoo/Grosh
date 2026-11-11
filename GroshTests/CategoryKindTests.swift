@@ -8,10 +8,10 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct CategoryKindTests {
-    private let store: CategoryFixture
+    private let store: TestStore
 
     init() throws {
-        store = try CategoryFixture()
+        store = try TestStore()
     }
 
     @Test func aSeededCategoryIsRegularAndItsSubcategoriesFollowIt() throws {

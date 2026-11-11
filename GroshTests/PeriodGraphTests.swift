@@ -70,8 +70,7 @@ struct PeriodGraphTests {
     }
 
     @Test func aGraphCountsOnlyTheWalletItIsGiven() throws {
-        let savings = Wallet(name: "Savings")
-        store.context.insert(savings)
+        let savings = store.context.addWallet("Savings")
         try store.record(-25_00, "Café", on: day(2026, 10, 4), in: savings)
         try store.record(-40_00, "Café", on: day(2026, 10, 3))
 

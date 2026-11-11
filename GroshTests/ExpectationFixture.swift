@@ -15,8 +15,7 @@ struct ExpectationFixture {
 
     init() throws {
         store = try MonthGraphFixture()
-        cash = Wallet(name: "Cash")
-        store.context.insert(cash)
+        cash = store.context.addWallet("Cash")
     }
 
     func person(_ name: String) throws -> Person {

@@ -10,25 +10,20 @@ import Testing
 struct RecentlyDeletedTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
     private let deletedAt = Date(timeIntervalSinceReferenceDate: 800_000_000)
     private let checking: Wallet
     private let savings: Wallet
 
     init() throws {
         container = try GroshStore.makeContainer(inMemory: true)
-        checking = Wallet(name: "Checking")
-        savings = Wallet(name: "Savings")
-        container.mainContext.insert(checking)
-        container.mainContext.insert(savings)
+        checking = container.mainContext.addWallet("Checking")
+        savings = container.mainContext.addWallet("Savings")
     }
 
     @discardableResult
     private func record(_ note: String, _ cents: Int, in wallet: Wallet, link: UUID? = nil) -> Transaction {
-        let transaction = Transaction.insert(
-            Money(cents: cents), on: today, wallet: nil, category: nil, note: note, in: context
-        )
-        transaction.wallet = wallet
+        let transaction = context.record(cents, on: today, in: wallet, note: note)
         transaction.joinTestLink(link, as: .transfer)
         return transaction
     }
@@ -41,10 +36,6 @@ struct RecentlyDeletedTests {
         count * 24 * 60 * 60
     }
 
-    private func storedCount() throws -> Int {
-        try context.fetchCount(FetchDescriptor<Transaction>())
-    }
-
     // MARK: Deleting a transaction
 
     @Test func deletingATransactionMovesItToRecentlyDeletedAndOutOfItsWalletsBalance() throws {
@@ -55,9 +46,9 @@ struct RecentlyDeletedTests {
 
         #expect(coffee.isInRecentlyDeleted)
         #expect(try bin().transactions == [coffee])
-        #expect(checking.balance(asOf: today) == Money(cents: 100_00))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: 100_00))
         #expect(try context.fetch(Transaction.notDeleted).map(\.note) == ["salary"])
-        #expect(try storedCount() == 2)
+        #expect(try context.transactionCount() == 2)
     }
 
     @Test func deletingWithRelatedMovesEachLinkedTransactionToTheBinOnItsOwn() throws {
@@ -68,7 +59,7 @@ struct RecentlyDeletedTests {
         try outgoing.delete(.withRelated, in: context, at: deletedAt)
 
         #expect(try Set(bin().transactions) == [outgoing, incoming])
-        #expect(savings.balance(asOf: today) == Money(cents: 0))
+        #expect(walletBalance(savings, asOf: today) == Money(cents: 0))
     }
 
     @Test func restoringATransactionBringsItBackLinkedAsBefore() throws {
@@ -82,7 +73,7 @@ struct RecentlyDeletedTests {
 
         #expect(!outgoing.isInRecentlyDeleted)
         #expect(try incoming.related(in: context) == [outgoing])
-        #expect(checking.balance(asOf: today) == Money(cents: -500_00))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: -500_00))
         #expect(try bin().isEmpty)
     }
 
@@ -101,15 +92,8 @@ struct RecentlyDeletedTests {
 
     @Test func aLoansPaymentInTheBinStillKeepsItsWalletAndCategory() throws {
         try CategorySeeder.seedIfNeeded(in: context)
-        var lend = TransactionDraft(type: .debtLoan, day: today)
-        lend.wallet = checking
-        lend.amount = Money(cents: 100_00)
-        lend.category = try context.lockedCategory(.loan)
-        lend.people = [try Person.add(named: "Pasha", in: context)]
-        let loan = try Transaction.create(lend, in: context)
-        var payment = try DebtPaymentDraft(settling: loan, on: today, in: context)
-        payment.amount = Money(cents: 60_00)
-        let collection = try DebtPayment.record(payment, in: context).payment
+        let loan = try context.recordLoanOrDebt(.loan, 100_00, with: context.person("Pasha"), on: today, in: checking)
+        let collection = try context.pay(60_00, on: loan, on: today).payment
         try collection.delete(.onlySelected, in: context, at: deletedAt)
 
         var editing = TransactionDraft(editing: loan)
@@ -125,17 +109,10 @@ struct RecentlyDeletedTests {
 
     @Test func aPaymentCantBeRestoredOntoALoanForgivenSinceItWasDeleted() throws {
         try CategorySeeder.seedIfNeeded(in: context)
-        var lend = TransactionDraft(type: .debtLoan, day: today)
-        lend.wallet = checking
-        lend.amount = Money(cents: 100_00)
-        lend.category = try context.lockedCategory(.loan)
-        lend.people = [try Person.add(named: "Pasha", in: context)]
-        let loan = try Transaction.create(lend, in: context)
-        var payment = try DebtPaymentDraft(settling: loan, on: today, in: context)
-        payment.amount = Money(cents: 60_00)
-        let collection = try DebtPayment.record(payment, in: context).payment
+        let loan = try context.recordLoanOrDebt(.loan, 100_00, with: context.person("Pasha"), on: today, in: checking)
+        let collection = try context.pay(60_00, on: loan, on: today).payment
         try collection.delete(.onlySelected, in: context, at: deletedAt)
-        try Forgiveness.record(try ForgiveDraft(forgiving: loan, on: today, in: context), in: context)
+        try context.forgive(loan, on: today)
 
         #expect(collection.restoreBlocker() == .loanOrDebtIsForgiven)
         #expect(throws: RecentlyDeletedError.loanOrDebtIsForgiven) { try collection.restore() }
@@ -163,7 +140,7 @@ struct RecentlyDeletedTests {
         #expect(bin.transactions.isEmpty)
         #expect(checking.transactionsDeletedWithIt.count == 3)
         #expect(try context.fetch(Wallet.unarchived) == [savings])
-        #expect(Wallet.total(of: [checking, savings], asOf: today) == [Money(cents: 20_00)])
+        #expect(walletTotal([checking, savings], asOf: today) == [Money(cents: 20_00)])
         // The transfer's other half stays in its wallet, its own half now a dash.
         #expect(!incoming.isInRecentlyDeleted)
         #expect(try incoming.related(in: context).isEmpty)
@@ -180,7 +157,7 @@ struct RecentlyDeletedTests {
 
         #expect(!checking.isInRecentlyDeleted)
         #expect(!salary.isInRecentlyDeleted)
-        #expect(checking.balance(asOf: today) == Money(cents: 100_00))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: 100_00))
         #expect(try bin().isEmpty)
     }
 
@@ -197,9 +174,9 @@ struct RecentlyDeletedTests {
         try checking.restore(today: today)
 
         #expect(coffee.isInRecentlyDeleted)
-        #expect(checking.balance(asOf: today) == Money(cents: 100_00))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: 100_00))
         try coffee.restore()
-        #expect(checking.balance(asOf: today) == Money(cents: 95_50))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: 95_50))
     }
 
     @Test func aDeletedWalletsCardsWaitWithItAndGoWithItForGood() throws {
@@ -235,12 +212,12 @@ struct RecentlyDeletedTests {
         record("lunch", -12_00, in: savings)
 
         try RecentlyDeleted.purgeExpired(in: context, now: deletedAt.addingTimeInterval(days(29)))
-        #expect(try storedCount() == 3)
+        #expect(try context.transactionCount() == 3)
 
         try RecentlyDeleted.purgeExpired(in: context, now: deletedAt.addingTimeInterval(days(30)))
         #expect(try context.fetch(FetchDescriptor<Wallet>()) == [savings])
         #expect(try bin().transactions == [coffee])
-        #expect(try storedCount() == 2)
+        #expect(try context.transactionCount() == 2)
 
         try RecentlyDeleted.purgeExpired(in: context, now: deletedAt.addingTimeInterval(days(40)))
         #expect(try bin().isEmpty)
@@ -256,10 +233,10 @@ struct RecentlyDeletedTests {
         try checking.delete(at: deletedAt)
 
         try coffee.deleteForever(in: context)
-        #expect(try storedCount() == 1)
+        #expect(try context.transactionCount() == 1)
 
         try checking.deleteForever(in: context)
-        #expect(try storedCount() == 0)
+        #expect(try context.transactionCount() == 0)
         #expect(try context.fetch(FetchDescriptor<Wallet>()) == [savings])
     }
 

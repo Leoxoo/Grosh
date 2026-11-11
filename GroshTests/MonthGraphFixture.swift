@@ -3,21 +3,22 @@ import Testing
 @testable import Grosh
 
 /// An in-memory store seeded with the default category tree and a Checking wallet, for Month graph tests. It is seen on
-/// `today`, the 12th of a 31-day October, after a 30-day September and a year after another 31-day October.
+/// a day of its own, ``today``, the 12th of a 31-day October, after a 30-day September and a year after another 31-day
+/// October; the snapshot references are drawn on it too.
 @MainActor
 struct MonthGraphFixture {
     let today = day(2026, 10, 12)
-    private let categories: CategoryFixture
-    var context: ModelContext { categories.context }
-    var container: ModelContainer { categories.container }
-    var checking: Wallet { categories.wallet }
+    private let store: TestStore
+    var context: ModelContext { store.context }
+    var container: ModelContainer { store.container }
+    var checking: Wallet { store.checking }
 
     init() throws {
-        categories = try CategoryFixture()
+        store = try TestStore()
     }
 
     func category(_ name: String, _ type: CategoryType = .expense) throws -> Grosh.Category {
-        try categories.category(name, type)
+        try store.category(name, type)
     }
 
     /// Records `cents` (signed, as it moves the wallet) filed under `categoryName` on `day`, in Checking unless another
@@ -27,27 +28,19 @@ struct MonthGraphFixture {
         _ cents: Int, _ categoryName: String, _ type: CategoryType = .expense, on day: CalendarDay,
         in wallet: Wallet? = nil
     ) throws -> Transaction {
-        let transaction = Transaction.insert(Money(cents: cents), on: day, wallet: nil, category: nil, in: context)
-        transaction.wallet = wallet ?? checking
-        transaction.category = try category(categoryName, type)
-        return transaction
+        try store.record(cents, categoryName, type, on: day, in: wallet)
     }
 
-    /// A Loan (`.loan`, money lent) or Debt (`.debt`, money borrowed) of `cents`, saved as the Add sheet's Debt/Loan tab
-    /// saves it: left in the report, so only its category keeps it off the cards.
+    /// A $60 dinner under Restaurants in Checking on the 3rd of October.
+    func dinner() throws -> Transaction {
+        try record(-60_00, "Restaurants", on: day(2026, 10, 3))
+    }
+
+    /// A Loan (`.loan`, money lent) or Debt (`.debt`, money borrowed) of `cents` with Pasha in Checking, saved as the Add
+    /// sheet's Debt/Loan tab saves it: left in the report, so only its category keeps it off the cards.
     @discardableResult
     func lendOrBorrow(_ role: LockedRole, _ cents: Int, on day: CalendarDay) throws -> Transaction {
-        var draft = TransactionDraft(type: .debtLoan, day: day)
-        draft.wallet = checking
-        draft.amount = Money(cents: cents)
-        draft.category = try context.lockedCategory(role)
-        draft.people = [try Person.add(named: "Pasha", in: context)]
-        return try Transaction.create(draft, in: context)
-    }
-
-    /// Forgives what is outstanding on `loanOrDebt` on `day`, under Other Expense for a Loan or Other Income for a Debt.
-    func forgive(_ loanOrDebt: Transaction, on day: CalendarDay) throws {
-        try Forgiveness.record(ForgiveDraft(forgiving: loanOrDebt, on: day, in: context), in: context)
+        try context.recordLoanOrDebt(role, cents, with: context.person("Pasha"), on: day, in: checking)
     }
 
     /// The Other Income category, which a report reads once and counts an Expense paid back beyond its amount under.

@@ -167,5 +167,4 @@ struct CategorySeedingTests {
 
         #expect(salary.type == .expense)
     }
-
 }

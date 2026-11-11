@@ -10,30 +10,21 @@ import Testing
 struct MultiDeleteTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
     private let checking: Wallet
     private let savings: Wallet
 
     init() throws {
         container = try GroshStore.makeContainer(inMemory: true)
-        checking = Wallet(name: "Checking")
-        savings = Wallet(name: "Savings")
-        container.mainContext.insert(checking)
-        container.mainContext.insert(savings)
+        checking = container.mainContext.addWallet("Checking")
+        savings = container.mainContext.addWallet("Savings")
     }
 
     @discardableResult
     private func record(_ note: String, _ cents: Int, in wallet: Wallet, link: UUID? = nil) -> Transaction {
-        let transaction = Transaction.insert(
-            Money(cents: cents), on: today, wallet: nil, category: nil, note: note, in: context
-        )
-        transaction.wallet = wallet
+        let transaction = context.record(cents, on: today, in: wallet, note: note)
         transaction.joinTestLink(link, as: .transfer)
         return transaction
-    }
-
-    private func notes() throws -> Set<String> {
-        Set(try context.fetch(Transaction.notDeleted).map(\.note))
     }
 
     @Test func aSelectionWithNothingRelatedIsSimplyDeleted() throws {
@@ -43,8 +34,8 @@ struct MultiDeleteTests {
         #expect(try selection.deleteScopes(in: context) == [.onlySelected])
         try selection.delete(.onlySelected, in: context)
 
-        #expect(try notes() == ["salary"])
-        #expect(checking.balance(asOf: today) == Money(cents: 100_00))
+        #expect(try context.notDeletedNotes() == ["salary"])
+        #expect(walletBalance(checking, asOf: today) == Money(cents: 100_00))
     }
 
     @Test func selectingBothHalvesOfATransferBreaksNoLinkSoNothingMoreIsAsked() throws {
@@ -77,8 +68,8 @@ struct MultiDeleteTests {
 
         try [outgoing, coffee].delete(.withRelated, in: context)
 
-        #expect(try notes() == ["another transfer"])
-        #expect(savings.balance(asOf: today) == Money(cents: 0))
+        #expect(try context.notDeletedNotes() == ["another transfer"])
+        #expect(walletBalance(savings, asOf: today) == Money(cents: 0))
     }
 
     @Test func deletingOnlyTheSelectionKeepsTheLinkedTransactionsLeftOutOfIt() throws {
@@ -89,7 +80,7 @@ struct MultiDeleteTests {
 
         try [outgoing, coffee].delete(.onlySelected, in: context)
 
-        #expect(try notes() == ["from checking"])
+        #expect(try context.notDeletedNotes() == ["from checking"])
     }
 
     @Test func linkedPaymentsLeftOutOfTheSelectionAreEachCountedOnce() throws {
@@ -102,7 +93,7 @@ struct MultiDeleteTests {
 
         try [firstPayment, secondPayment].delete(.withRelated, in: context)
 
-        #expect(try notes().isEmpty)
+        #expect(try context.notDeletedNotes().isEmpty)
     }
 
     // MARK: What the user is asked

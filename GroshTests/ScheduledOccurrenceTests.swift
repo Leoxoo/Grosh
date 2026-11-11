@@ -8,30 +8,21 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct ScheduledOccurrenceTests {
-    private let store: CategoryFixture
+    private let store: TestStore
     private var context: ModelContext { store.context }
     /// The day the rows are listed on: occurrences dated on or before it are transactions already, or were skipped.
     private let today = CalendarDay(year: 2026, month: 10, day: 11)
 
     init() throws {
-        store = try CategoryFixture()
+        store = try TestStore()
     }
 
-    /// A Recurring transaction of 15.99 starting on `start`, paid from the fixture's wallet unless `wallet` is given,
+    /// The fixture's Netflix starting on `start`, paid from Checking unless `wallet` is given,
     /// repeating `preset` until `end`, and saved on `today`.
     private func makeSchedule(
         starting start: CalendarDay, preset: RepeatPreset = .monthly, wallet: Wallet? = nil, end: RepeatEnd = .forever
     ) throws -> RecurringTransaction {
-        let category = Grosh.Category(name: "Subscriptions", type: .expense, symbolName: "repeat", color: .purple)
-        context.insert(category)
-        var draft = RecurringDraft(startDay: start)
-        draft.name = "Netflix"
-        draft.amount = Money(cents: 1599)
-        draft.wallet = wallet ?? store.wallet
-        draft.category = category
-        draft.preset = preset
-        draft.end = end
-        return try RecurringTransaction.create(draft, today: today, in: context)
+        try store.netflix(starting: start, today: today, preset: preset, wallet: wallet, end: end)
     }
 
     @Test func aScheduleThatRepeatsForeverListsOnlyItsNextOccurrence() throws {
@@ -96,11 +87,11 @@ struct ScheduledOccurrenceTests {
         let recurring = try makeSchedule(starting: day(2026, 10, 12), preset: .daily)
         #expect(recurring.scheduledDays(today: today) == [day(2026, 10, 12)])
 
-        store.wallet.isArchived = true
+        store.checking.isArchived = true
         #expect(recurring.scheduledDays(today: today).isEmpty)
 
-        store.wallet.isArchived = false
-        store.wallet.deletedAt = Date.now
+        store.checking.isArchived = false
+        store.checking.deletedAt = Date.now
         #expect(recurring.scheduledDays(today: today).isEmpty)
     }
 
@@ -113,12 +104,11 @@ struct ScheduledOccurrenceTests {
     }
 
     @Test func aBillWhoseAmountVariesHasEstimatedScheduledRowsAndOtherKindsDoNot() throws {
-        let utilities = Grosh.Category(name: "Utilities", type: .expense, symbolName: "bolt", color: .purple)
-        context.insert(utilities)
+        let utilities = context.addCategory("Utilities")
         var draft = RecurringDraft(startDay: day(2026, 10, 12))
         draft.name = "Electricity"
         draft.amount = Money(cents: 2_500)
-        draft.wallet = store.wallet
+        draft.wallet = store.checking
         draft.category = utilities
         draft.kind = .bill
         draft.amountVaries = true
@@ -136,18 +126,17 @@ struct ScheduledOccurrenceTests {
     }
 
     @Test func aVaryingBillsScheduledRowsShowItsEstimateInPlaceOfItsAmount() throws {
-        let water = Grosh.Category(name: "Water", type: .expense, symbolName: "bolt", color: .purple)
-        context.insert(water)
+        let water = context.addCategory("Water")
         for _ in 0..<2 {
             Transaction.insert(
-                Money(cents: -50_00), on: day(2026, 9, 1), wallet: store.wallet, category: water, in: context
+                Money(cents: -50_00), on: day(2026, 9, 1), wallet: store.checking, category: water, in: context
             )
         }
         try context.save()
         var draft = RecurringDraft(startDay: day(2026, 10, 12))
         draft.name = "Water"
         draft.amount = Money(cents: 0)
-        draft.wallet = store.wallet
+        draft.wallet = store.checking
         draft.category = water
         draft.kind = .bill
         draft.amountVaries = true
@@ -160,9 +149,7 @@ struct ScheduledOccurrenceTests {
     }
 
     @Test func theTotalListsOnlyTheWalletsCountedInIt() throws {
-        let savings = Wallet(name: "Savings")
-        savings.includeInTotal = false
-        context.insert(savings)
+        let savings = context.addWallet("Savings", includeInTotal: false)
         let checking = try makeSchedule(starting: day(2026, 10, 12), preset: .weekly)
         let kept = try makeSchedule(starting: day(2026, 10, 12), preset: .weekly, wallet: savings)
         let schedules = [checking, kept]
@@ -190,7 +177,7 @@ struct ScheduledOccurrenceTests {
         let netflix = try makeSchedule(starting: day(2026, 10, 20), end: .afterCount(3))
         let rows = [netflix].scheduledOccurrences(selection: .total, today: today)
         let lunch = Transaction.insert(
-            Money(cents: -5_00), on: day(2026, 10, 20), wallet: store.wallet, category: nil, in: context
+            Money(cents: -5_00), on: day(2026, 10, 20), wallet: store.checking, category: nil, in: context
         )
 
         let days = TransactionDay.days(of: [lunch], scheduled: rows)
@@ -208,7 +195,7 @@ struct ScheduledOccurrenceTests {
         let netflix = try makeSchedule(starting: day(2026, 10, 20), end: .afterCount(3))
         let rows = [netflix].scheduledOccurrences(selection: .total, today: today)
         let dinner = Transaction.insert(
-            Money(cents: -40_00), on: day(2026, 11, 3), wallet: store.wallet, category: nil, in: context
+            Money(cents: -40_00), on: day(2026, 11, 3), wallet: store.checking, category: nil, in: context
         )
 
         let future = Period.future.days(today: today)

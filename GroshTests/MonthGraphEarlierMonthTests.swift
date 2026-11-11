@@ -57,8 +57,7 @@ struct MonthGraphEarlierMonthTests {
     /// August's Expense is paid back in full into Cash, another wallet of the Total: in the Total it counts nothing, and
     /// nor does the payback, so the strip starts in September.
     @Test func anExpensePaidBackInFullIntoAnotherWalletDoesntStartTheStrip() throws {
-        let cash = Wallet(name: "Cash")
-        context.insert(cash)
+        let cash = context.addWallet("Cash")
         let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 8, 3))
         try dinner.recordPaybackElsewhere(
             ReimbursementDraft(amount: Money(cents: 60_00), day: day(2026, 8, 5)), into: cash, in: context
@@ -71,8 +70,7 @@ struct MonthGraphEarlierMonthTests {
     /// The earliest transaction is a payback into Cash, which the Total leaves out since its Expense counts it; the
     /// Expense, which still counts what wasn't paid back, starts the strip in August.
     @Test func aPaybackTheTotalLeavesOutDoesntHideTheMonthsAfterIt() throws {
-        let cash = Wallet(name: "Cash")
-        context.insert(cash)
+        let cash = context.addWallet("Cash")
         let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 8, 10))
         try dinner.recordPaybackElsewhere(
             ReimbursementDraft(amount: Money(cents: 20_00), day: day(2026, 7, 28)), into: cash, in: context

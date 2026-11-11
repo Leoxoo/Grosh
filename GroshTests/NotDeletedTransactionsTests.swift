@@ -12,22 +12,17 @@ import Testing
 struct NotDeletedTransactionsTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
     private let checking: Wallet
 
     init() throws {
         container = try GroshStore.makeContainer(inMemory: true)
-        checking = Wallet(name: "Checking")
-        container.mainContext.insert(checking)
+        checking = container.mainContext.addWallet("Checking")
     }
 
     @discardableResult
     private func record(_ note: String, in wallet: Wallet? = nil) -> Transaction {
-        let transaction = Transaction.insert(
-            Money(cents: -5_00), on: today, wallet: nil, category: nil, note: note, in: context
-        )
-        transaction.wallet = wallet ?? checking
-        return transaction
+        context.record(-5_00, on: today, in: wallet ?? checking, note: note)
     }
 
     private var shared: NotDeletedTransactions.Store { .of(context) }
@@ -89,8 +84,7 @@ struct NotDeletedTransactionsTests {
     }
 
     @Test func aWalletsTransactionsLeaveWithItAndComeBackWithIt() throws {
-        let savings = Wallet(name: "Savings")
-        context.insert(savings)
+        let savings = context.addWallet("Savings")
         record("coffee")
         record("interest", in: savings)
         try context.save()
@@ -109,8 +103,9 @@ struct NotDeletedTransactionsTests {
         #expect(notes.shared == notes.fetched)
     }
 
-    /// A screen showing them redraws for a change to a transaction through the transaction itself, so a save that
-    /// brings none in and takes none out leaves the list as it was.
+    /// Performance contract (the 16k store, `docs/agents/architecture.md`): a screen showing them redraws for a change to
+    /// a transaction through the transaction itself, so a save that brings none in and takes none out must not
+    /// invalidate the whole list. The last line is the behaviour.
     @Test func editingATransactionKeepsTheListAndShowsTheEdit() throws {
         let coffee = record("coffee")
         try context.save()
@@ -129,8 +124,7 @@ struct NotDeletedTransactionsTests {
     /// Balances add up the ledger entries, so a saved change to a transaction's wallet, day or amount is read into its
     /// entry, and the screens adding them up redraw.
     @Test func aSavedChangeToTheWalletDayOrAmountIsReadIntoTheLedger() throws {
-        let savings = Wallet(name: "Savings")
-        context.insert(savings)
+        let savings = context.addWallet("Savings")
         let coffee = record("coffee")
         try context.save()
         let store = shared
@@ -147,11 +141,14 @@ struct NotDeletedTransactionsTests {
         coffee.wallet = savings
         coffee.day = today.adding(days: -3)
         try context.save()
-        #expect(store.entries.first?.wallet === savings)
-        #expect(store.entries.first?.dayRaw == today.adding(days: -3).rawValue)
-        #expect(WalletBalances(store.entries, asOf: today).balance(of: savings) == savings.balance(asOf: today))
+        let balances = WalletBalances(store.entries, asOf: today)
+        #expect(balances.balance(of: savings) == Money(cents: -7_50))
+        #expect(balances.balance(of: checking) == Money(cents: 0))
+        #expect(WalletBalances(store.entries, asOf: today.adding(days: -4)).balance(of: savings) == Money(cents: 0))
     }
 
+    /// Performance contract (the 16k store): a saved change that moves no balance must not make every screen adding up
+    /// the ledger redraw.
     @Test func aSavedChangeToAnythingElseLeavesTheLedgerAsItWas() throws {
         let coffee = record("coffee")
         try context.save()

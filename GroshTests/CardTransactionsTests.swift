@@ -9,7 +9,7 @@ import Testing
 struct CardTransactionsTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
     private let checking: Wallet
 
     init() throws {
@@ -18,68 +18,52 @@ struct CardTransactionsTests {
         checking = try Wallet.create(name: "Checking", startingBalance: Money(cents: 0), on: today, in: container.mainContext)
     }
 
-    private func day(_ month: Int, _ day: Int, _ year: Int = 2026) -> CalendarDay {
-        CalendarDay(year: year, month: month, day: day)
-    }
-
-    private func addCard(_ name: String, kind: CardKind = .credit, statementDay: Int? = nil) throws -> Card {
-        try Card.create(CardDraft(name: name, kind: kind, payingWallet: checking, statementDay: statementDay), in: context)
-    }
-
     /// Records a transaction of `cents` (negative for money going out) paid with `card`.
     @discardableResult
     private func record(_ cents: Int, on day: CalendarDay, paidWith card: Card?) throws -> Transaction {
-        let transaction = Transaction.insert(Money(cents: cents), on: day, wallet: nil, category: nil, in: context)
-        transaction.wallet = checking
-        transaction.category = try context.otherCategory(cents > 0 ? .income : .expense)
-        transaction.card = card
-        return transaction
+        context.record(
+            cents, on: day, in: checking, under: try context.otherCategory(cents > 0 ? .income : .expense), card: card
+        )
     }
 
     // MARK: Which periods
 
     @Test func aCreditCardWithAStatementDateOpensOnItsCurrentStatementPeriod() throws {
-        let chase = try addCard("Chase", statementDay: 15)
+        let chase = try context.addCard("Chase", paidFrom: checking, statementDay: 15)
 
         let current = chase.period(containing: today)
 
         #expect(current.isStatement)
-        #expect(current.days == DayRange(first: day(9, 16), last: day(10, 15)))
+        #expect(current.days == DayRange(first: day(2026, 9, 16), last: day(2026, 10, 15)))
     }
 
-    @Test func aStatementDateOfThe31stOpensOnPeriodsEndingOnTheMonthsLastDay() throws {
-        let appleCard = try addCard("Apple Card", statementDay: 31)
+    /// Creating or editing a Card refuses a statement date on a Debit card, but a Card stored as Debit with one still
+    /// shows calendar months.
+    @Test func aDebitCardShowsCalendarMonthsEvenWithAStatementDate() throws {
+        let card = try context.addCard("Navy Federal", paidFrom: checking, statementDay: 15)
+        card.kind = .debit
 
-        #expect(appleCard.period(containing: day(2, 14)).days == DayRange(first: day(2, 1), last: day(2, 28)))
-        #expect(appleCard.period(containing: day(2, 14, 2028)).days == DayRange(first: day(2, 1, 2028), last: day(2, 29, 2028)))
-    }
+        let current = card.period(containing: today)
 
-    @Test func aDebitCardAndACreditCardWithoutAStatementDateShowCalendarMonths() throws {
-        let debit = try addCard("Navy Federal Debit", kind: .debit)
-        let petal = try addCard("Petal")
-        let october = DayRange(first: day(10, 1), last: day(10, 31))
-
-        #expect(!debit.period(containing: today).isStatement)
-        #expect(debit.period(containing: today).days == october)
-        #expect(!petal.period(containing: today).isStatement)
-        #expect(petal.period(containing: today).days == october)
+        #expect(!current.isStatement)
+        #expect(current.days == DayRange(first: day(2026, 10, 1), last: day(2026, 10, 31)))
     }
 
     // MARK: A period's transactions and total
 
     @Test func aStatementPeriodListsOnlyThisCardsTransactionsBetweenItsStatementDates() throws {
-        let chase = try addCard("Chase", statementDay: 15)
-        let amex = try addCard("Amex", statementDay: 15)
-        try record(-20_00, on: day(9, 15), paidWith: chase)
-        let first = try record(-12_76, on: day(9, 16), paidWith: chase)
-        let refund = try record(5_00, on: day(10, 1), paidWith: chase)
-        let excluded = try record(-100_00, on: day(10, 2), paidWith: chase)
+        let chase = try context.addCard("Chase", paidFrom: checking, statementDay: 15)
+        let amex = try context.addCard("Amex", paidFrom: checking, statementDay: 15)
+        try record(-20_00, on: day(2026, 9, 15), paidWith: chase)
+        let first = try record(-12_76, on: day(2026, 9, 16), paidWith: chase)
+        let refund = try record(5_00, on: day(2026, 10, 1), paidWith: chase)
+        let excluded = try record(-100_00, on: day(2026, 10, 2), paidWith: chase)
         excluded.isExcludedFromReport = true
         // Dated after today, but before the statement closes, so it is on this statement.
-        let last = try record(-30_00, on: day(10, 15), paidWith: chase)
-        try record(-7_00, on: day(10, 16), paidWith: chase)
-        try record(-50_00, on: day(10, 1), paidWith: amex)
-        try record(-9_00, on: day(10, 1), paidWith: nil)
+        let last = try record(-30_00, on: day(2026, 10, 15), paidWith: chase)
+        try record(-7_00, on: day(2026, 10, 16), paidWith: chase)
+        try record(-50_00, on: day(2026, 10, 1), paidWith: amex)
+        try record(-9_00, on: day(2026, 10, 1), paidWith: nil)
 
         let shown = chase.transactions(in: chase.period(containing: today))
 
@@ -88,10 +72,10 @@ struct CardTransactionsTests {
     }
 
     @Test func steppingBackShowsThePreviousStatementsTransactions() throws {
-        let chase = try addCard("Chase", statementDay: 15)
-        let september = try record(-20_00, on: day(9, 15), paidWith: chase)
-        let august = try record(-40_00, on: day(8, 16), paidWith: chase)
-        try record(-12_76, on: day(9, 16), paidWith: chase)
+        let chase = try context.addCard("Chase", paidFrom: checking, statementDay: 15)
+        let september = try record(-20_00, on: day(2026, 9, 15), paidWith: chase)
+        let august = try record(-40_00, on: day(2026, 8, 16), paidWith: chase)
+        try record(-12_76, on: day(2026, 9, 16), paidWith: chase)
 
         let previous = chase.transactions(in: chase.period(containing: today).adding(-1))
 
@@ -100,10 +84,10 @@ struct CardTransactionsTests {
     }
 
     @Test func aCalendarMonthListsTheCardsTransactionsOfTheWholeMonth() throws {
-        let debit = try addCard("Navy Federal Debit", kind: .debit)
-        try record(-20_00, on: day(9, 30), paidWith: debit)
-        let first = try record(-12_76, on: day(10, 1), paidWith: debit)
-        let last = try record(-30_00, on: day(10, 31), paidWith: debit)
+        let debit = try context.addCard("Navy Federal Debit", kind: .debit, paidFrom: checking)
+        try record(-20_00, on: day(2026, 9, 30), paidWith: debit)
+        let first = try record(-12_76, on: day(2026, 10, 1), paidWith: debit)
+        let last = try record(-30_00, on: day(2026, 10, 31), paidWith: debit)
 
         let shown = debit.transactions(in: debit.period(containing: today))
 
@@ -114,16 +98,16 @@ struct CardTransactionsTests {
     // MARK: Lead-in transactions
 
     @Test func aStatementPeriodLeadsInWithTheTwoDaysBeforeItBegins() throws {
-        let chase = try addCard("Chase", statementDay: 15)
+        let chase = try context.addCard("Chase", paidFrom: checking, statementDay: 15)
 
-        #expect(chase.period(containing: today).leadInDays == DayRange(first: day(9, 14), last: day(9, 15)))
+        #expect(chase.period(containing: today).leadInDays == DayRange(first: day(2026, 9, 14), last: day(2026, 9, 15)))
     }
 
     @Test func aCalendarMonthHasNoLeadIn() throws {
-        let debit = try addCard("Navy Federal Debit", kind: .debit)
-        let petal = try addCard("Petal")
-        try record(-20_00, on: day(9, 30), paidWith: debit)
-        try record(-20_00, on: day(9, 30), paidWith: petal)
+        let debit = try context.addCard("Navy Federal Debit", kind: .debit, paidFrom: checking)
+        let petal = try context.addCard("Petal", paidFrom: checking)
+        try record(-20_00, on: day(2026, 9, 30), paidWith: debit)
+        try record(-20_00, on: day(2026, 9, 30), paidWith: petal)
 
         #expect(debit.period(containing: today).leadInDays == nil)
         #expect(debit.leadInTransactions(in: debit.period(containing: today)).isEmpty)
@@ -131,13 +115,13 @@ struct CardTransactionsTests {
     }
 
     @Test func leadInTransactionsAreThisCardsFromTheTwoDaysBeforeAndStayOnThePreviousStatement() throws {
-        let chase = try addCard("Chase", statementDay: 15)
-        let amex = try addCard("Amex", statementDay: 15)
-        try record(-1_00, on: day(9, 13), paidWith: chase)
-        let fourteenth = try record(-20_00, on: day(9, 14), paidWith: chase)
-        let fifteenth = try record(-30_00, on: day(9, 15), paidWith: chase)
-        let first = try record(-12_76, on: day(9, 16), paidWith: chase)
-        try record(-50_00, on: day(9, 15), paidWith: amex)
+        let chase = try context.addCard("Chase", paidFrom: checking, statementDay: 15)
+        let amex = try context.addCard("Amex", paidFrom: checking, statementDay: 15)
+        try record(-1_00, on: day(2026, 9, 13), paidWith: chase)
+        let fourteenth = try record(-20_00, on: day(2026, 9, 14), paidWith: chase)
+        let fifteenth = try record(-30_00, on: day(2026, 9, 15), paidWith: chase)
+        let first = try record(-12_76, on: day(2026, 9, 16), paidWith: chase)
+        try record(-50_00, on: day(2026, 9, 15), paidWith: amex)
         let current = chase.period(containing: today)
 
         #expect(Set(chase.leadInTransactions(in: current)) == [fourteenth, fifteenth])
@@ -146,10 +130,10 @@ struct CardTransactionsTests {
     }
 
     @Test func leadInTransactionsNeverCountInTheStatementTotalUnlessAdded() throws {
-        let chase = try addCard("Chase", statementDay: 15)
-        let leadIn = try record(-20_00, on: day(9, 15), paidWith: chase)
-        try record(-30_00, on: day(9, 14), paidWith: chase)
-        try record(-12_76, on: day(9, 16), paidWith: chase)
+        let chase = try context.addCard("Chase", paidFrom: checking, statementDay: 15)
+        let leadIn = try record(-20_00, on: day(2026, 9, 15), paidWith: chase)
+        try record(-30_00, on: day(2026, 9, 14), paidWith: chase)
+        try record(-12_76, on: day(2026, 9, 16), paidWith: chase)
         let current = chase.period(containing: today)
         let shown = chase.transactions(in: current)
 
@@ -161,30 +145,30 @@ struct CardTransactionsTests {
     // MARK: How far ‹ › step
 
     @Test func withoutTransactionsThereIsOnlyTheCurrentPeriod() throws {
-        let chase = try addCard("Chase", statementDay: 15)
+        let chase = try context.addCard("Chase", paidFrom: checking, statementDay: 15)
         let current = chase.period(containing: today)
 
         #expect(chase.periods(today: today) == current...current)
     }
 
     @Test func stepsReachBackToTheFirstTransactionsPeriodAndForwardToTheCurrentOne() throws {
-        let chase = try addCard("Chase", statementDay: 15)
-        try record(-20_00, on: day(6, 16), paidWith: chase)
-        try record(-12_76, on: day(9, 1), paidWith: chase)
+        let chase = try context.addCard("Chase", paidFrom: checking, statementDay: 15)
+        try record(-20_00, on: day(2026, 6, 16), paidWith: chase)
+        try record(-12_76, on: day(2026, 9, 1), paidWith: chase)
 
         let periods = chase.periods(today: today)
 
-        #expect(periods.lowerBound.days == DayRange(first: day(6, 16), last: day(7, 15)))
+        #expect(periods.lowerBound.days == DayRange(first: day(2026, 6, 16), last: day(2026, 7, 15)))
         #expect(periods.upperBound == chase.period(containing: today))
     }
 
     @Test func stepsReachForwardToAPeriodHoldingATransactionDatedAfterToday() throws {
-        let chase = try addCard("Chase", statementDay: 15)
-        try record(-20_00, on: day(12, 1), paidWith: chase)
+        let chase = try context.addCard("Chase", paidFrom: checking, statementDay: 15)
+        try record(-20_00, on: day(2026, 12, 1), paidWith: chase)
 
         let periods = chase.periods(today: today)
 
         #expect(periods.lowerBound == chase.period(containing: today))
-        #expect(periods.upperBound.days == DayRange(first: day(11, 16), last: day(12, 15)))
+        #expect(periods.upperBound.days == DayRange(first: day(2026, 11, 16), last: day(2026, 12, 15)))
     }
 }

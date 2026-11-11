@@ -7,31 +7,13 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct BalanceAdjustmentTests {
-    private let store: CategoryFixture
+    private let store: TestStore
     private var context: ModelContext { store.context }
-    private var checking: Wallet { store.wallet }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private var checking: Wallet { store.checking }
+    private let today = TestStore.today
 
     init() throws {
-        store = try CategoryFixture()
-    }
-
-    /// Records `cents` (signed) in `wallet` (Checking unless given) on `day`, filed under `categoryName`.
-    @discardableResult
-    private func record(
-        _ cents: Int, _ categoryName: String, _ type: CategoryType = .expense, in wallet: Wallet? = nil, on day: CalendarDay
-    ) throws -> Transaction {
-        let transaction = Transaction.insert(Money(cents: cents), on: day, wallet: nil, category: nil, in: context)
-        transaction.wallet = wallet ?? checking
-        transaction.category = try store.category(categoryName, type)
-        return transaction
-    }
-
-    /// A second wallet, after Checking.
-    private func addSavings() -> Wallet {
-        let savings = Wallet(name: "Savings")
-        context.insert(savings)
-        return savings
+        store = try TestStore()
     }
 
     /// Adjusts Checking to a real balance of `cents` on `day`.
@@ -45,33 +27,33 @@ struct BalanceAdjustmentTests {
     // MARK: The balance becomes what was typed
 
     @Test func afterAdjustingTheWalletBalanceEqualsTheTypedAmount() throws {
-        try record(1_000_00, "Salary", .income, on: CalendarDay(year: 2026, month: 10, day: 1))
-        try record(-40_00, "Café", on: CalendarDay(year: 2026, month: 10, day: 3))
+        try store.record(1_000_00, "Salary", .income, on: CalendarDay(year: 2026, month: 10, day: 1))
+        try store.record(-40_00, "Café", on: CalendarDay(year: 2026, month: 10, day: 3))
 
         try adjust(to: 975_55)
 
-        #expect(checking.balance(asOf: today) == Money(cents: 975_55))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: 975_55))
     }
 
     @Test func adjustingOnAnEarlierDaySetsTheBalanceOnThatDay() throws {
         let fifth = CalendarDay(year: 2026, month: 10, day: 5)
-        try record(1_000_00, "Salary", .income, on: CalendarDay(year: 2026, month: 10, day: 1))
-        try record(-40_00, "Café", on: CalendarDay(year: 2026, month: 10, day: 8))
+        try store.record(1_000_00, "Salary", .income, on: CalendarDay(year: 2026, month: 10, day: 1))
+        try store.record(-40_00, "Café", on: CalendarDay(year: 2026, month: 10, day: 8))
 
         try adjust(to: 900_00, on: fifth)
 
-        #expect(checking.balance(asOf: fifth) == Money(cents: 900_00))
-        #expect(checking.balance(asOf: today) == Money(cents: 860_00))
+        #expect(walletBalance(checking, asOf: fifth) == Money(cents: 900_00))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: 860_00))
     }
 
     // MARK: Where Adjust Balance starts
 
     @Test func adjustingWhileViewingAWalletStartsTodayInThatWallet() throws {
-        try record(500_00, "Salary", .income, on: today)
-        let savings = addSavings()
+        try store.record(500_00, "Salary", .income, on: today)
+        let savings = context.addWallet("Savings")
 
         let suggested = try TransactionDefaults.suggestBalanceAdjustment(
-            on: today, viewing: savings, balances: Wallet.balances(of: [checking, savings], asOf: today), in: context
+            on: today, viewing: savings, balances: WalletBalances(of: [checking, savings], asOf: today), in: context
         )
 
         #expect(suggested.wallet == savings)
@@ -79,12 +61,12 @@ struct BalanceAdjustmentTests {
     }
 
     @Test func adjustingFromTheTotalStartsInTheLastUsedWallet() throws {
-        let savings = addSavings()
-        try record(-4_50, "Café", on: today).createdAt = .distantPast
-        try record(75_00, "Salary", .income, in: savings, on: today)
+        let savings = context.addWallet("Savings")
+        try store.record(-4_50, "Café", on: today).createdAt = .distantPast
+        try store.record(75_00, "Salary", .income, on: today, in: savings)
 
         let suggested = try TransactionDefaults.suggestBalanceAdjustment(
-            on: today, balances: Wallet.balances(of: [checking, savings], asOf: today), in: context
+            on: today, balances: WalletBalances(of: [checking, savings], asOf: today), in: context
         )
 
         #expect(suggested.wallet == savings)
@@ -93,7 +75,7 @@ struct BalanceAdjustmentTests {
     // MARK: The real balance starts from the recorded one
 
     @Test func theRealBalanceStartsAtTheRecordedBalanceSoThereIsNothingToAdjust() throws {
-        try record(500_00, "Salary", .income, on: today)
+        try store.record(500_00, "Salary", .income, on: today)
 
         let draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
 
@@ -102,7 +84,7 @@ struct BalanceAdjustmentTests {
     }
 
     @Test func changingTheDayBeforeTypingStartsAgainFromThatDaysRecordedBalance() throws {
-        try record(500_00, "Salary", .income, on: today)
+        try store.record(500_00, "Salary", .income, on: today)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
 
         draft.day = today.adding(days: -1)
@@ -113,7 +95,7 @@ struct BalanceAdjustmentTests {
     }
 
     @Test func changingTheDayKeepsARealBalanceAlreadyTyped() throws {
-        try record(500_00, "Salary", .income, on: today)
+        try store.record(500_00, "Salary", .income, on: today)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
         draft.realBalanceEntry.press(.digit(7))
 
@@ -125,9 +107,9 @@ struct BalanceAdjustmentTests {
     }
 
     @Test func changingTheWalletStartsAgainFromThatWalletsRecordedBalance() throws {
-        try record(500_00, "Salary", .income, on: today)
-        let savings = addSavings()
-        try record(75_00, "Salary", .income, in: savings, on: today)
+        try store.record(500_00, "Salary", .income, on: today)
+        let savings = context.addWallet("Savings")
+        try store.record(75_00, "Salary", .income, on: today, in: savings)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
         draft.realBalance = Money(cents: 450_00)
 
@@ -139,8 +121,8 @@ struct BalanceAdjustmentTests {
     }
 
     @Test func untilTheNewWalletsBalanceIsReadThereIsNothingToAdjust() throws {
-        try record(500_00, "Salary", .income, on: today)
-        let savings = addSavings()
+        try store.record(500_00, "Salary", .income, on: today)
+        let savings = context.addWallet("Savings")
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
         draft.realBalance = Money(cents: 450_00)
 
@@ -153,7 +135,7 @@ struct BalanceAdjustmentTests {
     }
 
     @Test func theFirstDigitTypedReplacesTheRecordedBalance() throws {
-        try record(500_00, "Salary", .income, on: today)
+        try store.record(500_00, "Salary", .income, on: today)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
 
         draft.realBalanceEntry.press(.digit(4))
@@ -164,7 +146,7 @@ struct BalanceAdjustmentTests {
     }
 
     @Test func aRealBalanceTheKeypadCantWorkOutCantBeSaved() throws {
-        try record(500_00, "Salary", .income, on: today)
+        try store.record(500_00, "Salary", .income, on: today)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
 
         for key: KeypadKey in [.digit(4), .operation(.divide), .digit(0), .equals] {
@@ -176,7 +158,7 @@ struct BalanceAdjustmentTests {
     }
 
     @Test func aRealBalanceCanBeTypedBelowZeroWithALeadingMinus() throws {
-        try record(500_00, "Salary", .income, on: today)
+        try store.record(500_00, "Salary", .income, on: today)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
 
         for key: KeypadKey in [.allClear, .operation(.subtract), .digit(4), .digit(2)] {
@@ -190,7 +172,7 @@ struct BalanceAdjustmentTests {
     // MARK: The reason
 
     @Test func aRealBalanceAboveTheRecordedOneIsOtherIncome() throws {
-        try record(100_00, "Salary", .income, on: today)
+        try store.record(100_00, "Salary", .income, on: today)
 
         let adjustment = try adjust(to: 115_55)
 
@@ -199,7 +181,7 @@ struct BalanceAdjustmentTests {
     }
 
     @Test func aRealBalanceBelowTheRecordedOneIsOtherExpense() throws {
-        try record(100_00, "Salary", .income, on: today)
+        try store.record(100_00, "Salary", .income, on: today)
 
         let adjustment = try adjust(to: 84_45)
 
@@ -208,7 +190,7 @@ struct BalanceAdjustmentTests {
     }
 
     @Test func theReasonCanBeAnyCategoryOfTheMatchingType() throws {
-        try record(100_00, "Salary", .income, on: today)
+        try store.record(100_00, "Salary", .income, on: today)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
         draft.realBalance = Money(cents: 101_20)
         draft.category = try store.category("Collect Interest", .income)
@@ -219,7 +201,7 @@ struct BalanceAdjustmentTests {
     }
 
     @Test func aReasonOfTheOtherTypeGivesWayToTheDefaultUntilTheSignComesBack() throws {
-        try record(100_00, "Salary", .income, on: today)
+        try store.record(100_00, "Salary", .income, on: today)
         let interest = try store.category("Collect Interest", .income)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
         draft.realBalance = Money(cents: 101_20)
@@ -256,7 +238,7 @@ struct BalanceAdjustmentTests {
         #expect(adjustment.isExcludedFromReport)
         #expect(adjustment.category == (try context.lockedCategory(.otherExpense)))
         #expect(adjustment.note == "to old savings")
-        #expect(checking.balance(asOf: today) == Money(cents: -74_91))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: -74_91))
     }
 
     @Test func aKnownDifferenceCountsInReportsUnlessExcluded() throws {
@@ -286,7 +268,7 @@ struct BalanceAdjustmentTests {
 
     @Test func editingAnAdjustmentOffersOnlyExpenseAndIncome() throws {
         let adjustment = try adjust(to: 15_55)
-        let coffee = try record(-4_50, "Café", on: today)
+        let coffee = try store.record(-4_50, "Café", on: today)
 
         #expect(TransactionDraft(editing: adjustment).types == [.expense, .income])
         #expect(TransactionDraft(editing: coffee).types == [.expense, .income, .debtLoan])
@@ -319,8 +301,8 @@ struct BalanceAdjustmentTests {
     // MARK: Recorded → actual
 
     @Test func theDetailShowsTheRecordedBalanceAndTheActualOneTyped() throws {
-        try record(100_00, "Salary", .income, on: CalendarDay(year: 2026, month: 10, day: 1))
-        try record(-4_50, "Café", on: today)
+        try store.record(100_00, "Salary", .income, on: CalendarDay(year: 2026, month: 10, day: 1))
+        try store.record(-4_50, "Café", on: today)
 
         let adjustment = try adjust(to: 80_00)
 
@@ -329,10 +311,10 @@ struct BalanceAdjustmentTests {
     }
 
     @Test func whatIsEnteredLaterTheSameDayDoesntChangeRecordedOrActual() throws {
-        try record(100_00, "Salary", .income, on: today)
+        try store.record(100_00, "Salary", .income, on: today)
         let adjustment = try adjust(to: 80_00)
 
-        let lunch = try record(-12_00, "Restaurants", on: today)
+        let lunch = try store.record(-12_00, "Restaurants", on: today)
         lunch.createdAt = adjustment.createdAt.addingTimeInterval(60)
 
         #expect(adjustment.balanceChange?.recorded == Money(cents: 100_00))
@@ -340,7 +322,7 @@ struct BalanceAdjustmentTests {
     }
 
     @Test func onlyABalanceAdjustmentHasABalanceChange() throws {
-        let coffee = try record(-4_50, "Café", on: today)
+        let coffee = try store.record(-4_50, "Café", on: today)
 
         #expect(coffee.balanceChange == nil)
     }
@@ -348,7 +330,7 @@ struct BalanceAdjustmentTests {
     // MARK: Nothing to adjust
 
     @Test func aRealBalanceEqualToTheRecordedOneHasNothingToAdjust() throws {
-        try record(100_00, "Salary", .income, on: today)
+        try store.record(100_00, "Salary", .income, on: today)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
         draft.realBalance = Money(cents: 100_00)
 
@@ -374,22 +356,17 @@ struct BalanceAdjustmentTests {
         #expect(!adjustment.isExcludedFromReport)
     }
 
-    @discardableResult
-    private func addCard() throws -> Card {
-        try Card.create(CardDraft(name: "Apple Card", kind: .credit, payingWallet: checking), in: context)
-    }
-
     @Test func aNegativeAdjustmentInAWalletWithCardsIsSavedWithoutACard() throws {
-        try addCard()
+        try context.addCard(paidFrom: checking)
 
         let adjustment = try adjust(to: -15_55)
 
         #expect(adjustment.card == nil)
-        #expect(checking.balance(asOf: today) == Money(cents: -15_55))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: -15_55))
     }
 
     @Test func editingANegativeAdjustmentInAWalletWithCardsStillNeedsNoCard() throws {
-        try addCard()
+        try context.addCard(paidFrom: checking)
         let adjustment = try adjust(to: -15_55)
 
         var draft = TransactionDraft(editing: adjustment)

@@ -25,12 +25,6 @@ struct ReportTotalsTests {
         )
     }
 
-    private func addSavings() -> Wallet {
-        let savings = Wallet(name: "Savings")
-        context.insert(savings)
-        return savings
-    }
-
     // MARK: What counts
 
     @Test func incomeSpentAndNetIncomeOfTheMonthSoFar() throws {
@@ -41,13 +35,6 @@ struct ReportTotalsTests {
         #expect(october.income == Money(cents: 1_500_00))
         #expect(october.spent == Money(cents: 40_00))
         #expect(october.netIncome == Money(cents: 1_460_00))
-    }
-
-    @Test func aRefundLowersSpent() throws {
-        try store.record(-80_00, "Clothing", on: day(2026, 10, 2))
-        try store.record(30_00, "Clothing", on: day(2026, 10, 6))
-
-        #expect(try totals().spent == Money(cents: 50_00))
     }
 
     @Test func withTotalTheMonthEqualsHomesMonthGraphHeadlines() throws {
@@ -82,7 +69,7 @@ struct ReportTotalsTests {
     }
 
     @Test func aWalletCountsOnlyItsOwnTransactions() throws {
-        let savings = addSavings()
+        let savings = context.addWallet("Savings")
         try store.record(-25_00, "Café", on: day(2026, 10, 4), in: savings)
         try store.record(-40_00, "Café", on: day(2026, 10, 3))
 
@@ -91,34 +78,26 @@ struct ReportTotalsTests {
         #expect(try totals(.total).spent == Money(cents: 65_00))
     }
 
-    /// A transfer's halves are filed under an Expense and an Income category, and neither is excluded from report.
-    @Test func transfersCountInNeither() throws {
-        let savings = addSavings()
+    /// What counts toward Spent and Income is tested on Home's Month graph (`MonthGraphTests`); a transfer's halves
+    /// count in neither even when one wallet is selected.
+    @Test func aTransferCountsInNeitherWallet() throws {
+        let savings = context.addWallet("Savings")
         var draft = TransferDraft(day: day(2026, 10, 4))
         draft.from = checking
         draft.to = savings
         draft.amount = Money(cents: 250_00)
         try Transfer.create(draft, in: context)
 
-        #expect(try totals() == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
+        #expect(try totals(.wallet(checking)) == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
         #expect(try totals(.wallet(savings)) == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
-    }
-
-    @Test func aTransactionExcludedFromReportCountsInNeither() throws {
-        let coffee = try store.record(-40_00, "Café", on: day(2026, 10, 3))
-        let salary = try store.record(1_500_00, "Salary", .income, on: day(2026, 10, 5))
-        coffee.isExcludedFromReport = true
-        salary.isExcludedFromReport = true
-
-        #expect(try totals() == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
     }
 
     /// A Loan forgiven in October is spent in October, on the day it was forgiven, and a Debt forgiven is income.
     @Test func forgivenLoansAndDebtsCountOnTheDayTheyWereForgiven() throws {
         let loan = try store.lendOrBorrow(.loan, 250_00, on: day(2026, 9, 20))
         let debt = try store.lendOrBorrow(.debt, 80_00, on: day(2026, 9, 25))
-        try store.forgive(loan, on: day(2026, 10, 5))
-        try store.forgive(debt, on: day(2026, 10, 7))
+        try store.context.forgive(loan, on: day(2026, 10, 5))
+        try store.context.forgive(debt, on: day(2026, 10, 7))
 
         let october = try totals()
         #expect(october.spent == Money(cents: 250_00))
@@ -127,10 +106,10 @@ struct ReportTotalsTests {
     }
 
     @Test func aWalletsForgivenLoanCountsOnlyWhenItIsSelected() throws {
-        let savings = addSavings()
+        let savings = context.addWallet("Savings")
         let loan = try store.lendOrBorrow(.loan, 250_00, on: day(2026, 9, 20))
         loan.wallet = savings
-        try store.forgive(loan, on: day(2026, 10, 5))
+        try store.context.forgive(loan, on: day(2026, 10, 5))
 
         #expect(try totals(.wallet(checking)).spent == Money(cents: 0))
         #expect(try totals(.wallet(savings)).spent == Money(cents: 250_00))

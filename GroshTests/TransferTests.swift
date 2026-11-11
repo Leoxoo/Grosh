@@ -10,7 +10,7 @@ import Testing
 struct TransferTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
     private let checking: Wallet
     private let savings: Wallet
 
@@ -40,8 +40,8 @@ struct TransferTests {
     @Test func aTransferMovesTheAmountFromOneWalletToTheOther() throws {
         try Transfer.create(draft(250_00), in: context)
 
-        #expect(checking.balance(asOf: today) == Money(cents: 750_00))
-        #expect(savings.balance(asOf: today) == Money(cents: 250_00))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: 750_00))
+        #expect(walletBalance(savings, asOf: today) == Money(cents: 250_00))
     }
 
     @Test func aNewTransferStartsTodayFromTheLastUsedWalletToTheFirstOtherOne() throws {
@@ -202,9 +202,9 @@ struct TransferTests {
 
         try transfer.outgoing.update(with: edited, scope: .onlyThisOne, in: context)
 
-        #expect(checking.balance(asOf: today) == Money(cents: 745_00))
-        #expect(savings.balance(asOf: today) == Money(cents: 250_00))
-        #expect(Wallet.total(of: [checking, savings], asOf: today) == [Money(cents: 995_00)])
+        #expect(walletBalance(checking, asOf: today) == Money(cents: 745_00))
+        #expect(walletBalance(savings, asOf: today) == Money(cents: 250_00))
+        #expect(walletTotal([checking, savings], asOf: today) == [Money(cents: 995_00)])
     }
 
     @Test func updatingBothGivesTheOtherHalfTheNewAmount() throws {
@@ -214,8 +214,8 @@ struct TransferTests {
 
         try transfer.incoming.update(with: edited, scope: .bothHalves, in: context)
 
-        #expect(checking.balance(asOf: today) == Money(cents: 700_00))
-        #expect(savings.balance(asOf: today) == Money(cents: 300_00))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: 700_00))
+        #expect(walletBalance(savings, asOf: today) == Money(cents: 300_00))
     }
 
     @Test func updatingBothMovesTheOtherHalfToTheNewDateAndKeepsAFeeTakenBefore() throws {
@@ -270,8 +270,8 @@ struct TransferTests {
 
         try transfer.outgoing.delete(.withRelated, in: context)
 
-        #expect(checking.balance(asOf: today) == Money(cents: 1_000_00))
-        #expect(savings.balance(asOf: today) == Money(cents: 0))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: 1_000_00))
+        #expect(walletBalance(savings, asOf: today) == Money(cents: 0))
     }
 
     @Test func deletingOnlyThisOneKeepsTheOtherHalf() throws {
@@ -279,8 +279,8 @@ struct TransferTests {
 
         try transfer.outgoing.delete(.onlySelected, in: context)
 
-        #expect(checking.balance(asOf: today) == Money(cents: 1_000_00))
-        #expect(savings.balance(asOf: today) == Money(cents: 250_00))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: 1_000_00))
+        #expect(walletBalance(savings, asOf: today) == Money(cents: 250_00))
         #expect(try transfer.incoming.related(in: context).isEmpty)
     }
 
@@ -289,7 +289,7 @@ struct TransferTests {
     @Test func aTransferLeavesTheTotalUnchanged() throws {
         try Transfer.create(draft(250_00), in: context)
 
-        #expect(Wallet.total(of: [checking, savings], asOf: today) == [Money(cents: 1_000_00)])
+        #expect(walletTotal([checking, savings], asOf: today) == [Money(cents: 1_000_00)])
     }
 
     @Test func neitherHalfOfATransferCountsAsIncomeOrSpending() throws {

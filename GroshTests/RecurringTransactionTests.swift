@@ -8,28 +8,18 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct RecurringTransactionTests {
-    private let store: CategoryFixture
+    private let store: TestStore
     private var context: ModelContext { store.context }
     /// The day the schedules are saved on: occurrences dated on or before it aren't made.
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
 
     init() throws {
-        store = try CategoryFixture()
+        store = try TestStore()
     }
 
-    private func category(_ name: String, _ type: CategoryType) -> Grosh.Category {
-        let category = Grosh.Category(name: name, type: type, symbolName: "repeat", color: .purple)
-        context.insert(category)
-        return category
-    }
-
-    /// A monthly Netflix of 15.99 starting on `start`, paid from the fixture's wallet.
+    /// The fixture's monthly Netflix starting on `start`, with a note typed with spaces around it.
     private func netflix(starting start: CalendarDay) -> RecurringDraft {
-        var draft = RecurringDraft(startDay: start)
-        draft.name = "Netflix"
-        draft.amount = Money(cents: 1599)
-        draft.wallet = store.wallet
-        draft.category = category("Subscriptions", .expense)
+        var draft = store.netflixDraft(starting: start)
         draft.note = "  family plan  "
         return draft
     }
@@ -46,7 +36,7 @@ struct RecurringTransactionTests {
     }
 
     @Test func theTransactionMadeCarriesTheSchedulesFieldsAndAnExpenseSign() throws {
-        let card = Card(name: "Visa", kind: .credit, payingWallet: store.wallet)
+        let card = Card(name: "Visa", kind: .credit, payingWallet: store.checking)
         context.insert(card)
         var draft = netflix(starting: day(2026, 10, 12))
         draft.card = card
@@ -56,7 +46,7 @@ struct RecurringTransactionTests {
 
         let transaction = try #require(recurring.attachedTransactions.first)
         #expect(transaction.amountCents == -1599)
-        #expect(transaction.wallet == store.wallet)
+        #expect(transaction.wallet == store.checking)
         #expect(transaction.category?.name == "Subscriptions")
         #expect(transaction.card == card)
         #expect(transaction.note == "family plan")
@@ -66,7 +56,7 @@ struct RecurringTransactionTests {
     @Test func anIncomeCategoryMakesPositiveTransactions() throws {
         var draft = netflix(starting: day(2026, 10, 12))
         draft.type = .income
-        draft.category = category("Salary", .income)
+        draft.category = context.addCategory("Salary", .income)
         let recurring = try RecurringTransaction.create(draft, today: today, in: context)
 
         try RecurringTransaction.catchUp(through: day(2026, 10, 12), in: context)
@@ -160,8 +150,7 @@ struct RecurringTransactionTests {
     }
 
     @Test func aCardFromAnotherWalletIsRefused() {
-        let savings = Wallet(name: "Savings")
-        context.insert(savings)
+        let savings = context.addWallet("Savings")
         let card = Card(name: "Amex", kind: .credit, payingWallet: savings)
         context.insert(card)
         var draft = netflix(starting: day(2026, 10, 12))
@@ -305,7 +294,7 @@ struct RecurringTransactionTests {
 
     @Test func addingATransactionNowToAPausedScheduleIsRefused() throws {
         let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 10, 12)), today: today, in: context)
-        store.wallet.isArchived = true
+        store.checking.isArchived = true
 
         #expect(throws: AddTransactionNowError.inactive) {
             try recurring.addTransactionNow(today: today, in: context)
@@ -323,7 +312,7 @@ struct RecurringTransactionTests {
             try recurring.addTransactionNow(today: today, in: context)
         }
 
-        recurring.category = category("Subscriptions", .expense)
+        recurring.category = context.addCategory("Subscriptions")
         recurring.wallet = nil
         #expect(!recurring.canAddTransactionNow)
         #expect(throws: AddTransactionNowError.incomplete) {
@@ -356,7 +345,7 @@ struct RecurringTransactionTests {
         #expect(copy.startDay == today)
         #expect(copy.name == "Netflix")
         #expect(copy.amount.cents == 1599)
-        #expect(copy.wallet == store.wallet)
+        #expect(copy.wallet == store.checking)
         #expect(copy.category == original.category)
         #expect(copy.note == "family plan")
         #expect(copy.kind == .subscription)

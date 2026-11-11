@@ -20,10 +20,10 @@ struct ReimbursementRecentlyDeletedTests {
 
     /// A $60 dinner on the 3rd with $20 and $15 of it paid back.
     @discardableResult
-    private func reimbursedDinner() throws -> Transaction {
-        let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 10, 3))
+    private func dinnerPaidBackTwice() throws -> Transaction {
+        let dinner = try store.dinner()
         for cents in [20_00, 15_00] {
-            try Reimbursement.add(ReimbursementDraft(amount: Money(cents: cents), day: today), to: dinner, in: context)
+            try context.payBack(cents, on: today, to: dinner)
         }
         return dinner
     }
@@ -33,7 +33,7 @@ struct ReimbursementRecentlyDeletedTests {
     }
 
     @Test func deletingAnExpenseKeepsItsReimbursementsWithItInRecentlyDeleted() throws {
-        let dinner = try reimbursedDinner()
+        let dinner = try dinnerPaidBackTwice()
 
         try dinner.delete(.onlySelected, in: context, at: deletedAt)
 
@@ -44,11 +44,11 @@ struct ReimbursementRecentlyDeletedTests {
     }
 
     @Test func aDeletedExpenseAndItsReimbursementsCountInNoBalanceOrReport() throws {
-        let dinner = try reimbursedDinner()
+        let dinner = try dinnerPaidBackTwice()
 
         try dinner.delete(.onlySelected, in: context, at: deletedAt)
 
-        #expect(checking.balance(asOf: today) == Money(cents: 0))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: 0))
         #expect(dinner.countedAmount(otherIncome: try store.otherIncome()) == nil)
         #expect(try PeriodTotals(
             of: CountedHistory(store.transactions(), in: .total, otherIncome: store.otherIncome())
@@ -58,21 +58,21 @@ struct ReimbursementRecentlyDeletedTests {
     }
 
     @Test func restoringAnExpenseBringsItsReimbursementsBack() throws {
-        let dinner = try reimbursedDinner()
+        let dinner = try dinnerPaidBackTwice()
         try dinner.delete(.onlySelected, in: context, at: deletedAt)
 
         try dinner.restore()
 
         #expect(!dinner.isInRecentlyDeleted)
         #expect(dinner.netCents == -25_00)
-        #expect(checking.balance(asOf: today) == Money(cents: -25_00))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: -25_00))
         #expect(dinner.countedAmount(otherIncome: try store.otherIncome())?.amount == Money(cents: 25_00))
         #expect(try store.graph(.spent).headline == Money(cents: 25_00))
     }
 
     @Test func deletingAnExpenseForeverRemovesItsReimbursementsToo() throws {
-        let dinner = try reimbursedDinner()
-        let kept = try reimbursedDinner()
+        let dinner = try dinnerPaidBackTwice()
+        let kept = try dinnerPaidBackTwice()
         try dinner.delete(.onlySelected, in: context, at: deletedAt)
 
         try dinner.deleteForever(in: context)
@@ -83,7 +83,7 @@ struct ReimbursementRecentlyDeletedTests {
     }
 
     @Test func theThirtyDayPurgeRemovesAnExpensesReimbursementsToo() throws {
-        let dinner = try reimbursedDinner()
+        let dinner = try dinnerPaidBackTwice()
         try dinner.delete(.onlySelected, in: context, at: deletedAt)
         let thirtyDays: TimeInterval = 30 * 24 * 60 * 60
 
@@ -96,8 +96,8 @@ struct ReimbursementRecentlyDeletedTests {
     }
 
     @Test func emptyingTheBinRemovesReimbursementsOnlyOfWhatIsInIt() throws {
-        let deleted = try reimbursedDinner()
-        let kept = try reimbursedDinner()
+        let deleted = try dinnerPaidBackTwice()
+        let kept = try dinnerPaidBackTwice()
         try deleted.delete(.onlySelected, in: context, at: deletedAt)
 
         try RecentlyDeleted.empty(in: context)
@@ -107,11 +107,10 @@ struct ReimbursementRecentlyDeletedTests {
     }
 
     @Test func deletingAWalletForeverRemovesTheReimbursementsOfItsExpenses() throws {
-        let savings = Wallet(name: "Savings")
-        context.insert(savings)
+        let savings = context.addWallet("Savings")
         let lunch = try store.record(-30_00, "Restaurants", on: day(2026, 10, 4), in: savings)
-        try Reimbursement.add(ReimbursementDraft(amount: Money(cents: 10_00), day: today), to: lunch, in: context)
-        try reimbursedDinner()
+        try context.payBack(10_00, on: today, to: lunch)
+        try dinnerPaidBackTwice()
 
         try savings.delete(at: deletedAt)
         #expect(lunch.orderedReimbursements.count == 1)
@@ -123,7 +122,7 @@ struct ReimbursementRecentlyDeletedTests {
     }
 
     @Test func deletingAReimbursementDoesNotDeleteItsExpense() throws {
-        let dinner = try reimbursedDinner()
+        let dinner = try dinnerPaidBackTwice()
 
         // The $20, so the $60 dinner keeps the $15 paid back.
         try #require(dinner.orderedReimbursements.first { $0.amountCents == 20_00 }).delete()

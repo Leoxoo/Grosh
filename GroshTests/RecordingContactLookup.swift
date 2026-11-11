@@ -1,9 +1,10 @@
 import Testing
 @testable import Grosh
 
-/// Stands in for the user's Contacts: holds the contacts a test gives it (its ``book``), answers like the real lookup
-/// (nothing is readable unless access is allowed), and records when it is asked for access instead of asking the user. A
-/// test makes a contact vanish, as when it is deleted or not shared, by taking it out of ``book``.
+/// Stands in for the user's Contacts: holds the contacts a test gives it (its ``book``), resolves identifiers among them
+/// while access is allowed, and records when it is asked for access instead of asking the user. A test makes a contact
+/// vanish, as when it is deleted or not shared, by taking it out of ``book``. It doesn't search: how the With menu
+/// searches contacts is ``SystemContacts/search(_:)``, whose filter `PersonContactTests` tests directly.
 @MainActor
 final class RecordingContactLookup: ContactLookup {
     enum Call: Equatable {
@@ -35,7 +36,7 @@ final class RecordingContactLookup: ContactLookup {
 
     func search(_ typed: String) async -> [Contact] {
         calls.append(.search(typed))
-        return access.showsContacts ? book.filter(nameContaining: typed, name: \.name) : []
+        return []
     }
 
     func contacts(withIdentifiers identifiers: [String]) async -> [Contact] {

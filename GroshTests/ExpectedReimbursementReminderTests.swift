@@ -20,11 +20,6 @@ struct ExpectedReimbursementReminderTests {
         fixture = try ExpectationFixture()
     }
 
-    /// `hour`:00 on `today`, in UTC.
-    private func now(at hour: Int) -> Date {
-        Calendar.utcGregorian.date(from: DateComponents(year: 2026, month: 10, day: 12, hour: hour)) ?? .distantPast
-    }
-
     // MARK: Default, edited and off
 
     @Test func aNewExpectationRemindsAWeekAfterTheExpensesDay() throws {
@@ -90,7 +85,7 @@ struct ExpectedReimbursementReminderTests {
         #expect(byAlex.day == day(2026, 10, 10))
         #expect(byAlex.arrival == .onItsDay)
         #expect(byAlex.title == "Owes you")
-        #expect(byAlex.body == "Alex owes you \(Money(cents: 30_00).formatted()) for Dinner.")
+        #expect(byAlex.body == "Alex owes you $30.00 for Dinner.")
         #expect(bySam.body == "Sam owes you for Dinner.")
     }
 
@@ -102,7 +97,6 @@ struct ExpectedReimbursementReminderTests {
 
         let reminder = try #require(fixture.owesMe().reminders(from: dinnerDay).first)
 
-        #expect(ExpectedReimbursementReminder.categoryIdentifier == "grosh.owes-me")
         #expect(reminder.textThem == TextThemPayload(
             person: alex.persistentModelID, personName: "Alex", phone: "555 0100", expense: "Dinner",
             outstanding: Money(cents: 30_00)
@@ -113,15 +107,25 @@ struct ExpectedReimbursementReminderTests {
     @Test func aReminderArrivesAtNineOnItsDay() async throws {
         let alex = try fixture.person("Alex")
         let dinner = try fixture.dinner(on: dinnerDay, owing: [(alex, 30_00)])
-        try fixture.expectation(of: alex, on: dinner).setReminder(day(2026, 10, 15))
+        dinner.note = "Dinner"
+        let owed = try fixture.expectation(of: alex, on: dinner)
+        try owed.setReminder(day(2026, 10, 15))
         let scheduler = RecordingReminderScheduler<ExpectedReimbursementReminder>()
 
-        try await fixture.owesMe().reschedule(at: now(at: 8), calendar: .utcGregorian, after: [], using: scheduler)
+        try await fixture.owesMe().reschedule(
+            at: moment(today, at: 8), calendar: .utcGregorian, after: [], using: scheduler
+        )
 
-        let expected = try #require(fixture.owesMe().reminders(from: today).first)
-        #expect(scheduler.calls == [.requestPermission, .replacePending([expected])])
-        #expect(expected.day == day(2026, 10, 15))
-        #expect(expected.arrival == .onItsDay)
+        #expect(scheduler.calls == [
+            .requestPermission,
+            .replacePending([
+                ExpectedReimbursementReminder(
+                    original: owed.persistentModelID, day: day(2026, 10, 15), person: alex.persistentModelID,
+                    personName: "Alex", phone: nil, expense: "Dinner", outstanding: Money(cents: 30_00),
+                    arrival: .onItsDay
+                ),
+            ]),
+        ])
     }
 
     @Test func aReminderForTodayArrivesRightAwayWhenItIsNewAfterNine() throws {
@@ -131,8 +135,8 @@ struct ExpectedReimbursementReminderTests {
         #expect(owed.reminderDay == today)
         let list = try fixture.owesMe()
 
-        let newAfterNine = list.reminders(at: now(at: 14), calendar: .utcGregorian, after: [])
-        let arrivedAlready = list.reminders(at: now(at: 14), calendar: .utcGregorian, after: list.reminders(from: today))
+        let newAfterNine = list.reminders(at: moment(today, at: 14), calendar: .utcGregorian, after: [])
+        let arrivedAlready = list.reminders(at: moment(today, at: 14), calendar: .utcGregorian, after: list.reminders(from: today))
 
         #expect(newAfterNine.map(\.arrival) == [.rightAway])
         #expect(arrivedAlready.isEmpty)

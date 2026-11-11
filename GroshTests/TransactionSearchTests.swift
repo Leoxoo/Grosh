@@ -6,12 +6,12 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct TransactionSearchTests {
-    private let fixture: CategoryFixture
+    private let fixture: TestStore
     private var context: ModelContext { fixture.context }
-    private var checking: Wallet { fixture.wallet }
+    private var checking: Wallet { fixture.checking }
 
     init() throws {
-        fixture = try CategoryFixture()
+        fixture = try TestStore()
     }
 
     @discardableResult
@@ -22,12 +22,7 @@ struct TransactionSearchTests {
         in wallet: Wallet? = nil,
         on day: CalendarDay = CalendarDay(year: 2026, month: 10, day: 1)
     ) -> Transaction {
-        let transaction = Transaction.insert(
-            Money(cents: cents), on: day, wallet: nil, category: nil, note: note, in: context
-        )
-        transaction.wallet = wallet ?? checking
-        transaction.category = category
-        return transaction
+        context.record(cents, on: day, in: wallet ?? checking, under: category, note: note)
     }
 
     private func search(_ text: String, in transactions: [Transaction]) -> [String] {
@@ -85,12 +80,9 @@ struct TransactionSearchTests {
     }
 
     @Test func searchLooksAcrossAllTimeAndEveryWalletArchivedOnesIncluded() throws {
-        let today = CalendarDay(year: 2026, month: 10, day: 9)
-        let oldBank = Wallet(name: "Old bank")
-        context.insert(oldBank)
-        let brokerage = Wallet(name: "Brokerage")
-        context.insert(brokerage)
-        brokerage.includeInTotal = false
+        let today = TestStore.today
+        let oldBank = context.addWallet("Old bank")
+        let brokerage = context.addWallet("Brokerage", includeInTotal: false)
         let all = [
             record(-5_00, "monthly fee", in: oldBank, on: CalendarDay(year: 2021, month: 3, day: 2)),
             record(-1_00, "trading fee", in: brokerage, on: CalendarDay(year: 2026, month: 9, day: 12)),

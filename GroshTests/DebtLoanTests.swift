@@ -7,40 +7,28 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct DebtLoanTests {
-    private let store: CategoryFixture
+    private let store: TestStore
     private var context: ModelContext { store.context }
-    private var checking: Wallet { store.wallet }
+    private var checking: Wallet { store.checking }
     private let lentOn = CalendarDay(year: 2026, month: 5, day: 27)
     private let paidOn = CalendarDay(year: 2026, month: 6, day: 15)
 
     init() throws {
-        store = try CategoryFixture()
-    }
-
-    /// A Loan (you lent) or Debt (you borrowed) of `cents` with `name`, saved through the Add sheet's draft.
-    private func record(_ role: LockedRole, _ cents: Int, with name: String) throws -> Transaction {
-        var draft = TransactionDraft(type: .debtLoan, day: lentOn)
-        draft.wallet = checking
-        draft.amount = Money(cents: cents)
-        draft.category = try context.lockedCategory(role)
-        draft.people = [try Person.add(named: name, in: context)]
-        return try Transaction.create(draft, in: context)
+        store = try TestStore()
     }
 
     private func lend(_ cents: Int, to name: String = "Pasha") throws -> Transaction {
-        try record(.loan, cents, with: name)
+        try context.recordLoanOrDebt(.loan, cents, with: context.person(name), on: lentOn, in: checking)
     }
 
     private func borrow(_ cents: Int, from name: String = "Anna") throws -> Transaction {
-        try record(.debt, cents, with: name)
+        try context.recordLoanOrDebt(.debt, cents, with: context.person(name), on: lentOn, in: checking)
     }
 
-    /// Records a payment of `cents` against `loanOrDebt` on `day` through Record payment's draft.
+    /// Records a payment of `cents` against `loanOrDebt` on `day`, the day it was paid unless another is given.
     @discardableResult
     private func pay(_ cents: Int, on loanOrDebt: Transaction, day: CalendarDay? = nil) throws -> DebtPayment {
-        var draft = try DebtPaymentDraft(settling: loanOrDebt, on: day ?? paidOn, in: context)
-        draft.amount = Money(cents: cents)
-        return try DebtPayment.record(draft, in: context)
+        try context.pay(cents, on: loanOrDebt, on: day ?? paidOn)
     }
 
     /// What is still outstanding on `original`, a Loan or Debt, as every screen works it out.
@@ -88,7 +76,7 @@ struct DebtLoanTests {
         #expect(collection.isExcludedFromReport)
         #expect(recorded.overpayment == nil)
         #expect(try loan.related(in: context) == [collection])
-        #expect(checking.balance(asOf: paidOn) == Money(cents: -40_00))
+        #expect(walletBalance(checking, asOf: paidOn) == Money(cents: -40_00))
     }
 
     @Test func aPaymentOnADebtIsALinkedRepaymentTakenFromTheWallet() throws {
@@ -102,7 +90,7 @@ struct DebtLoanTests {
         #expect(repayment.isExcludedFromReport)
         #expect(try debt.related(in: context) == [repayment])
         #expect(try outstanding(debt) == Money(cents: 75_00))
-        #expect(checking.balance(asOf: paidOn) == Money(cents: 75_00))
+        #expect(walletBalance(checking, asOf: paidOn) == Money(cents: 75_00))
     }
 
     @Test func recordPaymentStartsAtWhatIsOutstanding() throws {
@@ -140,7 +128,7 @@ struct DebtLoanTests {
         #expect(try loan.related(in: context).contains(income))
         #expect(try outstanding(loan) == Money(cents: 0))
         #expect(try isSettled(loan))
-        #expect(checking.balance(asOf: paidOn.adding(days: 7)) == Money(cents: 30_00))
+        #expect(walletBalance(checking, asOf: paidOn.adding(days: 7)) == Money(cents: 30_00))
     }
 
     @Test func anOverpaidDebtIsAnExpenseForTheRest() throws {
@@ -163,7 +151,9 @@ struct DebtLoanTests {
     func anOverpaymentIsOtherIncomeOrOtherExpenseUnlessAnotherCategoryIsPicked(
         role: LockedRole, expected: LockedRole
     ) throws {
-        let original = try record(role, 100_00, with: "Pasha")
+        let original = try context.recordLoanOrDebt(
+            role, 100_00, with: context.person("Pasha"), on: lentOn, in: checking
+        )
 
         let draft = try DebtPaymentDraft(settling: original, on: paidOn, in: context)
 
@@ -183,10 +173,6 @@ struct DebtLoanTests {
 
     // MARK: Payment rules
 
-    private func transactionCount() throws -> Int {
-        try context.fetchCount(FetchDescriptor<Transaction>())
-    }
-
     @Test func aPaymentOfNothingIsRefused() throws {
         let loan = try lend(100_00)
         var draft = try DebtPaymentDraft(settling: loan, on: paidOn, in: context)
@@ -194,7 +180,7 @@ struct DebtLoanTests {
 
         #expect(!draft.canSave)
         #expect(throws: TransactionRuleError.missingAmount) { try DebtPayment.record(draft, in: context) }
-        #expect(try transactionCount() == 1)
+        #expect(try context.transactionCount() == 1)
     }
 
     @Test func aSettledLoanTakesNoMorePayments() throws {
@@ -204,7 +190,7 @@ struct DebtLoanTests {
 
         #expect(throws: DebtLoanRuleError.alreadySettled) { try pay(10_00, on: loan) }
         #expect(throws: DebtLoanRuleError.alreadySettled) { try DebtPayment.record(draft, in: context) }
-        #expect(try transactionCount() == 2)
+        #expect(try context.transactionCount() == 2)
     }
 
     @Test func anOverpaymentNeedsACategoryOfTheMatchingType() throws {
@@ -218,7 +204,7 @@ struct DebtLoanTests {
 
         draft.overpaymentCategory = nil
         #expect(throws: TransactionRuleError.missingCategory) { try DebtPayment.record(draft, in: context) }
-        #expect(try transactionCount() == 1)
+        #expect(try context.transactionCount() == 1)
     }
 
     // MARK: Forgive the rest
@@ -226,8 +212,8 @@ struct DebtLoanTests {
     @Test func forgivingALoanMarksItForgivenWithoutAddingAnyTransaction() throws {
         let loan = try lend(50_00)
         let collection = try pay(30_00, on: loan).payment
-        let balanceBefore = checking.balance(asOf: paidOn)
-        let countBefore = try transactionCount()
+        let balanceBefore = walletBalance(checking, asOf: paidOn)
+        let countBefore = try context.transactionCount()
         let forgivenOn = paidOn.adding(days: 3)
 
         var draft = try ForgiveDraft(forgiving: loan, on: forgivenOn, in: context)
@@ -236,7 +222,7 @@ struct DebtLoanTests {
         #expect(draft.forgiven == Money(cents: 20_00))
         let forgiveness = try Forgiveness.record(draft, in: context)
 
-        #expect(try transactionCount() == countBefore)
+        #expect(try context.transactionCount() == countBefore)
         #expect(forgiveness.amount == Money(cents: 20_00))
         #expect(forgiveness.day == forgivenOn)
         #expect(forgiveness.category == (try store.category("Friends & Lover")))
@@ -246,7 +232,7 @@ struct DebtLoanTests {
         #expect(try outstanding(loan) == Money(cents: 0))
         #expect(try loan.related(in: context) == [collection])
         #expect(collection.amountCents == 30_00)
-        #expect(checking.balance(asOf: forgivenOn) == balanceBefore)
+        #expect(walletBalance(checking, asOf: forgivenOn) == balanceBefore)
     }
 
     @Test func forgivingADebtMarksItForgivenAndKeepsItsRepayments() throws {
@@ -261,8 +247,8 @@ struct DebtLoanTests {
         #expect(settled.isSettled)
         #expect(settled.paid == Money(cents: 200_00))
         #expect(settled.forgiveness?.amount == Money(cents: 50_00))
-        #expect(checking.balance(asOf: paidOn) == Money(cents: 50_00))
-        #expect(try transactionCount() == 2)
+        #expect(walletBalance(checking, asOf: paidOn) == Money(cents: 50_00))
+        #expect(try context.transactionCount() == 2)
     }
 
     @Test func theForgivenAmountCountsInReportsAsExpenseForALoanAndIncomeForADebt() throws {
@@ -322,7 +308,9 @@ struct DebtLoanTests {
     func whatIsForgivenIsOtherExpenseOrOtherIncomeUnlessAnotherCategoryIsPicked(
         role: LockedRole, expected: LockedRole
     ) throws {
-        let original = try record(role, 100_00, with: "Pasha")
+        let original = try context.recordLoanOrDebt(
+            role, 100_00, with: context.person("Pasha"), on: lentOn, in: checking
+        )
 
         let draft = try ForgiveDraft(forgiving: original, on: paidOn, in: context)
 
@@ -402,9 +390,8 @@ struct DebtLoanTests {
             owed: Money(cents: 250_00), paid: Money(cents: 200_00), forgiven: Money(cents: 50_00)
         )
 
-        func amount(_ cents: Int) -> String { Money(cents: cents).formatted() }
-        #expect(story == "Lent \(amount(50_00)) · Collected \(amount(30_00)) · Forgiven \(amount(20_00))")
-        #expect(debtStory == "Borrowed \(amount(250_00)) · Repaid \(amount(200_00)) · Forgiven \(amount(50_00)) · Kept \(amount(50_00))")
+        #expect(story == "Lent $50.00 · Collected $30.00 · Forgiven $20.00")
+        #expect(debtStory == "Borrowed $250.00 · Repaid $200.00 · Forgiven $50.00 · Kept $50.00")
     }
 
     @Test func forgivenessRecordedUnderTheOldRuleStillSettlesTheLoan() throws {
@@ -430,7 +417,7 @@ struct DebtLoanTests {
     // MARK: The Card rule
 
     @Test func whatOverpayingADebtWritesOffNeedsNoCard() throws {
-        try Card.create(CardDraft(name: "Apple Card", kind: .credit, payingWallet: checking), in: context)
+        try context.addCard(paidFrom: checking)
         let debt = try borrow(100_00)
         var payment = try DebtPaymentDraft(settling: debt, on: paidOn, in: context)
         payment.amount = Money(cents: 120_00)
@@ -505,8 +492,7 @@ struct DebtLoanTests {
     @Test func aLoanWithPaymentsKeepsItsWalletTypeAndCategory() throws {
         let loan = try lend(100_00)
         try pay(60_00, on: loan)
-        let savings = Wallet(name: "Savings")
-        context.insert(savings)
+        let savings = context.addWallet("Savings")
         let editing = TransactionDraft(editing: loan)
         #expect(editing.isLockedByPayments)
 
