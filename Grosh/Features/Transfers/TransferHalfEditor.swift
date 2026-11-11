@@ -83,7 +83,7 @@ struct TransferHalfEditor: View {
 
     private func save(_ scope: TransferUpdateScope) {
         let saved = Log.store.perform("Saving a transfer", errorMessage: &errorMessage) {
-            try transaction.update(with: draftToSave, scope: scope, in: context)
+            try transaction.update(with: draftToSave, scope: scope)
         }
         if saved {
             dismiss()

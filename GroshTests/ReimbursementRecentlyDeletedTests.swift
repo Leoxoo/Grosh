@@ -75,7 +75,7 @@ struct ReimbursementRecentlyDeletedTests {
         let kept = try dinnerPaidBackTwice()
         try dinner.delete(.onlySelected, in: context, at: deletedAt)
 
-        try dinner.deleteForever(in: context)
+        try dinner.deleteForever()
 
         #expect(try storedReimbursementCount() == 2)
         #expect(kept.reimbursements?.count == 2)
@@ -116,7 +116,7 @@ struct ReimbursementRecentlyDeletedTests {
         #expect(lunch.orderedReimbursements.count == 1)
         #expect(try storedReimbursementCount() == 3)
 
-        try savings.deleteForever(in: context)
+        try savings.deleteForever()
 
         #expect(try storedReimbursementCount() == 2)
     }

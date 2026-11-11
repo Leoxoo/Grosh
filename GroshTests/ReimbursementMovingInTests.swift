@@ -112,7 +112,7 @@ struct ReimbursementMovingInTests {
         let deposit = try deposit()
         try Reimbursement.moveIn(deposit, to: dinner, in: context, at: deletedAt)
 
-        try deposit.deleteForever(in: context)
+        try deposit.deleteForever()
 
         #expect(dinner.orderedReimbursements.map(\.amountCents) == [25_00])
         #expect(dinner.netCents == -35_00)

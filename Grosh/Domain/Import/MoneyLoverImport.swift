@@ -40,7 +40,6 @@ enum MoneyLoverImport {
                 return summary
             }
         } catch {
-            Log.importing.failed("Importing from MoneyLover", error)
             context.rollback()
             throw error
         }
@@ -351,9 +350,7 @@ private struct Importer {
         var open = oldestFirst.filter(\.isLoanOrDebt)
         var unlinked: [Transaction] = []
         for payment in oldestFirst {
-            guard let role = payment.category?.lockedRole, role == .debtCollection || role == .repayment else {
-                continue
-            }
+            guard payment.paidLoanOrDebtKind != nil else { continue }
             guard let index = open.firstIndex(where: { $0.isPaidBackInFull(by: payment) }) else {
                 unlinked.append(payment)
                 continue

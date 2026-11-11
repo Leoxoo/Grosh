@@ -195,7 +195,7 @@ private struct TransactionForm: View {
                     try Transaction.create(draftToSave, in: context)
                 case .payment(let recurring):
                     let transaction = try Transaction.create(draftToSave, in: context)
-                    try recurring.attach(transaction, in: context)
+                    try recurring.attach(transaction)
                 case .edit(let transaction):
                     try transaction.update(with: draftToSave)
                 }

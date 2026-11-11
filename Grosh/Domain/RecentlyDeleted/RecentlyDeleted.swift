@@ -140,7 +140,7 @@ nonisolated struct RecentlyDeleted {
 }
 
 /// Why something in Recently Deleted can't be restored or removed on its own.
-nonisolated enum RecentlyDeletedError: Error, Equatable {
+nonisolated enum RecentlyDeletedError: RuleRefusal, Equatable {
     /// The item isn't in Recently Deleted.
     case notDeleted
     /// A transaction whose wallet is in Recently Deleted waits for the wallet to be restored first.
@@ -220,7 +220,8 @@ extension Wallet {
 
     /// Delete Forever: removes the wallet in Recently Deleted for good, with every transaction and Recurring transaction
     /// in it and the Cards paid from it that are left with none. Saves.
-    func deleteForever(in context: ModelContext) throws {
+    func deleteForever() throws {
+        let context = try storeContext()
         guard isInRecentlyDeleted else { throw RecentlyDeletedError.notDeleted }
         try RecentlyDeleted.removeForGood(wallets: [self], transactions: [], in: context)
     }
@@ -247,7 +248,8 @@ extension RecurringTransaction {
 
     /// Delete Forever: removes a schedule deleted on its own for good. The transactions it made stay as ordinary ones.
     /// Saves.
-    func deleteForever(in context: ModelContext) throws {
+    func deleteForever() throws {
+        let context = try storeContext()
         guard isInRecentlyDeleted else { throw RecentlyDeletedError.notDeleted }
         guard !deletedWithWallet else { throw RecentlyDeletedError.deletedWithWallet }
         try RecentlyDeleted.removeForGood(wallets: [], transactions: [], recurring: [self], in: context)
@@ -295,7 +297,8 @@ extension Transaction {
     }
 
     /// Delete Forever: removes a transaction deleted on its own for good. Saves.
-    func deleteForever(in context: ModelContext) throws {
+    func deleteForever() throws {
+        let context = try storeContext()
         guard isInRecentlyDeleted else { throw RecentlyDeletedError.notDeleted }
         guard !deletedWithWallet else { throw RecentlyDeletedError.deletedWithWallet }
         try RecentlyDeleted.removeForGood(wallets: [], transactions: [self], in: context)

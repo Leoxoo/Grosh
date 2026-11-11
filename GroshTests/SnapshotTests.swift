@@ -47,7 +47,7 @@ struct SnapshotTests {
         restaurants.amount = Money(cents: 2_610)
         restaurants.category = try fixture.category("Restaurants")
         draft.addPart(restaurants)
-        let part = try original.split(draft, in: fixture.context)[0]
+        let part = try original.split(draft)[0]
         assertLooks(of: TransactionRow(transaction: part).padding(), in: fixture)
     }
 

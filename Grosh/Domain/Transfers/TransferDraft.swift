@@ -17,7 +17,7 @@ nonisolated struct TransferDraft {
 }
 
 /// Why a transfer can't be saved yet.
-nonisolated enum TransferRuleError: Error, Equatable {
+nonisolated enum TransferRuleError: RuleRefusal, Equatable {
     /// A wallet is only missing when there is no second one to pick, so both say to add another.
     case missingSourceWallet
     case missingDestinationWallet

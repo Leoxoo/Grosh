@@ -91,7 +91,7 @@ struct ExpectedReimbursementPaymentTests {
 
         #expect(draft.amount == Money(cents: 30_00))
         #expect(draft.wallet === checking)
-        try owed.recordPayment(draft, in: context)
+        try owed.recordPayment(draft)
 
         #expect(owed.status == .paidBack)
     }
@@ -177,7 +177,7 @@ struct ExpectedReimbursementPaymentTests {
 
         #expect(draft.amount == Money(cents: 0))
         #expect(throws: ReimbursementRuleError.missingAmount) {
-            try owed.recordPayment(draft, in: context)
+            try owed.recordPayment(draft)
         }
     }
 

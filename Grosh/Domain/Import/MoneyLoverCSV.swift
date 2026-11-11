@@ -43,7 +43,7 @@ nonisolated struct MoneyLoverExport: Equatable, Sendable {
 }
 
 /// Why a file can't be imported from MoneyLover. Nothing is replaced when it can't.
-nonisolated enum MoneyLoverImportError: Error, Equatable {
+nonisolated enum MoneyLoverImportError: RuleRefusal, Equatable {
     /// The file doesn't have a MoneyLover export's Date, Category, Amount and Wallet columns.
     case notAMoneyLoverExport
     /// The file has the columns but not a single transaction.

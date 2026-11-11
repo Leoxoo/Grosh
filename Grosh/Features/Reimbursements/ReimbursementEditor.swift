@@ -70,7 +70,7 @@ private struct ReimbursementForm: View {
             if let editing {
                 try editing.update(with: draftToSave)
             } else {
-                try expense.recordPayback(draftToSave, into: wallet, in: context)
+                try expense.recordPayback(draftToSave, into: wallet)
             }
         }
         if saved {

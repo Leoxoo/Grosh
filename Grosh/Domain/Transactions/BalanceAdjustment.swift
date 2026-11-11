@@ -117,7 +117,7 @@ nonisolated struct BalanceAdjustmentDraft {
 }
 
 /// Why a balance adjustment can't be recorded.
-nonisolated enum BalanceAdjustmentRuleError: Error, Equatable {
+nonisolated enum BalanceAdjustmentRuleError: RuleRefusal, Equatable {
     /// The keypad can't work out the real balance typed, such as when dividing by zero.
     case missingRealBalance
     /// The real balance is what the wallet's transactions already add up to.

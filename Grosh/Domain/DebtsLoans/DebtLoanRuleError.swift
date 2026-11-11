@@ -1,7 +1,7 @@
 import Foundation
 
 /// Why a payment or forgive on a Loan or Debt can't be recorded.
-nonisolated enum DebtLoanRuleError: Error, Equatable {
+nonisolated enum DebtLoanRuleError: RuleRefusal, Equatable {
     /// Only a Loan or a Debt is paid back or forgiven.
     case notALoanOrDebt
     /// Nothing is outstanding any more.

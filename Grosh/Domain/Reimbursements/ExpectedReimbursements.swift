@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// Why an Expected reimbursement can't be saved, paid, closed or forgiven.
-nonisolated enum ExpectedReimbursementRuleError: Error, Equatable {
+nonisolated enum ExpectedReimbursementRuleError: RuleRefusal, Equatable {
     /// Only an Expense can have Owes me.
     case notAnExpense
     /// Owes me is for a Person in With; this one (by name) was taken out.

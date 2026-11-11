@@ -191,7 +191,7 @@ struct ExpectedReimbursementTests {
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
         try dinner.delete(.onlySelected, in: context, at: deletedAt)
 
-        try dinner.deleteForever(in: context)
+        try dinner.deleteForever()
 
         #expect(try context.fetchCount(FetchDescriptor<ExpectedReimbursement>()) == 0)
         #expect(try context.fetchCount(FetchDescriptor<Person>()) == 1)

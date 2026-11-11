@@ -169,7 +169,7 @@ nonisolated struct TransactionDraft {
 }
 
 /// Why a transaction can't be saved yet.
-nonisolated enum TransactionRuleError: Error, Equatable {
+nonisolated enum TransactionRuleError: RuleRefusal, Equatable {
     case missingWallet
     /// The amount must be above zero; the category sets the sign.
     case missingAmount
@@ -283,6 +283,6 @@ nonisolated extension TransactionDraft {
     /// Whether the amount adds to the wallet (`1`) or takes from it (`-1`): the category's ``Category/sign``, or
     /// before one is chosen, the type's. `0` while a Debt/Loan has neither Loan nor Debt picked.
     var sign: Int {
-        category?.sign ?? (type == .expense ? -1 : type == .income ? 1 : 0)
+        category?.sign ?? type.sign ?? 0
     }
 }

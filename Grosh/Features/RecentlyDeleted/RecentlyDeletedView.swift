@@ -122,9 +122,9 @@ struct RecentlyDeletedView: View {
     private func remove(_ removal: PendingRemoval) {
         perform {
             switch removal {
-            case .wallet(let wallet): try wallet.deleteForever(in: context)
-            case .recurring(let schedule): try schedule.deleteForever(in: context)
-            case .transaction(let transaction): try transaction.deleteForever(in: context)
+            case .wallet(let wallet): try wallet.deleteForever()
+            case .recurring(let schedule): try schedule.deleteForever()
+            case .transaction(let transaction): try transaction.deleteForever()
             case .everything: try RecentlyDeleted.empty(in: context)
             }
         }

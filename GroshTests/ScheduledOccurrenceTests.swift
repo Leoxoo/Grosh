@@ -99,7 +99,7 @@ struct ScheduledOccurrenceTests {
         let recurring = try makeSchedule(starting: day(2026, 10, 12), preset: .daily)
         #expect(recurring.scheduledDays(today: today) == [day(2026, 10, 12)])
 
-        try recurring.delete(today: today, in: context)
+        try recurring.delete(today: today)
         #expect(recurring.scheduledDays(today: today).isEmpty)
     }
 

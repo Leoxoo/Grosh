@@ -172,7 +172,7 @@ struct CardManagementTests {
         let groceries = try addExpense(84_10, paidWith: nfcu, on: CalendarDay(year: 2026, month: 9, day: 30))
         let petrol = try addExpense(40_00, paidWith: navyFederal)
 
-        try nfcu.merge(into: navyFederal, in: context)
+        try nfcu.merge(into: navyFederal)
 
         #expect(lunch.card == navyFederal)
         #expect(groceries.card == navyFederal)
@@ -188,7 +188,7 @@ struct CardManagementTests {
         nfcu.imageData = Data([4, 5, 6])
         navyFederal.imageData = Data([1, 2, 3])
 
-        try nfcu.merge(into: navyFederal, in: context)
+        try nfcu.merge(into: navyFederal)
 
         #expect(navyFederal.imageData == Data([1, 2, 3]))
     }
@@ -210,7 +210,7 @@ struct CardManagementTests {
         let savingsDebit = try context.addCard("Savings Debit", kind: .debit, paidFrom: savings)
         let lunch = try addExpense(12_76, paidWith: nfcu)
 
-        #expect(throws: CardRuleError.mergeIntoAnotherWallet) { try nfcu.merge(into: savingsDebit, in: context) }
+        #expect(throws: CardRuleError.mergeIntoAnotherWallet) { try nfcu.merge(into: savingsDebit) }
         #expect(lunch.card == nfcu)
         #expect(Set(try allCards()) == [nfcu, savingsDebit])
     }
@@ -221,7 +221,7 @@ struct CardManagementTests {
         try oldAmex.archive()
         let lunch = try addExpense(12_76, paidWith: nfcu)
 
-        #expect(throws: CardRuleError.mergeIntoArchived) { try nfcu.merge(into: oldAmex, in: context) }
+        #expect(throws: CardRuleError.mergeIntoArchived) { try nfcu.merge(into: oldAmex) }
         #expect(lunch.card == nfcu)
     }
 
@@ -253,7 +253,7 @@ struct CardManagementTests {
         let amex = try context.addCard("Amex", paidFrom: checking)
         let dinner = try addExpense(55_00, paidWith: amex)
 
-        #expect(throws: CardRuleError.mergeIntoItself) { try amex.merge(into: amex, in: context) }
+        #expect(throws: CardRuleError.mergeIntoItself) { try amex.merge(into: amex) }
         #expect(try allCards() == [amex])
         #expect(dinner.card == amex)
     }
@@ -264,11 +264,11 @@ struct CardManagementTests {
         let unused = try context.addCard("PayPal", paidFrom: checking)
         let dinner = try addExpense(55_00, paidWith: boa)
 
-        #expect(throws: CardRuleError.hasTransactions) { try boa.delete(in: context) }
+        #expect(throws: CardRuleError.hasTransactions) { try boa.delete() }
         #expect(dinner.card == boa)
 
-        try unused.delete(in: context)
-        try boa.merge(into: citi, in: context)
+        try unused.delete()
+        try boa.merge(into: citi)
 
         #expect(try allCards() == [citi])
         #expect(dinner.card == citi)

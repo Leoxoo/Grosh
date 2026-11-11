@@ -64,7 +64,7 @@ struct SplitSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(Strings.Transactions.split, action: split)
-                        .disabled(!draft.canSplit)
+                        .disabled(!draft.canSave)
                 }
             }
         }
@@ -162,7 +162,7 @@ struct SplitSheet: View {
 
     private func split() {
         let succeeded = Log.store.perform("Splitting a transaction", errorMessage: &errorMessage) {
-            try transaction.split(draft, in: context)
+            try transaction.split(draft)
         }
         if succeeded {
             dismiss()

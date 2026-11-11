@@ -34,12 +34,12 @@ extension ExpectedReimbursement {
     /// its net lands in that wallet on the Expense's own day, as for any Reimbursement. Paid more than expected, the
     /// excess follows the Reimbursement rule and counts as Other Income. An expectation with an amount closes itself
     /// once its payments cover it; an open amount stays open until closed by hand. In another wallet it is a real
-    /// transaction there, with the Person in With (``Transaction/recordPaybackElsewhere(_:into:from:for:in:)``). Saves.
-    func recordPayment(_ draft: ExpectationPaymentDraft, in context: ModelContext) throws {
+    /// transaction there, with the Person in With (``Transaction/recordPaybackElsewhere(_:into:from:for:)``). Saves.
+    func recordPayment(_ draft: ExpectationPaymentDraft) throws {
         try validate(draft)
         guard let expense else { throw ReimbursementRuleError.notAnExpense }
         let entry = ReimbursementDraft(amount: draft.amount, day: draft.day, note: draft.note)
-        try expense.recordPayback(entry, into: draft.wallet, from: person, for: self, in: context)
+        try expense.recordPayback(entry, into: draft.wallet, from: person, for: self)
     }
 }
 
@@ -55,16 +55,16 @@ extension Transaction {
 
     /// Someone paid this Expense back `draft`, into `wallet`: into its own wallet (or none chosen) it is a
     /// Reimbursement on the Expense (ADR-0008); into another wallet it is a transaction there, linked to the Expense
-    /// (``recordPaybackElsewhere(_:into:from:for:in:)``, ADR-0010). `person` paid it, against `expectation`, when
+    /// (``recordPaybackElsewhere(_:into:from:for:)``, ADR-0010). `person` paid it, against `expectation`, when
     /// someone owed it. Saves.
     func recordPayback(
         _ draft: ReimbursementDraft, into wallet: Wallet?, from person: Person? = nil,
-        for expectation: ExpectedReimbursement? = nil, in context: ModelContext
+        for expectation: ExpectedReimbursement? = nil
     ) throws {
         if isElsewhere(wallet), let wallet {
-            try recordPaybackElsewhere(draft, into: wallet, from: person, for: expectation, in: context)
+            try recordPaybackElsewhere(draft, into: wallet, from: person, for: expectation)
         } else {
-            try Reimbursement.add(draft, to: self, for: expectation, in: context)
+            try Reimbursement.add(draft, to: self, for: expectation, in: storeContext())
         }
     }
 
@@ -93,10 +93,11 @@ extension Transaction {
     @discardableResult
     func recordPaybackElsewhere(
         _ draft: ReimbursementDraft, into wallet: Wallet, from person: Person? = nil,
-        for expectation: ExpectedReimbursement? = nil, in context: ModelContext
+        for expectation: ExpectedReimbursement? = nil
     ) throws -> Transaction {
         try draft.validate()
         try checkPayback(into: wallet)
+        let context = try storeContext()
         let category = try context.lockedCategory(.reimbursement)
         hasPaybacksElsewhere = true
         let payback = Transaction.insert(
@@ -138,12 +139,16 @@ extension Transaction {
     /// it in its net (``totalViewNetCents``). A payback whose Expense is outside the Total (or in Recently Deleted)
     /// stays in the Total as the money in it is. Its own wallet's list and report show it.
     ///
-    /// The Total list and report read this for every transaction, so it asks first whether it pays an Expense back at
-    /// all: that is `nil` on all but paybacks.
+    /// The Total list and report read this for every transaction, so it asks first what its stored link kind says,
+    /// before reading any relationship: only a transaction on a payback's link can be one (ADR-0012).
     var isHiddenInTotal: Bool {
-        guard let expense = paidBackExpense, category?.lockedRole == .reimbursement else { return false }
+        guard linkKind == .payback, isFiledAsPayback, let expense = paidBackExpense else { return false }
         return !expense.isInRecentlyDeleted && expense.wallet?.countsInTotal == true
     }
+
+    /// Whether it is filed under the locked Reimbursement category: money paid back into another wallet than its
+    /// Expense's (ADR-0010).
+    var isFiledAsPayback: Bool { category?.lockedRole == .reimbursement }
 
     /// Called as `removed` leave the store for good: an Expense none of whose paybacks is left, not even in Recently
     /// Deleted, is no longer paid back elsewhere. It leaves the link it shared with them, so it can be split and change

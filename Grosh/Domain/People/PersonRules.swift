@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// Why a Person can't be added.
-nonisolated enum PersonRuleError: Error, Equatable {
+nonisolated enum PersonRuleError: RuleRefusal, Equatable {
     /// A Person needs a name.
     case missingName
 }

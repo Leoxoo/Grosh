@@ -79,13 +79,10 @@ struct ImportFromMoneyLoverView: View {
         withAnimation {
             isImporting = true
         } completion: {
-            // The import logs its own failure, so this only shows it.
-            do {
+            Log.importing.perform("Importing from MoneyLover", errorMessage: &errorMessage) {
                 summary = try MoneyLoverImport.replaceAllData(
                     with: export.export, cards: .ownersCards, in: context
                 )
-            } catch {
-                errorMessage = error.localizedDescription
             }
             isImporting = false
         }

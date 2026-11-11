@@ -25,7 +25,7 @@ nonisolated struct ReimbursementDraft {
 }
 
 /// Why a Reimbursement can't be saved.
-nonisolated enum ReimbursementRuleError: Error, Equatable {
+nonisolated enum ReimbursementRuleError: RuleRefusal, Equatable {
     /// The amount paid back must be above zero.
     case missingAmount
     /// Only an Expense can be paid back.

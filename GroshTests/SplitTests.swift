@@ -61,7 +61,7 @@ struct SplitTests {
             }
             draft.addPart(new)
         }
-        return try transaction.split(draft, in: context)
+        return try transaction.split(draft)
     }
 
     private func balance() -> Money { walletBalance(checking, asOf: today) }
@@ -140,7 +140,7 @@ struct SplitTests {
         var draft = SplitDraft(splitting: startingBalance)
         draft.addPart(draft.newPart())
 
-        #expect(throws: SplitRuleError.notSplittable) { try startingBalance.split(draft, in: context) }
+        #expect(throws: SplitRuleError.notSplittable) { try startingBalance.split(draft) }
         #expect(startingBalance.linkID == nil)
         #expect(wallet.transactions?.count == 1)
     }
@@ -226,7 +226,7 @@ struct SplitTests {
         schedule.category = category
         let recurring = try RecurringTransaction.create(schedule, today: today, in: context)
         let coffee = try record(25_00)
-        try recurring.attach(coffee, in: context)
+        try recurring.attach(coffee)
         let createdAt = coffee.createdAt
         let identity = coffee.persistentModelID
 
@@ -286,7 +286,7 @@ struct SplitTests {
         draft.original.category = try store.category("Restaurants")
         draft.original.day = today.adding(days: 1)
 
-        let created = try #require(try coffee.split(draft, in: context).first)
+        let created = try #require(try coffee.split(draft).first)
 
         #expect(created.amountCents == -10_00)
         #expect(created.category == (try store.category("Education")))
@@ -328,7 +328,7 @@ struct SplitTests {
         #expect(draft.was == Money(cents: 25_00))
         #expect(draft.total == Money(cents: 26_80))
         #expect(draft.walletChange == Money(cents: -1_80))
-        try coffee.split(draft, in: context)
+        try coffee.split(draft)
         #expect(coffee.amountCents == -16_80)
         #expect(balance() == Money(cents: balanceBefore.cents - 1_80))
     }
@@ -354,7 +354,7 @@ struct SplitTests {
         draft.original.amount = Money(cents: 75_00)
 
         #expect(draft.walletChange == Money(cents: 5_00))
-        let created = try #require(try salary.split(draft, in: context).first)
+        let created = try #require(try salary.split(draft).first)
 
         #expect(created.amountCents == 30_00)
         #expect(salary.amountCents == 75_00)
@@ -381,7 +381,7 @@ struct SplitTests {
         draft.addPart(part)
         draft.original.amount = Money(cents: 16_00)
 
-        try coffee.split(draft, in: context)
+        try coffee.split(draft)
 
         #expect(!coffee.isEstimated)
     }
@@ -402,8 +402,8 @@ struct SplitTests {
         let coffee = try record(25_00)
         let draft = SplitDraft(splitting: coffee)
 
-        #expect(!draft.canSplit)
-        #expect(throws: SplitRuleError.noParts) { try coffee.split(draft, in: context) }
+        #expect(!draft.canSave)
+        #expect(throws: SplitRuleError.noParts) { try coffee.split(draft) }
         #expect(coffee.linkID == nil)
     }
 
@@ -412,8 +412,8 @@ struct SplitTests {
         var draft = SplitDraft(splitting: coffee)
         draft.addPart(draft.newPart())
 
-        #expect(!draft.canSplit)
-        #expect(throws: SplitRuleError.missingAmount) { try coffee.split(draft, in: context) }
+        #expect(!draft.canSave)
+        #expect(throws: SplitRuleError.missingAmount) { try coffee.split(draft) }
         #expect(try allTransactions().count == 1)
     }
 
@@ -425,7 +425,7 @@ struct SplitTests {
         draft.addPart(part)
 
         #expect(draft.original.amount == Money(cents: 0))
-        #expect(throws: SplitRuleError.missingAmount) { try coffee.split(draft, in: context) }
+        #expect(throws: SplitRuleError.missingAmount) { try coffee.split(draft) }
         #expect(coffee.amountCents == -25_00)
         #expect(try allTransactions().count == 1)
     }
@@ -438,7 +438,7 @@ struct SplitTests {
         part.category = nil
         draft.addPart(part)
 
-        #expect(throws: SplitRuleError.missingCategory) { try coffee.split(draft, in: context) }
+        #expect(throws: SplitRuleError.missingCategory) { try coffee.split(draft) }
         #expect(coffee.amountCents == -25_00)
     }
 
@@ -541,7 +541,7 @@ struct SplitTests {
         let parts = try split(coffee, off: [10_00, 5_00])
         let identity = coffee.persistentModelID
 
-        try parts[1].undoSplit(in: context)
+        try parts[1].undoSplit()
 
         #expect(try allTransactions().contains { $0.persistentModelID == identity })
         #expect(try allTransactions().count == 1)
@@ -558,10 +558,10 @@ struct SplitTests {
         part.amount = Money(cents: 10_00)
         draft.addPart(part)
         draft.original.amount = Money(cents: 16_80)
-        let created = try #require(try coffee.split(draft, in: context).first)
+        let created = try #require(try coffee.split(draft).first)
         created.amountCents = -9_00
 
-        try coffee.undoSplit(in: context)
+        try coffee.undoSplit()
 
         #expect(coffee.amountCents == -25_80)
         #expect(balance() == Money(cents: -25_80))
@@ -571,7 +571,7 @@ struct SplitTests {
         let salary = try record(100_00, "Salary", .income)
         let parts = try split(salary, off: [30_00, 20_00])
 
-        try parts[0].undoSplit(in: context)
+        try parts[0].undoSplit()
 
         #expect(salary.amountCents == 100_00)
     }
@@ -585,11 +585,11 @@ struct SplitTests {
         schedule.category = category
         let recurring = try RecurringTransaction.create(schedule, today: today, in: context)
         let coffee = try record(25_00)
-        try recurring.attach(coffee, in: context)
+        try recurring.attach(coffee)
         coffee.note = "Brunch"
         let parts = try split(coffee, off: [10_00], into: "Education")
 
-        try parts[0].undoSplit(in: context)
+        try parts[0].undoSplit()
 
         #expect(coffee.category == category)
         #expect(coffee.note == "Brunch")
@@ -601,7 +601,7 @@ struct SplitTests {
         let parts = try split(coffee, off: [10_00, 5_00])
         try parts[0].delete(.onlySelected, in: context)
 
-        try coffee.undoSplit(in: context)
+        try coffee.undoSplit()
 
         // What is left of the original and the part that was not deleted: 10.00 + 5.00 less the deleted 10.00.
         #expect(coffee.amountCents == -15_00)
@@ -613,7 +613,7 @@ struct SplitTests {
     @Test func undoSplitIsRefusedForATransactionThatIsNotSplit() throws {
         let coffee = try record(25_00)
 
-        #expect(throws: SplitRuleError.notSplit) { try coffee.undoSplit(in: context) }
+        #expect(throws: SplitRuleError.notSplit) { try coffee.undoSplit() }
     }
 
     @Test func undoSplitIsRefusedOnceEveryOtherPartIsDeleted() throws {
@@ -621,7 +621,7 @@ struct SplitTests {
         let parts = try split(coffee, off: [10_00])
         try parts[0].delete(.onlySelected, in: context)
 
-        #expect(throws: SplitRuleError.notSplit) { try coffee.undoSplit(in: context) }
+        #expect(throws: SplitRuleError.notSplit) { try coffee.undoSplit() }
         #expect(coffee.amountCents == -15_00)
     }
 
@@ -630,7 +630,7 @@ struct SplitTests {
         let parts = try split(coffee, off: [10_00, 5_00])
         try coffee.delete(.onlySelected, in: context)
 
-        try parts[1].undoSplit(in: context)
+        try parts[1].undoSplit()
 
         let merged = try #require(try allTransactions().first)
         #expect(try allTransactions().count == 1)
@@ -643,7 +643,7 @@ struct SplitTests {
         let first = try #require(try split(coffee, off: [10_00]).first)
         try split(first, off: [4_00])
 
-        try first.undoSplit(in: context)
+        try first.undoSplit()
 
         #expect(try allTransactions() == [coffee])
         #expect(coffee.amountCents == -25_00)
@@ -667,15 +667,15 @@ struct SplitTests {
         draft.addPart(part)
 
         #expect(draft.reimbursements.count == 2)
-        #expect(!draft.canSplit)
-        #expect(throws: SplitRuleError.unassignedReimbursement) { try coffee.split(draft, in: context) }
+        #expect(!draft.canSave)
+        #expect(throws: SplitRuleError.unassignedReimbursement) { try coffee.split(draft) }
         #expect(coffee.linkID == nil)
         #expect(try allTransactions().count == 1)
 
         try assign(first, to: .part(0), in: &draft)
-        #expect(!draft.canSplit)
+        #expect(!draft.canSave)
         try assign(second, to: .original, in: &draft)
-        #expect(draft.canSplit)
+        #expect(draft.canSave)
     }
 
     @Test func splittingSendsEachReimbursementToThePartItWasAssignedTo() throws {
@@ -716,7 +716,7 @@ struct SplitTests {
         try assign(onSecond, to: .part(1), in: &draft)
         try assign(onThird, to: .part(2), in: &draft)
         try assign(onOriginal, to: .original, in: &draft)
-        #expect(draft.canSplit)
+        #expect(draft.canSave)
 
         draft.removePart(at: 1)
 
@@ -724,7 +724,7 @@ struct SplitTests {
         #expect(assignment(of: onSecond, in: draft) == nil)
         #expect(assignment(of: onThird, in: draft) == .part(1))
         #expect(assignment(of: onOriginal, in: draft) == .original)
-        #expect(!draft.canSplit)
+        #expect(!draft.canSave)
     }
 
     @Test func undoSplitMovesEveryPartsReimbursementsBackOntoTheOriginal() throws {
@@ -737,7 +737,7 @@ struct SplitTests {
             coffee, off: [10_00, 5_00], sending: [(first, .part(0)), (second, .part(1)), (third, .original)]
         )
 
-        try parts[1].undoSplit(in: context)
+        try parts[1].undoSplit()
 
         #expect(try allTransactions() == [coffee])
         #expect(Set(coffee.orderedReimbursements) == [first, second, third])
@@ -755,7 +755,7 @@ struct SplitTests {
 
         #expect(reimbursement.expense == second)
         #expect(first.orderedReimbursements.isEmpty)
-        try first.undoSplit(in: context)
+        try first.undoSplit()
         #expect(coffee.orderedReimbursements == [reimbursement])
     }
 
@@ -774,7 +774,7 @@ struct SplitTests {
         part.people = [anna, ivan]
         draft.addPart(part)
 
-        let created = try #require(try coffee.split(draft, in: context).first)
+        let created = try #require(try coffee.split(draft).first)
 
         #expect(created.orderedPeople.map(\.name) == ["Anna", "Ivan"])
         #expect(created.withName == "Anna; Ivan")

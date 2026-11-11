@@ -57,7 +57,7 @@ struct ExpectationFixture {
         draft.amount = Money(cents: cents)
         if let wallet { draft.wallet = wallet }
         draft.note = note
-        try expectation.recordPayment(draft, in: context)
+        try expectation.recordPayment(draft)
     }
 
     /// What the Report counts for `selection` in October.

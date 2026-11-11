@@ -108,7 +108,7 @@ struct MonthGraphProjectionTests {
         let gym = try schedule("Gym", 30_00, "Sports", starting: day(2026, 10, 20))
         #expect(try store.graph(.spent).expectedByPeriodEnd == Money(cents: 30_00))
 
-        try gym.delete(today: today, in: context)
+        try gym.delete(today: today)
 
         let spent = try store.graph(.spent)
         #expect(spent.scheduledLine == nil)

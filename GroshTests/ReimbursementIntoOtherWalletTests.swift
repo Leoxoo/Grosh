@@ -356,7 +356,7 @@ struct ReimbursementIntoOtherWalletTests {
         let dinner = try fixture.dinner()
         let draft = ReimbursementDraft(amount: Money(cents: 20_00), day: receivedDay, note: "Cash")
 
-        let payback = try dinner.recordPaybackElsewhere(draft, into: cash, in: context)
+        let payback = try dinner.recordPaybackElsewhere(draft, into: cash)
 
         #expect(payback.wallet === cash)
         #expect(payback.amountCents == 20_00)
@@ -380,7 +380,7 @@ struct ReimbursementIntoOtherWalletTests {
         let draft = ReimbursementDraft(amount: Money(cents: 20_00), day: receivedDay)
 
         #expect(throws: ExpectedReimbursementRuleError.otherCurrency) {
-            try dinner.recordPaybackElsewhere(draft, into: euros, in: context)
+            try dinner.recordPaybackElsewhere(draft, into: euros)
         }
         #expect(!dinner.hasPaybacksElsewhere)
     }

@@ -20,7 +20,7 @@ struct LinkExistingTransactionView: View {
             errorTitle: Strings.Recurring.couldntLink,
             failure: ("Linking a transaction to a Recurring transaction", Log.recurring)
         ) { transaction in
-            try recurring.attach(transaction, in: context)
+            try recurring.attach(transaction)
         }
     }
 }

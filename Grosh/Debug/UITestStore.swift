@@ -56,7 +56,7 @@ enum UITestStore {
 }
 
 /// Why the app couldn't open the store a UI test asked for.
-nonisolated enum UITestStoreError: Error, Equatable {
+nonisolated enum UITestStoreError: GroshError, Equatable {
     /// `-GroshUITestStore` named a store there is none of.
     case unknown(String)
 }

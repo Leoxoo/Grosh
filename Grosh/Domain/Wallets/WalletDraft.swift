@@ -32,7 +32,7 @@ nonisolated struct WalletDraft {
 }
 
 /// Why a wallet change was refused.
-nonisolated enum WalletRuleError: Error, Equatable {
+nonisolated enum WalletRuleError: RuleRefusal, Equatable {
     case missingName
 }
 

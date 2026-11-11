@@ -76,7 +76,7 @@ struct NotDeletedTransactionsTests {
         _ = shared
 
         try [coffee].delete(.onlySelected, in: context)
-        try coffee.deleteForever(in: context)
+        try coffee.deleteForever()
 
         let notes = try notes()
         #expect(notes.shared == ["lunch"])
@@ -97,7 +97,7 @@ struct NotDeletedTransactionsTests {
         #expect(try notes().shared == ["coffee", "interest"])
 
         try savings.delete(today: TestStore.today)
-        try savings.deleteForever(in: context)
+        try savings.deleteForever()
         let notes = try notes()
         #expect(notes.shared == ["coffee"])
         #expect(notes.shared == notes.fetched)

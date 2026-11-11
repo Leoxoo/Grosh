@@ -112,13 +112,25 @@ nonisolated enum LoanOrDebtKind: Hashable, Sendable {
         }
     }
 
-    /// How a payment moves the wallet: a Debt Collection brings money in (`1`), a Repayment takes it out (`-1`).
-    var paymentSign: Int {
+    /// The kind whose payments are filed under `role`: Loan for Debt Collection, Debt for Repayment, `nil` for any
+    /// other role.
+    init?(paymentRole role: LockedRole?) {
+        guard let kind = [LoanOrDebtKind.loan, .debt].first(where: { $0.paymentRole == role }) else { return nil }
+        self = kind
+    }
+
+    /// How the Loan or Debt itself moves the wallet: a Loan (you lent) takes money out (`-1`), a Debt (you borrowed)
+    /// brings it in (`1`).
+    var sign: Int {
         switch self {
-        case .loan: 1
-        case .debt: -1
+        case .loan: -1
+        case .debt: 1
         }
     }
+
+    /// How a payment moves the wallet, back the other way: a Debt Collection brings money in (`1`), a Repayment takes
+    /// it out (`-1`).
+    var paymentSign: Int { -sign }
 
     /// Income for money collected beyond a Loan, Expense for money repaid beyond a Debt.
     var overpaymentType: CategoryType {
@@ -158,9 +170,7 @@ extension Transaction {
     func isPayment(of kind: LoanOrDebtKind) -> Bool { category?.lockedRole == kind.paymentRole }
 
     /// The kind of Loan or Debt this pays: Loan for a Debt Collection, Debt for a Repayment, `nil` for anything else.
-    var paidLoanOrDebtKind: LoanOrDebtKind? {
-        [LoanOrDebtKind.loan, .debt].first { isPayment(of: $0) }
-    }
+    var paidLoanOrDebtKind: LoanOrDebtKind? { LoanOrDebtKind(paymentRole: category?.lockedRole) }
 
     /// Whether this is a Debt Collection or Repayment on the link of a Loan or Debt that is forgiven. Restoring such a
     /// payment from Recently Deleted would count it a second time, since the forgiven amount already settles what it

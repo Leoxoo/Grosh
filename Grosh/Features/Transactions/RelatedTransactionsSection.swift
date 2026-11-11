@@ -54,7 +54,7 @@ struct RelatedTransactionsSection: View {
     private func undoSplit() {
         let id = transaction.persistentModelID
         Log.store.perform("Undoing a split", errorMessage: &errorMessage) {
-            if try transaction.undoSplit(in: context).persistentModelID != id {
+            if try transaction.undoSplit().persistentModelID != id {
                 dismiss()
             }
         }

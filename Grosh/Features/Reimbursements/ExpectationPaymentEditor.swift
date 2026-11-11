@@ -67,7 +67,7 @@ private struct ExpectationPaymentForm: View {
 
     private func save() {
         let saved = Log.store.perform("Recording a payment on Owes me", errorMessage: &errorMessage) {
-            try expectation.recordPayment(draftToSave, in: context)
+            try expectation.recordPayment(draftToSave)
         }
         if saved {
             dismiss()

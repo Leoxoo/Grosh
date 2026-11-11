@@ -86,7 +86,7 @@ struct GroshCSVExportTests {
             part.amount = Money(cents: cents)
             draft.addPart(part)
         }
-        try dinner.split(draft, in: context)
+        try dinner.split(draft)
 
         let rows = try exportedRows().filter { $0["Category"] == "Café" }
         let original = try #require(rows.first { $0["Amount"] == "-30.00" })

@@ -37,7 +37,7 @@ struct PurchaseProgressTests {
         let payment = Transaction.insert(
             Money(cents: -cents), on: dated, wallet: store.checking, category: nil, in: context
         )
-        try recurring.attach(payment, in: context)
+        try recurring.attach(payment)
         return payment
     }
 
