@@ -98,4 +98,27 @@ struct TransactionSearchTests {
 
         #expect(Set(listed.map(\.note)) == ["monthly fee", "trading fee", "atm fee"])
     }
+
+    // MARK: Pickers
+
+    @Test func aPickerListsItsCandidatesNewestFirstNarrowedBySearch() {
+        let older = record(-4_50, "coffee", on: CalendarDay(year: 2026, month: 9, day: 1))
+        let newer = record(-3_00, "coffee", on: CalendarDay(year: 2026, month: 10, day: 2))
+        let lunch = record(-12_00, "lunch")
+        let candidates = PickerCandidates([older, lunch, newer])
+
+        #expect(candidates.transactions == [newer, lunch, older])
+        let listing = TransactionListing.picking(candidates, filter: TransactionFilter(searchText: "coffee"))
+        #expect(listing.transactions == [newer, older])
+    }
+
+    @Test func aPickersRowsShowTheirWalletOnlyWhenTheCandidatesComeFromMoreThanOne() {
+        let cash = context.addWallet("Cash")
+        let inChecking = [record(-4_50, "coffee"), record(-12_00, "lunch")]
+        let inBoth = inChecking + [record(-2_00, "bus", in: cash)]
+
+        #expect(!TransactionListing.picking(PickerCandidates(inChecking), filter: TransactionFilter()).mixesWallets)
+        #expect(TransactionListing.picking(PickerCandidates(inBoth), filter: TransactionFilter()).mixesWallets)
+        #expect(!TransactionListing.picking(PickerCandidates(inBoth), filter: TransactionFilter(wallet: cash)).mixesWallets)
+    }
 }

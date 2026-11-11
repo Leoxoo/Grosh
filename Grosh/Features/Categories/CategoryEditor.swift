@@ -43,14 +43,22 @@ struct CategoryEditor: View {
     @State private var isMerging = false
     @State private var isConfirmingDelete = false
     @State private var errorMessage: String?
+    /// Whether the category being edited (or a subcategory) has transactions, counted in the store once when the sheet
+    /// opens rather than each time it draws.
+    @State private var inUse: Set<PersistentIdentifier>
 
     init(mode: Mode) {
         self.mode = mode
         switch mode {
         case .add(let type):
             _draft = State(initialValue: CategoryDraft(type: type, symbolName: "tag.fill", color: .blue))
+            _inUse = State(initialValue: [])
         case .edit(let category):
             _draft = State(initialValue: CategoryDraft(category))
+            _inUse = State(
+                initialValue: category.modelContext.map { CategoryCatalog(context: $0).inUse([category]) }
+                    ?? [category.persistentModelID]
+            )
         }
     }
 
@@ -65,7 +73,7 @@ struct CategoryEditor: View {
     /// A category's type is fixed once it (or a subcategory) has transactions.
     private var canChangeType: Bool {
         guard let editing else { return true }
-        return !editing.isLocked && !catalog.hasTransactions(editing)
+        return !editing.isLocked && !inUse.contains(editing.persistentModelID)
     }
 
     private var parentOptions: [Category] {
@@ -122,7 +130,7 @@ struct CategoryEditor: View {
         }
     }
 
-    /// The name, type and parent. `canChangeType` and `parentOptions` are read from the store once per draw.
+    /// The name, type and parent. `parentOptions` is read from the store once per draw.
     private func detailsSection(canChangeType: Bool, parentOptions: [Category]) -> some View {
         Section {
             HStack(spacing: 12) {
@@ -197,7 +205,7 @@ struct CategoryEditor: View {
     }
 
     private func manageSection(for category: Category) -> some View {
-        let canDelete = catalog.canDelete(category)
+        let canDelete = CategoryCatalog.canDelete(category, inUse: inUse)
         return Section {
             Button(
                 category.isHidden ? Strings.Categories.unhideCategory : Strings.Categories.hideCategory,

@@ -73,6 +73,12 @@ struct TestStore {
         )
     }
 
+    /// The categories of `type` a category picker offers, in its order before the most used lately move up
+    /// (``CategoryCatalog/pickable(of:from:)``).
+    func pickable(_ type: CategoryType) throws -> [Grosh.Category] {
+        CategoryCatalog.pickable(of: type, from: try context.fetch(FetchDescriptor<Grosh.Category>()))
+    }
+
     /// What ``AmountEstimate`` makes of `category`'s history in `currencyCode`, from everything in the store. Saves first.
     func estimate(for category: Grosh.Category, currencyCode: String = "USD") throws -> Int? {
         try context.save()

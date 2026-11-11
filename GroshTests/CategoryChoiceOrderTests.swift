@@ -15,7 +15,7 @@ struct CategoryChoiceOrderTests {
     }
 
     private var expenseTree: [Grosh.Category] {
-        get throws { try fixture.catalog.pickerCategories(of: .expense) }
+        get throws { try fixture.pickable(.expense) }
     }
 
     /// Records `count` expenses under `name`, dated `day` or today.
