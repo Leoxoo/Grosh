@@ -19,16 +19,13 @@ extension Transaction {
     /// a Split (``isSplitPart``) is edited there too, on its own. A Starting balance and a transfer half have their own
     /// editors, since the Add sheet would re-sign their amount by type and never offers their category.
     var editFlow: TransactionEditFlow? {
-        if category?.isTransferHalf == true { return .transferHalf }
-        if isLoanOrDebt { return .addSheet }
-        switch linkKind {
-        case nil, .split, .payback: break
-        case .transfer, .loanOrDebt: return nil
-        }
         switch category?.lockedRole {
-        case .startingBalance: return .startingBalance
-        case .outgoingTransfer, .incomingTransfer, .debtCollection, .repayment, .reimbursement: return nil
-        case .otherIncome, .otherExpense, .loan, .debt, nil: return .addSheet
+        case .outgoingTransfer, .incomingTransfer: return .transferHalf
+        case .loan, .debt: return .addSheet
+        case .debtCollection, .repayment, .reimbursement: return nil
+        case .startingBalance, .otherIncome, .otherExpense, nil:
+            if linkKind == .transfer || linkKind == .loanOrDebt { return nil }
+            return category?.lockedRole == .startingBalance ? .startingBalance : .addSheet
         }
     }
 

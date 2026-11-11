@@ -29,11 +29,26 @@ nonisolated struct DebtReminder: PendingReminder {
             person: person, personName: withName, phone: phone, outstanding: outstanding, youOwe: kind == .debt
         )
     }
+
+    /// "Loan reminder" or "Debt reminder".
+    var title: String {
+        switch kind {
+        case .loan: String(localized: Strings.DebtsLoans.loanReminder)
+        case .debt: String(localized: Strings.DebtsLoans.debtReminder)
+        }
+    }
+
+    /// Who owes whom, and how much is outstanding.
+    var body: String {
+        let amount = outstanding.formatted()
+        return switch kind {
+        case .loan: String(localized: Strings.DebtsLoans.owesYou(withName, amount))
+        case .debt: String(localized: Strings.DebtsLoans.youOwe(withName, amount))
+        }
+    }
 }
 
 extension DebtsAndLoans: ReminderSource {
-    static var records: FetchDescriptor<Transaction> { transactions }
-
     static func reminderDay(of loanOrDebt: LoanOrDebt) -> CalendarDay? { loanOrDebt.openReminderDay }
 
     static func reminder(for loanOrDebt: LoanOrDebt, on day: CalendarDay) -> DebtReminder {

@@ -590,7 +590,7 @@ struct DebtLoanTests {
         try pay(60_00, on: pasha)
         store.spend(4_50, on: try store.category("Café"))
 
-        let list = DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions))
+        let list = DebtsAndLoans(try context.fetch(DebtsAndLoans.records))
 
         #expect(list.open.map(\.original) == [anna, pasha])
         #expect(list.open.map(\.outstanding) == [Money(cents: 50_00), Money(cents: 40_00)])

@@ -11,8 +11,7 @@ import UniformTypeIdentifiers
 /// carries it.
 enum BenchmarkStore {
     static func open(at url: URL) throws -> ModelContainer {
-        let configuration = ModelConfiguration(schema: GroshStore.schema, url: url, cloudKitDatabase: .none)
-        return try ModelContainer(for: GroshStore.schema, configurations: configuration)
+        try GroshStore.makeContainer(at: url)
     }
 
     static func prepare(at url: URL, years: Int) throws {

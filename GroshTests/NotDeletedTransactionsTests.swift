@@ -90,13 +90,13 @@ struct NotDeletedTransactionsTests {
         try context.save()
         _ = shared
 
-        try savings.delete()
+        try savings.delete(today: TestStore.today)
         #expect(try notes().shared == ["coffee"])
 
         try savings.restore(today: today)
         #expect(try notes().shared == ["coffee", "interest"])
 
-        try savings.delete()
+        try savings.delete(today: TestStore.today)
         try savings.deleteForever(in: context)
         let notes = try notes()
         #expect(notes.shared == ["coffee"])

@@ -167,13 +167,13 @@ extension RecentlyDeletedError: LocalizedError {
 
 extension Wallet {
     /// Deletes the wallet: moves it, every transaction in it and its Recurring transactions to Recently Deleted as one
-    /// item. Due Recurring transactions are made first, so no due day is lost. It leaves the Total, every list and every
-    /// picker. A transfer's other half in another wallet stays where it is. Saves.
-    func delete(at now: Date = .now) throws {
+    /// item. Recurring transactions due by `today` are made first, so no due day is lost. It leaves the Total, every list
+    /// and every picker. A transfer's other half in another wallet stays where it is. Saves.
+    func delete(today: CalendarDay, at now: Date = .now) throws {
         let context = try storeContext()
         let schedules = (recurringTransactions ?? []).filter { !$0.isInRecentlyDeleted }
         for schedule in schedules {
-            schedule.makeDueTransactions(through: CalendarDay(now), in: context)
+            schedule.makeDueTransactions(through: today, in: context)
         }
         deletedAt = now
         for transaction in (transactions ?? []).notDeleted {
@@ -268,15 +268,15 @@ extension Transaction {
 
     /// Why this transaction in Recently Deleted can't be restored on its own, or `nil` when it can. One deleted with its
     /// wallet comes back only with the wallet, one whose wallet is in the bin waits for the wallet, and a payment
-    /// whose Loan or Debt was forgiven since waits for it to be un-forgiven (``paysForgivenLoanOrDebt(in:)``). A payment
+    /// whose Loan or Debt was forgiven since waits for it to be un-forgiven (``paysForgivenLoanOrDebt()``). A payment
     /// reads the store for that, so a screen asks once per row. When that read fails the answer is
     /// ``RecentlyDeletedError/couldntCheck``: the transaction stays in the bin rather than risk counting twice.
-    func restoreBlocker() -> RecentlyDeletedError? {
-        guard isInRecentlyDeleted, let context = modelContext else { return .notDeleted }
+    var restoreBlocker: RecentlyDeletedError? {
+        guard isInRecentlyDeleted else { return .notDeleted }
         if deletedWithWallet { return .deletedWithWallet }
         if wallet?.isInRecentlyDeleted == true { return .walletIsDeleted }
         do {
-            if try paysForgivenLoanOrDebt(in: context) { return .loanOrDebtIsForgiven }
+            if try paysForgivenLoanOrDebt() { return .loanOrDebtIsForgiven }
         } catch {
             Log.store.failed("Reading the transactions linked to a payment", error)
             return .couldntCheck
@@ -285,10 +285,10 @@ extension Transaction {
     }
 
     /// Brings a transaction deleted on its own back from Recently Deleted, linked as before, unless its
-    /// ``restoreBlocker()`` says why not. A deposit moved into an Expense takes its Reimbursement back off the Expense
+    /// ``restoreBlocker`` says why not. A deposit moved into an Expense takes its Reimbursement back off the Expense
     /// (``takeBackMovedInReimbursements()``). Saves.
     func restore() throws {
-        if let blocker = restoreBlocker() { throw blocker }
+        if let restoreBlocker { throw restoreBlocker }
         deletedAt = nil
         try takeBackMovedInReimbursements()
         try saveToStore()

@@ -13,7 +13,6 @@ One subsystem, `Leoxo.Grosh` (the bundle identifier), and a category per area:
 | `Recurring` | `Log.recurring` | Recurring transactions: making what came due, and saving them. |
 | `Reminders` | `Log.reminders` | Scheduling Loan, Debt and Estimated-amount reminders, and saving a Loan's or Debt's reminder day. |
 | `Contacts` | `Log.contacts` | Asking for Contacts access and reading contacts for With. |
-| `Reports` | `Log.reports` | The Report. Nothing logs here yet. |
 
 In a `catch`, `Log.store.failed("Saving a transaction", error)`. Where a `try?` dropped the error, `Log.store.attempt("Reading every transaction") { try … } ?? []` gives the same value and logs why it failed. Log only on save, fetch, import and reminder paths, never in a row, a per-transaction loop or anything that runs per frame.
 
@@ -43,7 +42,7 @@ From a device, in Console.app: select the device in the sidebar, click Start, fi
 | `Launch` | `GroshApp` | The startup work: `RecentlyDeleted.purgeExpired` and `RecurringTransaction.catchUp`. It runs again each time the app returns to the foreground. |
 | `Save transaction` | `TransactionEditor` | The editor's save: validating the draft and saving it to the store, not the Success cue or closing the sheet. |
 | `Import CSV` | `MoneyLoverImport` | Deleting the old data, adding the imported rows and saving. |
-| `Search` | `TransactionFilter.listed` | Working out the Transactions tab's search results over every transaction, each time they are worked out while there is search text. |
+| `Search` | `TransactionListing` | Working out the search results over every transaction, each time they are worked out while there is search text. |
 | `Open Home` | `HomeView` | Home appearing, from when SwiftUI reports it to the next turn of the main actor. |
 | `Open Transactions` | `TransactionsView` | The Transactions tab appearing, measured the same way. |
 | `Open Report` | `ReportView` | The Report appearing, measured the same way. |

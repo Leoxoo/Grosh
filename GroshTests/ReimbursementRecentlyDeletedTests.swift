@@ -112,7 +112,7 @@ struct ReimbursementRecentlyDeletedTests {
         try context.payBack(10_00, on: today, to: lunch)
         try dinnerPaidBackTwice()
 
-        try savings.delete(at: deletedAt)
+        try savings.delete(today: CalendarDay(deletedAt), at: deletedAt)
         #expect(lunch.orderedReimbursements.count == 1)
         #expect(try storedReimbursementCount() == 3)
 

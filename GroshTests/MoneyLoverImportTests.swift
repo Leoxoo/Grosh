@@ -257,7 +257,7 @@ struct MoneyLoverImportTests {
             let original = loanOrDebt.original
             return "\(original.wallet?.name ?? "") \(original.day.month)/\(original.day.day) \(original.amountCents)"
         }
-        let all = DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions))
+        let all = DebtsAndLoans(try context.fetch(DebtsAndLoans.records))
         return (Set(all.open.map { describe($0) }), Set(all.settled.map { describe($0) }))
     }
 

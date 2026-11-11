@@ -13,7 +13,7 @@ struct DebtsAndLoans {
     /// Every transaction filed under a Debt/Loan category, outside Recently Deleted: the Loans and Debts and their
     /// payments. A list made from them stays current, since a new payment or a change to a Loan or Debt changes what
     /// this fetches.
-    static var transactions: FetchDescriptor<Transaction> {
+    static var records: FetchDescriptor<Transaction> {
         let debtLoan: String? = CategoryType.debtLoan.rawValue
         return FetchDescriptor(predicate: #Predicate { $0.category?.typeRaw == debtLoan && $0.deletedAt == nil })
     }

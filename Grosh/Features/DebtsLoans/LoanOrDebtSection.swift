@@ -17,7 +17,7 @@ struct LoanOrDebtSection: View {
     @Binding var action: LoanOrDebtAction?
 
     /// Every Loan, Debt and payment, so the section is current as soon as a payment is recorded.
-    @Query(DebtsAndLoans.transactions) private var debtLoanTransactions: [Transaction]
+    @Query(DebtsAndLoans.records) private var debtLoanTransactions: [Transaction]
     @State private var errorMessage: String?
 
     var body: some View {

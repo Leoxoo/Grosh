@@ -17,12 +17,17 @@ enum GroshStore {
                 for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
             )
         }
-        let configuration = ModelConfiguration(
-            schema: schema,
-            isStoredInMemoryOnly: inMemory,
-            cloudKitDatabase: .none
+        return try makeContainer(
+            ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory, cloudKitDatabase: .none)
         )
-        return try ModelContainer(for: schema, configurations: configuration)
     }
 
+    /// A container for the store file at `url` instead of the app's own, such as the 16k store the benchmarks use.
+    static func makeContainer(at url: URL) throws -> ModelContainer {
+        try makeContainer(ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none))
+    }
+
+    private static func makeContainer(_ configuration: ModelConfiguration) throws -> ModelContainer {
+        try ModelContainer(for: schema, configurations: configuration)
+    }
 }

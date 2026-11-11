@@ -193,7 +193,7 @@ struct GroshCSVExportTests {
         try context.importMoneyLover(export)
 
         #expect(try exported() == export)
-        let loan = try #require(try context.fetch(DebtsAndLoans.transactions).first { $0.isLoanOrDebt })
+        let loan = try #require(try context.fetch(DebtsAndLoans.records).first { $0.isLoanOrDebt })
         let forgiveness = try #require(loan.forgiveness)
         #expect(forgiveness.amount == Money(cents: 20_00))
         #expect(forgiveness.day == CalendarDay(year: 2026, month: 10, day: 9))

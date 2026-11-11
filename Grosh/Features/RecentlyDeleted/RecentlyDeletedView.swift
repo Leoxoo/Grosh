@@ -74,7 +74,7 @@ struct RecentlyDeletedView: View {
             if !bin.transactions.isEmpty {
                 Section {
                     ForEach(bin.transactions) { transaction in
-                        let blocker = transaction.restoreBlocker()
+                        let blocker = transaction.restoreBlocker
                         DeletedTransactionRow(transaction: transaction, blocker: blocker, now: now)
                             .recentlyDeletedActions(canRestore: blocker == nil) {
                                 perform { try transaction.restore() }

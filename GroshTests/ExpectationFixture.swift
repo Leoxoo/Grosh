@@ -70,6 +70,6 @@ struct ExpectationFixture {
 
     /// Every Expected reimbursement the way Debts & Loans reads them.
     func owesMe() throws -> ExpectedReimbursements {
-        ExpectedReimbursements(try context.fetch(ExpectedReimbursements.all))
+        ExpectedReimbursements(try context.fetch(ExpectedReimbursements.records))
     }
 }

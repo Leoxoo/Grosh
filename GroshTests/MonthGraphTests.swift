@@ -133,7 +133,7 @@ struct MonthGraphTests {
         try store.record(-500_00, "Investment", on: day(2026, 10, 3), in: brokerage)
         try store.record(900_00, "Salary", .income, on: day(2026, 10, 4), in: oldBank)
         try store.record(-25_00, "Café", on: day(2026, 10, 5), in: cash)
-        try cash.delete()
+        try cash.delete(today: TestStore.today)
 
         #expect(try store.graph(.spent).headline == Money(cents: 40_00))
         #expect(try store.graph(.income).headline == Money(cents: 0))

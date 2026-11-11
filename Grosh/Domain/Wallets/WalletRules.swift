@@ -24,11 +24,7 @@ extension Wallet {
     /// Applies a drag in `ordered` (a list in the user's order) by renumbering the wallets in their new order.
     /// Saves.
     static func move(_ ordered: [Wallet], fromOffsets source: IndexSet, toOffset destination: Int) throws {
-        let moving = source.map { ordered[$0] }
-        var reordered = ordered.enumerated().filter { !source.contains($0.offset) }.map(\.element)
-        let insertionIndex = destination - source.count(in: 0..<destination)
-        reordered.insert(contentsOf: moving, at: insertionIndex)
-        for (position, wallet) in reordered.enumerated() {
+        for (position, wallet) in ordered.reordered(fromOffsets: source, toOffset: destination).enumerated() {
             wallet.sortOrder = position
         }
         try ordered.first?.saveToStore()

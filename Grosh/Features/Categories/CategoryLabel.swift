@@ -22,7 +22,7 @@ struct CategoryIcon: View {
         if let subscriptionIcon, let image = CroppedPhoto.image(from: subscriptionIcon) {
             CroppedPhotoImage(image: image, height: size)
         } else {
-            SymbolCircle(symbolName: category?.symbolName ?? "questionmark", color: category?.color ?? .gray, size: size)
+            SymbolCircle(symbolName: category?.symbolName ?? Category.placeholderSymbolName, color: category?.color ?? .gray, size: size)
         }
     }
 }

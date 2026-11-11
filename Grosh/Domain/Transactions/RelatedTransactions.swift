@@ -13,9 +13,17 @@ extension Transaction {
     /// link. A list made from them stays current, since a transaction linked later (such as a payment on a Loan,
     /// which leaves the Loan itself unchanged) changes what this fetches. A linked transaction in Recently Deleted
     /// is left out until it is restored, as the other half of a transfer shows as a dash.
-    var linkedTransactions: FetchDescriptor<Transaction> {
+    var linkedTransactions: FetchDescriptor<Transaction> { linked(withRecentlyDeleted: false) }
+
+    /// Every transaction sharing this one's link, this one and those in Recently Deleted included; nothing when it has
+    /// no link.
+    var linkedTransactionsWithRecentlyDeleted: FetchDescriptor<Transaction> { linked(withRecentlyDeleted: true) }
+
+    private func linked(withRecentlyDeleted: Bool) -> FetchDescriptor<Transaction> {
         guard let link = linkID else { return FetchDescriptor(predicate: #Predicate { _ in false }) }
-        return FetchDescriptor(predicate: #Predicate { $0.linkID == link && $0.deletedAt == nil })
+        return FetchDescriptor(predicate: #Predicate { transaction in
+            transaction.linkID == link && (withRecentlyDeleted || transaction.deletedAt == nil)
+        })
     }
 
     /// The Related transactions among `linked` (what ``linkedTransactions`` fetches): all but this one, newest first.

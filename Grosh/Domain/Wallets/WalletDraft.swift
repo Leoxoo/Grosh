@@ -5,7 +5,7 @@ import SwiftData
 /// A new wallet's Starting balance is given to ``Wallet/create(_:startingBalance:on:in:)`` alongside it.
 nonisolated struct WalletDraft {
     var name = ""
-    var symbolName = "wallet.bifold.fill"
+    var symbolName = Wallet.defaultSymbolName
     var color = PaletteColor.green
     var includeInTotal = true
     /// The wallet's currency. A new wallet takes the one in Settings → Currency; an existing one keeps its own.

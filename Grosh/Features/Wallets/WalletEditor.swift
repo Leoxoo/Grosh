@@ -4,7 +4,7 @@ import SwiftUI
 /// Adds a wallet (asking for the money it holds now, its Starting balance) or edits one.
 struct WalletEditor: View {
     static let symbolChoices = [
-        "wallet.bifold.fill", "creditcard.fill", "banknote.fill", "building.columns.fill",
+        Wallet.defaultSymbolName, "creditcard.fill", "banknote.fill", "building.columns.fill",
         "dollarsign.circle.fill", "bitcoinsign.circle.fill", "chart.line.uptrend.xyaxis", "chart.pie.fill",
         "briefcase.fill", "house.fill", "car.fill", "cart.fill",
         "bag.fill", "gift.fill", "airplane", "graduationcap.fill",

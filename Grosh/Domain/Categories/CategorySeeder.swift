@@ -43,7 +43,7 @@ enum CategorySeeder {
         }
         for seed in seeds {
             for category in categories
-            where category.name == seed.name && category.type == seed.type && category.symbolName == "questionmark" {
+            where category.name == seed.name && category.type == seed.type && category.symbolName == Category.placeholderSymbolName {
                 category.symbolName = seed.symbolName
             }
         }

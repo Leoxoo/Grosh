@@ -325,7 +325,7 @@ struct ExpectedReimbursements {
     /// row read, so listing them reads no relationship one expectation at a time (docs/agents/architecture.md). The
     /// ones of an Expense in Recently Deleted are left out by ``init(_:)``, which reads the Expense's
     /// ``Transaction/deletedAt``, so a screen showing them follows the Expense going to the bin and coming back.
-    static var all: FetchDescriptor<ExpectedReimbursement> {
+    static var records: FetchDescriptor<ExpectedReimbursement> {
         var descriptor = FetchDescriptor<ExpectedReimbursement>()
         descriptor.relationshipKeyPathsForPrefetching = [\.expense, \.person, \.reimbursements, \.paybacks]
         return descriptor

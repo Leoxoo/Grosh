@@ -70,7 +70,7 @@ struct RecurringTransactionRecentlyDeletedTests {
     @Test func aScheduleCannotBeRestoredWhileItsWalletIsInRecentlyDeleted() throws {
         let recurring = try store.netflix(starting: day(2026, 10, 12))
         try recurring.delete(today: today, at: deletedAt, in: context)
-        try store.checking.delete(at: day(2026, 10, 14).date())
+        try store.checking.delete(today: day(2026, 10, 14), at: day(2026, 10, 14).date())
 
         #expect(recurring.restoreBlocker == .walletIsDeleted)
         #expect(throws: RecentlyDeletedError.walletIsDeleted) { try recurring.restore(today: today) }
@@ -82,7 +82,7 @@ struct RecurringTransactionRecentlyDeletedTests {
         let recurring = try store.netflix(starting: day(2026, 10, 12))
         try RecurringTransaction.catchUp(through: day(2026, 10, 12), in: context)
 
-        try store.checking.delete(at: deletedAt)
+        try store.checking.delete(today: CalendarDay(deletedAt), at: deletedAt)
 
         #expect(recurring.deletedWithWallet)
         #expect(recurring.restoreBlocker == .deletedWithWallet)
@@ -100,7 +100,7 @@ struct RecurringTransactionRecentlyDeletedTests {
     @Test func deletingAWalletMakesWhatFellDueFirstSoItGoesIntoItsItem() throws {
         _ = try store.netflix(starting: day(2026, 10, 12))
 
-        try store.checking.delete(at: deletedAt)
+        try store.checking.delete(today: CalendarDay(deletedAt), at: deletedAt)
 
         #expect(store.checking.transactionsDeletedWithIt.map(\.day) == [day(2026, 10, 12)])
     }
@@ -159,7 +159,7 @@ struct RecurringTransactionRecentlyDeletedTests {
 
     @Test func removingAWalletForGoodRemovesItsSchedules() throws {
         _ = try store.netflix(starting: day(2026, 10, 12))
-        try store.checking.delete(at: deletedAt)
+        try store.checking.delete(today: CalendarDay(deletedAt), at: deletedAt)
 
         try store.checking.deleteForever(in: context)
 

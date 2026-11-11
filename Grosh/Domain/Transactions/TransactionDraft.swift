@@ -119,12 +119,12 @@ nonisolated struct TransactionDraft {
     /// What holds a Loan or Debt in place while it is edited, or `nil` when nothing does. When its payments can't be
     /// read, it is held as if paid in full: a lock lifted by a failed read would let it change under its payments.
     @MainActor private static func paymentLock(editing transaction: Transaction) -> PaymentLock? {
-        guard transaction.isLoanOrDebt, let context = transaction.modelContext else { return nil }
+        guard transaction.isLoanOrDebt, transaction.modelContext != nil else { return nil }
         let owed = Money(cents: abs(transaction.amountCents), currencyCode: transaction.amount.currencyCode)
         let forgivenOwed = transaction.isForgiven ? owed : nil
         let payments: [Transaction]
         do {
-            payments = try transaction.paymentsWithRecentlyDeleted(in: context)
+            payments = try transaction.paymentsWithRecentlyDeleted()
         } catch {
             Log.store.failed("Reading the payments of a Loan or Debt", error)
             return PaymentLock(

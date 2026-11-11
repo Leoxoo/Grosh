@@ -12,7 +12,7 @@ struct CategoryDraft {
     init(
         name: String = "",
         type: CategoryType = .expense,
-        symbolName: String = "questionmark",
+        symbolName: String = Category.placeholderSymbolName,
         color: PaletteColor = .gray,
         parent: Category? = nil,
         ownKind: RecurringKind? = nil

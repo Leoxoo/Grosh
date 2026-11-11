@@ -177,7 +177,7 @@ struct EstimatedAmountTests {
 
     @Test func confirmingTheAmountClearsTheMarkItsReminderAndTheBellItem() throws {
         let made = try estimatedElectricity()
-        #expect(try context.fetch(EstimatedAmounts.transactions).count == 1)
+        #expect(try context.fetch(EstimatedAmounts.records).count == 1)
         #expect(EstimatedAmounts([made]).due(on: day(2026, 10, 14)).count == 1)
 
         try made.confirmAmount(cents: 2_750)
@@ -186,7 +186,7 @@ struct EstimatedAmountTests {
         #expect(!made.isEstimated)
         #expect(made.estimateReminderDay == nil)
         #expect(EstimatedAmounts([made]).due(on: day(2026, 10, 20)).isEmpty)
-        #expect(try context.fetch(EstimatedAmounts.transactions).isEmpty)
+        #expect(try context.fetch(EstimatedAmounts.records).isEmpty)
     }
 
     @Test func editingTheAmountClearsTheMarkButEditingOnlyTheNoteKeepsIt() throws {

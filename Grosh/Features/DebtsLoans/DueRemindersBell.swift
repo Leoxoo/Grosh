@@ -12,9 +12,9 @@ extension View {
 /// The bell and the sheet it opens. The sheet hangs off the screen rather than the toolbar button, so rebuilding the
 /// toolbar never closes it.
 private struct DueRemindersBell: ViewModifier {
-    @Query(DebtsAndLoans.transactions) private var transactions: [Transaction]
-    @Query(EstimatedAmounts.transactions) private var estimates: [Transaction]
-    @Query(ExpectedReimbursements.all) private var expectations: [ExpectedReimbursement]
+    @Query(DebtsAndLoans.records) private var transactions: [Transaction]
+    @Query(EstimatedAmounts.records) private var estimates: [Transaction]
+    @Query(ExpectedReimbursements.records) private var expectations: [ExpectedReimbursement]
     @Environment(\.today) private var today
     @State private var isShowingList = false
 
@@ -38,9 +38,9 @@ private struct DueRemindersBell: ViewModifier {
 /// come, then the estimated amounts waiting for their real figures. A Loan or Debt opens its transaction detail, an Owes
 /// me its own detail; an estimate opens its amount editor.
 private struct DueRemindersList: View {
-    @Query(DebtsAndLoans.transactions) private var transactions: [Transaction]
-    @Query(EstimatedAmounts.transactions) private var estimates: [Transaction]
-    @Query(ExpectedReimbursements.all) private var expectations: [ExpectedReimbursement]
+    @Query(DebtsAndLoans.records) private var transactions: [Transaction]
+    @Query(EstimatedAmounts.records) private var estimates: [Transaction]
+    @Query(ExpectedReimbursements.records) private var expectations: [ExpectedReimbursement]
     @Environment(\.dismiss) private var dismiss
     @Environment(\.today) private var today
     /// The estimate whose amount editor is open, while it is.
