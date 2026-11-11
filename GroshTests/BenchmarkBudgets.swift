@@ -110,11 +110,12 @@ enum BenchmarkSetup {
     }
 
     /// The simulated iPhone's model, which stays the same when Xcode runs a clone of the simulator.
-    private static var simulator: String {
+    static var simulator: String {
         environment["SIMULATOR_MODEL_IDENTIFIER"].map { "\($0) simulator" } ?? "not a simulator"
     }
 
-    private static var operatingSystem: String {
+    /// The simulated iOS, with its build: "iOS 27.0 (24A434)".
+    static var operatingSystem: String {
         let version = ProcessInfo.processInfo.operatingSystemVersion
         var name = "\(version.majorVersion).\(version.minorVersion)"
         if version.patchVersion != 0 { name += ".\(version.patchVersion)" }

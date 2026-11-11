@@ -11,7 +11,7 @@ import UIKit
 /// Month graph, each in light, dark and the accessibility text size AX3. Every screen is drawn as of
 /// `MonthGraphFixture.today`, from fixed transactions, in English (United States) on a 402 × 874 screen, so the same
 /// tree gives the same images on any day. The references are PNG files in `__Snapshots__`, recorded on the developer's
-/// Mac: `docs/agents/testing.md` says how to record them and review a change.
+/// Mac on the setup ``SnapshotSetup`` names: `docs/agents/testing.md` says how to record them and review a change.
 @MainActor
 @Suite(.namedInTheLog, .serialized, .enabled(if: snapshotsRunHere))
 struct SnapshotTests {
@@ -29,8 +29,7 @@ struct SnapshotTests {
 
     @Test func transferRow() throws {
         let fixture = try MonthGraphFixture()
-        let savings = Wallet(name: "Savings")
-        fixture.context.insert(savings)
+        let savings = fixture.context.addWallet("Savings")
         var draft = TransferDraft(day: fixture.today)
         draft.from = fixture.checking
         draft.to = savings
@@ -55,10 +54,7 @@ struct SnapshotTests {
     @Test func reimbursementRow() throws {
         let fixture = try MonthGraphFixture()
         let dinner = try fixture.record(-6_200, "Restaurants", on: fixture.today)
-        try Reimbursement.add(
-            ReimbursementDraft(amount: Money(cents: 2_000), day: fixture.today, note: "Dinner share"), to: dinner,
-            in: fixture.context
-        )
+        try fixture.context.payBack(2_000, on: fixture.today, note: "Dinner share", to: dinner)
         assertLooks(of: TransactionRow(transaction: dinner).padding(), in: fixture)
     }
 
@@ -117,12 +113,43 @@ struct SnapshotTests {
 }
 
 /// Whether the suite runs. CI sets `CI`, and the workflow passes it to the test process as `TEST_RUNNER_CI`, since
-/// xcodebuild forwards only `TEST_RUNNER_` variables. Where it is set, the suite is skipped and one line says so.
+/// xcodebuild forwards only `TEST_RUNNER_` variables. Elsewhere the suite runs only on the setup its references were
+/// drawn on, since another iOS or simulator draws other pixels. Where it is skipped, one line says why.
 private let snapshotsRunHere: Bool = {
     guard ProcessInfo.processInfo.environment["CI"] == nil else {
         print("Snapshot tests skipped on CI: their references are recorded on a Mac (docs/agents/testing.md).")
         return false
     }
-    return true
+    return SnapshotSetup.isRecordedSetup
 }()
+
+/// The simulator and iOS the references were drawn on, kept in `recorded-setup.txt` beside them. A run with no such
+/// file, as after the references were deleted to record them again, records them and writes this run's setup there.
+enum SnapshotSetup {
+    /// This run's simulator and iOS: "iPhone18,1 simulator / iOS 27.0 (24A434)".
+    static let current = "\(BenchmarkSetup.simulator) / \(BenchmarkSetup.operatingSystem)"
+
+    private static let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        .appending(path: "__Snapshots__/SnapshotTests/recorded-setup.txt")
+
+    /// Whether this run is on the recorded setup, writing it down first when none is recorded.
+    static var isRecordedSetup: Bool {
+        guard let recorded = try? String(contentsOf: file, encoding: .utf8) else {
+            try? FileManager.default.createDirectory(
+                at: file.deletingLastPathComponent(), withIntermediateDirectories: true
+            )
+            try? (current + "\n").write(to: file, atomically: true, encoding: .utf8)
+            return true
+        }
+        let setup = recorded.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard setup == current else {
+            print(
+                "Snapshot tests skipped: their references were drawn on \(setup), and this run is on \(current) "
+                    + "(docs/agents/testing.md says how to record them here)."
+            )
+            return false
+        }
+        return true
+    }
+}
 #endif
