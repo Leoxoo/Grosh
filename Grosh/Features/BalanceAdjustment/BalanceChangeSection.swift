@@ -5,8 +5,10 @@ import SwiftUI
 struct BalanceChangeSection: View {
     let transaction: Transaction
 
+    @NotDeletedTransactions private var transactions: [Transaction]
+
     var body: some View {
-        if let change = transaction.balanceChange {
+        if let change = transaction.balanceChange(in: $transactions) {
             Section {
                 LabeledContent(Strings.Common.balance) {
                     HStack(spacing: 6) {

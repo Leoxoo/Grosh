@@ -116,10 +116,10 @@ struct ScheduledOccurrenceTests {
         let netflix = try makeSchedule(starting: day(2026, 10, 12))
 
         let electricityRow = ScheduledOccurrence(
-            recurring: electricity, day: day(2026, 10, 12), amount: electricity.startingAmount(among: [])
+            recurring: electricity, day: day(2026, 10, 12), amount: electricity.startingAmount(estimateCents: nil)
         )
         let netflixRow = ScheduledOccurrence(
-            recurring: netflix, day: day(2026, 10, 12), amount: netflix.startingAmount(among: [])
+            recurring: netflix, day: day(2026, 10, 12), amount: netflix.startingAmount(estimateCents: nil)
         )
         #expect(electricityRow.isEstimated)
         #expect(!netflixRow.isEstimated)

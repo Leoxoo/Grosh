@@ -6,15 +6,14 @@ import SwiftUI
 /// with `emptyTitle` and `emptyDescription`.
 struct TransactionPickerSheet: View {
     let title: LocalizedStringResource
-    /// Every transaction that may be picked, before search and filters.
+    /// Every transaction that may be picked, before search and filters. Put in order once, when the sheet opens.
     let candidates: [Transaction]
     let emptyTitle: LocalizedStringResource
     let emptyDescription: LocalizedStringResource
-    /// Whether every candidate is in the same wallet, so the rows never show a wallet's icon.
-    var candidatesShareAWallet = false
     let errorTitle: LocalizedStringResource
-    /// What picking is called in the log, and where it is logged, when `pick` fails.
-    let failure: (what: String, log: Logger)
+    /// What picking is called in `log` when `pick` fails.
+    let failure: String
+    let log: Logger
     let pick: (Transaction) throws -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -27,41 +26,49 @@ struct TransactionPickerSheet: View {
         startingFilter: TransactionFilter = TransactionFilter(),
         emptyTitle: LocalizedStringResource,
         emptyDescription: LocalizedStringResource,
-        candidatesShareAWallet: Bool = false,
         errorTitle: LocalizedStringResource,
-        failure: (what: String, log: Logger),
+        failure: String,
+        log: Logger,
         pick: @escaping (Transaction) throws -> Void
     ) {
         self.title = title
         self.candidates = candidates
         self.emptyTitle = emptyTitle
         self.emptyDescription = emptyDescription
-        self.candidatesShareAWallet = candidatesShareAWallet
         self.errorTitle = errorTitle
         self.failure = failure
+        self.log = log
         self.pick = pick
         _filter = State(initialValue: startingFilter)
     }
 
     var body: some View {
-        let shown = candidates.matching(filter).inListOrder()
+        MadeOnce {
+            PickerCandidates(candidates)
+        } content: { candidates in
+            list(TransactionListing.picking(candidates, filter: filter))
+        }
+    }
+
+    private func list(_ listing: TransactionListing) -> some View {
         NavigationStack {
             Group {
-                if shown.isEmpty {
+                if listing.transactions.isEmpty {
                     if filter.isOn {
                         NoMatchingTransactionsView(filter: filter)
                     } else {
                         ContentUnavailableView(emptyTitle, systemImage: "tray", description: Text(emptyDescription))
                     }
                 } else {
-                    List(shown) { transaction in
+                    List(listing.transactions) { transaction in
                         Button {
                             choose(transaction)
                         } label: {
                             TransactionRow(
                                 transaction: transaction,
                                 showsDay: true,
-                                showsWalletIcon: !candidatesShareAWallet && filter.wallet == nil
+                                showsWalletIcon: listing.mixesWallets,
+                                listed: listing.listed
                             )
                         }
                         .buttonStyle(.plain)
@@ -86,7 +93,7 @@ struct TransactionPickerSheet: View {
     }
 
     private func choose(_ transaction: Transaction) {
-        if failure.log.perform(failure.what, errorMessage: &errorMessage, { try pick(transaction) }) {
+        if log.perform(failure, errorMessage: &errorMessage, { try pick(transaction) }) {
             dismiss()
         }
     }

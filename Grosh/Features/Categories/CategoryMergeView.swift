@@ -12,7 +12,17 @@ struct CategoryMergeView: View {
     private var catalog: CategoryCatalog { CategoryCatalog(context: context) }
 
     var body: some View {
-        let transactionCount = (source.transactions ?? []).notDeleted.count
+        // Counted in the store once, when the sheet opens.
+        MadeOnce {
+            Log.store.attempt("Counting a category's transactions") {
+                try context.fetchCount(source.notDeletedTransactions)
+            } ?? 0
+        } content: { transactionCount in
+            mergeSheet(transactionCount: transactionCount)
+        }
+    }
+
+    private func mergeSheet(transactionCount: Int) -> some View {
         MergeSheet(
             sourceName: source.name,
             targets: Log.store.attempt("Reading the categories to merge into") {

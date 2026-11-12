@@ -33,10 +33,11 @@ struct CategoryCatalog {
         sorted(parent.children ?? [])
     }
 
-    /// The categories of `type` the user may file a transaction under, in tree order. Hidden categories, and those
-    /// only the app itself files under (transfers, payments, Starting balance), are left out.
-    func pickerCategories(of type: CategoryType) throws -> [Category] {
-        try categories(of: type, includingHidden: false).filter { $0.lockedRole?.isOfferedInPicker != false }
+    /// The categories of `type` found in `all` that the user may file a transaction under, in tree order. Hidden
+    /// categories, and those only the app itself files under (transfers, payments, Starting balance), are left out.
+    /// For views that already hold the categories from a query.
+    static func pickable(of type: CategoryType, from all: [Category]) -> [Category] {
+        tree(of: type, from: all, includingHidden: false).filter { $0.lockedRole?.isOfferedInPicker != false }
     }
 
     // MARK: Adding and editing
@@ -208,8 +209,9 @@ struct CategoryCatalog {
 
     // MARK: Deleting
 
-    func canDelete(_ category: Category) -> Bool {
-        (try? checkDelete(category)) != nil
+    /// Whether `category` can be deleted: it isn't locked and has no transactions, as `inUse` (``inUse(_:)``) says.
+    static func canDelete(_ category: Category, inUse: Set<PersistentIdentifier>) -> Bool {
+        !category.isLocked && !inUse.contains(category.persistentModelID)
     }
 
     /// Deletes a category that has no transactions, along with its subcategories.
@@ -233,9 +235,31 @@ struct CategoryCatalog {
     /// category's transactions; when the store can't be read, it counts as having some, so nothing is deleted or
     /// retyped on a guess.
     func hasTransactions(_ category: Category) -> Bool {
-        Log.store.attempt("Counting a category's transactions") {
-            try ([category] + (category.children ?? [])).contains { try isInUse($0) }
-        } ?? true
+        inUse([category]).contains(category.persistentModelID)
+    }
+
+    /// Which of `categories` have transactions, as ``hasTransactions(_:)`` says, each category counted in the store
+    /// once: a screen that offers Delete on many rows asks once for all of them, rather than once per row as it draws.
+    func inUse(_ categories: [Category]) -> Set<PersistentIdentifier> {
+        do {
+            var counted: [PersistentIdentifier: Bool] = [:]
+            var used = Set<PersistentIdentifier>()
+            for category in categories {
+                for filed in [category] + (category.children ?? []) {
+                    let id = filed.persistentModelID
+                    let isUsed = try counted[id] ?? isInUse(filed)
+                    counted[id] = isUsed
+                    if isUsed {
+                        used.insert(category.persistentModelID)
+                        break
+                    }
+                }
+            }
+            return used
+        } catch {
+            Log.store.failed("Counting the categories' transactions", error)
+            return Set(categories.map(\.persistentModelID))
+        }
     }
 
     private func isInUse(_ category: Category) throws -> Bool {

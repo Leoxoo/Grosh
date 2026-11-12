@@ -17,7 +17,7 @@ struct LinkExistingTransactionView: View {
             emptyTitle: Strings.Recurring.noTransactionsToLink,
             emptyDescription: Strings.Recurring.noTransactionsToLinkDescription,
             errorTitle: Strings.Recurring.couldntLink,
-            failure: ("Linking a transaction to a Recurring transaction", Log.recurring)
+            failure: "Linking a transaction to a Recurring transaction", log: Log.recurring
         ) { transaction in
             try recurring.attach(transaction)
         }

@@ -30,7 +30,10 @@ struct ReportView: View {
     @ViewBuilder
     private func content(_ history: CountedHistory) -> some View {
         let counted = history.during(period, today: today)
-        let summary = PeriodSummary(of: transactions.filter(walletSelection.includes), in: period, today: today)
+        // The same ledger entries of the selection the Transactions tab adds its Opening and Ending balances up from.
+        let summary = PeriodSummary(
+            of: TransactionFilter().transactions(in: walletSelection, from: $transactions), in: period, today: today
+        )
         NavigationStack(path: $path) {
             List {
                 Section {

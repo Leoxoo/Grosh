@@ -23,15 +23,41 @@ nonisolated enum AmountEstimate {
         return Int((Double(total) / Double(recent.count)).rounded())
     }
 
-    /// Every transaction filed under `category` or its subcategories, Recently Deleted ones included: all that
-    /// ``cents(among:for:currencyCode:)`` can count for it, read from the category's own transactions rather than
-    /// the whole store.
-    static func history(for category: Category) -> [Transaction] {
-        ([category] + (category.children ?? [])).flatMap { $0.transactions ?? [] }
+    /// ``cents(among:for:currencyCode:)`` over what the store holds for `category`, read through its context: only
+    /// the newest of its usable transactions, which the store finds and sorts, rather than every transaction filed
+    /// under it. `nil` too when the store can't be read, which is logged.
+    static func cents(for category: Category, currencyCode: String) -> Int? {
+        guard let context = category.modelContext else { return nil }
+        return Log.store.attempt("Reading a varying Bill's estimate") {
+            let newest = try newestUsable(for: category, currencyCode: currencyCode, in: context)
+            return cents(among: newest, for: category, currencyCode: currencyCode)
+        } ?? nil
     }
 
-    /// ``cents(among:for:currencyCode:)`` over the category's own ``history(for:)``.
-    static func cents(for category: Category, currencyCode: String) -> Int? {
-        cents(among: history(for: category), for: category, currencyCode: currencyCode)
+    /// The ``sampleSize`` newest usable transactions filed under `category` or its subcategories in `currencyCode`, by
+    /// day and by when they were entered, plus any entered at the very moment of the last of them: list order breaks
+    /// that tie by identity, which the store can't sort by, so ``cents(among:for:currencyCode:)`` picks among them.
+    private static func newestUsable(
+        for category: Category, currencyCode: String, in context: ModelContext
+    ) throws -> [Transaction] {
+        let id = category.persistentModelID
+        let usable = #Predicate<Transaction> { transaction in
+            (transaction.category?.persistentModelID == id || transaction.category?.parent?.persistentModelID == id)
+                && transaction.deletedAt == nil && !transaction.isEstimated && !transaction.isExcludedFromReport
+                && transaction.wallet?.currencyCode == currencyCode
+        }
+        var newest = FetchDescriptor<Transaction>(
+            predicate: usable,
+            sortBy: [SortDescriptor(\.dayRaw, order: .reverse), SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        newest.fetchLimit = sampleSize
+        let found = try context.fetch(newest)
+        guard found.count == sampleSize, let last = found.last else { return found }
+        let dayRaw = last.dayRaw
+        let createdAt = last.createdAt
+        let tied = try context.fetch(
+            FetchDescriptor<Transaction>(predicate: #Predicate { $0.dayRaw == dayRaw && $0.createdAt == createdAt })
+        )
+        return found + tied.filter { !found.contains($0) }
     }
 }

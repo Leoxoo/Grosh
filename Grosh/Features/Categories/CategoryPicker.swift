@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 /// Picks a category. A transaction's category is picked from the categories of its type the user may pick by hand
-/// (``CategoryCatalog/pickerCategories(of:)``): hidden ones and those the app files itself are left out, and Debt/Loan
+/// (``CategoryCatalog/pickable(of:from:)``): hidden ones and those the app files itself are left out, and Debt/Loan
 /// offers only Loan and Debt; the current selection still shows when it isn't offered any more. A filter picks from
 /// every category of every type, hidden and locked ones included, or none. The list it opens puts the categories used
 /// most in the last month first, each with its subcategories in their usual order, and can be searched by name.
@@ -68,8 +68,7 @@ private struct CategoryChoiceList: View {
     @Binding var selection: Category?
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
-    /// Keeps the list current when categories change.
+    /// Every category, which the choices are arranged from.
     @Query private var categories: [Category]
     /// The transactions that decide which categories are used most lately.
     @Query private var recentTransactions: [Transaction]
@@ -126,9 +125,7 @@ private struct CategoryChoiceList: View {
     private var sections: [ChoiceSection] {
         let all: [ChoiceSection] = switch offered {
         case .pickable(let type):
-            [ChoiceSection(title: nil, categories: Log.store.attempt("Reading the categories to pick from") {
-                try CategoryCatalog(context: context).pickerCategories(of: type)
-            } ?? [])]
+            [ChoiceSection(title: nil, categories: CategoryCatalog.pickable(of: type, from: categories))]
         case .every:
             CategoryType.allCases.map { type in
                 ChoiceSection(title: type.title, categories: CategoryCatalog.tree(of: type, from: categories))

@@ -375,7 +375,7 @@ struct DebtLoanTests {
         try Forgiveness.record(forgive, in: context)
 
         #expect(store.catalog.hasTransactions(friends))
-        #expect(!store.catalog.canDelete(friends))
+        #expect(!CategoryCatalog.canDelete(friends, inUse: store.catalog.inUse([friends])))
 
         let gifts = try store.category("Gifts & Donations")
         try store.catalog.merge(friends, into: gifts)

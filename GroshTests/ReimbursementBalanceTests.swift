@@ -68,8 +68,8 @@ struct ReimbursementBalanceTests {
         let adjustment = try store.record(5_00, "Collect Interest", .income, on: today)
         adjustment.isBalanceAdjustment = true
 
-        #expect(adjustment.balanceChange?.recorded == Money(cents: -40_00))
-        #expect(adjustment.balanceChange?.actual == Money(cents: -35_00))
+        #expect(try balanceChange(of: adjustment)?.recorded == Money(cents: -40_00))
+        #expect(try balanceChange(of: adjustment)?.actual == Money(cents: -35_00))
     }
 
     // MARK: Opening and Ending balance, the list
@@ -153,7 +153,7 @@ struct ReimbursementBalanceTests {
         let dinner = try store.dinner()
         dinner.card = chase
         try context.payBack(20_00, on: today, to: dinner)
-        let shown = chase.transactions(in: chase.period(containing: today))
+        let shown = chase.statement(for: chase.period(containing: today), today: today).transactions
 
         #expect(shown == [dinner])
         #expect(shown.charged == Money(cents: -60_00))
@@ -169,7 +169,8 @@ struct ReimbursementBalanceTests {
         coffee.card = chase
         try context.payBack(20_00, on: today, to: dinner)
 
-        let days = TransactionDay.days(of: chase.transactions(in: chase.period(containing: today)))
+        let statement = chase.statement(for: chase.period(containing: today), today: today)
+        let days = TransactionDay.days(of: statement.transactions)
 
         #expect(days.map { $0.total(.charged) } == [Money(cents: -64_00)])
         #expect(days.map { $0.total(.net) } == [Money(cents: -44_00)])
@@ -182,10 +183,10 @@ struct ReimbursementBalanceTests {
         dinner.card = chase
         try context.payBack(20_00, on: today, to: dinner)
         let current = chase.period(containing: today)
-        let leadIns = chase.leadInTransactions(in: current)
+        let leadIns = chase.statement(for: current, today: today).leadIns
 
         #expect(leadIns == [dinner])
-        #expect((chase.transactions(in: current) + leadIns).charged == Money(cents: -60_00))
+        #expect((chase.statement(for: current, today: today).transactions + leadIns).charged == Money(cents: -60_00))
     }
 
     @Test func theCardFiltersTotalIgnoresReimbursements() throws {

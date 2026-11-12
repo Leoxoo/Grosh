@@ -8,9 +8,20 @@ struct CardMergeView: View {
     /// Called after the merge, once `source` no longer exists.
     var onMerged: () -> Void = {}
 
+    @Environment(\.modelContext) private var context
 
     var body: some View {
-        let transactionCount = (source.transactions ?? []).notDeleted.count
+        // Counted in the store once, when the sheet opens.
+        MadeOnce {
+            Log.store.attempt("Counting a Card's transactions") {
+                try context.fetchCount(source.notDeletedTransactions)
+            } ?? 0
+        } content: { transactionCount in
+            mergeSheet(transactionCount: transactionCount)
+        }
+    }
+
+    private func mergeSheet(transactionCount: Int) -> some View {
         MergeSheet(
             sourceName: source.name,
             targets: source.mergeTargets,
