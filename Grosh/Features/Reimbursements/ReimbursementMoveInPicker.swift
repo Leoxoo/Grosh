@@ -16,9 +16,8 @@ struct ReimbursementMoveInPicker: View {
             candidates: transactions.filter { $0.canBeMovedIntoReimbursement(of: expense) },
             emptyTitle: Strings.Reimbursements.noTransactionsToMoveIn,
             emptyDescription: Strings.Reimbursements.noTransactionsToMoveInDescription,
-            candidatesShareAWallet: true,
             errorTitle: Strings.Reimbursements.couldntMoveIn,
-            failure: ("Moving a transaction in", Log.store)
+            failure: "Moving a transaction in", log: Log.store
         ) { deposit in
             try Reimbursement.moveIn(deposit, to: expense, in: context)
         }

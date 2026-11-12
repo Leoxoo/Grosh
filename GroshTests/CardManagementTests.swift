@@ -52,6 +52,18 @@ struct CardManagementTests {
         try context.fetch(FetchDescriptor<Card>())
     }
 
+    @Test func theCardsListAndFilterKeepACardWithNoPayingWallet() throws {
+        let archived = try Card.create(CardDraft(name: "Old", kind: .debit, payingWallet: checking), in: context)
+        try archived.archive()
+        let unpaid = Card(name: "Unpaid", kind: .debit, payingWallet: nil)
+        context.insert(unpaid)
+        try context.save()
+
+        #expect(try context.fetch(Card.unarchived) == [unpaid])
+        #expect(try context.fetch(Card.archived) == [archived])
+        #expect(try Set(context.fetch(Card.listed)) == [archived, unpaid])
+    }
+
     @Test func theStatementDateCanOnlyBeSetOnCreditCards() throws {
         #expect(throws: CardRuleError.statementDateRequiresCredit) {
             try Card.create(

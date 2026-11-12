@@ -148,7 +148,7 @@ extension Card {
 
     func update(with draft: CardDraft) throws {
         try draft.validate()
-        guard draft.payingWallet == payingWallet || !hasTransactions else {
+        guard try draft.payingWallet == payingWallet || !hasTransactions() else {
             throw CardRuleError.payingWalletHasTransactions
         }
         apply(draft)
@@ -168,14 +168,22 @@ extension Card {
     /// The order Cards are listed in everywhere: the order they were added.
     static let userOrder: [SortDescriptor<Card>] = [SortDescriptor(\.sortOrder), SortDescriptor(\.name)]
 
-    /// The unarchived Cards in the user's order, as Account → Cards lists them first.
-    static var unarchived: FetchDescriptor<Card> {
-        FetchDescriptor(predicate: #Predicate { !$0.isArchived }, sortBy: userOrder)
+    /// Every Card in the user's order, archived ones included, as a filter offers them. A Card whose paying wallet is
+    /// in Recently Deleted waits out of sight with it: it is left out, and comes back when the wallet is restored.
+    static var listed: FetchDescriptor<Card> {
+        FetchDescriptor(predicate: #Predicate { $0.payingWallet?.deletedAt == nil }, sortBy: userOrder)
     }
 
-    /// The archived Cards in the user's order, as Account → Cards lists them below the others.
+    /// The unarchived Cards in the user's order, as Account → Cards lists them first. Like ``listed``, it leaves out
+    /// the Cards whose paying wallet is in Recently Deleted.
+    static var unarchived: FetchDescriptor<Card> {
+        FetchDescriptor(predicate: #Predicate { !$0.isArchived && $0.payingWallet?.deletedAt == nil }, sortBy: userOrder)
+    }
+
+    /// The archived Cards in the user's order, as Account → Cards lists them below the others. Like ``listed``, it
+    /// leaves out the Cards whose paying wallet is in Recently Deleted.
     static var archived: FetchDescriptor<Card> {
-        FetchDescriptor(predicate: #Predicate { $0.isArchived }, sortBy: userOrder)
+        FetchDescriptor(predicate: #Predicate { $0.isArchived && $0.payingWallet?.deletedAt == nil }, sortBy: userOrder)
     }
 
     /// The Cards a transaction in `wallet` can be paid with: the unarchived Cards whose paying wallet it is.
@@ -223,13 +231,20 @@ extension Card {
 
     /// Whether any transaction was paid with this Card, or a Recurring transaction is set to pay with it, so it can
     /// only go away by merging. Transactions in Recently Deleted count too, so they still have their Card when restored.
-    var hasTransactions: Bool {
-        !(transactions ?? []).isEmpty || !(recurringTransactions ?? []).isEmpty
+    /// Counted in the store rather than by loading the Card's transactions, which run into thousands for a main Card.
+    func hasTransactions() throws -> Bool {
+        let context = try storeContext()
+        let id = persistentModelID
+        var paid = FetchDescriptor<Transaction>(predicate: #Predicate { $0.card?.persistentModelID == id })
+        paid.fetchLimit = 1
+        var recurring = FetchDescriptor<RecurringTransaction>(predicate: #Predicate { $0.card?.persistentModelID == id })
+        recurring.fetchLimit = 1
+        return try context.fetchCount(paid) > 0 || context.fetchCount(recurring) > 0
     }
 
     /// Removes a Card that never paid for anything. A Card with transactions must be merged instead. Saves.
     func delete(in context: ModelContext) throws {
-        guard !hasTransactions else { throw CardRuleError.hasTransactions }
+        guard try !hasTransactions() else { throw CardRuleError.hasTransactions }
         context.delete(self)
         try context.save()
     }

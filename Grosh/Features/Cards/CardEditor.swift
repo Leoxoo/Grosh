@@ -16,11 +16,19 @@ struct CardEditor: View {
     @State private var isMerging = false
     @State private var isConfirmingDelete = false
     private var saver = SheetSaver(Strings.Cards.couldntSave)
+    /// Whether the Card being edited paid for anything, counted in the store once when the sheet opens. When the
+    /// store can't be read it counts as having paid, so nothing is offered on a guess.
+    @State private var hasTransactions: Bool
 
     init(mode: EditorMode<Card>) {
         self.mode = mode
         let draft = mode.editing.map { CardDraft($0) } ?? CardDraft.new
         _draft = State(initialValue: draft)
+        _hasTransactions = State(
+            initialValue: mode.editing.map { card in
+                Log.store.attempt("Counting a Card's transactions") { try card.hasTransactions() } ?? true
+            } ?? false
+        )
         _hasStatementDate = State(initialValue: draft.statementDay != nil)
         _statementDay = State(initialValue: draft.statementDay ?? 1)
     }
@@ -32,7 +40,7 @@ struct CardEditor: View {
     }
 
     /// A Card that paid for transactions keeps its paying wallet.
-    private var isPayingWalletFixed: Bool { editedCard?.hasTransactions == true }
+    private var isPayingWalletFixed: Bool { editedCard != nil && hasTransactions }
 
     private var draftToSave: CardDraft { draft.withStatementDay(hasStatementDate ? statementDay : nil) }
 
@@ -165,7 +173,7 @@ struct CardEditor: View {
             Button(Strings.Cards.mergeIntoAnother, systemImage: "arrow.triangle.merge") {
                 isMerging = true
             }
-            if !card.hasTransactions {
+            if !hasTransactions {
                 Button(Strings.Cards.deleteCard, systemImage: "trash", role: .destructive) {
                     isConfirmingDelete = true
                 }
@@ -174,7 +182,7 @@ struct CardEditor: View {
                 }
             }
         } footer: {
-            if card.hasTransactions {
+            if hasTransactions {
                 Text(Strings.Cards.archivedMergeFooter)
             } else {
                 Text(Strings.Cards.archivedFooter)

@@ -306,8 +306,8 @@ struct BalanceAdjustmentTests {
 
         let adjustment = try adjust(to: 80_00)
 
-        #expect(adjustment.balanceChange?.recorded == Money(cents: 95_50))
-        #expect(adjustment.balanceChange?.actual == Money(cents: 80_00))
+        #expect(try balanceChange(of: adjustment)?.recorded == Money(cents: 95_50))
+        #expect(try balanceChange(of: adjustment)?.actual == Money(cents: 80_00))
     }
 
     @Test func whatIsEnteredLaterTheSameDayDoesntChangeRecordedOrActual() throws {
@@ -317,14 +317,28 @@ struct BalanceAdjustmentTests {
         let lunch = try store.record(-12_00, "Restaurants", on: today)
         lunch.createdAt = adjustment.createdAt.addingTimeInterval(60)
 
-        #expect(adjustment.balanceChange?.recorded == Money(cents: 100_00))
-        #expect(adjustment.balanceChange?.actual == Money(cents: 80_00))
+        #expect(try balanceChange(of: adjustment)?.recorded == Money(cents: 100_00))
+        #expect(try balanceChange(of: adjustment)?.actual == Money(cents: 80_00))
+    }
+
+    @Test func theRecordedBalanceCountsOnlyThisWalletUpToTheAdjustment() throws {
+        let fifth = CalendarDay(year: 2026, month: 10, day: 5)
+        let savings = context.addWallet("Savings")
+        try store.record(100_00, "Salary", .income, on: CalendarDay(year: 2026, month: 10, day: 1))
+        try store.record(500_00, "Salary", .income, on: CalendarDay(year: 2026, month: 10, day: 1), in: savings)
+        try store.record(-10_00, "Café", on: fifth).createdAt = .distantPast
+        try store.record(-30_00, "Café", on: CalendarDay(year: 2026, month: 10, day: 8))
+
+        let adjustment = try adjust(to: 50_00, on: fifth)
+
+        #expect(try balanceChange(of: adjustment)?.recorded == Money(cents: 90_00))
+        #expect(try balanceChange(of: adjustment)?.actual == Money(cents: 50_00))
     }
 
     @Test func onlyABalanceAdjustmentHasABalanceChange() throws {
         let coffee = try store.record(-4_50, "Café", on: today)
 
-        #expect(coffee.balanceChange == nil)
+        #expect(try balanceChange(of: coffee) == nil)
     }
 
     // MARK: Nothing to adjust

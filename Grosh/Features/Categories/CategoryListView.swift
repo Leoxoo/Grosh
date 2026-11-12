@@ -14,6 +14,9 @@ struct CategoryListView: View {
     @State private var errorMessage: String?
     /// Whether the list shows the categories for dragging into a new order.
     @State private var isReordering = false
+    /// Which of the type's categories have transactions, so can't be deleted: counted in the store once for the list
+    /// rather than once per row as it draws, and again when the type changes or categories come or go.
+    @State private var usage = Usage()
 
     private var catalog: CategoryCatalog { CategoryCatalog(context: context) }
 
@@ -38,6 +41,10 @@ struct CategoryListView: View {
             } else {
                 categorySections
             }
+        }
+        .task(id: CategoryCatalog.tree(of: type, from: allCategories).map(\.persistentModelID)) {
+            let tree = CategoryCatalog.tree(of: type, from: allCategories)
+            usage = Usage(counted: Set(tree.map(\.persistentModelID)), inUse: catalog.inUse(tree))
         }
         #if os(iOS)
         .environment(\.editMode, .constant(isReordering ? .active : .inactive))
@@ -86,8 +93,7 @@ struct CategoryListView: View {
     private var categorySections: some View {
         Section {
             ForEach(rows) { category in
-                // Counted in the store once per row, for both the swipe actions and the menu.
-                let canDelete = catalog.canDelete(category)
+                let canDelete = usage.canDelete(category)
                 Button {
                     editorMode = .edit(category)
                 } label: {
@@ -192,6 +198,16 @@ struct CategoryListView: View {
                 Log.store.perform("Changing a category", errorMessage: &errorMessage) { try catalog.setHidden(category, !category.isHidden) }
             }
             .tint(.hideAction)
+        }
+    }
+
+    /// The categories counted so far and those of them in use. One not counted yet offers no Delete.
+    private struct Usage {
+        var counted: Set<PersistentIdentifier> = []
+        var inUse: Set<PersistentIdentifier> = []
+
+        func canDelete(_ category: Category) -> Bool {
+            counted.contains(category.persistentModelID) && CategoryCatalog.canDelete(category, inUse: inUse)
         }
     }
 }

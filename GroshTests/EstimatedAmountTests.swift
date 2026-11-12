@@ -127,13 +127,13 @@ struct EstimatedAmountTests {
         let fixed = try RecurringTransaction.create(
             electricity(under: utilities, varies: false), today: today, in: context
         )
-        #expect(varying.startingAmount(among: []).cents == -2_500)
+        #expect(varying.currentStartingAmount().cents == -2_500)
 
         try record(5_000, under: utilities)
-        let history = try context.fetch(FetchDescriptor<Transaction>())
 
-        #expect(varying.startingAmount(among: history).cents == -5_000)
-        #expect(fixed.startingAmount(among: history).cents == -2_500)
+        #expect(varying.currentStartingAmount().cents == -5_000)
+        #expect(fixed.currentStartingAmount().cents == -2_500)
+        #expect(RecurringFigures([varying, fixed]).startingAmount(of: varying).cents == -5_000)
     }
 
     @Test func theReminderComesTheChosenNumberOfDaysAfterTheOccurrence() throws {

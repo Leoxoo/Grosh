@@ -55,6 +55,17 @@ struct TransactionListing {
         )
     }
 
+    /// A picker's list: the `candidates` that pass `filter`, still in list order. Like Search, it looks across the
+    /// candidates' wallets, so the rows show their wallet's icon unless the candidates all come from one wallet or the
+    /// wallet filter keeps them to one.
+    static func picking(_ candidates: PickerCandidates, filter: TransactionFilter) -> TransactionListing {
+        TransactionListing(
+            selection: filter.selection(replacing: .total), selected: [],
+            transactions: candidates.transactions.matching(filter),
+            listed: listed(filter, hidesPaybacks: false), mixesWallets: candidates.spanWallets && filter.wallet == nil
+        )
+    }
+
     private init(
         searching all: [Transaction], filter: TransactionFilter, selection: WalletSelection, selected: [LedgerEntry]
     ) {

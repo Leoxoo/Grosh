@@ -73,6 +73,12 @@ struct TestStore {
         )
     }
 
+    /// The categories of `type` a category picker offers, in its order before the most used lately move up
+    /// (``CategoryCatalog/pickable(of:from:)``).
+    func pickable(_ type: CategoryType) throws -> [Grosh.Category] {
+        CategoryCatalog.pickable(of: type, from: try context.fetch(FetchDescriptor<Grosh.Category>()))
+    }
+
     /// What ``AmountEstimate`` makes of `category`'s history in `currencyCode`, from everything in the store. Saves first.
     func estimate(for category: Grosh.Category, currencyCode: String = "USD") throws -> Int? {
         try context.save()
@@ -222,6 +228,14 @@ extension ModelContext {
 @MainActor
 func walletBalance(_ wallet: Wallet, asOf today: CalendarDay) -> Money {
     WalletBalances(of: [wallet], asOf: today).balance(of: wallet)
+}
+
+/// A balance adjustment's recorded and actual balance, as the transaction detail adds them up from the ledger entries
+/// of every transaction outside Recently Deleted (``Transaction/balanceChange(in:)``).
+@MainActor
+func balanceChange(of transaction: Transaction) throws -> (recorded: Money, actual: Money)? {
+    let context = try transaction.storeContext()
+    return transaction.balanceChange(in: try context.fetch(Transaction.notDeleted).map(LedgerEntry.init))
 }
 
 /// The Total of `wallets` on `today`, per currency, as ``WalletBalances/total(of:)`` adds it up.

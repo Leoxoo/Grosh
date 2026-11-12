@@ -18,7 +18,7 @@ struct CategoryVisibilityTests {
         try catalog.setHidden(cafe, true)
 
         #expect(latte.category?.name == "Café")
-        let picker = try catalog.pickerCategories(of: .expense).map(\.name)
+        let picker = try store.pickable(.expense).map(\.name)
         #expect(!picker.contains("Café"))
         #expect(picker.contains("Restaurants"))
     }
@@ -26,7 +26,7 @@ struct CategoryVisibilityTests {
     @Test func hidingAParentTakesItsSubcategoriesOutOfThePickerToo() throws {
         try catalog.setHidden(try store.category("Food & Beverage"), true)
 
-        let picker = try catalog.pickerCategories(of: .expense).map(\.name)
+        let picker = try store.pickable(.expense).map(\.name)
         #expect(!picker.contains("Food & Beverage"))
         #expect(!picker.contains("Café"))
         #expect(!picker.contains("Restaurants"))
@@ -34,16 +34,16 @@ struct CategoryVisibilityTests {
     }
 
     @Test func thePickerNeverOffersCategoriesOnlyTheAppFilesUnder() throws {
-        let expense = try catalog.pickerCategories(of: .expense).map(\.name)
-        let income = try catalog.pickerCategories(of: .income).map(\.name)
+        let expense = try store.pickable(.expense).map(\.name)
+        let income = try store.pickable(.income).map(\.name)
 
         #expect(!expense.contains("Outgoing transfer"))
         #expect(expense.last == "Other Expense")
         #expect(!income.contains("Incoming transfer"))
         #expect(!income.contains("Reimbursement"))
         #expect(income.last == "Other Income")
-        #expect(try catalog.pickerCategories(of: .debtLoan).map(\.name) == ["Loan", "Debt"])
-        #expect(try catalog.pickerCategories(of: .system).isEmpty)
+        #expect(try store.pickable(.debtLoan).map(\.name) == ["Loan", "Debt"])
+        #expect(try store.pickable(.system).isEmpty)
     }
 
     @Test func hiddenCategoriesShowInTheListOnlyWhenAskedFor() throws {
@@ -64,7 +64,7 @@ struct CategoryVisibilityTests {
 
         try catalog.setHidden(pets, false)
 
-        #expect(try catalog.pickerCategories(of: .expense).map(\.name).contains("Pets"))
+        #expect(try store.pickable(.expense).map(\.name).contains("Pets"))
     }
 
     @Test func lockedCategoriesCantBeHidden() throws {

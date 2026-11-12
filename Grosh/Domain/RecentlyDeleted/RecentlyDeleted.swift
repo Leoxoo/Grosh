@@ -261,12 +261,6 @@ extension RecurringTransaction {
     }
 }
 
-extension Card {
-    /// Whether the Card's paying wallet is in Recently Deleted. The Card waits out of sight with it: it leaves the
-    /// Cards list and pickers, and comes back when the wallet is restored.
-    var isPaidFromDeletedWallet: Bool { payingWallet?.isInRecentlyDeleted == true }
-}
-
 extension Transaction {
     /// Every transaction outside Recently Deleted: what every balance, list, search and report counts.
     static var notDeleted: FetchDescriptor<Transaction> {
