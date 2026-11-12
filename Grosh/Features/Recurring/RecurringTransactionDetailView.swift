@@ -11,7 +11,6 @@ struct RecurringTransactionDetailView: View {
     let recurring: RecurringTransaction
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
     @Environment(\.today) private var today
     @State private var isEditing = false
     @State private var isDuplicating = false

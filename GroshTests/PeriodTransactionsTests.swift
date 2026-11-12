@@ -15,7 +15,7 @@ struct PeriodTransactionsTests {
 
     /// What October's Step lists toward `side`, or toward both for `nil`, in the Total.
     private func listed(_ side: SpentOrIncome?) throws -> ReportTransactions {
-        let history = try CountedHistory(store.transactions(), in: .total, otherIncome: store.otherIncome())
+        let history = try CountedHistory(store.transactions(), in: .total, currencyCode: "USD", otherIncome: store.otherIncome())
         return ReportTransactions(step: side, on: october, in: history)
     }
 

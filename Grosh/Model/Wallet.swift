@@ -27,7 +27,9 @@ final class Wallet {
     @Relationship(deleteRule: .nullify, inverse: \RecurringTransaction.wallet)
     var recurringTransactions: [RecurringTransaction]? = []
 
-    init(name: String, symbolName: String = Wallet.defaultSymbolName, color: PaletteColor = .green, sortOrder: Int = 0) {
+    init(
+        name: String, symbolName: String = Wallet.defaultSymbolName, color: PaletteColor = .green, sortOrder: Int = 0
+    ) {
         self.name = name
         self.symbolName = symbolName
         self.color = color

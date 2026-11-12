@@ -92,10 +92,12 @@ private struct HomeMonthGraphCard: View {
         _transactions = Query(MonthGraphHistory.transactions(for: month))
     }
 
+    @Query(Wallet.unarchived) private var wallets: [Wallet]
+
     var body: some View {
         // What counts is worked out once for both tabs.
         let history = MonthGraphHistory.history(
-            read: transactions, forgiven: forgiven, firstDay: firstDay, otherIncome: otherIncome
+            read: transactions, forgiven: forgiven, firstDay: firstDay, wallets: wallets, otherIncome: otherIncome
         )
         MonthGraphCard(
             spent: graph(for: .spent, in: history),

@@ -27,7 +27,7 @@ extension Transaction {
 
     /// An amount paid back as a row lists it: "+20" or "+3.50". A whole amount drops its cents.
     static func paidBackText(_ cents: Int, locale: Locale = .current) -> String {
-        "+" + Money(cents: cents).plainNumber(locale: locale)
+        "+" + Money.plainNumber(cents: cents, locale: locale)
     }
 
     /// What a paid-back Expense comes to in a list showing `listed`, as its row shows it after the amount: its net, or

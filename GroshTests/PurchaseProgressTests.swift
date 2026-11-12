@@ -35,7 +35,7 @@ struct PurchaseProgressTests {
     @discardableResult
     private func attachPayment(_ cents: Int, dated: CalendarDay, to recurring: RecurringTransaction) throws -> Transaction {
         let payment = Transaction.insert(
-            Money(cents: -cents), on: dated, wallet: store.checking, category: nil, in: context
+            cents: -cents, on: dated, wallet: store.checking, category: nil, in: context
         )
         try recurring.attach(payment)
         return payment

@@ -24,12 +24,12 @@ struct ReimbursementCountingTests {
 
     /// What counts for `selection`, as the Report counts it.
     private func history(_ selection: WalletSelection = .total) throws -> CountedHistory {
-        try CountedHistory(store.transactions(), in: selection, otherIncome: store.otherIncome())
+        try CountedHistory(store.transactions(), in: selection, currencyCode: "USD", otherIncome: store.otherIncome())
     }
 
     /// The totals of `period`, this month unless another is given, for `selection`, as the Report counts them.
     private func totals(_ selection: WalletSelection = .total, of period: Period? = nil) throws -> PeriodTotals {
-        try PeriodTotals(of: history(selection).during(period ?? .month(CalendarMonth(today)), today: today))
+        try PeriodTotals(of: history(selection).during(period ?? .month(CalendarMonth(today)), today: today), currencyCode: "USD")
     }
 
     // MARK: What an Expense counts
@@ -167,8 +167,8 @@ struct ReimbursementCountingTests {
         try payBack(50_00, to: lunch)
 
         let counted = try history().during(.month(CalendarMonth(today)), today: today)
-        let spent = CategoryBreakdown(side: .spent, of: counted)
-        let income = CategoryBreakdown(side: .income, of: counted)
+        let spent = CategoryBreakdown(side: .spent, of: counted, currencyCode: "USD")
+        let income = CategoryBreakdown(side: .income, of: counted, currencyCode: "USD")
 
         #expect(spent.categories.map(\.category.name) == ["Food & Beverage"])
         #expect(spent.total == Money(cents: 40_00))
@@ -182,7 +182,7 @@ struct ReimbursementCountingTests {
         let otherIncome = try context.lockedCategory(.otherIncome)
         let days = DayRange(first: day(2026, 10, 1), last: today)
 
-        let history = CountedHistory(try store.transactions(), in: .total, otherIncome: otherIncome)
+        let history = CountedHistory(try store.transactions(), in: .total, currencyCode: "USD", otherIncome: otherIncome)
         let income = ReportTransactions(category: otherIncome, side: .income, on: days, in: history)
         let spent = ReportTransactions(
             category: try store.category("Food & Beverage"), side: .spent, on: days, in: history

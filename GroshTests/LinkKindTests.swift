@@ -85,7 +85,7 @@ struct LinkKindTests {
         func kind(of roles: LockedRole?...) throws -> LinkKind {
             let members = try roles.map { role in
                 Transaction.insert(
-                    Money(cents: -1_00), on: today, wallet: checking,
+                    cents: -1_00, on: today, wallet: checking,
                     category: try role.map(context.lockedCategory) ?? fixture.store.category("Restaurants"), in: context
                 )
             }

@@ -71,7 +71,7 @@ struct MonthGraphChart: View {
                 AxisGridLine()
                 AxisValueLabel(anchor: .leading) {
                     if let cents = value.as(Double.self) {
-                        Text(Money(cents: Int(cents.rounded())).decimalValue, format: .number.notation(.compactName))
+                        Text(Decimal(Int(cents.rounded())) / 100, format: .number.notation(.compactName))
                     }
                 }
             }

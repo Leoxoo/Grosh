@@ -21,10 +21,12 @@ nonisolated struct TransactionFilter: Equatable {
     var type: CategoryType?
     /// Only transactions dated within these days. Open on both sides by default.
     var dateRange = DayRange()
-    /// Only transactions of at least this amount, as entered (positive, whatever the type).
-    var minimumAmount: Money?
-    /// Only transactions of at most this amount, as entered (positive, whatever the type).
-    var maximumAmount: Money?
+    /// Only transactions of at least this many cents, as entered (positive, whatever the type), in whichever currency
+    /// each transaction's wallet is in.
+    var minimumCents: Int?
+    /// Only transactions of at most this many cents, as entered (positive, whatever the type), in whichever currency
+    /// each transaction's wallet is in.
+    var maximumCents: Int?
     /// Only transactions excluded from report.
     var excludedOnly = false
 
@@ -38,8 +40,8 @@ nonisolated struct TransactionFilter: Equatable {
             && lhs.person === rhs.person
             && lhs.type == rhs.type
             && lhs.dateRange == rhs.dateRange
-            && lhs.minimumAmount == rhs.minimumAmount
-            && lhs.maximumAmount == rhs.maximumAmount
+            && lhs.minimumCents == rhs.minimumCents
+            && lhs.maximumCents == rhs.maximumCents
             && lhs.excludedOnly == rhs.excludedOnly
     }
 
@@ -66,7 +68,7 @@ nonisolated struct TransactionFilter: Equatable {
                     || transaction.note.localizedStandardContains(query)
                     || transaction.withName.localizedStandardContains(query)
                     || transaction.category?.name.localizedStandardContains(query) == true
-                    || amount?.matches(Money(cents: transaction.amountCents)) == true)
+                    || amount?.matches(cents: transaction.amountCents) == true)
         }
     }
 
@@ -75,8 +77,8 @@ nonisolated struct TransactionFilter: Equatable {
         guard dateRange.contains(transaction.day) else { return false }
         if excludedOnly, !transaction.isExcludedFromReport { return false }
         let enteredCents = abs(transaction.amountCents)
-        if let minimumAmount, enteredCents < minimumAmount.cents { return false }
-        if let maximumAmount, enteredCents > maximumAmount.cents { return false }
+        if let minimumCents, enteredCents < minimumCents { return false }
+        if let maximumCents, enteredCents > maximumCents { return false }
         if let wallet, transaction.wallet !== wallet { return false }
         if let category, transaction.category !== category, transaction.category?.parent !== category { return false }
         if let card, transaction.card !== card { return false }

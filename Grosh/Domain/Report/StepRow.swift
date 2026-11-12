@@ -11,13 +11,16 @@ struct StepRow: Identifiable {
     var title: String { step.title() }
 
     /// One row per Step of `days` on a screen showing `timeRange`, oldest first, each with what `counted` adds up to in its
-    /// days. The Steps cover `days` once each, so the rows' totals add up to the period's.
+    /// days, in `currencyCode`. The Steps cover `days` once each, so the rows' totals add up to the period's.
     static func rows(
-        of counted: [CountedAmount], for timeRange: TimeRange, over days: DayRange, today: CalendarDay,
-        firstWeekday: Int = Calendar.current.firstWeekday
+        of counted: [CountedAmount], currencyCode: String, for timeRange: TimeRange, over days: DayRange,
+        today: CalendarDay, firstWeekday: Int = Calendar.current.firstWeekday
     ) -> [StepRow] {
         Step.steps(for: timeRange, over: days, today: today, firstWeekday: firstWeekday).map { step in
-            StepRow(step: step, totals: PeriodTotals(of: counted.filter { step.contains($0.day) }))
+            StepRow(
+                step: step,
+                totals: PeriodTotals(of: counted.filter { step.contains($0.day) }, currencyCode: currencyCode)
+            )
         }
     }
 }

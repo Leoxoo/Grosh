@@ -6,6 +6,8 @@
 /// it reads (``MonthGraphHistory``), with the first day read from the store on its own.
 struct CountedHistory {
     let selection: WalletSelection
+    /// The currency every figure is written in: the selection's (``WalletSelection/currencyCode(among:)``).
+    let currencyCode: String
     /// What counts, one for each of `transactions`, in no particular order.
     let counted: [CountedAmount]
     /// The first day anything counts, on either side, or `nil` when nothing does: where the strip starts, the Average
@@ -14,20 +16,26 @@ struct CountedHistory {
     /// The transaction each of `counted` is from.
     private let transactions: [Transaction]
 
-    /// Everything `transactions` count for `selection`. An Expense paid back beyond its amount counts the extra under
-    /// `otherIncome`.
-    init(_ transactions: [Transaction], in selection: WalletSelection, otherIncome: Category) {
-        self.init(transactions, selection: selection, otherIncome: otherIncome, firstDay: nil)
+    /// Everything `transactions` count for `selection`, in `currencyCode`. An Expense paid back beyond its amount
+    /// counts the extra under `otherIncome`.
+    init(_ transactions: [Transaction], in selection: WalletSelection, currencyCode: String, otherIncome: Category) {
+        self.init(
+            transactions, selection: selection, currencyCode: currencyCode, otherIncome: otherIncome, firstDay: nil
+        )
     }
 
-    /// What `transactions` count in the Total, where `firstDay`, read from the store, is the first day anything counts:
-    /// Home's Month graph, which holds only some months.
-    init(_ transactions: [Transaction], otherIncome: Category, firstDay: CalendarDay?) {
-        self.init(transactions, selection: .total, otherIncome: otherIncome, firstDay: .some(firstDay))
+    /// What `transactions` count in the Total, in `currencyCode`, where `firstDay`, read from the store, is the first
+    /// day anything counts: Home's Month graph, which holds only some months.
+    init(_ transactions: [Transaction], currencyCode: String, otherIncome: Category, firstDay: CalendarDay?) {
+        self.init(
+            transactions, selection: .total, currencyCode: currencyCode, otherIncome: otherIncome,
+            firstDay: .some(firstDay)
+        )
     }
 
     private init(
-        _ transactions: [Transaction], selection: WalletSelection, otherIncome: Category, firstDay: CalendarDay??
+        _ transactions: [Transaction], selection: WalletSelection, currencyCode: String, otherIncome: Category,
+        firstDay: CalendarDay??
     ) {
         var counted: [CountedAmount] = []
         var sources: [Transaction] = []
@@ -37,6 +45,7 @@ struct CountedHistory {
             sources.append(transaction)
         }
         self.selection = selection
+        self.currencyCode = currencyCode
         self.counted = counted
         self.transactions = sources
         self.firstDay = firstDay ?? counted.firstDay
@@ -72,7 +81,7 @@ struct CountedHistory {
             listed.append(transaction)
             amounts.append(amount)
         }
-        return (listed.inListOrder(), PeriodTotals(of: amounts))
+        return (listed.inListOrder(), PeriodTotals(of: amounts, currencyCode: currencyCode))
     }
 
     /// The Month graph tab for `side` showing `period` as it stands on `today`, with what `recurring` still has due,
@@ -84,7 +93,7 @@ struct CountedHistory {
         guard GraphSpan(period) != nil else { return nil }
         return MonthGraph(
             side, of: counted, countingFrom: firstDay, recurring: recurring, in: period, today: today,
-            comparingWith: choice, selection: selection
+            comparingWith: choice, selection: selection, currencyCode: currencyCode
         )
     }
 
@@ -95,7 +104,7 @@ struct CountedHistory {
     ) -> MonthGraph {
         MonthGraph(
             side, of: counted, countingFrom: firstDay, recurring: recurring, in: .month(month), today: today,
-            comparingWith: choice, selection: selection
+            comparingWith: choice, selection: selection, currencyCode: currencyCode
         )
     }
 }

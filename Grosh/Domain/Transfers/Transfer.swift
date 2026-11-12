@@ -20,7 +20,7 @@ extension Transfer {
         func half(_ role: LockedRole, _ cents: Int, in wallet: Wallet?) throws -> Transaction {
             let category = try context.lockedCategory(role)
             return Transaction.insert(
-                Money(cents: cents), on: draft.day, wallet: wallet, category: category, note: note, in: context
+                cents: cents, on: draft.day, wallet: wallet, category: category, note: note, in: context
             )
         }
 

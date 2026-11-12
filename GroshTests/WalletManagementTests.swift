@@ -46,11 +46,10 @@ struct WalletManagementTests {
 
         #expect(travel.currencyCode == "EUR")
         #expect(WalletDraft(travel).currencyCode == "EUR")
-        #expect(WalletDraft().currencyCode == "USD")
     }
 
     @Test func aWalletNeedsAName() throws {
-        var draft = WalletDraft()
+        var draft = WalletDraft(currencyCode: Money.defaultCurrencyCode)
         draft.name = "  "
 
         #expect(throws: WalletRuleError.missingName) {
@@ -106,7 +105,7 @@ struct WalletManagementTests {
 
     @Test func onlyAStartingBalanceTakesAStartingBalanceEdit() throws {
         let checking = try addWallet("Checking")
-        let salary = Transaction.insert(Money(cents: 2_000_00), on: today, wallet: nil, category: nil, in: context)
+        let salary = Transaction.insert(cents: 2_000_00, on: today, wallet: nil, category: nil, in: context)
         salary.wallet = checking
         salary.category = try context.lockedCategory(.otherIncome)
         var edit = StartingBalanceDraft(editing: salary)

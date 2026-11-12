@@ -204,7 +204,7 @@ extension Transaction {
         }
         let created = draft.parts.map { part -> Transaction in
             let transaction = Transaction.insert(
-                Money(cents: 0), on: part.day, wallet: wallet, category: nil, card: card, in: context
+                cents: 0, on: part.day, wallet: wallet, category: nil, card: card, in: context
             )
             part.apply(to: transaction)
             transaction.isExcludedFromReport = isExcludedFromReport

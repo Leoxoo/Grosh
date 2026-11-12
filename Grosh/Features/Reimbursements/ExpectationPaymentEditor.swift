@@ -19,7 +19,6 @@ private struct ExpectationPaymentForm: View {
     let expectation: ExpectedReimbursement
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
 
     @State private var draft: ExpectationPaymentDraft
     @State private var entry: AmountEntry

@@ -9,10 +9,10 @@ nonisolated struct WalletDraft {
     var color = PaletteColor.green
     var includeInTotal = true
     /// The wallet's currency. A new wallet takes the one in Settings → Currency; an existing one keeps its own.
-    var currencyCode = Money.defaultCurrencyCode
+    var currencyCode: String
 
     /// A new wallet in `currencyCode`.
-    init(currencyCode: String = Money.defaultCurrencyCode) {
+    init(currencyCode: String) {
         self.currencyCode = currencyCode
     }
 
@@ -74,7 +74,9 @@ extension Wallet {
         let category = try context.lockedCategory(.startingBalance)
         let wallet = try insertWithoutStartingBalance(draft, in: context)
 
-        let starting = Transaction.insert(startingBalance, on: day, wallet: wallet, category: category, in: context)
+        let starting = Transaction.insert(
+            cents: startingBalance.cents, on: day, wallet: wallet, category: category, in: context
+        )
         starting.isExcludedFromReport = true
         starting.createdAt = enteredAt
         return wallet

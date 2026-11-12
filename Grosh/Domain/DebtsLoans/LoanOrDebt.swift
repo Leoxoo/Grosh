@@ -80,7 +80,7 @@ struct LoanOrDebt {
         isExcludedFromReport: Bool, in context: ModelContext
     ) throws -> Transaction {
         let transaction = Transaction.insert(
-            Money(cents: cents), on: day, wallet: original.wallet, category: category,
+            cents: cents, on: day, wallet: original.wallet, category: category,
             note: note.trimmingCharacters(in: .whitespacesAndNewlines), in: context
         )
         transaction.setPeople(original.orderedPeople)

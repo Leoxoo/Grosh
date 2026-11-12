@@ -36,6 +36,8 @@ struct MonthGraph {
 
     let side: SpentOrIncome
     let period: Period
+    /// The currency every total is in.
+    let currencyCode: String
     /// The days the period covers, which the line runs across.
     let span: GraphSpan
     /// The legend's name for the line, as the strip above the card names the period: "This month", "Last month",
@@ -58,17 +60,21 @@ struct MonthGraph {
     /// `choice`, as the "vs last year" switch is set, for the transactions of `selection`. `counted` holds at least what
     /// counts for `selection` in the periods the tab sums (a ``CountedHistory``'s, worked out once for both tabs; Home
     /// reads only those of the months ``MonthGraphHistory`` names), and `firstDay`
-    /// is the first day anything counts, on either tab, or `nil` when nothing does.
+    /// is the first day anything counts, on either tab, or `nil` when nothing does. Every total is in `currencyCode`, the
+    /// selection's (``WalletSelection/currencyCode(among:)``).
     init(
         _ side: SpentOrIncome, of counted: [CountedAmount], countingFrom firstDay: CalendarDay?,
         recurring: [RecurringTransaction] = [], in period: Period, today: CalendarDay,
-        comparingWith choice: MonthGraphComparison = .average, selection: WalletSelection = .total
+        comparingWith choice: MonthGraphComparison = .average, selection: WalletSelection = .total,
+        currencyCode: String
     ) {
         guard let span = GraphSpan(period) else {
             preconditionFailure("A Month graph shows a week, month, quarter or year")
         }
-        let dailyTotals = counted.dailyTotals(side, in: span, through: today)
-        let lastYear = MonthGraphComparison.lastYear.dailyTotals(side, of: counted, countingFrom: firstDay, for: period)
+        let dailyTotals = counted.dailyTotals(side, in: span, through: today, currencyCode: currencyCode)
+        let lastYear = MonthGraphComparison.lastYear.dailyTotals(
+            side, of: counted, countingFrom: firstDay, for: period, currencyCode: currencyCode
+        )
         self.isLastYearAvailable = lastYear != nil
         if choice == .lastYear, let lastYear {
             self.comparison = .lastYear
@@ -77,13 +83,14 @@ struct MonthGraph {
             // A switch left on shows the Average while Last year isn't available, and Last year again once it is.
             self.comparison = .average
             self.dailyComparisons = MonthGraphComparison.average.dailyTotals(
-                side, of: counted, countingFrom: firstDay, for: period
+                side, of: counted, countingFrom: firstDay, for: period, currencyCode: currencyCode
             )
         }
         self.projection = MonthGraphProjection(
             side, of: recurring, in: span, selection: selection, today: today,
-            todaysTotal: dailyTotals.last?.total ?? Money(cents: 0)
+            todaysTotal: dailyTotals.last?.total ?? Money(cents: 0, currencyCode: currencyCode)
         )
+        self.currencyCode = currencyCode
         self.side = side
         self.period = period
         self.span = span
@@ -108,7 +115,7 @@ struct MonthGraph {
     var expectedByPeriodEnd: Money? { projection?.dailyTotals.last?.total }
 
     /// The period's total so far, the tab's headline: where the line ends.
-    var headline: Money { dailyTotals.last?.total ?? Money(cents: 0) }
+    var headline: Money { dailyTotals.last?.total ?? Money(cents: 0, currencyCode: currencyCode) }
 
     /// The day the marker and popup are on until the user picks another: the last day the line reaches, which in the
     /// current period is today.
@@ -157,7 +164,7 @@ struct MonthGraph {
 
     /// Zero at the start of the first day, then each of `daily`'s totals at the end of its day.
     private func points(_ daily: [DailyTotal]) -> [Point] {
-        [Point(position: 0, total: Money(cents: 0))]
+        [Point(position: 0, total: Money(cents: 0, currencyCode: currencyCode))]
             + daily.map { Point(position: position(of: $0.day), total: $0.total) }
     }
 }
@@ -183,8 +190,10 @@ extension Sequence where Element == CountedAmount {
     }
 
     /// The running total of what counts toward `side` in `span`, through the end of each of its days up to `lastDay`, the
-    /// first day first.
-    func dailyTotals(_ side: SpentOrIncome, in span: GraphSpan, through lastDay: CalendarDay) -> [DailyTotal] {
+    /// first day first, in `currencyCode`.
+    func dailyTotals(
+        _ side: SpentOrIncome, in span: GraphSpan, through lastDay: CalendarDay, currencyCode: String
+    ) -> [DailyTotal] {
         var centsByDay: [CalendarDay: Int] = [:]
         for counted in self where counted.side == side && span.contains(counted.day) {
             centsByDay[counted.day, default: 0] += counted.amount.cents
@@ -195,7 +204,7 @@ extension Sequence where Element == CountedAmount {
             let day = span.day(number)
             guard day <= lastDay else { break }
             running += centsByDay[day, default: 0]
-            dailyTotals.append(DailyTotal(day: day, total: Money(cents: running)))
+            dailyTotals.append(DailyTotal(day: day, total: Money(cents: running, currencyCode: currencyCode)))
         }
         return dailyTotals
     }

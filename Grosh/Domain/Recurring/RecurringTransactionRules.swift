@@ -51,7 +51,7 @@ extension AddTransactionNowError: LocalizedError {
 nonisolated struct RecurringDraft {
     var name = ""
     /// Entered positive; the category sets the sign.
-    var amount = Money(cents: 0)
+    var amount = Money.nothingTyped
     /// A Purchase's total price, or `nil` for none. A Kind change keeps it, as it keeps the icon.
     var total: Money?
     /// Expense or Income. Switching it drops a category of the other type.
@@ -326,8 +326,8 @@ extension RecurringTransaction {
     func makeTransaction(on day: CalendarDay, history: [Transaction], in context: ModelContext) -> Transaction? {
         guard let wallet = self.wallet, let category = self.category else { return nil }
         let transaction = Transaction.insert(
-            startingAmount(among: history), on: day, wallet: wallet, category: category, card: card, note: note,
-            in: context
+            cents: startingAmount(among: history).cents, on: day, wallet: wallet, category: category, card: card,
+            note: note, in: context
         )
         transaction.recurring = self
         if estimatesAmount {

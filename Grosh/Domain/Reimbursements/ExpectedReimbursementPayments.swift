@@ -101,7 +101,7 @@ extension Transaction {
         let category = try context.lockedCategory(.reimbursement)
         hasPaybacksElsewhere = true
         let payback = Transaction.insert(
-            draft.amount, on: draft.day, wallet: wallet, category: category,
+            cents: draft.amount.cents, on: draft.day, wallet: wallet, category: category,
             note: draft.note.trimmingCharacters(in: .whitespacesAndNewlines), in: context
         )
         payback.setPeople(person.map { [$0] } ?? [])

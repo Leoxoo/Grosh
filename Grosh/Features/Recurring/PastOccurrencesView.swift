@@ -10,7 +10,6 @@ struct PastOccurrencesView: View {
     let days: [CalendarDay]
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
     @State private var selected: Set<CalendarDay> = []
     @State private var errorMessage: String?
 

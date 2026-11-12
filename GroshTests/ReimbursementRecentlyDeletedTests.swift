@@ -51,8 +51,8 @@ struct ReimbursementRecentlyDeletedTests {
         #expect(walletBalance(checking, asOf: today) == Money(cents: 0))
         #expect(dinner.countedAmount(otherIncome: try store.otherIncome()) == nil)
         #expect(try PeriodTotals(
-            of: CountedHistory(store.transactions(), in: .total, otherIncome: store.otherIncome())
-                .during(.month(CalendarMonth(today)), today: today)
+            of: CountedHistory(store.transactions(), in: .total, currencyCode: "USD", otherIncome: store.otherIncome())
+                .during(.month(CalendarMonth(today)), today: today), currencyCode: "USD"
         ) == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
         #expect(try store.graph(.spent).headline == Money(cents: 0))
     }

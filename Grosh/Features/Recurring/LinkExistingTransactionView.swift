@@ -7,7 +7,6 @@ import SwiftUI
 struct LinkExistingTransactionView: View {
     let recurring: RecurringTransaction
 
-    @Environment(\.modelContext) private var context
     @NotDeletedTransactions private var transactions: [Transaction]
 
     var body: some View {

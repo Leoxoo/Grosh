@@ -3,7 +3,7 @@ import SwiftData
 
 /// What a Reimbursement sheet holds: an amount, the day it was paid back and an optional note.
 nonisolated struct ReimbursementDraft {
-    var amount = Money(cents: 0)
+    var amount = Money.nothingTyped
     var day: CalendarDay
     var note = ""
 
@@ -13,7 +13,7 @@ nonisolated struct ReimbursementDraft {
         note = reimbursement.note
     }
 
-    init(amount: Money = Money(cents: 0), day: CalendarDay, note: String = "") {
+    init(amount: Money = .nothingTyped, day: CalendarDay, note: String = "") {
         self.amount = amount
         self.day = day
         self.note = note
@@ -95,7 +95,7 @@ extension Reimbursement {
     ) throws -> Reimbursement {
         try draft.validate()
         guard expense.canBeReimbursed else { throw ReimbursementRuleError.notAnExpense }
-        let reimbursement = Reimbursement(amount: Money(cents: 0), day: draft.day)
+        let reimbursement = Reimbursement(amountCents: 0, day: draft.day)
         context.insert(reimbursement)
         reimbursement.expense = expense
         reimbursement.expectation = expectation

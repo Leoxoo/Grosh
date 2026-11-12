@@ -63,8 +63,8 @@ struct ExpectationFixture {
     /// What the Report counts for `selection` in October.
     func totals(in selection: WalletSelection = .total) throws -> PeriodTotals {
         try PeriodTotals(
-            of: CountedHistory(store.transactions(), in: selection, otherIncome: store.otherIncome())
-                .during(.month(CalendarMonth(today)), today: today)
+            of: CountedHistory(store.transactions(), in: selection, currencyCode: "USD", otherIncome: store.otherIncome())
+                .during(.month(CalendarMonth(today)), today: today), currencyCode: "USD"
         )
     }
 

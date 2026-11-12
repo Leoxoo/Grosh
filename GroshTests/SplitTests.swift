@@ -256,8 +256,8 @@ struct SplitTests {
         let coffee = try record(25_00)
         func spent() throws -> Money {
             try PeriodTotals(
-                of: CountedHistory(allTransactions(), in: .total, otherIncome: context.otherCategory(.income))
-                    .during(.month(CalendarMonth(today)), today: today)
+                of: CountedHistory(allTransactions(), in: .total, currencyCode: "USD", otherIncome: context.otherCategory(.income))
+                    .during(.month(CalendarMonth(today)), today: today), currencyCode: "USD"
             ).spent
         }
         let balanceBefore = balance()

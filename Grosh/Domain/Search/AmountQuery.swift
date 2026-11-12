@@ -36,10 +36,10 @@ nonisolated struct AmountQuery: Equatable {
         cents = whole * 100 + (Int(centText) ?? 0) * (centDigits == 1 ? 10 : 1)
     }
 
-    /// Whether `amount` begins with the typed digits.
-    func matches(_ amount: Money) -> Bool {
+    /// Whether an amount of `amountCents`, in any currency, begins with the typed digits.
+    func matches(cents amountCents: Int) -> Bool {
         let unit = [100, 10, 1][centDigits]
-        return abs(amount.cents) / unit == cents / unit
+        return abs(amountCents) / unit == cents / unit
     }
 }
 

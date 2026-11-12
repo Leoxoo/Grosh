@@ -72,7 +72,7 @@ struct GroshCSVExportTests {
             "4,10/05/2026,Loan,-50,USD,Cash,,Sam,,,"
         ))
 
-        let links = try MoneyLoverCSV.read(exported()).rows.map(\.link)
+        let links = try MoneyLoverCSV.read(exported(), currencyCode: "USD").rows.map(\.link)
         // Debt Collection, the transfer's halves, two Starting balances, the Loan, and Cash's Starting balance.
         #expect(links == ["1", "2", "2", "", "", "1", ""])
     }
@@ -201,6 +201,37 @@ struct GroshCSVExportTests {
         #expect(forgiveness.category?.type == .expense)
         #expect(forgiveness.note == "Birthday, late")
         #expect(try #require(try LoanOrDebt(loan, in: context)).isSettled)
+    }
+
+    /// Each wallet is restored in the currency its rows name, so a store with a euro wallet round-trips.
+    @Test func aWalletKeepsItsCurrencyThroughExportAndRestore() throws {
+        let export = groshExport(
+            "1,10/05/2026,Café,-3.50,EUR,Paris,,,,,,,,,,,,,",
+            "2,10/05/2026,Starting balance,100.00,EUR,Paris,,,,1,,,,,,,,,",
+            "3,10/05/2026,Café,-2.00,USD,Checking,,,,,,,,,,,,,",
+            "4,10/05/2026,Starting balance,50.00,USD,Checking,,,,1,,,,,,,,,"
+        )
+
+        try context.importMoneyLover(export)
+
+        #expect(try context.wallet(named: "Paris").currencyCode == "EUR")
+        #expect(try context.wallet(named: "Checking").currencyCode == "USD")
+        #expect(walletBalance(try context.wallet(named: "Paris"), asOf: today) == Money(cents: 96_50, currencyCode: "EUR"))
+        #expect(try exported() == export)
+    }
+
+    /// A MoneyLover file whose Currency column is empty, or missing, puts its wallets in the currency Settings →
+    /// Currency names.
+    @Test func aWalletWhoseRowsNameNoCurrencyTakesTheCurrencySetting() throws {
+        try context.importMoneyLover(
+            "Date,Category,Amount,Wallet\r\n10/05/2026,Café,-3.00,Cash\r\n", currencyCode: "GBP"
+        )
+        #expect(try context.wallet(named: "Cash").currencyCode == "GBP")
+
+        try context.importMoneyLover(moneyLoverExport("1,10/05/2026,Café,-3.00,,Wallet,,,,,"), currencyCode: "JPY")
+
+        #expect(try context.wallet(named: "Wallet").currencyCode == "JPY")
+        #expect(try exportedRows().map { $0["Currency"] } == ["JPY", "JPY"])
     }
 
     @Test func aWalletsStartingBalanceIsTheFilesOwnRow() throws {

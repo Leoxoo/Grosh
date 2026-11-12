@@ -175,7 +175,7 @@ extension Transaction {
         guard category.type == type else { throw BalanceAdjustmentRuleError.reasonDoesNotMatchDifference }
 
         let adjustment = Transaction.insert(
-            difference, on: day, wallet: wallet, category: category,
+            cents: difference.cents, on: day, wallet: wallet, category: category,
             note: note.trimmingCharacters(in: .whitespacesAndNewlines), in: context
         )
         adjustment.isExcludedFromReport = isExcludedFromReport

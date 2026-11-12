@@ -22,7 +22,6 @@ private struct ReimbursementForm: View {
     let editing: Reimbursement?
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
 
     @State private var draft: ReimbursementDraft
     @State private var entry: AmountEntry

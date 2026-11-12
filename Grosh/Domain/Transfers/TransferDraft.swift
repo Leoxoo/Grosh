@@ -7,7 +7,7 @@ nonisolated struct TransferDraft {
     /// The wallet the money goes to: it gets the Incoming transfer.
     var to: Wallet?
     /// Entered positive.
-    var amount = Money(cents: 0)
+    var amount = Money.nothingTyped
     var day: CalendarDay
     var note = ""
 

@@ -21,7 +21,7 @@ struct WithMigrationTests {
     @discardableResult
     private func legacy(_ name: String, minutesAgo: Double = 0) throws -> Transaction {
         let transaction = Transaction.insert(
-            Money(cents: -30_00), on: day, wallet: store.checking, category: nil, in: context
+            cents: -30_00, on: day, wallet: store.checking, category: nil, in: context
         )
         transaction.createdAt = Date.now.addingTimeInterval(-minutesAgo * 60)
         transaction.withName = name

@@ -32,7 +32,7 @@ nonisolated struct TransactionDraft {
         }
     }
     /// Entered positive; the category decides whether it adds to or takes from the wallet.
-    var amount = Money(cents: 0)
+    var amount = Money.nothingTyped
     /// Changing it to a Loan or a Debt keeps only the first of the people in With, since those are with one Person.
     var category: Category? {
         didSet {

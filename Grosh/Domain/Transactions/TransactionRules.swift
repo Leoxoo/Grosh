@@ -6,7 +6,7 @@ extension Transaction {
     @discardableResult
     static func create(_ draft: TransactionDraft, in context: ModelContext) throws -> Transaction {
         try draft.validate()
-        let transaction = Transaction.insert(Money(cents: 0), on: draft.day, wallet: nil, category: nil, in: context)
+        let transaction = Transaction.insert(cents: 0, on: draft.day, wallet: nil, category: nil, in: context)
         try transaction.apply(draft)
         try context.save()
         return transaction

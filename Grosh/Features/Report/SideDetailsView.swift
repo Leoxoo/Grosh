@@ -36,7 +36,7 @@ struct SideDetailsView: View {
     private func content(_ history: CountedHistory) -> some View {
         let days = history.days(of: period, today: today)
         let counted = history.during(period, today: today)
-        let total = PeriodTotals(of: counted).total(of: side)
+        let total = PeriodTotals(of: counted, currencyCode: history.currencyCode).total(of: side)
         List {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
@@ -77,9 +77,9 @@ struct SideDetailsView: View {
 
             switch shows {
             case .breakdown:
-                breakdown(counted: counted, days: days)
+                breakdown(counted: counted, currencyCode: history.currencyCode, days: days)
             case .trend:
-                trend(counted: counted, days: days, today: today)
+                trend(counted: counted, currencyCode: history.currencyCode, days: days, today: today)
             }
         }
         .roundedSectionsListStyle()
@@ -94,8 +94,8 @@ struct SideDetailsView: View {
     }
 
     @ViewBuilder
-    private func breakdown(counted: [CountedAmount], days: DayRange) -> some View {
-        let breakdown = CategoryBreakdown(side: side, of: counted)
+    private func breakdown(counted: [CountedAmount], currencyCode: String, days: DayRange) -> some View {
+        let breakdown = CategoryBreakdown(side: side, of: counted, currencyCode: currencyCode)
         Section {
             CategoryDonut(breakdown: breakdown, donut: .details)
                 .frame(maxWidth: 300)
@@ -117,10 +117,12 @@ struct SideDetailsView: View {
     }
 
     @ViewBuilder
-    private func trend(counted: [CountedAmount], days: DayRange, today: CalendarDay) -> some View {
-        let rows = StepRow.rows(of: counted, for: timeRange, over: days, today: today)
+    private func trend(
+        counted: [CountedAmount], currencyCode: String, days: DayRange, today: CalendarDay
+    ) -> some View {
+        let rows = StepRow.rows(of: counted, currencyCode: currencyCode, for: timeRange, over: days, today: today)
         Section {
-            SideTrendChart(side: side, rows: rows)
+            SideTrendChart(side: side, rows: rows, currencyCode: currencyCode)
                 .padding(.vertical, 8)
         }
 
@@ -169,6 +171,7 @@ private struct CategoryBreakdownRow: View {
 private struct SideTrendChart: View {
     let side: SpentOrIncome
     let rows: [StepRow]
+    let currencyCode: String
 
     var body: some View {
         Chart {
@@ -181,6 +184,6 @@ private struct SideTrendChart: View {
             RuleMark(y: .value(Strings.Common.zero, 0))
                 .foregroundStyle(.secondary.opacity(0.4))
         }
-        .stepBarAxes()
+        .stepBarAxes(currencyCode: currencyCode)
     }
 }

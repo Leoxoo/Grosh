@@ -37,7 +37,7 @@ struct TestStore {
         in wallet: Wallet? = nil
     ) throws -> Transaction {
         Transaction.insert(
-            Money(cents: cents), on: day, wallet: wallet ?? checking, category: try category(categoryName, type),
+            cents: cents, on: day, wallet: wallet ?? checking, category: try category(categoryName, type),
             in: context
         )
     }
@@ -45,7 +45,7 @@ struct TestStore {
     /// Records an expense of `cents` under `category` on the 1st of October, in Checking.
     @discardableResult
     func spend(_ cents: Int, on category: Grosh.Category) -> Transaction {
-        Transaction.insert(Money(cents: -cents), on: day(2026, 10, 1), wallet: checking, category: category, in: context)
+        Transaction.insert(cents: -cents, on: day(2026, 10, 1), wallet: checking, category: category, in: context)
     }
 
     /// A monthly Netflix schedule of $15.99 under a new Subscriptions category, in Checking unless another wallet is
@@ -138,7 +138,7 @@ extension ModelContext {
         card: Card? = nil, note: String = "", enteredAt seconds: Double? = nil
     ) -> Transaction {
         let transaction = Transaction.insert(
-            Money(cents: cents), on: day, wallet: wallet, category: category, card: card, note: note, in: self
+            cents: cents, on: day, wallet: wallet, category: category, card: card, note: note, in: self
         )
         if let seconds { transaction.createdAt = Date(timeIntervalSinceReferenceDate: 800_000_000 + seconds) }
         return transaction
@@ -208,10 +208,13 @@ extension ModelContext {
         try Reimbursement.add(ReimbursementDraft(amount: Money(cents: cents), day: day, note: note), to: expense, in: self)
     }
 
-    /// Replaces everything in the store with what `csv`, a Money Lover export, holds, the owner's cards included.
+    /// Replaces everything in the store with what `csv`, a Money Lover export, holds, the owner's cards included. A row
+    /// that names no currency is in `currencyCode`, as Settings → Currency would have it.
     @discardableResult
-    func importMoneyLover(_ csv: String) throws -> MoneyLoverImportSummary {
-        try MoneyLoverImport.replaceAllData(with: MoneyLoverCSV.read(csv), cards: .ownersCards, in: self)
+    func importMoneyLover(_ csv: String, currencyCode: String = "USD") throws -> MoneyLoverImportSummary {
+        try MoneyLoverImport.replaceAllData(
+            with: MoneyLoverCSV.read(csv, currencyCode: currencyCode), cards: .ownersCards, in: self
+        )
     }
 }
 
@@ -268,14 +271,14 @@ extension Wallet {
     @discardableResult
     static func create(
         name: String,
-        symbolName: String = WalletDraft().symbolName,
-        color: PaletteColor = WalletDraft().color,
+        symbolName: String = WalletDraft(currencyCode: Money.defaultCurrencyCode).symbolName,
+        color: PaletteColor = WalletDraft(currencyCode: Money.defaultCurrencyCode).color,
         includeInTotal: Bool = true,
         startingBalance: Money,
         on day: CalendarDay,
         in context: ModelContext
     ) throws -> Wallet {
-        var draft = WalletDraft()
+        var draft = WalletDraft(currencyCode: startingBalance.currencyCode)
         draft.name = name
         draft.symbolName = symbolName
         draft.color = color
@@ -307,5 +310,19 @@ extension BalanceAdjustmentDraft {
     /// Reads the recorded balance again after the wallet or the day changed, as the sheet does.
     mutating func readRecordedBalance() {
         readRecordedBalance(from: (wallet?.transactions ?? []).notDeleted)
+    }
+}
+
+// MARK: - The test store's currency
+
+/// The test store's wallets are in the default currency, US dollars, unless a test says otherwise, so an amount a test
+/// writes is in it too. The app itself always says which currency an amount is in.
+extension Money {
+    init(cents: Int) {
+        self.init(cents: cents, currencyCode: Money.defaultCurrencyCode)
+    }
+
+    init?(decimalString text: String) {
+        self.init(decimalString: text, currencyCode: Money.defaultCurrencyCode)
     }
 }

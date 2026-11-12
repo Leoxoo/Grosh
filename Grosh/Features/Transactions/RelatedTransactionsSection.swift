@@ -8,7 +8,6 @@ struct RelatedTransactionsSection: View {
     let transaction: Transaction
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
     @State private var isConfirmingUndoSplit = false
     @State private var errorMessage: String?
 

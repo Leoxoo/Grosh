@@ -8,7 +8,6 @@ struct CardMergeView: View {
     /// Called after the merge, once `source` no longer exists.
     var onMerged: () -> Void = {}
 
-    @Environment(\.modelContext) private var context
 
     var body: some View {
         let transactionCount = (source.transactions ?? []).notDeleted.count
