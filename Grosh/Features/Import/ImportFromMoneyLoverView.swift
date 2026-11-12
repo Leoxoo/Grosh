@@ -7,7 +7,7 @@ import UniformTypeIdentifiers
 struct ImportFromMoneyLoverView: View {
     @Environment(\.modelContext) private var context
     /// The currency of a row that names none, and so of its wallet.
-    @AppStorage(AppSettings.currencyCodeKey) private var currencyCode = AppSettings.currencyCodeDefault
+    @AppStorage(AppSettings.currencyCode) private var currencyCode
     @State private var isPickingFile = false
     /// The export read from the picked file, waiting for the user to confirm.
     @State private var picked: PickedExport?

@@ -24,7 +24,7 @@ struct Keypad: View {
     /// The top row is shorter than the digit rows, by this much.
     private static let topRowScale: CGFloat = 0.72
 
-    @AppStorage(AppSettings.hapticsKey) private var hapticsOn = AppSettings.hapticsDefault
+    @AppStorage(AppSettings.haptics) private var hapticsOn
 
     var body: some View {
         GeometryReader { geometry in

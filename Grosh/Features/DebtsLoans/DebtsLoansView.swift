@@ -11,7 +11,7 @@ import SwiftUI
 struct DebtsLoansView: View {
     @Query(DebtsAndLoans.records) private var transactions: [Transaction]
     @Query(ExpectedReimbursements.records) private var expectations: [ExpectedReimbursement]
-    @AppStorage(AppSettings.debtsLoansGroupingKey) private var grouping = AppSettings.debtsLoansGroupingDefault
+    @AppStorage(AppSettings.debtsLoansGrouping) private var grouping
     /// The message being texted, while Text them is open.
     @State private var texting: TextReminder?
 

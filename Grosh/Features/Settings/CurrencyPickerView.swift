@@ -4,7 +4,7 @@ import SwiftUI
 struct CurrencyPickerView: View {
     static let offeredCurrencyCodes = [Money.defaultCurrencyCode]
 
-    @AppStorage(AppSettings.currencyCodeKey) private var currencyCode = AppSettings.currencyCodeDefault
+    @AppStorage(AppSettings.currencyCode) private var currencyCode
 
     var body: some View {
         Form {

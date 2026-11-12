@@ -15,7 +15,7 @@ struct WalletEditor: View {
     let mode: EditorMode<Wallet>
 
     @Environment(\.today) private var today
-    @AppStorage(AppSettings.currencyCodeKey) private var currencyCode = AppSettings.currencyCodeDefault
+    @AppStorage(AppSettings.currencyCode) private var currencyCode
 
     var body: some View {
         MadeOnce {

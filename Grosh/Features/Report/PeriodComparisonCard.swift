@@ -10,7 +10,7 @@ struct PeriodComparisonCard: View {
     /// Whether the "vs last year" switch, which Home's Month graph shares, is on.
     @Binding var comparesWithLastYear: Bool
 
-    @AppStorage(AppSettings.isComparisonCardShownKey) private var isShown = AppSettings.isComparisonCardShownDefault
+    @AppStorage(AppSettings.isComparisonCardShown) private var isShown
     /// The day the user last moved the marker to, or `nil` until they move it.
     @State private var scrubbedDay: CalendarDay?
 

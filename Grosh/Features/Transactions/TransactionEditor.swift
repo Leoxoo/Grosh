@@ -60,9 +60,9 @@ private struct TransactionForm: View {
 
     @Environment(\.modelContext) private var context
 
-    @AppStorage(AppSettings.soundsKey) private var soundsOn = AppSettings.soundsDefault
-    @AppStorage(AppSettings.hapticsKey) private var hapticsOn = AppSettings.hapticsDefault
-    @AppStorage(AppSettings.chimeKey) private var chime = AppSettings.chimeDefault
+    @AppStorage(AppSettings.sounds) private var soundsOn
+    @AppStorage(AppSettings.haptics) private var hapticsOn
+    @AppStorage(AppSettings.chime) private var chime
 
     @State private var draft: TransactionDraft
     @State private var isShowingDetails: Bool

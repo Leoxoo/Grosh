@@ -17,7 +17,7 @@ private struct HomeContent: View {
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     /// What the Total and the wallets' balances add up.
     @NotDeletedTransactions private var transactions: [Transaction]
-    @AppStorage(AppSettings.isTotalHiddenKey) private var isTotalHidden = AppSettings.isTotalHiddenDefault
+    @AppStorage(AppSettings.isTotalHidden) private var isTotalHidden
     @Environment(\.today) private var today
     /// The month Home's Month graph shows, which the Report opens on.
     @State private var monthPeriod: Period
