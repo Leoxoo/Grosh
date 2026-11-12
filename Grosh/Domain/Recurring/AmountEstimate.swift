@@ -8,41 +8,44 @@ nonisolated enum AmountEstimate {
     static let sampleSize = 12
 
     /// The average size in cents of the last ``sampleSize`` usable transactions filed under `category` or its
-    /// subcategories, across every wallet in `currencyCode`, or `nil` when there are none. A transaction is usable when
-    /// it isn't Estimated, isn't excluded from report and isn't in Recently Deleted. Nothing is converted.
-    static func cents(among transactions: [Transaction], for category: Category, currencyCode: String) -> Int? {
-        let filed = Set(([category] + (category.children ?? [])).map(\.persistentModelID))
-        let usable = transactions.filter { transaction in
-            guard let id = transaction.category?.persistentModelID, filed.contains(id) else { return false }
-            return transaction.deletedAt == nil && !transaction.isEstimated && !transaction.isExcludedFromReport
-                && transaction.wallet?.currencyCode == currencyCode
-        }
-        let recent = usable.inListOrder().prefix(sampleSize)
-        guard !recent.isEmpty else { return nil }
-        let total = recent.reduce(0) { $0 + abs($1.amountCents) }
-        return Int((Double(total) / Double(recent.count)).rounded())
-    }
-
-    /// ``cents(among:for:currencyCode:)`` over what the store holds for `category`, read through its context: only
-    /// the newest of its usable transactions, which the store finds and sorts, rather than every transaction filed
-    /// under it. `nil` too when the store can't be read, which is logged.
+    /// subcategories, across every wallet in `currencyCode`, or `nil` when there are none or the store can't be read,
+    /// which is logged. A transaction is usable when it isn't Estimated, isn't excluded from report and isn't in
+    /// Recently Deleted. Nothing is converted. Only the newest usable transactions are read, which the store finds and
+    /// sorts, rather than every transaction filed under the category.
     static func cents(for category: Category, currencyCode: String) -> Int? {
         guard let context = category.modelContext else { return nil }
         return Log.store.attempt("Reading a varying Bill's estimate") {
-            let newest = try newestUsable(for: category, currencyCode: currencyCode, in: context)
-            return cents(among: newest, for: category, currencyCode: currencyCode)
+            let recent = try newestUsable(for: category, currencyCode: currencyCode, in: context)
+                .inListOrder().prefix(sampleSize)
+            guard !recent.isEmpty else { return nil }
+            let total = recent.reduce(0) { $0 + abs($1.amountCents) }
+            return Int((Double(total) / Double(recent.count)).rounded())
         } ?? nil
     }
 
-    /// The ``sampleSize`` newest usable transactions filed under `category` or its subcategories in `currencyCode`, by
-    /// day and by when they were entered, plus any entered at the very moment of the last of them: list order breaks
-    /// that tie by identity, which the store can't sort by, so ``cents(among:for:currencyCode:)`` picks among them.
+    /// The estimate `request` asks for: what a Recurring transaction's draft needs (``RecurringDraft/neededEstimate``).
+    static func cents(for request: RecurringDraft.EstimateRequest) -> Int? {
+        cents(for: request.category, currencyCode: request.currencyCode)
+    }
+
+    /// The ``sampleSize`` newest usable transactions filed under `category` and under each of its subcategories in
+    /// `currencyCode`, by day and by when they were entered, plus any usable ones entered at the very moment of the last
+    /// of them: list order breaks that tie by identity, which the store can't sort by, so ``cents(for:currencyCode:)``
+    /// picks among them. Each category is read on its own: a predicate reaching through `category?.parent` leaves out
+    /// the transactions of a category that has no parent.
     private static func newestUsable(
         for category: Category, currencyCode: String, in context: ModelContext
     ) throws -> [Transaction] {
-        let id = category.persistentModelID
+        try ([category] + (category.children ?? [])).flatMap { filed in
+            try newestUsable(filedUnder: filed.persistentModelID, currencyCode: currencyCode, in: context)
+        }
+    }
+
+    private static func newestUsable(
+        filedUnder id: PersistentIdentifier, currencyCode: String, in context: ModelContext
+    ) throws -> [Transaction] {
         let usable = #Predicate<Transaction> { transaction in
-            (transaction.category?.persistentModelID == id || transaction.category?.parent?.persistentModelID == id)
+            transaction.category?.persistentModelID == id
                 && transaction.deletedAt == nil && !transaction.isEstimated && !transaction.isExcludedFromReport
                 && transaction.wallet?.currencyCode == currencyCode
         }
@@ -55,9 +58,9 @@ nonisolated enum AmountEstimate {
         guard found.count == sampleSize, let last = found.last else { return found }
         let dayRaw = last.dayRaw
         let createdAt = last.createdAt
-        let tied = try context.fetch(
-            FetchDescriptor<Transaction>(predicate: #Predicate { $0.dayRaw == dayRaw && $0.createdAt == createdAt })
-        )
+        let tied = try context.fetch(FetchDescriptor<Transaction>(predicate: #Predicate { transaction in
+            transaction.dayRaw == dayRaw && transaction.createdAt == createdAt && usable.evaluate(transaction)
+        }))
         return found + tied.filter { !found.contains($0) }
     }
 }

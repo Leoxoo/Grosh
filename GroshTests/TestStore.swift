@@ -79,12 +79,10 @@ struct TestStore {
         CategoryCatalog.pickable(of: type, from: try context.fetch(FetchDescriptor<Grosh.Category>()))
     }
 
-    /// What ``AmountEstimate`` makes of `category`'s history in `currencyCode`, from everything in the store. Saves first.
+    /// What ``AmountEstimate`` makes of `category`'s history in `currencyCode`, read from the store. Saves first.
     func estimate(for category: Grosh.Category, currencyCode: String = "USD") throws -> Int? {
         try context.save()
-        return AmountEstimate.cents(
-            among: try context.fetch(FetchDescriptor<Transaction>()), for: category, currencyCode: currencyCode
-        )
+        return AmountEstimate.cents(for: category, currencyCode: currencyCode)
     }
 
     /// An Expense of $30 under Restaurants in Checking on ``today`` with `people`, saved as the Add sheet saves it.

@@ -31,15 +31,26 @@ struct RecurringTransactionEditor: View {
     }
 
     private func makeStartingDraft() -> RecurringDraft {
+        var draft: RecurringDraft
         switch mode {
         case .add:
-            var draft = RecurringDraft(startDay: today)
+            draft = RecurringDraft(startDay: today)
             draft.wallet = TransactionDefaults.suggest(on: today, in: context).wallet
-            return draft
         case .duplicate(let recurring):
-            return RecurringDraft(duplicating: recurring, on: today)
+            draft = RecurringDraft(duplicating: recurring, on: today)
         case .edit(let recurring):
-            return RecurringDraft(editing: recurring)
+            draft = RecurringDraft(editing: recurring)
+        }
+        draft.readNeededEstimate()
+        return draft
+    }
+}
+
+extension RecurringDraft {
+    /// Reads the estimate the draft needs now from the store, if it needs one, and gives it to the draft.
+    fileprivate mutating func readNeededEstimate() {
+        if let request = neededEstimate {
+            setEstimate(AmountEstimate.cents(for: request), for: request)
         }
     }
 }
@@ -94,6 +105,10 @@ private struct RecurringForm: View {
         }
         .sheet(item: $pastPrompt, onDismiss: { dismiss() }) { prompt in
             PastOccurrencesView(recurring: prompt.recurring, days: prompt.days)
+        }
+        // Read once per change of category, wallet, Kind or "amount varies", rather than each time the draft is checked.
+        .onChange(of: draft.neededEstimate) {
+            draft.readNeededEstimate()
         }
     }
 

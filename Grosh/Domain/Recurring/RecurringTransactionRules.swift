@@ -71,17 +71,10 @@ nonisolated struct RecurringDraft {
         didSet {
             if wallet !== oldValue {
                 card = nil
-                readEstimate()
             }
         }
     }
-    var category: Category? {
-        didSet {
-            if category !== oldValue {
-                readEstimate()
-            }
-        }
-    }
+    var category: Category?
     /// The category as the form picks it. A Recurring transaction is named after its category until the user types a
     /// name of their own, and a new one (Add or Duplicate) takes the category's default Kind, which the user can change.
     var pickedCategory: Category? {
@@ -106,27 +99,15 @@ nonisolated struct RecurringDraft {
             if kind == .purchase, oldValue != .purchase {
                 endKind = .afterCount
             }
-            if kind != oldValue {
-                readEstimate()
-            }
         }
     }
     /// Only a Bill's amount can vary: each transaction it makes then starts as an estimate, until the real amount is
     /// entered.
-    var amountVaries = false {
-        didSet {
-            if amountVaries != oldValue {
-                readEstimate()
-            }
-        }
-    }
+    var amountVaries = false
     /// For a varying Bill, how many days after an occurrence the user is reminded to enter its real amount.
     var remindAfterDays = 2
-    /// The average a varying Bill's transactions would start at, from its category's history in its wallet's currency
-    /// (``AmountEstimate``), or `nil` when there is none or the amount doesn't vary. It stands in for an amount left
-    /// empty, and is never saved. It is read again whenever the category, wallet, Kind or "amount varies" changes, so
-    /// the category's history is walked once per change rather than each time the draft is checked.
-    private(set) var estimateCents: Int?
+    /// The estimate last given with ``setEstimate(_:for:)``, and what it was read for.
+    private var estimate: (request: EstimateRequest, cents: Int?)?
     /// Whether each transaction it makes would start Estimated: a Bill whose amount varies, as on the model.
     var estimatesAmount: Bool { kind.estimates(amountVaries: amountVaries) }
     var note = ""
@@ -185,15 +166,33 @@ nonisolated struct RecurringDraft {
         monthlyDay = schedule.monthlyDay
         end = schedule.end
         savedStart = schedule.start
-        readEstimate()
     }
 
-    private mutating func readEstimate() {
-        guard estimatesAmount, let category else {
-            estimateCents = nil
-            return
-        }
-        estimateCents = AmountEstimate.cents(for: category, currencyCode: wallet.currencyCodeOrDefault)
+    /// What a varying Bill's estimate is read for: its category's history in its wallet's currency (``AmountEstimate``).
+    struct EstimateRequest: Equatable {
+        let category: Category
+        let currencyCode: String
+    }
+
+    /// The estimate the draft needs now, or `nil` when its amount doesn't vary or it has no category yet. The draft
+    /// reads nothing from the store: whoever holds it reads the estimate from ``AmountEstimate`` and gives it with
+    /// ``setEstimate(_:for:)`` whenever this changes.
+    var neededEstimate: EstimateRequest? {
+        guard estimatesAmount, let category else { return nil }
+        return EstimateRequest(category: category, currencyCode: currencyCode)
+    }
+
+    /// Gives the draft the estimate read for `request`: `cents`, or `nil` when the category has no history to average.
+    mutating func setEstimate(_ cents: Int?, for request: EstimateRequest) {
+        estimate = (request, cents)
+    }
+
+    /// The average a varying Bill's transactions would start at, or `nil` when there is none or the amount doesn't
+    /// vary. It stands in for an amount left empty, and is never saved. An estimate given for another category,
+    /// currency or Kind than the draft now has counts as none.
+    var estimateCents: Int? {
+        guard let request = neededEstimate, let estimate, estimate.request == request else { return nil }
+        return estimate.cents
     }
 
     /// A new Recurring transaction like `recurring`, starting `today` ("Duplicate"). It copies every field and the Kind's
@@ -431,6 +430,12 @@ extension RecurringTransaction {
         (transactions ?? [])
             .filter { $0.deletedAt == nil }
             .inListOrder()
+    }
+
+    /// Every Recurring transaction outside Recently Deleted, in the order they were added: what Account → Recurring
+    /// transactions lists.
+    static var notDeleted: FetchDescriptor<RecurringTransaction> {
+        FetchDescriptor(predicate: #Predicate { $0.deletedAt == nil }, sortBy: [SortDescriptor(\.createdAt)])
     }
 
     /// Makes the transactions that have come due by `today`, for every Recurring transaction, and saves. The app runs

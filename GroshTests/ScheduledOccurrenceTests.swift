@@ -140,6 +140,9 @@ struct ScheduledOccurrenceTests {
         draft.category = water
         draft.kind = .bill
         draft.amountVaries = true
+        // As the Recurring editor does, the estimate the draft needs is read from the store and given to it.
+        let request = try #require(draft.neededEstimate)
+        draft.setEstimate(AmountEstimate.cents(for: request), for: request)
         let bill = try RecurringTransaction.create(draft, today: today, in: context)
 
         let rows = [bill].scheduledOccurrences(selection: .total, today: today)
