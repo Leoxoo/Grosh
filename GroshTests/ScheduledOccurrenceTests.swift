@@ -104,25 +104,18 @@ struct ScheduledOccurrenceTests {
     }
 
     @Test func aBillWhoseAmountVariesHasEstimatedScheduledRowsAndOtherKindsDoNot() throws {
-        let utilities = context.addCategory("Utilities")
-        var draft = RecurringDraft(startDay: day(2026, 10, 12))
-        draft.name = "Electricity"
-        draft.entry = AmountEntry(cents: 2_500)
-        draft.wallet = store.checking
-        draft.category = utilities
+        var draft = store.recurringDraft(
+            "Electricity", 25_00, under: context.addCategory("Utilities"), starting: day(2026, 10, 12)
+        )
         draft.kind = .bill
         draft.amountVaries = true
         let electricity = try RecurringTransaction.create(draft, today: today, in: context)
         let netflix = try makeSchedule(starting: day(2026, 10, 12))
 
-        let electricityRow = ScheduledOccurrence(
-            recurring: electricity, day: day(2026, 10, 12), amount: electricity.startingAmount(estimateCents: nil)
-        )
-        let netflixRow = ScheduledOccurrence(
-            recurring: netflix, day: day(2026, 10, 12), amount: netflix.startingAmount(estimateCents: nil)
-        )
-        #expect(electricityRow.isEstimated)
-        #expect(!netflixRow.isEstimated)
+        let rows = [electricity, netflix].scheduledOccurrences(selection: .total, today: today)
+
+        #expect(rows.filter { $0.recurring === electricity }.map(\.isEstimated) == [true])
+        #expect(rows.filter { $0.recurring === netflix }.map(\.isEstimated) == [false])
     }
 
     @Test func aVaryingBillsScheduledRowsShowItsEstimateInPlaceOfItsAmount() throws {
@@ -133,16 +126,10 @@ struct ScheduledOccurrenceTests {
             )
         }
         try context.save()
-        var draft = RecurringDraft(startDay: day(2026, 10, 12))
-        draft.name = "Water"
-        draft.entry = AmountEntry(cents: 0)
-        draft.wallet = store.checking
-        draft.category = water
+        var draft = store.recurringDraft("Water", 0, under: water, starting: day(2026, 10, 12))
         draft.kind = .bill
         draft.amountVaries = true
-        // As the Recurring editor does, the estimate the draft needs is read from the store and given to it.
-        let request = try #require(draft.neededEstimate)
-        draft.setEstimate(AmountEstimate.cents(for: request), for: request)
+        draft = store.estimated(draft)
         let bill = try RecurringTransaction.create(draft, today: today, in: context)
 
         let rows = [bill].scheduledOccurrences(selection: .total, today: today)

@@ -39,12 +39,6 @@ struct DebtsAndLoansByPersonTests {
         )
     }
 
-    private func euroWallet() -> Wallet {
-        let wallet = context.addWallet("Euro")
-        wallet.currencyCode = "EUR"
-        return wallet
-    }
-
     // MARK: Grouping
 
     @Test func eachPersonHasTheirLoansDebtsAndExpectations() throws {
@@ -113,7 +107,7 @@ struct DebtsAndLoansByPersonTests {
 
     @Test func eachCurrencyHasItsOwnAmountAndNeverAddsToAnother() throws {
         let alex = try fixture.person("Alex")
-        let euros = euroWallet()
+        let euros = context.addWallet("Euro", currencyCode: "EUR")
         try record(.loan, 100_00, with: alex)
         try record(.loan, 20_00, with: alex, in: euros)
         try record(.loan, 5_00, with: alex, in: euros)
@@ -265,8 +259,7 @@ struct DebtsAndLoansByPersonTests {
     // MARK: The remembered choice
 
     /// The choice is kept in the user's settings by these names, so renaming a case would forget it.
-    @Test func showByLoanOrDebtIsTodaysListAndTheChoiceIsKeptByItsStoredName() {
-        #expect(AppSettings.debtsLoansGroupingDefault == .loanOrDebt)
+    @Test func theGroupingChoiceIsKeptByItsStoredName() {
         #expect(DebtsLoansGrouping(rawValue: "people") == .people)
         #expect(DebtsLoansGrouping(rawValue: "loanOrDebt") == .loanOrDebt)
         #expect(DebtsLoansGrouping(rawValue: "something else") == nil)

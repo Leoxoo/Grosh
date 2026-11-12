@@ -132,7 +132,9 @@ enum MonthGraphHistory {
         )
     }
 
-    /// The history of `month`, read from `context` as Home's queries read it.
+    /// The history of `month`, read from `context` in one call as Home reads it through its queries: the same
+    /// ``firstDay(earliest:forgiven:otherIncome:)`` and ``history(read:forgiven:firstDay:wallets:otherIncome:)`` over
+    /// the same descriptors. Home itself never calls it; the tests and benchmarks read Home's history with it.
     static func read(_ month: CalendarMonth, in context: ModelContext, otherIncome: Category) throws -> CountedHistory {
         let forgiven = try context.fetch(Self.forgiven)
         let firstDay = firstDay(earliest: try context.fetch(earliestCounted), forgiven: forgiven, otherIncome: otherIncome)

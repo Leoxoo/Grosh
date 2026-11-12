@@ -48,16 +48,30 @@ struct TestStore {
         Transaction.insert(cents: -cents, on: day(2026, 10, 1), wallet: checking, category: category, in: context)
     }
 
+    /// A new monthly Recurring transaction named `name` of `cents` (entered positive) under `category`, in Checking
+    /// unless another wallet is given, starting on `start`, as the Recurring editor fills it: picking the category
+    /// sets its type and its default Kind.
+    func recurringDraft(
+        _ name: String, _ cents: Int, under category: Grosh.Category, starting start: CalendarDay,
+        wallet: Wallet? = nil
+    ) -> RecurringDraft {
+        var draft = RecurringDraft(startDay: start)
+        draft.type = category.type
+        draft.wallet = wallet ?? checking
+        draft.pickedCategory = category
+        draft.name = name
+        draft.entry = AmountEntry(cents: cents)
+        return draft
+    }
+
     /// A monthly Netflix schedule of $15.99 under a new Subscriptions category, in Checking unless another wallet is
     /// given, starting on `start`, as the Recurring editor fills it.
     func netflixDraft(
         starting start: CalendarDay, preset: RepeatPreset = .monthly, wallet: Wallet? = nil, end: RepeatEnd = .forever
     ) -> RecurringDraft {
-        var draft = RecurringDraft(startDay: start)
-        draft.name = "Netflix"
-        draft.entry = AmountEntry(cents: 15_99)
-        draft.wallet = wallet ?? checking
-        draft.category = context.addCategory("Subscriptions")
+        var draft = recurringDraft(
+            "Netflix", 15_99, under: context.addCategory("Subscriptions"), starting: start, wallet: wallet
+        )
         draft.preset = preset
         draft.end = end
         return draft
@@ -73,6 +87,22 @@ struct TestStore {
         )
     }
 
+    /// What the Report counts for `selection`, from every transaction in the store, those in Recently Deleted included,
+    /// in US dollars.
+    func history(_ selection: WalletSelection = .total) throws -> CountedHistory {
+        try CountedHistory(
+            context.fetch(FetchDescriptor<Transaction>()), in: selection, currencyCode: "USD",
+            otherIncome: context.otherCategory(.income)
+        )
+    }
+
+    /// The Report's totals of `period` for `selection`, as of `today`.
+    func totals(
+        _ selection: WalletSelection = .total, of period: Period, today: CalendarDay = TestStore.today
+    ) throws -> PeriodTotals {
+        try PeriodTotals(of: history(selection).during(period, today: today), currencyCode: "USD")
+    }
+
     /// The categories of `type` a category picker offers, in its order before the most used lately move up
     /// (``CategoryCatalog/pickable(of:from:)``).
     func pickable(_ type: CategoryType) throws -> [Grosh.Category] {
@@ -83,6 +113,15 @@ struct TestStore {
     func estimate(for category: Grosh.Category, currencyCode: String = "USD") throws -> Int? {
         try context.save()
         return AmountEstimate.cents(for: category, currencyCode: currencyCode)
+    }
+
+    /// `draft` with the estimate it needs now, read from the store and given to it as the Recurring editor gives it.
+    func estimated(_ draft: RecurringDraft) -> RecurringDraft {
+        var draft = draft
+        if let request = draft.neededEstimate {
+            draft.setEstimate(AmountEstimate.cents(for: request), for: request)
+        }
+        return draft
     }
 
     /// An Expense of $30 under Restaurants in Checking on ``today`` with `people`, saved as the Add sheet saves it.
@@ -102,10 +141,13 @@ struct TestStore {
 /// What the suites make in a store, the way the app makes it. Each works in any in-memory container, seeded or not.
 @MainActor
 extension ModelContext {
-    /// Adds a wallet named `name`, with no transactions.
+    /// Adds a wallet named `name` in `currencyCode`, the default currency unless another is given, with no transactions.
     @discardableResult
-    func addWallet(_ name: String, includeInTotal: Bool = true) -> Wallet {
+    func addWallet(
+        _ name: String, currencyCode: String = Money.defaultCurrencyCode, includeInTotal: Bool = true
+    ) -> Wallet {
         let wallet = Wallet(name: name)
+        wallet.currencyCode = currencyCode
         wallet.includeInTotal = includeInTotal
         insert(wallet)
         return wallet
@@ -212,6 +254,18 @@ extension ModelContext {
         try Reimbursement.add(ReimbursementDraft(amount: Money(cents: cents), day: day, note: note), to: expense, in: self)
     }
 
+    /// `cents` paid back on `expense` on `day` into `wallet`, as the Reimbursement editor records it
+    /// (``Transaction/recordPayback(_:into:from:for:)``): into another wallet than the Expense's own, the transaction
+    /// it makes there.
+    @discardableResult
+    func payBack(
+        _ cents: Int, on day: CalendarDay, note: String = "", to expense: Transaction, into wallet: Wallet
+    ) throws -> Transaction {
+        let earlier = Set(expense.paybacksElsewhere.map(\.persistentModelID))
+        try expense.recordPayback(ReimbursementDraft(amount: Money(cents: cents), day: day, note: note), into: wallet)
+        return try #require(expense.paybacksElsewhere.first { !earlier.contains($0.persistentModelID) })
+    }
+
     /// Replaces everything in the store with what `csv`, a Money Lover export, holds, the owner's cards included. A row
     /// that names no currency is in `currencyCode`, as Settings → Currency would have it.
     @discardableResult
@@ -246,10 +300,11 @@ func walletTotal(_ wallets: [Wallet], asOf today: CalendarDay) -> [Money] {
 }
 
 extension WalletBalances {
-    /// The balances of `wallets` on `today`, from their own transactions outside Recently Deleted.
+    /// The balances of `wallets` on `today`, from the ledger entries of their own transactions outside Recently
+    /// Deleted, as the screens read them (``NotDeletedTransactions``).
     @MainActor
     init(of wallets: [Wallet], asOf today: CalendarDay) {
-        self.init(wallets.flatMap { ($0.transactions ?? []).notDeleted }, asOf: today)
+        self.init(wallets.flatMap { ($0.transactions ?? []).notDeleted }.map(LedgerEntry.init), asOf: today)
     }
 }
 

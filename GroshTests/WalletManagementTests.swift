@@ -56,7 +56,7 @@ struct WalletManagementTests {
             try Wallet.create(draft, startingBalance: Money(cents: 100_00), on: today, in: context)
         }
         #expect(try context.fetchCount(FetchDescriptor<Wallet>()) == 0)
-        #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 0)
+        #expect(try context.transactionCount() == 0)
     }
 
     @Test func editingAWalletSavesItsFieldsAndKeepsItsTransactions() throws {
@@ -86,7 +86,7 @@ struct WalletManagementTests {
         var edit = StartingBalanceDraft(editing: starting)
         #expect(edit.amount == Money(cents: -250_00))
 
-        edit.entry = AmountEntry(cents: -300_00)
+        edit.entry = AmountEntry(cents: -300_00, kind: .balance)
         edit.day = CalendarDay(year: 2026, month: 9, day: 1)
         edit.note = " Balance on the September statement "
         try starting.update(with: edit)
@@ -105,11 +105,9 @@ struct WalletManagementTests {
 
     @Test func onlyAStartingBalanceTakesAStartingBalanceEdit() throws {
         let checking = try addWallet("Checking")
-        let salary = Transaction.insert(cents: 2_000_00, on: today, wallet: nil, category: nil, in: context)
-        salary.wallet = checking
-        salary.category = try context.lockedCategory(.otherIncome)
+        let salary = context.record(2_000_00, on: today, in: checking, under: try context.lockedCategory(.otherIncome))
         var edit = StartingBalanceDraft(editing: salary)
-        edit.entry = AmountEntry(cents: -5_00)
+        edit.entry = AmountEntry(cents: -5_00, kind: .balance)
 
         #expect(throws: TransactionRuleError.notAStartingBalance) { try salary.update(with: edit) }
         #expect(salary.amount == Money(cents: 2_000_00))

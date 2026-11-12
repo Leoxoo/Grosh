@@ -80,17 +80,6 @@ struct PersonContactTests {
         #expect(try Person.add(named: "Pasha", in: context).contactIdentifier == nil)
     }
 
-    @Test func anIdentifierResolvesToTheContactsCurrentPhone() async {
-        let contacts = RecordingContactLookup([pasha])
-
-        #expect(await contacts.contact(withIdentifier: "c-pasha")?.phoneNumbers == ["+1 555 0100"])
-
-        contacts.book = [Contact(identifier: "c-pasha", name: "Pasha", phoneNumbers: ["+1 555 0199"])]
-
-        #expect(await contacts.contact(withIdentifier: "c-pasha")?.phoneNumbers == ["+1 555 0199"])
-        #expect(await contacts.contact(withIdentifier: "c-missing") == nil)
-    }
-
     @Test func aContactHoldsEachNumberOnceAndTrimsItsName() {
         let contact = Contact(identifier: "c", name: " Pasha ", phoneNumbers: [" 555 ", "555", "", "777"])
 

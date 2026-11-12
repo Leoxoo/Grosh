@@ -58,7 +58,7 @@ struct ExpectedReimbursementForgiveTests {
         let balance = walletBalance(fixture.checking, asOf: today)
         let totals = try fixture.totals()
         let graph = try fixture.store.graph(.spent).headline
-        let transactionCount = try context.fetchCount(FetchDescriptor<Transaction>())
+        let before = try context.transactionCount()
 
         try fixture.expectation(of: alex, on: dinner).forgive(on: today, note: "Gift")
 
@@ -68,7 +68,7 @@ struct ExpectedReimbursementForgiveTests {
         #expect(dinner.netCents == -60_00)
         #expect(dinner.reimbursedCents == 0)
         #expect(dinner.orderedReimbursements.isEmpty)
-        #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == transactionCount)
+        #expect(try context.transactionCount() == before)
     }
 
     @Test func forgivingTheRestAfterAPartialPaymentSettlesIt() throws {

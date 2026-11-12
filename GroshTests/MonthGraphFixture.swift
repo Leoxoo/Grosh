@@ -31,8 +31,18 @@ struct MonthGraphFixture {
         try store.record(cents, categoryName, type, on: day, in: wallet)
     }
 
-    /// A $60 dinner under Restaurants in Checking on the 3rd of October.
-    func dinner() throws -> Transaction {
+    /// ``TestStore/recurringDraft(_:_:under:starting:wallet:)``.
+    func recurringDraft(
+        _ name: String, _ cents: Int, under category: Grosh.Category, starting start: CalendarDay,
+        wallet: Wallet? = nil
+    ) -> RecurringDraft {
+        store.recurringDraft(name, cents, under: category, starting: start, wallet: wallet)
+    }
+
+    /// Records a $60 dinner under Restaurants in Checking on the 3rd of October, inserted directly. For one saved as the
+    /// Add sheet saves it, with + Owes me, see ``ExpectationFixture/dinner(_:on:owing:)``.
+    @discardableResult
+    func recordDinner() throws -> Transaction {
         try record(-60_00, "Restaurants", on: day(2026, 10, 3))
     }
 
@@ -51,6 +61,16 @@ struct MonthGraphFixture {
     /// Every transaction in the store, those in Recently Deleted included.
     func transactions() throws -> [Transaction] {
         try context.fetch(FetchDescriptor<Transaction>())
+    }
+
+    /// What the Report counts for `selection` (``TestStore/history(_:)``).
+    func history(_ selection: WalletSelection = .total) throws -> CountedHistory {
+        try store.history(selection)
+    }
+
+    /// The Report's totals of `period`, this month unless another is given, for `selection`, as of ``today``.
+    func totals(_ selection: WalletSelection = .total, of period: Period? = nil) throws -> PeriodTotals {
+        try store.totals(selection, of: period ?? .month(CalendarMonth(today)), today: today)
     }
 
     /// The card for `side` showing `month`, this month unless another is given, compared with `choice`, as Home makes

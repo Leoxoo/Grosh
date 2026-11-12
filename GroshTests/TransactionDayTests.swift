@@ -90,15 +90,11 @@ struct TransactionOrderAcrossLaunchesTests {
             let container = try openStore()
             let wallet = Wallet(name: "Checking")
             container.mainContext.insert(wallet)
-            let sameMoment = Date(timeIntervalSinceReferenceDate: 800_000_000)
             for (index, note) in ["a", "b", "c", "d", "e", "f"].enumerated() {
-                let transaction = Transaction.insert(
-                    cents: -100, on: CalendarDay(year: 2026, month: 10, day: 3), wallet: nil, category: nil,
-                    note: note, in: container.mainContext
-                )
-                transaction.wallet = wallet
                 // Two entered one after the other, four at the same moment (as an import does).
-                transaction.createdAt = index < 2 ? sameMoment.addingTimeInterval(Double(index + 1)) : sameMoment
+                container.mainContext.record(
+                    -1_00, on: day(2026, 10, 3), in: wallet, note: note, enteredAt: index < 2 ? Double(index + 1) : 0
+                )
             }
             try container.mainContext.save()
             firstLaunch = try listedNotes(in: container)

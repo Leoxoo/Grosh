@@ -20,11 +20,8 @@ struct TransactionFilterTests {
         Period.month(CalendarMonth(year: 2026, month: month)).days(today: today)
     }
 
-    private func card(_ name: String) -> Card {
-        let card = Card(name: name, kind: .credit, payingWallet: nil)
-        context.insert(card)
-        card.payingWallet = checking
-        return card
+    private func card(_ name: String) throws -> Card {
+        try context.addCard(name, paidFrom: checking)
     }
 
     private static let firstOfOctober = day(2026, 10, 1)
@@ -51,9 +48,9 @@ struct TransactionFilterTests {
         Set(TransactionListing(all, showing: .total, on: days, filter: filter).transactions.map(\.note))
     }
 
-    @Test func aCardFilterListsThatCardsTransactionsInTheSelectedPeriodAndTheirTotal() {
-        let amex = card("Amex")
-        let chase = card("Chase")
+    @Test func aCardFilterListsThatCardsTransactionsInTheSelectedPeriodAndTheirTotal() throws {
+        let amex = try card("Amex")
+        let chase = try card("Chase")
         let all = [
             record(-40_00, "groceries", on: day(2026, 9, 3), card: amex),
             record(-12_50, "lunch", on: day(2026, 9, 20), card: amex),
@@ -181,7 +178,7 @@ struct TransactionFilterTests {
     }
 
     @Test func filtersCombineWithEachOtherWithTheSelectedWalletAndWithTheSelectedPeriod() throws {
-        let amex = card("Amex")
+        let amex = try card("Amex")
         let cash = context.addWallet("Cash")
         let restaurants = try fixture.category("Restaurants")
         let all = [
@@ -199,8 +196,8 @@ struct TransactionFilterTests {
         #expect(listed.map(\.note) == ["dinner"])
     }
 
-    @Test func searchCombinesWithTheFilters() {
-        let amex = card("Amex")
+    @Test func searchCombinesWithTheFilters() throws {
+        let amex = try card("Amex")
         let all = [
             record(-4_50, "coffee", card: amex),
             record(-4_50, "coffee beans"),
@@ -210,19 +207,19 @@ struct TransactionFilterTests {
         #expect(notes(TransactionFilter(searchText: "coffee", card: amex), in: all) == ["coffee"])
     }
 
-    @Test func clearingTheFiltersKeepsTheSearchText() {
-        var filter = TransactionFilter(searchText: "coffee", card: card("Amex"), type: .expense, excludedOnly: true)
+    @Test func clearingTheFiltersKeepsTheSearchText() throws {
+        var filter = TransactionFilter(searchText: "coffee", card: try card("Amex"), type: .expense, excludedOnly: true)
 
         filter.clearFilters()
 
         #expect(filter == TransactionFilter(searchText: "coffee"))
     }
 
-    @Test func aFilterIsOnWhenItHasSearchTextOrAnyFilterSet() {
+    @Test func aFilterIsOnWhenItHasSearchTextOrAnyFilterSet() throws {
         #expect(!TransactionFilter().isOn)
         #expect(!TransactionFilter(searchText: "  ").isOn)
         #expect(TransactionFilter(searchText: "973").isOn)
-        #expect(TransactionFilter(card: card("Amex")).isOn)
+        #expect(TransactionFilter(card: try card("Amex")).isOn)
         #expect(TransactionFilter(dateRange: DayRange(first: day(2026, 9, 1))).isOn)
         #expect(TransactionFilter(minimumCents: 0).isOn)
         #expect(TransactionFilter(excludedOnly: true).isOn)

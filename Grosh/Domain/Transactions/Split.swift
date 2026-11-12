@@ -121,22 +121,27 @@ nonisolated struct SplitDraft {
         return part
     }
 
+    /// Adds `cents` to what is left on the original, as its Keypad then shows it.
+    private mutating func giveOriginal(_ cents: Int) {
+        original.entry = AmountEntry(cents: original.amount.cents + cents, kind: original.entry.kind)
+    }
+
     /// Adds `part`, taking its amount off the original.
     mutating func addPart(_ part: SplitPart) {
         parts.append(part)
-        original.amount.cents -= part.amount.cents
+        giveOriginal(-part.amount.cents)
     }
 
     /// Replaces the part at `index` with `part`; the original makes up the difference in amount.
     mutating func replacePart(at index: Int, with part: SplitPart) {
-        original.amount.cents += parts[index].amount.cents - part.amount.cents
+        giveOriginal(parts[index].amount.cents - part.amount.cents)
         parts[index] = part
     }
 
     /// Removes the part at `index`, giving its amount back to the original. Its Reimbursements become unassigned, so the
     /// user chooses again.
     mutating func removePart(at index: Int) {
-        original.amount.cents += parts.remove(at: index).amount.cents
+        giveOriginal(parts.remove(at: index).amount.cents)
         for position in reimbursements.indices {
             guard case .part(let assigned)? = reimbursements[position].part, assigned >= index else { continue }
             reimbursements[position].part = assigned == index ? nil : SplitPartRef.part(assigned - 1)

@@ -76,8 +76,7 @@ struct AmountEstimateTests {
 
     @Test func transactionsInAnotherCurrencyDoNotCount() throws {
         let utilities = context.addCategory("Utilities")
-        let euro = context.addWallet("Euro")
-        euro.currencyCode = "EUR"
+        let euro = context.addWallet("Euro", currencyCode: "EUR")
         record(1_000, under: utilities, on: day(2026, 9, 1))
         record(90_000, under: utilities, on: day(2026, 9, 2), from: euro)
 

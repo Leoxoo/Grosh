@@ -13,6 +13,7 @@ struct MultiDeleteTests {
     private let today = TestStore.today
     private let checking: Wallet
     private let savings: Wallet
+    private let links = TestLinks()
 
     init() throws {
         container = try GroshStore.makeContainer(inMemory: true)
@@ -23,7 +24,7 @@ struct MultiDeleteTests {
     @discardableResult
     private func record(_ note: String, _ cents: Int, in wallet: Wallet, link: UUID? = nil) -> Transaction {
         let transaction = context.record(cents, on: today, in: wallet, note: note)
-        transaction.joinTestLink(link, as: .transfer)
+        links.put(transaction, on: link, as: .transfer)
         return transaction
     }
 

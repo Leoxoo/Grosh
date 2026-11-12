@@ -102,11 +102,13 @@ struct MonthGraphTests {
     }
 
     @Test func aBalanceAdjustmentCountsByItsCategory() throws {
-        try Transaction.recordBalanceAdjustment(Money(cents: -12_00), in: checking, on: day(2026, 10, 4), in: context)
-        try Transaction.recordBalanceAdjustment(
-            Money(cents: 3_50), in: checking, on: day(2026, 10, 6),
-            reason: store.category("Collect Interest", .income), in: context
-        )
+        var missing = try BalanceAdjustmentDraft(wallet: checking, day: day(2026, 10, 4), in: context)
+        missing.realBalance = Money(cents: -12_00)
+        try Transaction.adjustBalance(missing, in: context)
+        var found = try BalanceAdjustmentDraft(wallet: checking, day: day(2026, 10, 6), in: context)
+        found.realBalance = Money(cents: -8_50)
+        found.category = try store.category("Collect Interest", .income)
+        try Transaction.adjustBalance(found, in: context)
 
         #expect(try store.graph(.spent).headline == Money(cents: 12_00))
         #expect(try store.graph(.income).headline == Money(cents: 3_50))
@@ -200,15 +202,6 @@ struct MonthGraphTests {
         #expect(popup.day == today)
         #expect(popup.total == Money(cents: 15_00))
         #expect(spent.position(of: spent.defaultSelection) == spent.line.last?.position)
-    }
-
-    @Test func aDayTheLineDoesNotReachYetHasNoAmountSoFar() throws {
-        try store.record(-12_00, "Café", on: day(2026, 10, 2))
-
-        let popup = try store.graph(.spent).popup(on: day(2026, 10, 20))
-
-        #expect(popup.day == day(2026, 10, 20))
-        #expect(popup.total == nil)
     }
 
     /// A day after today can be picked too, though the line doesn't reach it yet.

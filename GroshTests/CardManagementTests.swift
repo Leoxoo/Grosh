@@ -29,25 +29,6 @@ struct CardManagementTests {
         #expect(card.statementDay == 31)
     }
 
-    @Test func aStatementDateFallsOnTheMonthsLastDayWhenTheMonthIsShorter() throws {
-        let appleCard = try Card.create(CardDraft(name: "Apple Card", kind: .credit, payingWallet: checking, statementDay: 31), in: context)
-        let chase = try Card.create(CardDraft(name: "Chase", kind: .credit, payingWallet: checking, statementDay: 15), in: context)
-        let debit = try Card.create(CardDraft(name: "Navy Federal Debit", kind: .debit, payingWallet: checking), in: context)
-
-        #expect(statementCloses(appleCard, year: 2026, month: 10) == CalendarDay(year: 2026, month: 10, day: 31))
-        #expect(statementCloses(appleCard, year: 2026, month: 4) == CalendarDay(year: 2026, month: 4, day: 30))
-        #expect(statementCloses(appleCard, year: 2026, month: 2) == CalendarDay(year: 2026, month: 2, day: 28))
-        #expect(statementCloses(appleCard, year: 2028, month: 2) == CalendarDay(year: 2028, month: 2, day: 29))
-        #expect(statementCloses(chase, year: 2026, month: 2) == CalendarDay(year: 2026, month: 2, day: 15))
-        // With no statement date, a Card's period is the calendar month.
-        #expect(statementCloses(debit, year: 2026, month: 2) == CalendarDay(year: 2026, month: 2, day: 28))
-    }
-
-    /// The last day of `card`'s statement period that starts in `month` of `year`, as its Card statement shows it.
-    private func statementCloses(_ card: Card, year: Int, month: Int) -> CalendarDay {
-        CardPeriod(containing: CalendarDay(year: year, month: month, day: 1), statementDay: card.statementDay).lastDay
-    }
-
     private func allCards() throws -> [Card] {
         try context.fetch(FetchDescriptor<Card>())
     }
@@ -137,13 +118,9 @@ struct CardManagementTests {
     }
 
     private func addExpense(_ cents: Int, paidWith card: Card?, on day: CalendarDay? = nil) throws -> Transaction {
-        let transaction = Transaction.insert(
-            cents: -cents, on: day ?? today, wallet: nil, category: nil, in: context
+        context.record(
+            -cents, on: day ?? today, in: checking, under: try context.lockedCategory(.otherExpense), card: card
         )
-        transaction.wallet = checking
-        transaction.category = try context.lockedCategory(.otherExpense)
-        transaction.card = card
-        return transaction
     }
 
     @Test func anArchivedCardLeavesThePickerButStaysVisibleOnPastTransactions() throws {

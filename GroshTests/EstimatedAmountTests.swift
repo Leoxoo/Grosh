@@ -27,23 +27,10 @@ struct EstimatedAmountTests {
     private func electricity(
         under category: Grosh.Category, varies: Bool = true, remindAfter: Int = 2
     ) -> RecurringDraft {
-        var draft = RecurringDraft(startDay: day(2026, 10, 12))
-        draft.name = "Electricity"
-        draft.entry = AmountEntry(cents: 2_500)
-        draft.wallet = store.checking
-        draft.category = category
+        var draft = store.recurringDraft("Electricity", 25_00, under: category, starting: day(2026, 10, 12))
         draft.kind = .bill
         draft.amountVaries = varies
         draft.remindAfterDays = remindAfter
-        return draft
-    }
-
-    /// `draft` with the estimate it needs now, read from the store and given to it as the Recurring editor gives it.
-    private func estimated(_ draft: RecurringDraft) -> RecurringDraft {
-        var draft = draft
-        if let request = draft.neededEstimate {
-            draft.setEstimate(AmountEstimate.cents(for: request), for: request)
-        }
         return draft
     }
 
@@ -83,7 +70,7 @@ struct EstimatedAmountTests {
         var draft = electricity(under: water)
         draft.name = "Water"
         draft.entry = AmountEntry(cents: 0)
-        draft = estimated(draft)
+        draft = store.estimated(draft)
 
         #expect(draft.estimateCents == 5_000)
         #expect(draft.canSave)
@@ -99,7 +86,7 @@ struct EstimatedAmountTests {
     @Test func aVaryingBillWithNoEstimateAndNoAmountCannotBeSaved() {
         var draft = electricity(under: context.addCategory("Water"))
         draft.entry = AmountEntry(cents: 0)
-        draft = estimated(draft)
+        draft = store.estimated(draft)
         #expect(!draft.canSave)
     }
 
@@ -108,7 +95,7 @@ struct EstimatedAmountTests {
         try record(5_000, under: water)
         var draft = electricity(under: water, varies: false)
         draft.entry = AmountEntry(cents: 0)
-        draft = estimated(draft)
+        draft = store.estimated(draft)
 
         #expect(draft.estimateCents == nil)
         #expect(!draft.canSave)
@@ -119,13 +106,13 @@ struct EstimatedAmountTests {
         let gas = context.addCategory("Gas")
         try record(5_000, under: water)
         try record(1_000, under: gas)
-        var draft = estimated(electricity(under: water))
+        var draft = store.estimated(electricity(under: water))
         #expect(draft.neededEstimate?.category == water)
         #expect(draft.estimateCents == 5_000)
 
         draft.category = gas
         #expect(draft.estimateCents == nil, "an estimate read for Water doesn't stand for Gas")
-        draft = estimated(draft)
+        draft = store.estimated(draft)
         #expect(draft.estimateCents == 1_000)
 
         draft.amountVaries = false
@@ -212,7 +199,7 @@ struct EstimatedAmountTests {
         let made = try estimatedElectricity()
 
         #expect(made.amountCents < 0)
-        #expect(EstimatedAmountDraft(confirming: made).amount.cents == -made.amountCents)
+        #expect(EstimatedAmountDraft(confirming: made).amount.cents == 25_00)
     }
 
     @Test func confirmingNothingIsRefusedAndKeepsTheEstimate() throws {

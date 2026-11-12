@@ -432,7 +432,7 @@ struct MoneyLoverImportTests {
 
         #expect(try context.fetch(FetchDescriptor<Wallet>()).map(\.name) == ["Old wallet"])
         #expect(try context.fetchCount(FetchDescriptor<Card>()) == 1)
-        #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 2)
+        #expect(try context.transactionCount() == 2)
     }
 
     @Test func noRowsReplaceNothing() throws {

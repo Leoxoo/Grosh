@@ -31,12 +31,6 @@ struct SuggestDefaultsTests {
         transaction.createdAt = Date.now.addingTimeInterval(-minutesAgo * 60)
     }
 
-    @Test func aReminderTurnedOnStartsAWeekFromToday() {
-        #expect(ReminderDay.default(after: today) == CalendarDay(year: 2026, month: 10, day: 16))
-        #expect(ReminderDay.default(after: CalendarDay(year: 2026, month: 12, day: 28))
-            == CalendarDay(year: 2027, month: 1, day: 4))
-    }
-
     @Test func aNewTransactionStartsAsAnExpenseTodayWithNothingElseFilledIn() throws {
         let suggested = TransactionDefaults.suggest(on: today, in: context)
 

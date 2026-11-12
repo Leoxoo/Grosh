@@ -52,11 +52,7 @@ struct DraftRulesTests {
     @Test func anEditedRecurringTransactionKeepsItsKindWhenTheCategoryChanges() throws {
         let streaming = context.addCategory("Streaming")
         streaming.ownKind = .subscription
-        var draft = RecurringDraft(startDay: today)
-        draft.name = "Gym"
-        draft.entry = AmountEntry(cents: 30_00)
-        draft.wallet = fixture.checking
-        draft.pickedCategory = context.addCategory("Sport")
+        let draft = fixture.store.recurringDraft("Gym", 30_00, under: context.addCategory("Sport"), starting: today)
         let saved = try RecurringTransaction.create(draft, today: today, in: context)
 
         var edited = RecurringDraft(editing: saved)
@@ -67,11 +63,7 @@ struct DraftRulesTests {
     }
 
     @Test func pastOccurrencesAreOfferedForANewScheduleOrAMovedStart() throws {
-        var draft = RecurringDraft(startDay: today)
-        draft.name = "Gym"
-        draft.entry = AmountEntry(cents: 30_00)
-        draft.wallet = fixture.checking
-        draft.pickedCategory = context.addCategory("Sport")
+        let draft = fixture.store.recurringDraft("Gym", 30_00, under: context.addCategory("Sport"), starting: today)
         #expect(draft.offersPastOccurrences)
         let saved = try RecurringTransaction.create(draft, today: today, in: context)
 
@@ -83,11 +75,9 @@ struct DraftRulesTests {
     }
 
     @Test func aTotalOfZeroIsNoTotalAndOneThatCantBeWorkedOutIsRefused() {
-        var draft = RecurringDraft(startDay: today)
-        draft.name = "Laptop"
-        draft.entry = AmountEntry(cents: 100_00)
-        draft.wallet = fixture.checking
-        draft.pickedCategory = context.addCategory("Gadgets")
+        var draft = fixture.store.recurringDraft(
+            "Laptop", 100_00, under: context.addCategory("Gadgets"), starting: today
+        )
 
         draft.totalEntry = AmountEntry(showing: 0)
         #expect(draft.total == nil)
@@ -184,7 +174,7 @@ struct DraftRulesTests {
     // MARK: Lists and rows
 
     @Test func anItemInRecentlyDeletedEndsSoonWithThreeDaysLeftOrFewer() {
-        #expect(RecentlyDeleted.daysLeft(since: nil, now: .now) == RecentlyDeleted.keptDays)
+        #expect(RecentlyDeleted.daysLeft(since: nil, now: .now) == 30)
         #expect(RecentlyDeleted.isEndingSoon(daysLeft: 3))
         #expect(!RecentlyDeleted.isEndingSoon(daysLeft: 4))
     }
@@ -197,7 +187,7 @@ struct DraftRulesTests {
         #expect(loan.title == "Pasha")
 
         original.withName = ""
-        #expect(loan.title == original.categoryName)
+        #expect(loan.title == "Loan")
     }
 
     @Test func theBellListsWhatIsDue() throws {

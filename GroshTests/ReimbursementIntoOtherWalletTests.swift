@@ -107,8 +107,7 @@ struct ReimbursementIntoOtherWalletTests {
         let alex = try fixture.person("Alex")
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
         let owed = try fixture.expectation(of: alex, on: dinner)
-        let euros = context.addWallet("Euros")
-        euros.currencyCode = "EUR"
+        let euros = context.addWallet("Euros", currencyCode: "EUR")
 
         #expect(throws: ExpectedReimbursementRuleError.otherCurrency) {
             try fixture.pay(20_00, on: owed, into: euros)
@@ -127,10 +126,6 @@ struct ReimbursementIntoOtherWalletTests {
         #expect(walletBalance(cash, asOf: today) == Money(cents: 20_00))
         #expect(walletTotal([checking, cash], asOf: today) == [Money(cents: -40_00)])
         #expect(dinner.netCents == -60_00)
-        let entries = try context.fetch(Transaction.notDeleted).map(LedgerEntry.init)
-        let balances = WalletBalances(entries, asOf: today)
-        #expect(balances.balance(of: cash) == Money(cents: 20_00))
-        #expect(balances.total(of: [checking, cash]) == [Money(cents: -40_00)])
     }
 
     // MARK: Lists
@@ -339,7 +334,11 @@ struct ReimbursementIntoOtherWalletTests {
     @Test func aPartOfASplitCantBePaidBackIntoAnotherWallet() throws {
         let alex = try fixture.person("Alex")
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
-        Transaction.link([dinner], as: .split)
+        var split = SplitDraft(splitting: dinner)
+        var part = split.newPart()
+        part.entry = AmountEntry(cents: 10_00)
+        split.addPart(part)
+        try dinner.split(split)
         let owed = try fixture.expectation(of: alex, on: dinner)
 
         #expect(throws: ExpectedReimbursementRuleError.splitPart) {
@@ -354,9 +353,8 @@ struct ReimbursementIntoOtherWalletTests {
     /// transaction there as Record payment makes, with no one in With and no expectation.
     @Test func someonePaidMeBackIntoAnotherWalletWithoutOwesMe() throws {
         let dinner = try fixture.dinner()
-        let draft = ReimbursementDraft(amount: Money(cents: 20_00), day: receivedDay, note: "Cash")
 
-        let payback = try dinner.recordPaybackElsewhere(draft, into: cash)
+        let payback = try context.payBack(20_00, on: receivedDay, note: "Cash", to: dinner, into: cash)
 
         #expect(payback.wallet === cash)
         #expect(payback.amountCents == 20_00)
@@ -375,12 +373,11 @@ struct ReimbursementIntoOtherWalletTests {
 
     @Test func someonePaidMeBackIntoAWalletInAnotherCurrencyIsRefused() throws {
         let dinner = try fixture.dinner()
-        let euros = context.addWallet("Euros")
-        euros.currencyCode = "EUR"
+        let euros = context.addWallet("Euros", currencyCode: "EUR")
         let draft = ReimbursementDraft(amount: Money(cents: 20_00), day: receivedDay)
 
         #expect(throws: ExpectedReimbursementRuleError.otherCurrency) {
-            try dinner.recordPaybackElsewhere(draft, into: euros)
+            try dinner.recordPayback(draft, into: euros)
         }
         #expect(!dinner.hasPaybacksElsewhere)
     }

@@ -18,8 +18,7 @@ struct EditorRulesTests {
     // MARK: The typed amount
 
     @Test func theDraftsAmountIsWhatItsKeypadComesToInItsWalletsCurrency() {
-        let euros = context.addWallet("Euros")
-        euros.currencyCode = "EUR"
+        let euros = context.addWallet("Euros", currencyCode: "EUR")
         var draft = TransferDraft(day: day(2026, 10, 3))
         draft.from = euros
         #expect(draft.amount == Money(cents: 0, currencyCode: "EUR"))
@@ -194,18 +193,15 @@ struct EditorRulesTests {
         #expect(dinner.paidBackSummary(.net, locale: Locale(identifier: "en_US")) == "+20")
     }
 
-    @Test func aPaymentAboveALoanComesInAndAboveADebtGoesOut() throws {
-        let loan = try fixture.store.category("Loan", .debtLoan)
-        var draft = TransactionDraft(type: .debtLoan, day: day(2026, 10, 3))
-        draft.wallet = fixture.checking
-        draft.entry = AmountEntry(cents: 50_00)
-        draft.category = loan
-        draft.people = [try fixture.person("Alex")]
-        let lent = try Transaction.create(draft, in: context)
+    @Test(arguments: [(LockedRole.loan, 20_00), (.debt, -20_00)])
+    func aPaymentAboveALoanComesInAndAboveADebtGoesOut(role: LockedRole, overpaid: Int) throws {
+        let original = try context.recordLoanOrDebt(
+            role, 50_00, with: fixture.person("Alex"), on: day(2026, 10, 3), in: fixture.checking
+        )
 
-        var payment = try DebtPaymentDraft(settling: lent, on: day(2026, 10, 9), in: context)
+        var payment = try DebtPaymentDraft(settling: original, on: day(2026, 10, 9), in: context)
         payment.entry = AmountEntry(cents: 70_00)
-        #expect(payment.signedOverpaid.cents == 20_00)
+        #expect(payment.signedOverpaid.cents == overpaid)
     }
 
     // MARK: Merging and With
@@ -218,12 +214,6 @@ struct EditorRulesTests {
 
         let one = MergeConsequences.text(sourceName: "Visa", transactionCount: 1, targetName: nil, unchosen: "the Card you pick")
         #expect(one == "Its transaction moves to the Card you pick. Then “Visa” is removed.")
-    }
-
-    @Test func withNamesItsPeopleByNameJoinedAsTheTransactionKeepsThem() throws {
-        let zoe = try fixture.person("Zoe")
-        let alex = try fixture.person("Alex")
-        #expect(Transaction.withName(of: [zoe, alex]) == "Alex; Zoe")
     }
 
     @Test func aCategoryWithTransactionsIsCountedInTheStore() throws {

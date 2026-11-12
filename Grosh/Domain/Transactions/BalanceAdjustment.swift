@@ -154,18 +154,16 @@ extension Transaction {
         )
     }
 
-    /// Records a known `difference` as a balance adjustment in `wallet` on `day`: money found (above zero) or
-    /// missing (below zero). Its `reason` is an Income category for money found and an Expense category for money
-    /// missing; without one it is Other Income or Other Expense. It counts in reports unless excluded, and never
-    /// needs a Card. Saves.
-    @discardableResult
-    static func recordBalanceAdjustment(
+    /// Records `difference` as a balance adjustment in `wallet` on `day`: money found (above zero) or missing (below
+    /// zero). Its `reason` is an Income category for money found and an Expense category for money missing; without
+    /// one it is Other Income or Other Expense. It never needs a Card. Saves.
+    private static func recordBalanceAdjustment(
         _ difference: Money,
         in wallet: Wallet,
         on day: CalendarDay,
-        reason: Category? = nil,
-        note: String = "",
-        isExcludedFromReport: Bool = false,
+        reason: Category?,
+        note: String,
+        isExcludedFromReport: Bool,
         in context: ModelContext
     ) throws -> Transaction {
         guard let type = BalanceAdjustmentDraft.reasonType(for: difference.cents) else {

@@ -226,35 +226,11 @@ struct BalanceAdjustmentTests {
         #expect(adjustment.isExcludedFromReport)
     }
 
-    // MARK: Recording a known difference
-
-    /// What the importer does with a transfer row that has no partner.
-    @Test func aKnownDifferenceIsRecordedAsABalanceAdjustmentThatKeepsItsExcludedFlag() throws {
-        let adjustment = try Transaction.recordBalanceAdjustment(
-            Money(cents: -74_91), in: checking, on: today, note: "to old savings", isExcludedFromReport: true, in: context
-        )
+    @Test func anAdjustmentIsSavedAsOneAndCountsInReportsUnlessExcluded() throws {
+        let adjustment = try adjust(to: 20_00)
 
         #expect(adjustment.isBalanceAdjustment)
-        #expect(adjustment.isExcludedFromReport)
-        #expect(adjustment.category == (try context.lockedCategory(.otherExpense)))
-        #expect(adjustment.note == "to old savings")
-        #expect(walletBalance(checking, asOf: today) == Money(cents: -74_91))
-    }
-
-    @Test func aKnownDifferenceCountsInReportsUnlessExcluded() throws {
-        let adjustment = try Transaction.recordBalanceAdjustment(Money(cents: 20_00), in: checking, on: today, in: context)
-
         #expect(!adjustment.isExcludedFromReport)
-        #expect(adjustment.category == (try context.lockedCategory(.otherIncome)))
-    }
-
-    @Test func aReasonOfTheOtherTypeIsRefused() throws {
-        let cafe = try store.category("Café")
-
-        #expect(throws: BalanceAdjustmentRuleError.reasonDoesNotMatchDifference) {
-            try Transaction.recordBalanceAdjustment(Money(cents: 20_00), in: checking, on: today, reason: cafe, in: context)
-        }
-        #expect(checking.transactions?.isEmpty == true)
     }
 
     @Test func anAdjustmentIsEditedInTheAddSheetButNeverDuplicated() throws {

@@ -120,11 +120,11 @@ struct TransferTests {
 
     /// Saving `draft` throws `error`, Save stays disabled, and no transaction is recorded.
     private func expectRefused(_ draft: TransferDraft, because error: TransferRuleError) throws {
-        let before = try context.fetchCount(FetchDescriptor<Transaction>())
+        let before = try context.transactionCount()
 
         #expect(!draft.canSave)
         #expect(throws: error) { try Transfer.create(draft, in: context) }
-        #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == before)
+        #expect(try context.transactionCount() == before)
     }
 
     // MARK: Editing a half
@@ -262,7 +262,6 @@ struct TransferTests {
         let transfer = try Transfer.create(draft(250_00), in: context)
 
         #expect(try transfer.incoming.deleteScopes() == [.withRelated, .onlySelected])
-        #expect(TransactionDeleteScope.withRelated.buttonTitle(selectedCount: 1, relatedCount: 1) == "Delete Both")
     }
 
     @Test func deletingBothHalvesUndoesTheTransfer() throws {

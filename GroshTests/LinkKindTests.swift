@@ -21,8 +21,7 @@ struct LinkKindTests {
     /// A $60 dinner in Checking and $20 of it paid back into Cash, with no one expected to pay.
     private func paidBackIntoCash() throws -> (dinner: Transaction, payback: Transaction) {
         let dinner = try fixture.dinner()
-        let draft = ReimbursementDraft(amount: Money(cents: 20_00), day: today)
-        return (dinner, try dinner.recordPaybackElsewhere(draft, into: cash))
+        return (dinner, try context.payBack(20_00, on: today, to: dinner, into: cash))
     }
 
     // MARK: Made by the rule that links
@@ -135,9 +134,7 @@ struct LinkKindTests {
 
     @Test func anExpenseKeepsItsMarkWhileAnotherPaybackIsLeft() throws {
         let (dinner, first) = try paidBackIntoCash()
-        let second = try dinner.recordPaybackElsewhere(
-            ReimbursementDraft(amount: Money(cents: 5_00), day: today), into: cash
-        )
+        let second = try context.payBack(5_00, on: today, to: dinner, into: cash)
         try first.delete(.onlySelected)
 
         try first.deleteForever()
@@ -165,14 +162,14 @@ struct LinkKindTests {
         #expect(!(try Transaction.create(income, in: context).canBeReimbursed))
     }
 
-    @Test func aRefundIsNeitherPaidBackNorOwed() {
-        let rule = { (sign: Int) in
-            Transaction.isReimbursable(type: .expense, category: nil, isBalanceAdjustment: false, sign: sign)
-        }
+    @Test func moneyMissingFromABalanceAdjustmentIsNeitherPaidBackNorOwed() throws {
+        var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
+        draft.realBalance = Money(cents: -15_00)
 
-        #expect(rule(-1))
-        #expect(!rule(1))
-        #expect(!Transaction.isReimbursable(type: .expense, category: nil, isBalanceAdjustment: true, sign: -1))
+        let adjustment = try Transaction.adjustBalance(draft, in: context)
+
+        #expect(adjustment.category?.type == .expense)
+        #expect(!adjustment.canBeReimbursed)
     }
 }
 

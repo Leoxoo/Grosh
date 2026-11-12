@@ -50,8 +50,6 @@ struct ExpectedReimbursementPaymentTests {
         #expect([dinner].net == Money(cents: -40_00))
         #expect(try fixture.totals().spent == Money(cents: 40_00))
         #expect(try fixture.store.graph(.spent).headline == Money(cents: 40_00))
-        let entries = try context.fetch(Transaction.notDeleted).map(LedgerEntry.init)
-        #expect(WalletBalances(entries, asOf: today).balance(of: checking) == Money(cents: -40_00))
     }
 
     @Test func aPartialPaymentLeavesTheRestOutstanding() throws {

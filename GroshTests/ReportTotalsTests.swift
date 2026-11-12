@@ -17,21 +17,13 @@ struct ReportTotalsTests {
         store = try MonthGraphFixture()
     }
 
-    /// The totals of `period` (this month unless another is given) for `selection`, as of today.
-    private func totals(_ selection: WalletSelection = .total, in period: Period? = nil) throws -> PeriodTotals {
-        try PeriodTotals(
-            of: CountedHistory(store.transactions(), in: selection, currencyCode: "USD", otherIncome: store.otherIncome())
-                .during(period ?? .month(CalendarMonth(today)), today: today), currencyCode: "USD"
-        )
-    }
-
     // MARK: What counts
 
     @Test func incomeSpentAndNetIncomeOfTheMonthSoFar() throws {
         try store.record(-40_00, "Café", on: day(2026, 10, 3))
         try store.record(1_500_00, "Salary", .income, on: day(2026, 10, 5))
 
-        let october = try totals()
+        let october = try store.totals()
         #expect(october.income == Money(cents: 1_500_00))
         #expect(october.spent == Money(cents: 40_00))
         #expect(october.netIncome == Money(cents: 1_460_00))
@@ -43,7 +35,7 @@ struct ReportTotalsTests {
         try store.record(-80_00, "Clothing", on: day(2026, 10, 2))
         try store.record(30_00, "Clothing", on: day(2026, 10, 6))
 
-        let october = try totals()
+        let october = try store.totals()
         #expect(october.spent == (try store.graph(.spent).headline))
         #expect(october.income == (try store.graph(.income).headline))
     }
@@ -55,7 +47,7 @@ struct ReportTotalsTests {
         try store.record(-80_00, "Café", on: day(2026, 10, 12))
         try store.record(-90_00, "Café", on: day(2026, 10, 13))
 
-        #expect(try totals().spent == Money(cents: 150_00))
+        #expect(try store.totals().spent == Money(cents: 150_00))
     }
 
     @Test func aWeekCountsOnlyItsOwnDays() throws {
@@ -65,7 +57,7 @@ struct ReportTotalsTests {
         try store.record(-40_00, "Café", on: day(2026, 10, 12))
 
         let week = Period.week(startingOn: day(2026, 10, 5))
-        #expect(try totals(in: week).spent == Money(cents: 50_00))
+        #expect(try store.totals(of: week).spent == Money(cents: 50_00))
     }
 
     @Test func aWalletCountsOnlyItsOwnTransactions() throws {
@@ -73,9 +65,9 @@ struct ReportTotalsTests {
         try store.record(-25_00, "Café", on: day(2026, 10, 4), in: savings)
         try store.record(-40_00, "Café", on: day(2026, 10, 3))
 
-        #expect(try totals(.wallet(checking)).spent == Money(cents: 40_00))
-        #expect(try totals(.wallet(savings)).spent == Money(cents: 25_00))
-        #expect(try totals(.total).spent == Money(cents: 65_00))
+        #expect(try store.totals(.wallet(checking)).spent == Money(cents: 40_00))
+        #expect(try store.totals(.wallet(savings)).spent == Money(cents: 25_00))
+        #expect(try store.totals(.total).spent == Money(cents: 65_00))
     }
 
     /// What counts toward Spent and Income is tested on Home's Month graph (`MonthGraphTests`); a transfer's halves
@@ -88,8 +80,8 @@ struct ReportTotalsTests {
         draft.entry = AmountEntry(cents: 250_00)
         try Transfer.create(draft, in: context)
 
-        #expect(try totals(.wallet(checking)) == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
-        #expect(try totals(.wallet(savings)) == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
+        #expect(try store.totals(.wallet(checking)) == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
+        #expect(try store.totals(.wallet(savings)) == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
     }
 
     /// A Loan forgiven in October is spent in October, on the day it was forgiven, and a Debt forgiven is income.
@@ -99,10 +91,10 @@ struct ReportTotalsTests {
         try store.context.forgive(loan, on: day(2026, 10, 5))
         try store.context.forgive(debt, on: day(2026, 10, 7))
 
-        let october = try totals()
+        let october = try store.totals()
         #expect(october.spent == Money(cents: 250_00))
         #expect(october.income == Money(cents: 80_00))
-        #expect(try totals(in: .month(CalendarMonth(year: 2026, month: 9))).spent == Money(cents: 0))
+        #expect(try store.totals(of: .month(CalendarMonth(year: 2026, month: 9))).spent == Money(cents: 0))
     }
 
     @Test func aWalletsForgivenLoanCountsOnlyWhenItIsSelected() throws {
@@ -111,7 +103,7 @@ struct ReportTotalsTests {
         loan.wallet = savings
         try store.context.forgive(loan, on: day(2026, 10, 5))
 
-        #expect(try totals(.wallet(checking)).spent == Money(cents: 0))
-        #expect(try totals(.wallet(savings)).spent == Money(cents: 250_00))
+        #expect(try store.totals(.wallet(checking)).spent == Money(cents: 0))
+        #expect(try store.totals(.wallet(savings)).spent == Money(cents: 250_00))
     }
 }

@@ -62,10 +62,7 @@ struct ExpectationFixture {
 
     /// What the Report counts for `selection` in October.
     func totals(in selection: WalletSelection = .total) throws -> PeriodTotals {
-        try PeriodTotals(
-            of: CountedHistory(store.transactions(), in: selection, currencyCode: "USD", otherIncome: store.otherIncome())
-                .during(.month(CalendarMonth(today)), today: today), currencyCode: "USD"
-        )
+        try store.totals(selection)
     }
 
     /// Every Expected reimbursement the way Debts & Loans reads them.
