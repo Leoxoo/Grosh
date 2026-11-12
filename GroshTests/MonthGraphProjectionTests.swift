@@ -26,12 +26,9 @@ struct MonthGraphProjectionTests {
         starting start: CalendarDay, preset: RepeatPreset = .monthly, end: RepeatEnd = .forever,
         wallet: Wallet? = nil, configure: (inout RecurringDraft) -> Void = { _ in }
     ) throws -> RecurringTransaction {
-        var draft = RecurringDraft(startDay: start)
-        draft.name = name
-        draft.amount = Money(cents: cents)
-        draft.type = type
-        draft.wallet = wallet ?? checking
-        draft.category = try store.category(categoryName, type)
+        var draft = store.recurringDraft(
+            name, cents, under: try store.category(categoryName, type), starting: start, wallet: wallet
+        )
         draft.preset = preset
         draft.end = end
         configure(&draft)

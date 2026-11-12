@@ -22,20 +22,10 @@ struct ReimbursementCountingTests {
         try context.payBack(cents, on: paidOn ?? today, to: expense)
     }
 
-    /// What counts for `selection`, as the Report counts it.
-    private func history(_ selection: WalletSelection = .total) throws -> CountedHistory {
-        try CountedHistory(store.transactions(), in: selection, currencyCode: "USD", otherIncome: store.otherIncome())
-    }
-
-    /// The totals of `period`, this month unless another is given, for `selection`, as the Report counts them.
-    private func totals(_ selection: WalletSelection = .total, of period: Period? = nil) throws -> PeriodTotals {
-        try PeriodTotals(of: history(selection).during(period ?? .month(CalendarMonth(today)), today: today), currencyCode: "USD")
-    }
-
     // MARK: What an Expense counts
 
     @Test func aPartiallyReimbursedExpenseCountsItsNetAsSpentUnderItsOwnCategoryOnItsOwnDay() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         try payBack(20_00, on: day(2026, 10, 8), to: dinner)
 
         let counted = try #require(dinner.countedAmount(otherIncome: store.otherIncome()))
@@ -47,15 +37,15 @@ struct ReimbursementCountingTests {
     }
 
     @Test func anExactlyReimbursedExpenseCountsNothing() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         try payBack(60_00, to: dinner)
 
         #expect(dinner.countedAmount(otherIncome: try store.otherIncome()) == nil)
-        #expect(try totals() == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
+        #expect(try store.totals() == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
     }
 
     @Test func anOverReimbursedExpenseCountsTheExtraAsIncomeUnderOtherIncomeOnItsOwnDay() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         try payBack(100_00, on: day(2026, 10, 8), to: dinner)
 
         let counted = try #require(dinner.countedAmount(otherIncome: store.otherIncome()))
@@ -64,11 +54,11 @@ struct ReimbursementCountingTests {
         #expect(counted.amount == Money(cents: 40_00))
         #expect(counted.category.lockedRole == .otherIncome)
         #expect(counted.day == day(2026, 10, 3))
-        #expect(try totals() == PeriodTotals(income: Money(cents: 40_00), spent: Money(cents: 0)))
+        #expect(try store.totals() == PeriodTotals(income: Money(cents: 40_00), spent: Money(cents: 0)))
     }
 
     @Test func anOverReimbursedExpenseFilesItsExtraUnderTheOtherIncomeTheReportHandsIt() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         try payBack(100_00, to: dinner)
         let readOnce = try store.category("Tips", .income)
 
@@ -76,12 +66,12 @@ struct ReimbursementCountingTests {
     }
 
     @Test func severalReimbursementsCountTogether() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         try payBack(20_00, to: dinner)
         try payBack(15_00, to: dinner)
 
         #expect(dinner.countedAmount(otherIncome: try store.otherIncome())?.amount == Money(cents: 25_00))
-        #expect(try totals().spent == Money(cents: 25_00))
+        #expect(try store.totals().spent == Money(cents: 25_00))
 
         try payBack(30_00, to: dinner)
 
@@ -90,7 +80,7 @@ struct ReimbursementCountingTests {
     }
 
     @Test func removingAReimbursementCountsTheExpenseAgain() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         let entry = try payBack(60_00, to: dinner)
         #expect(dinner.countedAmount(otherIncome: try store.otherIncome()) == nil)
 
@@ -101,7 +91,7 @@ struct ReimbursementCountingTests {
     }
 
     @Test func anExpenseWithoutReimbursementsCountsAsBefore() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         let refund = try store.record(30_00, "Clothing", on: day(2026, 10, 6))
 
         #expect(dinner.countedAmount(otherIncome: try store.otherIncome())?.amount == Money(cents: 60_00))
@@ -110,7 +100,7 @@ struct ReimbursementCountingTests {
     }
 
     @Test func aReimbursedExpenseExcludedFromReportCountsInNeither() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         try payBack(100_00, to: dinner)
         dinner.isExcludedFromReport = true
 
@@ -122,51 +112,51 @@ struct ReimbursementCountingTests {
         try payBack(20_00, on: day(2026, 10, 5), to: dinner)
 
         let september = Period.month(CalendarMonth(year: 2026, month: 9))
-        #expect(try totals(of: september).spent == Money(cents: 40_00))
-        #expect(try totals().spent == Money(cents: 0))
+        #expect(try store.totals(of: september).spent == Money(cents: 40_00))
+        #expect(try store.totals().spent == Money(cents: 0))
     }
 
     // MARK: Where it counts
 
     @Test func aWalletCountsTheNetOfItsOwnExpensesOnly() throws {
         let savings = context.addWallet("Savings")
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         let lunch = try store.record(-30_00, "Restaurants", on: day(2026, 10, 4), in: savings)
         try payBack(20_00, to: dinner)
         try payBack(30_00, to: lunch)
 
-        #expect(try totals(.wallet(store.checking)).spent == Money(cents: 40_00))
-        #expect(try totals(.wallet(savings)) == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
-        #expect(try totals().spent == Money(cents: 40_00))
+        #expect(try store.totals(.wallet(store.checking)).spent == Money(cents: 40_00))
+        #expect(try store.totals(.wallet(savings)) == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
+        #expect(try store.totals().spent == Money(cents: 40_00))
     }
 
     @Test func theReportAndTheMonthGraphCountTheNet() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         try store.record(-10_00, "Café", on: day(2026, 10, 4))
         try payBack(20_00, to: dinner)
 
-        let october = try totals()
+        let october = try store.totals()
         #expect(october.spent == Money(cents: 50_00))
         #expect(october.netIncome == Money(cents: -50_00))
         #expect(try store.graph(.spent).headline == Money(cents: 50_00))
     }
 
     @Test func anOverReimbursedExpenseAddsToTheMonthGraphsIncome() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         try payBack(100_00, to: dinner)
 
         #expect(try store.graph(.income).headline == Money(cents: 40_00))
         #expect(try store.graph(.spent).headline == Money(cents: 0))
-        #expect(try totals().netIncome == Money(cents: 40_00))
+        #expect(try store.totals().netIncome == Money(cents: 40_00))
     }
 
     @Test func theCategoryReportFilesTheNetUnderTheExpensesCategoryAndTheExtraUnderOtherIncome() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         let lunch = try store.record(-30_00, "Café", on: day(2026, 10, 4))
         try payBack(20_00, to: dinner)
         try payBack(50_00, to: lunch)
 
-        let counted = try history().during(.month(CalendarMonth(today)), today: today)
+        let counted = try store.history().during(.month(CalendarMonth(today)), today: today)
         let spent = CategoryBreakdown(side: .spent, of: counted, currencyCode: "USD")
         let income = CategoryBreakdown(side: .income, of: counted, currencyCode: "USD")
 
@@ -177,12 +167,12 @@ struct ReimbursementCountingTests {
     }
 
     @Test func aBreakdownRowListsTheExpenseWhereItsNetCounts() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         try payBack(100_00, to: dinner)
         let otherIncome = try context.lockedCategory(.otherIncome)
         let days = DayRange(first: day(2026, 10, 1), last: today)
 
-        let history = CountedHistory(try store.transactions(), in: .total, currencyCode: "USD", otherIncome: otherIncome)
+        let history = try store.history()
         let income = ReportTransactions(category: otherIncome, side: .income, on: days, in: history)
         let spent = ReportTransactions(
             category: try store.category("Food & Beverage"), side: .spent, on: days, in: history
@@ -194,11 +184,11 @@ struct ReimbursementCountingTests {
     }
 
     @Test func aStepListsTheNetItCounts() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         try payBack(20_00, to: dinner)
 
         let step = ReportTransactions(
-            step: nil, on: DayRange(first: day(2026, 10, 3), last: day(2026, 10, 3)), in: try history()
+            step: nil, on: DayRange(first: day(2026, 10, 3), last: day(2026, 10, 3)), in: try store.history()
         )
 
         #expect(step.transactions == [dinner])
@@ -206,10 +196,10 @@ struct ReimbursementCountingTests {
     }
 
     @Test func theDailyAverageIsOfTheNet() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         try payBack(20_00, to: dinner)
         let days = DayRange(first: day(2026, 10, 1), last: day(2026, 10, 10))
 
-        #expect(DailyAverage.of(try totals().spent, over: days) == Money(cents: 4_00))
+        #expect(DailyAverage.of(try store.totals().spent, over: days) == Money(cents: 4_00))
     }
 }

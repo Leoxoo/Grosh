@@ -31,5 +31,6 @@ struct ReminderDayTests {
 
     @Test func aReminderTurnedOnStartsAWeekLater() {
         #expect(ReminderDay.default(after: today) == day(2026, 10, 19))
+        #expect(ReminderDay.default(after: day(2026, 12, 28)) == day(2027, 1, 4))
     }
 }

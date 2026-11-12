@@ -138,11 +138,7 @@ struct AttachedTransactionTests {
         let groceries = context.addCategory("Groceries")
         let chase = try context.addCard("Chase", paidFrom: store.checking)
         let savings = context.addWallet("Savings")
-        var draft = RecurringDraft(startDay: day(2026, 10, 12))
-        draft.name = "App subscription"
-        draft.amount = Money(cents: 499)
-        draft.wallet = store.checking
-        draft.category = apps
+        var draft = store.recurringDraft("App subscription", 4_99, under: apps, starting: day(2026, 10, 12))
         draft.card = chase
         let recurring = try RecurringTransaction.create(draft, today: today, in: context)
 

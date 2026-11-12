@@ -15,10 +15,6 @@ struct CountedHistoryTests {
         store = try MonthGraphFixture()
     }
 
-    private func history(_ selection: WalletSelection = .total) throws -> CountedHistory {
-        try CountedHistory(store.transactions(), in: selection, currencyCode: "USD", otherIncome: store.otherIncome())
-    }
-
     /// A wallet named `name` whose Starting balance is dated `day`.
     @discardableResult
     private func wallet(_ name: String, startingOn day: CalendarDay) throws -> Wallet {
@@ -34,11 +30,11 @@ struct CountedHistoryTests {
         try store.record(-15_00, "Café", on: day(2026, 3, 4))
         try store.record(50_00, "Salary", .income, on: day(2026, 8, 31), in: savings)
 
-        #expect(try history(.wallet(savings)).strip(.month, today: today) == [
+        #expect(try store.history(.wallet(savings)).strip(.month, today: today) == [
             .month(CalendarMonth(year: 2026, month: 8)), .month(CalendarMonth(year: 2026, month: 9)),
             .month(CalendarMonth(year: 2026, month: 10)),
         ])
-        #expect(try history().firstDay == day(2026, 3, 4))
+        #expect(try store.history().firstDay == day(2026, 3, 4))
     }
 
     /// All time runs from the first day anything counts through today.
@@ -46,13 +42,13 @@ struct CountedHistoryTests {
         try wallet("Cash", startingOn: day(2026, 5, 1))
         try store.record(-15_00, "Café", on: day(2026, 6, 4))
 
-        #expect(try history().days(of: .all, today: today) == DayRange(first: day(2026, 6, 4), last: today))
+        #expect(try store.history().days(of: .all, today: today) == DayRange(first: day(2026, 6, 4), last: today))
     }
 
     /// All time and a custom range have no fixed length, so they have no comparison graph; a week does.
     @Test func onlyAFixedLengthPeriodHasAGraph() throws {
         try store.record(-15_00, "Café", on: day(2026, 10, 4))
-        let total = try history()
+        let total = try store.history()
 
         #expect(total.graph(.spent, in: .all, recurring: [], today: today, comparingWith: .average) == nil)
         #expect(total.graph(.spent, in: .day(today), recurring: [], today: today, comparingWith: .average) == nil)

@@ -21,7 +21,7 @@ struct ReimbursementRecentlyDeletedTests {
     /// A $60 dinner on the 3rd with $20 and $15 of it paid back.
     @discardableResult
     private func dinnerPaidBackTwice() throws -> Transaction {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         for cents in [20_00, 15_00] {
             try context.payBack(cents, on: today, to: dinner)
         }
@@ -50,10 +50,7 @@ struct ReimbursementRecentlyDeletedTests {
 
         #expect(walletBalance(checking, asOf: today) == Money(cents: 0))
         #expect(dinner.countedAmount(otherIncome: try store.otherIncome()) == nil)
-        #expect(try PeriodTotals(
-            of: CountedHistory(store.transactions(), in: .total, currencyCode: "USD", otherIncome: store.otherIncome())
-                .during(.month(CalendarMonth(today)), today: today), currencyCode: "USD"
-        ) == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
+        #expect(try store.totals() == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
         #expect(try store.graph(.spent).headline == Money(cents: 0))
     }
 
@@ -79,7 +76,7 @@ struct ReimbursementRecentlyDeletedTests {
 
         #expect(try storedReimbursementCount() == 2)
         #expect(kept.reimbursements?.count == 2)
-        #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 1)
+        #expect(try context.transactionCount() == 1)
     }
 
     @Test func theThirtyDayPurgeRemovesAnExpensesReimbursementsToo() throws {
@@ -92,7 +89,7 @@ struct ReimbursementRecentlyDeletedTests {
 
         try RecentlyDeleted.purgeExpired(in: context, now: deletedAt.addingTimeInterval(thirtyDays))
         #expect(try storedReimbursementCount() == 0)
-        #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 0)
+        #expect(try context.transactionCount() == 0)
     }
 
     @Test func emptyingTheBinRemovesReimbursementsOnlyOfWhatIsInIt() throws {
@@ -128,7 +125,7 @@ struct ReimbursementRecentlyDeletedTests {
         try #require(dinner.orderedReimbursements.first { $0.amountCents == 20_00 }).delete()
 
         #expect(!dinner.isInRecentlyDeleted)
-        #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 1)
+        #expect(try context.transactionCount() == 1)
         #expect(dinner.netCents == -45_00)
     }
 }

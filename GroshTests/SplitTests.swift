@@ -219,11 +219,7 @@ struct SplitTests {
 
     @Test func theOriginalKeepsItsIdentityCreatedAtAndRecurringAttachment() throws {
         let category = try store.category("Café")
-        var schedule = RecurringDraft(startDay: today)
-        schedule.name = "Coffee"
-        schedule.amount = Money(cents: 25_00)
-        schedule.wallet = checking
-        schedule.category = category
+        let schedule = store.recurringDraft("Coffee", 25_00, under: category, starting: today)
         let recurring = try RecurringTransaction.create(schedule, today: today, in: context)
         let coffee = try record(25_00)
         try recurring.attach(coffee)
@@ -255,10 +251,7 @@ struct SplitTests {
         try record(1_000_00, "Salary", .income)
         let coffee = try record(25_00)
         func spent() throws -> Money {
-            try PeriodTotals(
-                of: CountedHistory(allTransactions(), in: .total, currencyCode: "USD", otherIncome: context.otherCategory(.income))
-                    .during(.month(CalendarMonth(today)), today: today), currencyCode: "USD"
-            ).spent
+            try store.totals(of: .month(CalendarMonth(today)), today: today).spent
         }
         let balanceBefore = balance()
         let spentBefore = try spent()
@@ -480,17 +473,6 @@ struct SplitTests {
         #expect(TransactionDraft(editing: part).requiresCard)
     }
 
-    @Test func whatAnOverpaymentWritesOffIsStillNotASplitPart() throws {
-        let debt = try context.recordLoanOrDebt(
-            .debt, 100_00, with: context.person("Anna"), on: today, in: checking
-        )
-        let overpaid = try #require(try context.pay(120_00, on: debt, on: today).overpayment)
-
-        #expect(overpaid.isDebtWriteOff)
-        #expect(!overpaid.isSplitPart)
-        #expect(overpaid.editFlow == nil)
-    }
-
     @Test func theStoredLinkKindTellsPartsFromWriteOffs() throws {
         let debt = try context.recordLoanOrDebt(
             .debt, 100_00, with: context.person("Anna"), on: today, in: checking
@@ -503,6 +485,7 @@ struct SplitTests {
 
         #expect(overpaid.linkKind == .loanOrDebt && debt.linkKind == .loanOrDebt)
         #expect(overpaid.isDebtWriteOff && !overpaid.isSplitPart)
+        #expect(overpaid.editFlow == nil)
         for transaction in [coffee, part] {
             #expect(transaction.linkKind == .split)
             #expect(transaction.isSplitPart && !transaction.isDebtWriteOff)
@@ -578,11 +561,7 @@ struct SplitTests {
 
     @Test func undoSplitKeepsTheOriginalsOwnFieldsAndRecurringAttachment() throws {
         let category = try store.category("Café")
-        var schedule = RecurringDraft(startDay: today)
-        schedule.name = "Coffee"
-        schedule.amount = Money(cents: 25_00)
-        schedule.wallet = checking
-        schedule.category = category
+        let schedule = store.recurringDraft("Coffee", 25_00, under: category, starting: today)
         let recurring = try RecurringTransaction.create(schedule, today: today, in: context)
         let coffee = try record(25_00)
         try recurring.attach(coffee)

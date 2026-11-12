@@ -55,8 +55,7 @@ struct WalletSelectorChoicesTests {
         let checking = context.addWallet("Checking")
         let cash = context.addWallet("Cash")
         let brokerage = context.addWallet("Brokerage", includeInTotal: false)
-        let euros = context.addWallet("Euros", includeInTotal: false)
-        euros.currencyCode = "EUR"
+        let euros = context.addWallet("Euros", currencyCode: "EUR", includeInTotal: false)
         record(100_00, in: checking)
         record(-900_00, in: checking, on: CalendarDay(year: 2026, month: 11, day: 1))
         record(25_00, in: cash)
@@ -74,8 +73,7 @@ struct WalletSelectorChoicesTests {
 
     @Test func theTotalAddsEachCurrencyUpOnItsOwn() {
         let checking = context.addWallet("Checking")
-        let euros = context.addWallet("Euros")
-        euros.currencyCode = "EUR"
+        let euros = context.addWallet("Euros", currencyCode: "EUR")
         record(100_00, in: checking)
         record(40_00, in: euros)
 
@@ -86,8 +84,7 @@ struct WalletSelectorChoicesTests {
     }
 
     @Test func aTotalOfNothingIsNothingInTheWalletsCurrency() {
-        let euros = context.addWallet("Euros")
-        euros.currencyCode = "EUR"
+        let euros = context.addWallet("Euros", currencyCode: "EUR")
 
         let choices = choices([euros])
 

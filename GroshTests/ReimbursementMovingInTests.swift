@@ -34,7 +34,7 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func movingADepositInMakesAReimbursementOfItsAmountDayAndNote() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
 
         let entry = try Reimbursement.moveIn(try deposit(note: "Sam's share"), to: dinner, in: context)
 
@@ -48,7 +48,7 @@ struct ReimbursementMovingInTests {
     @Test func movingADepositInSendsItToRecentlyDeleted() throws {
         let deposit = try deposit()
 
-        try Reimbursement.moveIn(deposit, to: try store.dinner(), in: context, at: deletedAt)
+        try Reimbursement.moveIn(deposit, to: try store.recordDinner(), in: context, at: deletedAt)
 
         #expect(deposit.isInRecentlyDeleted)
         #expect(deposit.deletedAt == deletedAt)
@@ -56,7 +56,7 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func theMovedDepositCountsOnceInTheBalance() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         let deposit = try deposit()
         let today = store.today
         try context.save()
@@ -68,7 +68,7 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func restoringTheDepositUndoesTheMoveSoItCountsOnce() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         let deposit = try deposit()
         let kept = try context.payBack(10_00, on: day(2026, 10, 4), to: dinner)
         try Reimbursement.moveIn(deposit, to: dinner, in: context, at: deletedAt)
@@ -83,7 +83,7 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func restoringTheDepositUndoesTheMoveEvenAfterTheEntryWasEdited() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         let deposit = try deposit()
         let entry = try Reimbursement.moveIn(deposit, to: dinner, in: context, at: deletedAt)
         try entry.update(with: ReimbursementDraft(amount: Money(cents: 30_00), day: day(2026, 10, 6)))
@@ -95,7 +95,7 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func restoringTheDepositOfAnExpenseInRecentlyDeletedTakesItsEntryOffToo() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         let deposit = try deposit()
         try Reimbursement.moveIn(deposit, to: dinner, in: context, at: deletedAt)
         try dinner.delete(.onlySelected, in: context, at: deletedAt)
@@ -108,7 +108,7 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func removingTheMovedDepositForGoodKeepsItsEntry() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         let deposit = try deposit()
         try Reimbursement.moveIn(deposit, to: dinner, in: context, at: deletedAt)
 
@@ -119,7 +119,7 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func aDepositCanBeMovedInAfterOtherEntries() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         try context.payBack(20_00, on: day(2026, 10, 4), to: dinner)
 
         try Reimbursement.moveIn(try deposit(10_00), to: dinner, in: context)
@@ -129,7 +129,7 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func aDepositAboveTheExpenseMovesInAsAnOverReimbursement() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
 
         try Reimbursement.moveIn(try deposit(100_00), to: dinner, in: context)
 
@@ -139,7 +139,7 @@ struct ReimbursementMovingInTests {
     // MARK: What can't move in
 
     @Test func onlyMoneyThatCameInUnderAnIncomeCategoryCanMoveIn() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         let salary = try deposit()
         let expense = try store.record(-15_00, "Restaurants", on: day(2026, 10, 4))
         let adjustment = try deposit()
@@ -158,7 +158,7 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func aDepositInAnotherWalletCantMoveInAndNothingChanges() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         let savings = context.addWallet("Savings")
         let elsewhere = try store.record(25_00, "Tips", .income, on: day(2026, 10, 5), in: savings)
 
@@ -171,7 +171,7 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func whatAnOverpaidLoanBringsInCantMoveIn() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         let loan = try store.lendOrBorrow(.loan, 100_00, on: day(2026, 10, 1))
         let overpaid = try #require(try context.pay(120_00, on: loan, on: day(2026, 10, 5)).overpayment)
         #expect(overpaid.category?.type == .income)
@@ -184,7 +184,7 @@ struct ReimbursementMovingInTests {
     }
 
     @Test func aTransactionThatIsntADepositIsRefusedAndNothingChanges() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         let lunch = try store.record(-15_00, "Restaurants", on: day(2026, 10, 4))
 
         #expect(throws: ReimbursementRuleError.notADeposit) {
@@ -210,11 +210,11 @@ struct ReimbursementMovingInTests {
     // MARK: The row's list of entries
 
     @Test func anExpenseWithoutReimbursementsHasNoSummary() throws {
-        #expect(try store.dinner().reimbursementSummary(locale: unitedStates) == "")
+        #expect(try store.recordDinner().reimbursementSummary(locale: unitedStates) == "")
     }
 
     @Test func theSummaryListsEntriesEarliestFirstAndDropsWholeCents() throws {
-        let dinner = try store.dinner()
+        let dinner = try store.recordDinner()
         try context.payBack(10_00, on: day(2026, 10, 6), to: dinner)
         try context.payBack(20_00, on: day(2026, 10, 4), to: dinner)
         try context.payBack(3_50, on: day(2026, 10, 9), to: dinner)

@@ -21,11 +21,7 @@ struct PurchaseProgressTests {
     private func laptop(
         total: Int?, starting start: CalendarDay = CalendarDay(year: 2026, month: 9, day: 1)
     ) -> RecurringDraft {
-        var draft = RecurringDraft(startDay: start)
-        draft.name = "Laptop"
-        draft.amount = Money(cents: 10_000)
-        draft.wallet = store.checking
-        draft.category = context.addCategory("Shopping", .expense)
+        var draft = store.recurringDraft("Laptop", 100_00, under: context.addCategory("Shopping"), starting: start)
         draft.kind = .purchase
         draft.total = total.map { Money(cents: $0) }
         return draft

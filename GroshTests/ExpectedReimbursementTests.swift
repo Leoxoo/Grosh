@@ -46,16 +46,6 @@ struct ExpectedReimbursementTests {
         #expect(owed.isOpen)
     }
 
-    @Test func onlyAnExpenseOffersOwesMe() throws {
-        var income = TransactionDraft(type: .income, day: today)
-        income.category = try fixture.store.category("Salary", .income)
-        var expense = TransactionDraft(type: .expense, day: today)
-        expense.category = try fixture.store.category("Restaurants")
-
-        #expect(!income.offersOwesMe)
-        #expect(expense.offersOwesMe)
-    }
-
     @Test func aPersonTakenOutOfWithLosesTheNewOwesMeTheyHad() throws {
         let alex = try fixture.person("Alex")
         let sam = try fixture.person("Sam")

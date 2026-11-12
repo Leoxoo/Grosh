@@ -9,7 +9,6 @@ import Testing
 final class RecordingContactLookup: ContactLookup {
     enum Call: Equatable {
         case requestAccess
-        case search(String)
         case contacts([String])
     }
 
@@ -34,18 +33,10 @@ final class RecordingContactLookup: ContactLookup {
         return access
     }
 
-    func search(_ typed: String) async -> [Contact] {
-        calls.append(.search(typed))
-        return []
-    }
+    func search(_ typed: String) async -> [Contact] { [] }
 
     func contacts(withIdentifiers identifiers: [String]) async -> [Contact] {
         calls.append(.contacts(identifiers))
         return access.showsContacts ? book.filter { identifiers.contains($0.identifier) } : []
-    }
-
-    /// Changes the user's mind in Settings.
-    func allow(_ access: ContactsAccess) {
-        self.access = access
     }
 }

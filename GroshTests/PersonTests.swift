@@ -177,7 +177,7 @@ struct PersonTests {
 
         #expect(!draft.canSave)
         #expect(throws: TransactionRuleError.tooManyWith) { try Transaction.create(draft, in: context) }
-        #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 0)
+        #expect(try context.transactionCount() == 0)
     }
 
     @Test func anExpenseNeedsNoPerson() throws {

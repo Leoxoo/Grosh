@@ -27,11 +27,7 @@ struct EstimatedAmountTests {
     private func electricity(
         under category: Grosh.Category, varies: Bool = true, remindAfter: Int = 2
     ) -> RecurringDraft {
-        var draft = RecurringDraft(startDay: day(2026, 10, 12))
-        draft.name = "Electricity"
-        draft.amount = Money(cents: 2_500)
-        draft.wallet = store.checking
-        draft.category = category
+        var draft = store.recurringDraft("Electricity", 25_00, under: category, starting: day(2026, 10, 12))
         draft.kind = .bill
         draft.amountVaries = varies
         draft.remindAfterDays = remindAfter
@@ -195,7 +191,7 @@ struct EstimatedAmountTests {
         let made = try estimatedElectricity()
 
         #expect(made.amountCents < 0)
-        #expect(EstimatedAmountDraft(confirming: made).amount.cents == -made.amountCents)
+        #expect(EstimatedAmountDraft(confirming: made).amount.cents == 25_00)
     }
 
     @Test func confirmingNothingIsRefusedAndKeepsTheEstimate() throws {

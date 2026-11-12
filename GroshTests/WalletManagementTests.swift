@@ -56,7 +56,7 @@ struct WalletManagementTests {
             try Wallet.create(draft, startingBalance: Money(cents: 100_00), on: today, in: context)
         }
         #expect(try context.fetchCount(FetchDescriptor<Wallet>()) == 0)
-        #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 0)
+        #expect(try context.transactionCount() == 0)
     }
 
     @Test func editingAWalletSavesItsFieldsAndKeepsItsTransactions() throws {
@@ -105,9 +105,7 @@ struct WalletManagementTests {
 
     @Test func onlyAStartingBalanceTakesAStartingBalanceEdit() throws {
         let checking = try addWallet("Checking")
-        let salary = Transaction.insert(cents: 2_000_00, on: today, wallet: nil, category: nil, in: context)
-        salary.wallet = checking
-        salary.category = try context.lockedCategory(.otherIncome)
+        let salary = context.record(2_000_00, on: today, in: checking, under: try context.lockedCategory(.otherIncome))
         var edit = StartingBalanceDraft(editing: salary)
         edit.amount = Money(cents: -5_00)
 

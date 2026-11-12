@@ -36,8 +36,7 @@ struct RecurringTransactionTests {
     }
 
     @Test func theTransactionMadeCarriesTheSchedulesFieldsAndAnExpenseSign() throws {
-        let card = Card(name: "Visa", kind: .credit, payingWallet: store.checking)
-        context.insert(card)
+        let card = try context.addCard("Visa", paidFrom: store.checking)
         var draft = netflix(starting: day(2026, 10, 12))
         draft.card = card
         let recurring = try RecurringTransaction.create(draft, today: today, in: context)
@@ -149,10 +148,9 @@ struct RecurringTransactionTests {
         #expect(transactions.first?.recurring == nil)
     }
 
-    @Test func aCardFromAnotherWalletIsRefused() {
+    @Test func aCardFromAnotherWalletIsRefused() throws {
         let savings = context.addWallet("Savings")
-        let card = Card(name: "Amex", kind: .credit, payingWallet: savings)
-        context.insert(card)
+        let card = try context.addCard("Amex", paidFrom: savings)
         var draft = netflix(starting: day(2026, 10, 12))
         draft.card = card
 

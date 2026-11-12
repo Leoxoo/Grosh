@@ -59,9 +59,7 @@ struct MonthGraphEarlierMonthTests {
     @Test func anExpensePaidBackInFullIntoAnotherWalletDoesntStartTheStrip() throws {
         let cash = context.addWallet("Cash")
         let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 8, 3))
-        try dinner.recordPaybackElsewhere(
-            ReimbursementDraft(amount: Money(cents: 60_00), day: day(2026, 8, 5)), into: cash
-        )
+        try context.payBack(60_00, on: day(2026, 8, 5), to: dinner, into: cash)
         try store.record(-25_00, "Café", on: day(2026, 9, 5))
 
         #expect(try store.strip() == [.month(month(2026, 9)), .month(month(2026, 10))])
@@ -72,9 +70,7 @@ struct MonthGraphEarlierMonthTests {
     @Test func aPaybackTheTotalLeavesOutDoesntHideTheMonthsAfterIt() throws {
         let cash = context.addWallet("Cash")
         let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 8, 10))
-        try dinner.recordPaybackElsewhere(
-            ReimbursementDraft(amount: Money(cents: 20_00), day: day(2026, 7, 28)), into: cash
-        )
+        try context.payBack(20_00, on: day(2026, 7, 28), to: dinner, into: cash)
 
         #expect(try store.strip() == [.month(month(2026, 8)), .month(month(2026, 9)), .month(month(2026, 10))])
     }

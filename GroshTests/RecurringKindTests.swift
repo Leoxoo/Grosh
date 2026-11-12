@@ -17,16 +17,10 @@ struct RecurringKindTests {
         store = try TestStore()
     }
 
-    /// A monthly membership from the 12th, paid from the fixture's wallet in `category`, starting as that category's
-    /// default Kind, as the new-Recurring form pre-fills it.
+    /// A monthly membership from the 12th, paid from the fixture's wallet in `category`, as the new-Recurring form
+    /// fills it.
     private func membership(in category: Grosh.Category) -> RecurringDraft {
-        var draft = RecurringDraft(startDay: CalendarDay(year: 2026, month: 10, day: 12))
-        draft.name = "Gym"
-        draft.amount = Money(cents: 2000)
-        draft.wallet = store.checking
-        draft.category = category
-        draft.kind = category.defaultKind
-        return draft
+        store.recurringDraft("Gym", 20_00, under: category, starting: day(2026, 10, 12))
     }
 
     @Test func aRecurringTransactionIsRegularUnlessItsKindIsSet() {

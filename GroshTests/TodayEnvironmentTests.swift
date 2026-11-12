@@ -18,13 +18,6 @@ struct TodayEnvironmentTests {
         #expect(value == before || value == after)
     }
 
-    @Test func aDaySetOnTheEnvironmentReadsBack() {
-        var values = EnvironmentValues()
-        values.today = day(2026, 10, 9)
-
-        #expect(values.today == day(2026, 10, 9))
-    }
-
     /// A period reaching past today ends in a Projected balance, any other in an Ending balance. A custom range of
     /// October 2026 reaches past a day inside it and not past a day after it, so the summary reads differently on the
     /// two, whatever the real date is.

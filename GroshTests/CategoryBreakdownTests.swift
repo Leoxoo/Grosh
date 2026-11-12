@@ -18,8 +18,7 @@ struct CategoryBreakdownTests {
 
     /// The breakdown of `side` for October, the Total, from every transaction in the store.
     private func breakdown(_ side: SpentOrIncome) throws -> CategoryBreakdown {
-        let counted = try CountedHistory(store.transactions(), in: .total, currencyCode: "USD", otherIncome: store.otherIncome())
-            .during(.month(CalendarMonth(today)), today: today)
+        let counted = try store.history().during(.month(CalendarMonth(today)), today: today)
         return CategoryBreakdown(side: side, of: counted, currencyCode: "USD")
     }
 

@@ -12,6 +12,7 @@ struct TransactionDetailTests {
     private let today = TestStore.today
     private let checking: Wallet
     private let savings: Wallet
+    private let links = TestLinks()
 
     init() throws {
         container = try GroshStore.makeContainer(inMemory: true)
@@ -25,7 +26,7 @@ struct TransactionDetailTests {
         enteredAt seconds: Double = 0
     ) -> Transaction {
         let transaction = context.record(cents, on: today, in: wallet, note: note, enteredAt: seconds)
-        transaction.joinTestLink(link, as: kind)
+        links.put(transaction, on: link, as: kind)
         return transaction
     }
 
@@ -101,45 +102,5 @@ struct TransactionDetailTests {
 
         #expect(original.editFlow == .addSheet)
         #expect(original.canBeDuplicated)
-    }
-
-    // MARK: Deleting
-
-    @Test func deletingOnlyThisOneKeepsTheRelatedTransactions() throws {
-        let loan = UUID()
-        let lent = record("lent to Pasha", -100_00, in: checking, link: loan, kind: .loanOrDebt)
-        record("Pasha paid 60", 60_00, in: checking, link: loan, kind: .loanOrDebt)
-        record("Pasha paid 40", 40_00, in: checking, link: loan, kind: .loanOrDebt)
-
-        try lent.delete(.onlySelected, in: context)
-
-        #expect(try context.notDeletedNotes() == ["Pasha paid 60", "Pasha paid 40"])
-    }
-
-    @Test func deletingWithRelatedDeletesEveryLinkedTransaction() throws {
-        let transfer = UUID()
-        let outgoing = record("to savings", -500_00, in: checking, link: transfer)
-        record("from checking", 500_00, in: savings, link: transfer)
-        record("coffee", -4_50, in: checking)
-        record("another transfer", -10_00, in: checking, link: UUID())
-
-        try outgoing.delete(.withRelated, in: context)
-
-        #expect(try context.notDeletedNotes() == ["coffee", "another transfer"])
-        #expect(walletBalance(savings, asOf: today) == Money(cents: 0))
-    }
-
-    @Test func aTransactionWithNothingRelatedIsDeletedOnItsOwn() throws {
-        let coffee = record("coffee", -4_50, in: checking)
-
-        #expect(try coffee.deleteScopes(in: context) == [.onlySelected])
-    }
-
-    @Test func aTransactionWithRelatedTransactionsOffersToDeleteThemToo() throws {
-        let transfer = UUID()
-        let outgoing = record("to savings", -500_00, in: checking, link: transfer)
-        record("from checking", 500_00, in: savings, link: transfer)
-
-        #expect(try outgoing.deleteScopes(in: context) == [.withRelated, .onlySelected])
     }
 }

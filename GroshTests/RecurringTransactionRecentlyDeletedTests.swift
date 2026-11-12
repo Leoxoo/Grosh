@@ -42,7 +42,7 @@ struct RecurringTransactionRecentlyDeletedTests {
         try RecurringTransaction.catchUp(through: day(2026, 12, 31), in: context)
 
         #expect(!recurring.isActive)
-        #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 0)
+        #expect(try context.transactionCount() == 0)
     }
 
     // MARK: Restoring a schedule
