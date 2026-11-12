@@ -85,7 +85,7 @@ struct ReportTotalsTests {
         var draft = TransferDraft(day: day(2026, 10, 4))
         draft.from = checking
         draft.to = savings
-        draft.amount = Money(cents: 250_00)
+        draft.entry = AmountEntry(cents: 250_00)
         try Transfer.create(draft, in: context)
 
         #expect(try totals(.wallet(checking)) == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))

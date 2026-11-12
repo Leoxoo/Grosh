@@ -25,7 +25,7 @@ struct SuggestDefaultsTests {
         let cafe = try #require(try context.fetch(FetchDescriptor<Grosh.Category>()).first { $0.name == "Café" })
         var draft = TransactionDraft(type: .expense, day: today)
         draft.wallet = wallet
-        draft.amount = Money(cents: 450)
+        draft.entry = AmountEntry(cents: 450)
         draft.category = cafe
         let transaction = try Transaction.create(draft, in: context)
         transaction.createdAt = Date.now.addingTimeInterval(-minutesAgo * 60)

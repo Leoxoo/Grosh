@@ -12,12 +12,8 @@ nonisolated protocol AmountDraft {
 
 nonisolated extension AmountDraft {
     /// What ``entry`` comes to, in ``currencyCode``. An empty entry, or one showing an error such as a division by zero,
-    /// comes to zero, which no draft that needs an amount saves. Setting it shows the amount on the Keypad as one the
-    /// draft starts from, which the first digit replaces; zero shows an empty Keypad.
-    var amount: Money {
-        get { Money(cents: entry.cents ?? 0, currencyCode: currencyCode) }
-        set { entry = AmountEntry(cents: newValue.cents, kind: entry.kind) }
-    }
+    /// comes to zero, which no draft that needs an amount saves.
+    var amount: Money { Money(cents: entry.cents ?? 0, currencyCode: currencyCode) }
 }
 
 extension TransactionDraft: AmountDraft {}

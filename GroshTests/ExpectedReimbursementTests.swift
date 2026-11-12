@@ -145,7 +145,7 @@ struct ExpectedReimbursementTests {
         let totalsBefore = try fixture.totals()
 
         var draft = TransactionDraft(editing: dinner)
-        draft.owes[0].amount = Money(cents: 10_00)
+        draft.owes[0].entry = AmountEntry(cents: 10_00)
         try dinner.update(with: draft)
         #expect(try fixture.expectation(of: alex, on: dinner).expected == Money(cents: 10_00))
         #expect(walletBalance(fixture.checking, asOf: today) == balanceBefore)
@@ -231,7 +231,7 @@ struct ExpectedReimbursementTests {
         let sam = try fixture.person("Sam")
         let dinner = try fixture.dinner(owing: [(alex, 30_00), (sam, 20_00)])
         var cheaper = TransactionDraft(editing: dinner)
-        cheaper.amount = Money(cents: 40_00)
+        cheaper.entry = AmountEntry(cents: 40_00)
 
         #expect(throws: ExpectedReimbursementRuleError.amountAboveExpense) {
             try dinner.update(with: cheaper)
@@ -243,16 +243,16 @@ struct ExpectedReimbursementTests {
         let alex = try fixture.person("Alex")
         var draft = TransactionDraft(type: .expense, day: today)
         draft.wallet = fixture.checking
-        draft.amount = Money(cents: 60_00)
+        draft.entry = AmountEntry(cents: 60_00)
         draft.category = try fixture.store.category("Restaurants")
         draft.people = [alex]
         draft.addOwes(alex)
-        draft.owes[0].amount = Money(cents: 70_00)
+        draft.owes[0].entry = AmountEntry(cents: 70_00)
 
         #expect(throws: ExpectedReimbursementRuleError.amountAboveExpense) {
             try Transaction.create(draft, in: context)
         }
-        draft.owes[0].amount = Money(cents: 0)
+        draft.owes[0].entry = AmountEntry(showing: 0)
         #expect(throws: ExpectedReimbursementRuleError.invalidAmount) {
             try Transaction.create(draft, in: context)
         }

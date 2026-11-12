@@ -55,7 +55,7 @@ struct TestStore {
     ) -> RecurringDraft {
         var draft = RecurringDraft(startDay: start)
         draft.name = "Netflix"
-        draft.amount = Money(cents: 15_99)
+        draft.entry = AmountEntry(cents: 15_99)
         draft.wallet = wallet ?? checking
         draft.category = context.addCategory("Subscriptions")
         draft.preset = preset
@@ -90,7 +90,7 @@ struct TestStore {
     func eat(with people: [Person]) throws -> Transaction {
         var draft = TransactionDraft(type: .expense, day: Self.today)
         draft.wallet = checking
-        draft.amount = Money(cents: 30_00)
+        draft.entry = AmountEntry(cents: 30_00)
         draft.category = try category("Restaurants")
         draft.people = people
         return try Transaction.create(draft, in: context)
@@ -186,7 +186,7 @@ extension ModelContext {
     ) throws -> Transaction {
         var draft = TransactionDraft(type: .debtLoan, day: day)
         draft.wallet = wallet
-        draft.amount = Money(cents: cents)
+        draft.entry = AmountEntry(cents: cents)
         draft.category = try lockedCategory(role)
         draft.people = [person]
         draft.reminderDay = reminderDay
@@ -197,7 +197,7 @@ extension ModelContext {
     @discardableResult
     func pay(_ cents: Int, on loanOrDebt: Transaction, on day: CalendarDay) throws -> DebtPayment {
         var draft = try DebtPaymentDraft(settling: loanOrDebt, on: day, in: self)
-        draft.amount = Money(cents: cents)
+        draft.entry = AmountEntry(cents: cents)
         return try DebtPayment.record(draft, in: self)
     }
 

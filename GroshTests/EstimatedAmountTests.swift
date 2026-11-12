@@ -29,7 +29,7 @@ struct EstimatedAmountTests {
     ) -> RecurringDraft {
         var draft = RecurringDraft(startDay: day(2026, 10, 12))
         draft.name = "Electricity"
-        draft.amount = Money(cents: 2_500)
+        draft.entry = AmountEntry(cents: 2_500)
         draft.wallet = store.checking
         draft.category = category
         draft.kind = .bill
@@ -82,7 +82,7 @@ struct EstimatedAmountTests {
         try record(5_000, under: water)
         var draft = electricity(under: water)
         draft.name = "Water"
-        draft.amount = Money(cents: 0)
+        draft.entry = AmountEntry(cents: 0)
         draft = estimated(draft)
 
         #expect(draft.estimateCents == 5_000)
@@ -98,7 +98,7 @@ struct EstimatedAmountTests {
 
     @Test func aVaryingBillWithNoEstimateAndNoAmountCannotBeSaved() {
         var draft = electricity(under: context.addCategory("Water"))
-        draft.amount = Money(cents: 0)
+        draft.entry = AmountEntry(cents: 0)
         draft = estimated(draft)
         #expect(!draft.canSave)
     }
@@ -107,7 +107,7 @@ struct EstimatedAmountTests {
         let water = context.addCategory("Water")
         try record(5_000, under: water)
         var draft = electricity(under: water, varies: false)
-        draft.amount = Money(cents: 0)
+        draft.entry = AmountEntry(cents: 0)
         draft = estimated(draft)
 
         #expect(draft.estimateCents == nil)
@@ -235,7 +235,7 @@ struct EstimatedAmountTests {
         #expect(made.isEstimated)
 
         var amountEdit = TransactionDraft(editing: made)
-        amountEdit.amount = Money(cents: 4_000)
+        amountEdit.entry = AmountEntry(cents: 4_000)
         try made.update(with: amountEdit)
         #expect(made.amountCents == -4_000)
         #expect(!made.isEstimated)

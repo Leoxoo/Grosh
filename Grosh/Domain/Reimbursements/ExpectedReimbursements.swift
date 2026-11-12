@@ -201,10 +201,8 @@ extension ExpectedReimbursement: RemindedRecord, ListedWithReminder {
 /// the reminder day.
 nonisolated struct OwesMeDraft {
     let person: Person
-    /// Entered positive, or `nil` while blank: an open amount. Typed on the Keypad with ``setAmount(typed:in:)``.
-    var amount: Money?
-    /// The amount as the Keypad shows it: blank for an open amount.
-    private(set) var typedAmount: AmountEntry
+    /// The amount as typed on the Keypad, in the Expense's currency: blank for an open amount.
+    var entry: AmountEntry
     /// On by default, a week after the Expense. `nil` switches it off.
     var reminderDay: CalendarDay?
     /// The expectation being edited, or `nil` for a new one.
@@ -215,7 +213,7 @@ nonisolated struct OwesMeDraft {
     /// A new expectation for `person` on an Expense dated `expenseDay`.
     init(person: Person, expenseDay: CalendarDay) {
         self.person = person
-        typedAmount = AmountEntry()
+        entry = AmountEntry()
         reminderDay = ReminderDay.default(after: expenseDay)
     }
 
@@ -223,22 +221,17 @@ nonisolated struct OwesMeDraft {
     init?(editing expectation: ExpectedReimbursement) {
         guard let person = expectation.person else { return nil }
         self.person = person
-        amount = expectation.expected
-        typedAmount = AmountEntry(cents: expectation.expected?.cents ?? 0)
+        entry = expectation.amountCents.map { AmountEntry(showing: $0) } ?? AmountEntry()
         reminderDay = expectation.reminderDay
         existing = expectation
         hasPayments = expectation.hasPayments
     }
 
-    /// Takes the amount as typed on the Keypad, in `currencyCode`: nothing typed is an open amount, and anything that
-    /// isn't an amount above zero comes to zero, which saving refuses (``ExpectedReimbursementRuleError/invalidAmount``).
-    mutating func setAmount(typed entry: AmountEntry, in currencyCode: String) {
-        typedAmount = entry
-        if entry.isEmpty {
-            amount = nil
-        } else {
-            amount = Money(cents: max(entry.cents ?? 0, 0), currencyCode: currencyCode)
-        }
+    /// What the Person is expected to pay back, in cents, or `nil` for an open amount, when nothing is typed. Anything
+    /// typed that isn't an amount above zero comes to zero, which saving refuses
+    /// (``ExpectedReimbursementRuleError/invalidAmount``).
+    var expectedCents: Int? {
+        entry.isEmpty ? nil : max(entry.cents ?? 0, 0)
     }
 }
 
@@ -267,7 +260,7 @@ extension Transaction {
                 expectation.expense = self
                 expectation.person = entry.person
             }
-            expectation.amountCents = entry.amount?.cents
+            expectation.amountCents = entry.expectedCents
             expectation.reminderDay = entry.reminderDay
         }
     }
@@ -321,7 +314,7 @@ nonisolated extension TransactionDraft {
             guard people.contains(where: { $0 === entry.person }) else {
                 throw ExpectedReimbursementRuleError.personNotInWith(entry.person.name)
             }
-            if let cents = entry.amount?.cents {
+            if let cents = entry.expectedCents {
                 guard cents > 0 else { throw ExpectedReimbursementRuleError.invalidAmount }
                 guard cents <= amount.cents else { throw ExpectedReimbursementRuleError.amountAboveExpense }
                 total += cents

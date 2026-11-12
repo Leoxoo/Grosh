@@ -30,7 +30,7 @@ struct TransferTests {
         var draft = TransferDraft(day: today)
         draft.from = checking
         draft.to = savings
-        draft.amount = Money(cents: cents)
+        draft.entry = AmountEntry(cents: cents)
         draft.note = note
         return draft
     }
@@ -47,7 +47,7 @@ struct TransferTests {
     @Test func aNewTransferStartsTodayFromTheLastUsedWalletToTheFirstOtherOne() throws {
         var spent = TransactionDraft(type: .income, day: today)
         spent.wallet = savings
-        spent.amount = Money(cents: 20_00)
+        spent.entry = AmountEntry(cents: 20_00)
         spent.category = try context.lockedCategory(.otherIncome)
         try Transaction.create(spent, in: context)
 
@@ -161,7 +161,7 @@ struct TransferTests {
     @Test func changingTheAmountAsksWhetherToUpdateBothHalves() throws {
         let transfer = try Transfer.create(draft(250_00), in: context)
         var edited = TransferHalfDraft(editing: transfer.outgoing)
-        edited.amount = Money(cents: 255_00)
+        edited.entry = AmountEntry(cents: 255_00)
 
         #expect(try transfer.outgoing.offersToUpdateOtherHalf(with: edited))
     }
@@ -189,7 +189,7 @@ struct TransferTests {
         let transfer = try Transfer.create(draft(250_00), in: context)
         try transfer.incoming.delete(.onlySelected)
         var edited = TransferHalfDraft(editing: transfer.outgoing)
-        edited.amount = Money(cents: 255_00)
+        edited.entry = AmountEntry(cents: 255_00)
 
         #expect(transfer.outgoing.editFlow == .transferHalf)
         #expect(try !transfer.outgoing.offersToUpdateOtherHalf(with: edited))
@@ -198,7 +198,7 @@ struct TransferTests {
     @Test func changingOnlyThisOneLeavesTheHalvesDifferentLikeAFee() throws {
         let transfer = try Transfer.create(draft(250_00), in: context)
         var edited = TransferHalfDraft(editing: transfer.outgoing)
-        edited.amount = Money(cents: 255_00)
+        edited.entry = AmountEntry(cents: 255_00)
 
         try transfer.outgoing.update(with: edited, scope: .onlyThisOne)
 
@@ -210,7 +210,7 @@ struct TransferTests {
     @Test func updatingBothGivesTheOtherHalfTheNewAmount() throws {
         let transfer = try Transfer.create(draft(250_00), in: context)
         var edited = TransferHalfDraft(editing: transfer.incoming)
-        edited.amount = Money(cents: 300_00)
+        edited.entry = AmountEntry(cents: 300_00)
 
         try transfer.incoming.update(with: edited, scope: .bothHalves)
 
@@ -221,7 +221,7 @@ struct TransferTests {
     @Test func updatingBothMovesTheOtherHalfToTheNewDateAndKeepsAFeeTakenBefore() throws {
         let transfer = try Transfer.create(draft(250_00), in: context)
         var fee = TransferHalfDraft(editing: transfer.outgoing)
-        fee.amount = Money(cents: 255_00)
+        fee.entry = AmountEntry(cents: 255_00)
         try transfer.outgoing.update(with: fee, scope: .onlyThisOne)
         var moved = TransferHalfDraft(editing: transfer.outgoing)
         moved.day = CalendarDay(year: 2026, month: 10, day: 2)
@@ -236,7 +236,7 @@ struct TransferTests {
     @Test func anEditWithoutAnAmountIsRefusedAndChangesNeitherHalf() throws {
         let transfer = try Transfer.create(draft(250_00), in: context)
         var edited = TransferHalfDraft(editing: transfer.outgoing)
-        edited.amount = Money(cents: 0)
+        edited.entry = AmountEntry(cents: 0)
 
         #expect(!edited.canSave)
         #expect(throws: TransferRuleError.missingAmount) {
@@ -302,7 +302,7 @@ struct TransferTests {
     @Test func anOrdinaryTransactionCountsAsIncomeOrSpendingUnlessExcludedFromReport() throws {
         var coffee = TransactionDraft(type: .expense, day: today)
         coffee.wallet = checking
-        coffee.amount = Money(cents: 4_50)
+        coffee.entry = AmountEntry(cents: 4_50)
         let cafe = try #require(try context.fetch(FetchDescriptor<Grosh.Category>()).first { $0.name == "Café" })
         coffee.category = cafe
         let counted = try Transaction.create(coffee, in: context)

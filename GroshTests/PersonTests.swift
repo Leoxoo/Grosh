@@ -26,7 +26,7 @@ struct PersonTests {
     private func loanDraft(with people: [Person]) throws -> TransactionDraft {
         var draft = TransactionDraft(type: .debtLoan, day: today)
         draft.wallet = store.checking
-        draft.amount = Money(cents: 100_00)
+        draft.entry = AmountEntry(cents: 100_00)
         draft.category = try context.lockedCategory(.loan)
         draft.people = people
         return draft
@@ -183,7 +183,7 @@ struct PersonTests {
     @Test func anExpenseNeedsNoPerson() throws {
         var draft = TransactionDraft(type: .expense, day: today)
         draft.wallet = store.checking
-        draft.amount = Money(cents: 30_00)
+        draft.entry = AmountEntry(cents: 30_00)
         draft.category = try store.category("Restaurants")
 
         #expect(draft.canSave)

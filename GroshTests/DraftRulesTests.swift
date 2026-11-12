@@ -54,7 +54,7 @@ struct DraftRulesTests {
         streaming.ownKind = .subscription
         var draft = RecurringDraft(startDay: today)
         draft.name = "Gym"
-        draft.amount = Money(cents: 30_00)
+        draft.entry = AmountEntry(cents: 30_00)
         draft.wallet = fixture.checking
         draft.pickedCategory = context.addCategory("Sport")
         let saved = try RecurringTransaction.create(draft, today: today, in: context)
@@ -69,7 +69,7 @@ struct DraftRulesTests {
     @Test func pastOccurrencesAreOfferedForANewScheduleOrAMovedStart() throws {
         var draft = RecurringDraft(startDay: today)
         draft.name = "Gym"
-        draft.amount = Money(cents: 30_00)
+        draft.entry = AmountEntry(cents: 30_00)
         draft.wallet = fixture.checking
         draft.pickedCategory = context.addCategory("Sport")
         #expect(draft.offersPastOccurrences)
@@ -85,7 +85,7 @@ struct DraftRulesTests {
     @Test func aTotalOfZeroIsNoTotalAndOneThatCantBeWorkedOutIsRefused() {
         var draft = RecurringDraft(startDay: today)
         draft.name = "Laptop"
-        draft.amount = Money(cents: 100_00)
+        draft.entry = AmountEntry(cents: 100_00)
         draft.wallet = fixture.checking
         draft.pickedCategory = context.addCategory("Gadgets")
 
@@ -107,19 +107,17 @@ struct DraftRulesTests {
     @Test func aTypedOwesMeAmountIsOpenWhenBlankAndZeroWhenItIsNoAmount() throws {
         var owes = OwesMeDraft(person: try fixture.person("Ann"), expenseDay: today)
 
-        owes.setAmount(typed: AmountEntry(cents: 12_00), in: "EUR")
-        #expect(owes.amount == Money(cents: 12_00, currencyCode: "EUR"))
-        #expect(owes.typedAmount == AmountEntry(cents: 12_00))
+        owes.entry = AmountEntry(cents: 12_00)
+        #expect(owes.expectedCents == 12_00)
 
-        owes.setAmount(typed: AmountEntry(), in: "EUR")
-        #expect(owes.amount == nil)
+        owes.entry = AmountEntry()
+        #expect(owes.expectedCents == nil)
 
-        var divided = AmountEntry(cents: 5_00)
-        divided.press(.operation(.divide))
-        divided.press(.digit(0))
-        divided.press(.equals)
-        owes.setAmount(typed: divided, in: "EUR")
-        #expect(owes.amount == Money(cents: 0, currencyCode: "EUR"))
+        owes.entry = AmountEntry(cents: 5_00)
+        owes.entry.press(.operation(.divide))
+        owes.entry.press(.digit(0))
+        owes.entry.press(.equals)
+        #expect(owes.expectedCents == 0)
     }
 
     @Test func owesMeIsOfferedForThoseInWithWhoDontOweYetOnAnExpense() throws {
@@ -173,7 +171,7 @@ struct DraftRulesTests {
         var split = SplitDraft(splitting: try fixture.dinner(60_00))
         var part = split.newPart()
         #expect(part.entry.isEmpty)
-        part.amount = Money(cents: 80_00)
+        part.entry = AmountEntry(cents: 80_00)
 
         split.addPart(part)
         #expect(split.original.amount.cents == -20_00)

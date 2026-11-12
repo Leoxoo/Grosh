@@ -152,7 +152,7 @@ nonisolated struct TransactionDraft {
     init(paymentFor recurring: RecurringTransaction, on today: CalendarDay) {
         self.init(type: recurring.category?.type ?? .expense, day: today)
         wallet = recurring.wallet
-        amount = Money(cents: abs(recurring.amountCents), currencyCode: recurring.currencyCode)
+        entry = AmountEntry(cents: abs(recurring.amountCents))
         category = recurring.category
         card = recurring.card
         note = recurring.note
@@ -161,7 +161,7 @@ nonisolated struct TransactionDraft {
     private init(copying transaction: Transaction, day: CalendarDay) {
         self.init(type: transaction.category?.type ?? .expense, day: day)
         wallet = transaction.wallet
-        amount = Money(cents: abs(transaction.amountCents), currencyCode: transaction.amount.currencyCode)
+        entry = AmountEntry(cents: abs(transaction.amountCents))
         category = transaction.category
         card = transaction.card
         note = transaction.note

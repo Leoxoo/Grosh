@@ -24,13 +24,11 @@ struct OwesMeAddButtons: View {
 struct OwesMeSections: View {
     @Binding var draft: TransactionDraft
 
-    private var currencyCode: String { draft.wallet.currencyCodeOrDefault }
-
     var body: some View {
         ForEach($draft.owes, id: \.person.persistentModelID) { $entry in
             Section(String(localized: Strings.OwesMe.personOwesMe(entry.person.name))) {
                 OwesMeRow(
-                    entry: $entry, currencyCode: currencyCode, expenseDay: draft.day,
+                    entry: $entry, currencyCode: draft.currencyCode, expenseDay: draft.day,
                     remove: entry.hasPayments ? nil : { draft.removeOwes(entry.person) }
                 )
             }
@@ -49,7 +47,7 @@ private struct OwesMeRow: View {
 
     var body: some View {
         AmountRow(
-            field: OwesMeAmountField(person: entry.person.persistentModelID), entry: typedAmount,
+            field: OwesMeAmountField(person: entry.person.persistentModelID), entry: $entry.entry,
             currencyCode: currencyCode, placeholder: Strings.OwesMe.unknownAmount, font: .body
         ) {
             Label(Strings.Common.amount, systemImage: "arrow.uturn.backward.circle")
@@ -58,14 +56,6 @@ private struct OwesMeRow: View {
         if let remove {
             Button(Strings.OwesMe.removeOwesMe, systemImage: "minus.circle", role: .destructive, action: remove)
         }
-    }
-
-    /// The amount on the Keypad, which the draft takes as an open amount or an amount (``OwesMeDraft/setAmount(typed:in:)``).
-    private var typedAmount: Binding<AmountEntry> {
-        Binding(
-            get: { entry.typedAmount },
-            set: { entry.setAmount(typed: $0, in: currencyCode) }
-        )
     }
 }
 

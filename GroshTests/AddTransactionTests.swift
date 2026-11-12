@@ -21,7 +21,7 @@ struct AddTransactionTests {
     private func draft(_ type: CategoryType, _ cents: Int, _ categoryName: String) throws -> TransactionDraft {
         var draft = TransactionDraft(type: type, day: today)
         draft.wallet = checking
-        draft.amount = Money(cents: cents)
+        draft.entry = AmountEntry(cents: cents)
         draft.category = try store.category(categoryName, type)
         if type == .debtLoan {
             draft.people = [try Person.add(named: "Pasha", in: context)]
@@ -339,7 +339,7 @@ struct AddTransactionTests {
         let original = try pashaLoan()
         let enteredAt = original.createdAt
         var editing = TransactionDraft(editing: original)
-        editing.amount = Money(cents: 12_000)
+        editing.entry = AmountEntry(cents: 12_000)
         editing.type = .debtLoan
         editing.category = try store.category("Debt", .debtLoan)
         editing.note = "Borrowed instead"
@@ -355,7 +355,7 @@ struct AddTransactionTests {
     @Test func anEditThatBreaksARuleChangesNothing() throws {
         let original = try pashaLoan()
         var editing = TransactionDraft(editing: original)
-        editing.amount = Money(cents: 0)
+        editing.entry = AmountEntry(cents: 0)
 
         #expect(throws: TransactionRuleError.missingAmount) { try original.update(with: editing) }
         #expect(original.amountCents == -10_000)

@@ -51,7 +51,7 @@ struct MonthGraphTests {
         var draft = TransferDraft(day: day(2026, 10, 4))
         draft.from = checking
         draft.to = savings
-        draft.amount = Money(cents: 250_00)
+        draft.entry = AmountEntry(cents: 250_00)
         try Transfer.create(draft, in: context)
 
         #expect(try store.graph(.spent).headline == Money(cents: 0))

@@ -23,11 +23,11 @@ struct PurchaseProgressTests {
     ) -> RecurringDraft {
         var draft = RecurringDraft(startDay: start)
         draft.name = "Laptop"
-        draft.amount = Money(cents: 10_000)
+        draft.entry = AmountEntry(cents: 10_000)
         draft.wallet = store.checking
         draft.category = context.addCategory("Shopping", .expense)
         draft.kind = .purchase
-        draft.total = total.map { Money(cents: $0) }
+        draft.totalEntry = AmountEntry(cents: total ?? 0)
         return draft
     }
 

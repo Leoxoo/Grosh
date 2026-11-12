@@ -122,7 +122,7 @@ struct ReimbursementBalanceTests {
         #expect(try entry().netCents == -40_00)
 
         var draft = ReimbursementDraft(editing: reimbursement)
-        draft.amount = Money(cents: 35_00)
+        draft.entry = AmountEntry(cents: 35_00)
         try reimbursement.update(with: draft)
         #expect(try entry().netCents == -25_00)
 

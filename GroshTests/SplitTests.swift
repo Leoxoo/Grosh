@@ -25,7 +25,7 @@ struct SplitTests {
     ) throws -> Transaction {
         var draft = TransactionDraft(type: type, day: today)
         draft.wallet = checking
-        draft.amount = Money(cents: cents)
+        draft.entry = AmountEntry(cents: cents)
         draft.category = try store.category(categoryName, type)
         draft.card = card
         return try Transaction.create(draft, in: context)
@@ -55,7 +55,7 @@ struct SplitTests {
         }
         for part in cents {
             var new = draft.newPart()
-            new.amount = Money(cents: part)
+            new.entry = AmountEntry(cents: part)
             if let categoryName {
                 new.category = try store.category(categoryName, transaction.category?.type ?? .expense)
             }
@@ -81,7 +81,7 @@ struct SplitTests {
         var draft = TransferDraft(day: today)
         draft.from = checking
         draft.to = savings
-        draft.amount = Money(cents: 50_00)
+        draft.entry = AmountEntry(cents: 50_00)
         let transfer = try Transfer.create(draft, in: context)
 
         #expect(!transfer.outgoing.canBeSplit)
@@ -183,16 +183,16 @@ struct SplitTests {
         #expect(draft.original.amount == Money(cents: 25_00))
 
         var first = draft.newPart()
-        first.amount = Money(cents: 10_00)
+        first.entry = AmountEntry(cents: 10_00)
         draft.addPart(first)
         #expect(draft.original.amount == Money(cents: 15_00))
 
         var second = draft.newPart()
-        second.amount = Money(cents: 4_00)
+        second.entry = AmountEntry(cents: 4_00)
         draft.addPart(second)
         #expect(draft.original.amount == Money(cents: 11_00))
 
-        first.amount = Money(cents: 12_00)
+        first.entry = AmountEntry(cents: 12_00)
         draft.replacePart(at: 0, with: first)
         #expect(draft.original.amount == Money(cents: 9_00))
 
@@ -221,7 +221,7 @@ struct SplitTests {
         let category = try store.category("Café")
         var schedule = RecurringDraft(startDay: today)
         schedule.name = "Coffee"
-        schedule.amount = Money(cents: 25_00)
+        schedule.entry = AmountEntry(cents: 25_00)
         schedule.wallet = checking
         schedule.category = category
         let recurring = try RecurringTransaction.create(schedule, today: today, in: context)
@@ -273,7 +273,7 @@ struct SplitTests {
         let coffee = try record(25_00)
         var draft = SplitDraft(splitting: coffee)
         var part = draft.newPart()
-        part.amount = Money(cents: 10_00)
+        part.entry = AmountEntry(cents: 10_00)
         part.category = try store.category("Education")
         part.day = today.adding(days: -2)
         part.note = "  Milk \n"
@@ -319,11 +319,11 @@ struct SplitTests {
         let balanceBefore = balance()
         var draft = SplitDraft(splitting: coffee)
         var part = draft.newPart()
-        part.amount = Money(cents: 10_00)
+        part.entry = AmountEntry(cents: 10_00)
         draft.addPart(part)
 
         // The original shows 15.00; the user types 16.80 over it.
-        draft.original.amount = Money(cents: 16_80)
+        draft.original.entry = AmountEntry(cents: 16_80)
 
         #expect(draft.was == Money(cents: 25_00))
         #expect(draft.total == Money(cents: 26_80))
@@ -337,7 +337,7 @@ struct SplitTests {
         let coffee = try record(25_00)
         var draft = SplitDraft(splitting: coffee)
         var part = draft.newPart()
-        part.amount = Money(cents: 10_00)
+        part.entry = AmountEntry(cents: 10_00)
         draft.addPart(part)
 
         #expect(draft.total == draft.was)
@@ -349,9 +349,9 @@ struct SplitTests {
         let balanceBefore = balance()
         var draft = SplitDraft(splitting: salary)
         var part = draft.newPart()
-        part.amount = Money(cents: 30_00)
+        part.entry = AmountEntry(cents: 30_00)
         draft.addPart(part)
-        draft.original.amount = Money(cents: 75_00)
+        draft.original.entry = AmountEntry(cents: 75_00)
 
         #expect(draft.walletChange == Money(cents: 5_00))
         let created = try #require(try salary.split(draft).first)
@@ -365,9 +365,9 @@ struct SplitTests {
         let coffee = try record(25_00)
         var draft = SplitDraft(splitting: coffee)
         var part = draft.newPart()
-        part.amount = Money(cents: 10_00)
+        part.entry = AmountEntry(cents: 10_00)
         draft.addPart(part)
-        draft.original.amount = Money(cents: 12_00)
+        draft.original.entry = AmountEntry(cents: 12_00)
 
         #expect(draft.walletChange == Money(cents: 3_00))
     }
@@ -377,9 +377,9 @@ struct SplitTests {
         coffee.isEstimated = true
         var draft = SplitDraft(splitting: coffee)
         var part = draft.newPart()
-        part.amount = Money(cents: 10_00)
+        part.entry = AmountEntry(cents: 10_00)
         draft.addPart(part)
-        draft.original.amount = Money(cents: 16_00)
+        draft.original.entry = AmountEntry(cents: 16_00)
 
         try coffee.split(draft)
 
@@ -421,7 +421,7 @@ struct SplitTests {
         let coffee = try record(25_00)
         var draft = SplitDraft(splitting: coffee)
         var part = draft.newPart()
-        part.amount = Money(cents: 25_00)
+        part.entry = AmountEntry(cents: 25_00)
         draft.addPart(part)
 
         #expect(draft.original.amount == Money(cents: 0))
@@ -434,7 +434,7 @@ struct SplitTests {
         let coffee = try record(25_00)
         var draft = SplitDraft(splitting: coffee)
         var part = draft.newPart()
-        part.amount = Money(cents: 10_00)
+        part.entry = AmountEntry(cents: 10_00)
         part.category = nil
         draft.addPart(part)
 
@@ -452,7 +452,7 @@ struct SplitTests {
         #expect(part.editFlow == .addSheet)
         #expect(coffee.editFlow == .addSheet)
         var edit = TransactionDraft(editing: part)
-        edit.amount = Money(cents: 12_00)
+        edit.entry = AmountEntry(cents: 12_00)
         edit.note = "Milk"
         try part.update(with: edit)
 
@@ -555,9 +555,9 @@ struct SplitTests {
         let coffee = try record(25_00)
         var draft = SplitDraft(splitting: coffee)
         var part = draft.newPart()
-        part.amount = Money(cents: 10_00)
+        part.entry = AmountEntry(cents: 10_00)
         draft.addPart(part)
-        draft.original.amount = Money(cents: 16_80)
+        draft.original.entry = AmountEntry(cents: 16_80)
         let created = try #require(try coffee.split(draft).first)
         created.amountCents = -9_00
 
@@ -580,7 +580,7 @@ struct SplitTests {
         let category = try store.category("Café")
         var schedule = RecurringDraft(startDay: today)
         schedule.name = "Coffee"
-        schedule.amount = Money(cents: 25_00)
+        schedule.entry = AmountEntry(cents: 25_00)
         schedule.wallet = checking
         schedule.category = category
         let recurring = try RecurringTransaction.create(schedule, today: today, in: context)
@@ -663,7 +663,7 @@ struct SplitTests {
         let second = try context.payBack(3_00, on: today, to: coffee)
         var draft = SplitDraft(splitting: coffee)
         var part = draft.newPart()
-        part.amount = Money(cents: 10_00)
+        part.entry = AmountEntry(cents: 10_00)
         draft.addPart(part)
 
         #expect(draft.reimbursements.count == 2)
@@ -709,7 +709,7 @@ struct SplitTests {
         var draft = SplitDraft(splitting: coffee)
         for cents in [10_00, 5_00, 3_00] {
             var part = draft.newPart()
-            part.amount = Money(cents: cents)
+            part.entry = AmountEntry(cents: cents)
             draft.addPart(part)
         }
         try assign(onFirst, to: .part(0), in: &draft)
@@ -770,7 +770,7 @@ struct SplitTests {
         #expect(draft.original.people == [anna])
         var part = draft.newPart()
         #expect(part.people == [anna])
-        part.amount = Money(cents: 10_00)
+        part.entry = AmountEntry(cents: 10_00)
         part.people = [anna, ivan]
         draft.addPart(part)
 

@@ -215,11 +215,8 @@ nonisolated struct RecurringDraft {
 
     /// A Purchase's total price, or `nil` for none: a total left empty or typed as zero is none.
     var total: Money? {
-        get {
-            guard let cents = totalEntry.cents, cents > 0 else { return nil }
-            return Money(cents: cents, currencyCode: currencyCode)
-        }
-        set { totalEntry = AmountEntry(cents: newValue?.cents ?? 0) }
+        guard let cents = totalEntry.cents, cents > 0 else { return nil }
+        return Money(cents: cents, currencyCode: currencyCode)
     }
 
     /// Whether it saves a new Recurring transaction, as Add and Duplicate do, rather than changing one.

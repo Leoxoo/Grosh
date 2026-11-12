@@ -83,7 +83,7 @@ struct GroshCSVExportTests {
         var draft = SplitDraft(splitting: dinner)
         for cents in [20_00, 10_00] {
             var part = draft.newPart()
-            part.amount = Money(cents: cents)
+            part.entry = AmountEntry(cents: cents)
             draft.addPart(part)
         }
         try dinner.split(draft)

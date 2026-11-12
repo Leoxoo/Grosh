@@ -471,7 +471,7 @@ struct MoneyLoverImportTests {
         ))
         var later = TransactionDraft(type: .expense, day: CalendarDay(year: 2026, month: 10, day: 5))
         later.wallet = try context.wallet(named: "Checking")
-        later.amount = Money(cents: 5_00)
+        later.entry = AmountEntry(cents: 5_00)
         later.category = try context.otherCategory(.expense)
         later.note = "Added later"
         try Transaction.create(later, in: context)

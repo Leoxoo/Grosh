@@ -144,7 +144,7 @@ struct CroppedPhotoTests {
         let today = TestStore.today
         var draft = RecurringDraft(startDay: CalendarDay(year: 2026, month: 10, day: 12))
         draft.name = "Streaming"
-        draft.amount = Money(cents: 1599)
+        draft.entry = AmountEntry(cents: 1599)
         draft.wallet = store.checking
         draft.category = try store.category("Entertainment")
         draft.kind = .subscription

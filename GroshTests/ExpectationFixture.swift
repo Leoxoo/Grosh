@@ -30,13 +30,13 @@ struct ExpectationFixture {
     ) throws -> Transaction {
         var draft = TransactionDraft(type: .expense, day: date ?? day(2026, 10, 3))
         draft.wallet = checking
-        draft.amount = Money(cents: cents)
+        draft.entry = AmountEntry(cents: cents)
         draft.category = try store.category("Restaurants")
         draft.people = owes.map(\.person)
         for owe in owes {
             draft.addOwes(owe.person)
             if let index = draft.owes.firstIndex(where: { $0.person === owe.person }) {
-                draft.owes[index].amount = owe.cents.map { Money(cents: $0) }
+                draft.owes[index].entry = owe.cents.map { AmountEntry(showing: $0) } ?? AmountEntry()
             }
         }
         return try Transaction.create(draft, in: context)
@@ -54,7 +54,7 @@ struct ExpectationFixture {
         note: String = ""
     ) throws {
         var draft = ExpectationPaymentDraft(paying: expectation, on: date ?? today)
-        draft.amount = Money(cents: cents)
+        draft.entry = AmountEntry(cents: cents)
         if let wallet { draft.wallet = wallet }
         draft.note = note
         try expectation.recordPayment(draft)

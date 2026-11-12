@@ -95,7 +95,7 @@ struct RecurringTransactionTests {
         try RecurringTransaction.catchUp(through: day(2026, 10, 12), in: context)
 
         var edited = RecurringDraft(editing: recurring)
-        edited.amount = Money(cents: 2000)
+        edited.entry = AmountEntry(cents: 2000)
         try recurring.update(with: edited, today: day(2026, 10, 13))
         try RecurringTransaction.catchUp(through: day(2026, 11, 12), in: context)
 
@@ -133,7 +133,7 @@ struct RecurringTransactionTests {
         let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 10, 12)), today: today, in: context)
 
         var edited = RecurringDraft(editing: recurring)
-        edited.amount = Money(cents: 2000)
+        edited.entry = AmountEntry(cents: 2000)
         try recurring.update(with: edited, today: day(2026, 10, 12))
 
         #expect(recurring.attachedTransactions.map(\.amountCents) == [-1599])
@@ -173,10 +173,10 @@ struct RecurringTransactionTests {
         #expect(throws: RecurringRuleError.missingName) { try draft.validate() }
 
         draft.name = "Netflix"
-        draft.amount = Money(cents: 0)
+        draft.entry = AmountEntry(cents: 0)
         #expect(throws: RecurringRuleError.missingAmount) { try draft.validate() }
 
-        draft.amount = Money(cents: 1599)
+        draft.entry = AmountEntry(cents: 1599)
         draft.wallet = nil
         #expect(throws: RecurringRuleError.missingWallet) { try draft.validate() }
     }

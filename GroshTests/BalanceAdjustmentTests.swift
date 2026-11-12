@@ -384,7 +384,7 @@ struct BalanceAdjustmentTests {
         let adjustment = try adjust(to: -15_55)
 
         var draft = TransactionDraft(editing: adjustment)
-        draft.amount = Money(cents: 20_00)
+        draft.entry = AmountEntry(cents: 20_00)
 
         #expect(!draft.requiresCard)
         try adjustment.update(with: draft)

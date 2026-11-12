@@ -102,7 +102,7 @@ struct ReimbursementTests {
         let entry = try payBack(20_00, to: dinner)
 
         var draft = ReimbursementDraft(editing: entry)
-        draft.amount = Money(cents: 35_00)
+        draft.entry = AmountEntry(cents: 35_00)
         draft.day = day(2026, 10, 6)
         draft.note = "Both shares"
         try entry.update(with: draft)
@@ -129,7 +129,7 @@ struct ReimbursementTests {
         let entry = try payBack(20_00, to: dinner)
 
         var draft = ReimbursementDraft(editing: entry)
-        draft.amount = Money(cents: 0)
+        draft.entry = AmountEntry(cents: 0)
         draft.note = "ignored"
 
         #expect(throws: ReimbursementRuleError.missingAmount) { try entry.update(with: draft) }
@@ -175,7 +175,7 @@ struct ReimbursementTests {
         transfer.from = store.checking
         let savings = context.addWallet("Savings")
         transfer.to = savings
-        transfer.amount = Money(cents: 100_00)
+        transfer.entry = AmountEntry(cents: 100_00)
         let made = try Transfer.create(transfer, in: context)
 
         for notAnExpense in [salary, loan, refund, made.outgoing, made.incoming] {

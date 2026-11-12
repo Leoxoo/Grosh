@@ -31,7 +31,7 @@ struct LinkKindTests {
         var draft = TransferDraft(day: today)
         draft.from = checking
         draft.to = cash
-        draft.amount = Money(cents: 50_00)
+        draft.entry = AmountEntry(cents: 50_00)
 
         let transfer = try Transfer.create(draft, in: context)
 
@@ -66,7 +66,7 @@ struct LinkKindTests {
         let dinner = try fixture.dinner()
         var draft = SplitDraft(splitting: dinner)
         var part = draft.newPart()
-        part.amount = Money(cents: 10_00)
+        part.entry = AmountEntry(cents: 10_00)
         draft.addPart(part)
         let parts = try dinner.split(draft)
 
@@ -152,11 +152,11 @@ struct LinkKindTests {
     @Test func whatTheAddSheetOffersOwesMeOnCanBePaidBackOnceSaved() throws {
         var expense = TransactionDraft(type: .expense, day: today)
         expense.wallet = checking
-        expense.amount = Money(cents: 30_00)
+        expense.entry = AmountEntry(cents: 30_00)
         expense.category = try fixture.store.category("Restaurants")
         var income = TransactionDraft(type: .income, day: today)
         income.wallet = checking
-        income.amount = Money(cents: 30_00)
+        income.entry = AmountEntry(cents: 30_00)
         income.category = try fixture.store.otherIncome()
 
         #expect(expense.offersOwesMe)

@@ -22,7 +22,7 @@ struct RecurringKindTests {
     private func membership(in category: Grosh.Category) -> RecurringDraft {
         var draft = RecurringDraft(startDay: CalendarDay(year: 2026, month: 10, day: 12))
         draft.name = "Gym"
-        draft.amount = Money(cents: 2000)
+        draft.entry = AmountEntry(cents: 2000)
         draft.wallet = store.checking
         draft.category = category
         draft.kind = category.defaultKind

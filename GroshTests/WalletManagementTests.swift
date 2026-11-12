@@ -86,7 +86,7 @@ struct WalletManagementTests {
         var edit = StartingBalanceDraft(editing: starting)
         #expect(edit.amount == Money(cents: -250_00))
 
-        edit.amount = Money(cents: -300_00)
+        edit.entry = AmountEntry(cents: -300_00)
         edit.day = CalendarDay(year: 2026, month: 9, day: 1)
         edit.note = " Balance on the September statement "
         try starting.update(with: edit)
@@ -98,7 +98,7 @@ struct WalletManagementTests {
         #expect(starting.isExcludedFromReport)
         #expect(walletBalance(creditLine, asOf: today) == Money(cents: -300_00))
 
-        edit.amount = Money(cents: 1_000_00)
+        edit.entry = AmountEntry(cents: 1_000_00)
         try starting.update(with: edit)
         #expect(walletBalance(creditLine, asOf: today) == Money(cents: 1_000_00))
     }
@@ -109,7 +109,7 @@ struct WalletManagementTests {
         salary.wallet = checking
         salary.category = try context.lockedCategory(.otherIncome)
         var edit = StartingBalanceDraft(editing: salary)
-        edit.amount = Money(cents: -5_00)
+        edit.entry = AmountEntry(cents: -5_00)
 
         #expect(throws: TransactionRuleError.notAStartingBalance) { try salary.update(with: edit) }
         #expect(salary.amount == Money(cents: 2_000_00))

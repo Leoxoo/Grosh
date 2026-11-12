@@ -83,7 +83,7 @@ struct EditorRulesTests {
         #expect(draft.shownProblem == nil)
 
         draft.to = fixture.checking
-        draft.amount = Money(cents: 5_00)
+        draft.entry = AmountEntry(cents: 5_00)
         #expect(draft.shownProblem as? TransferRuleError == .sameWallet)
 
         draft.to = fixture.cash
@@ -97,7 +97,7 @@ struct EditorRulesTests {
         draft.wallet = fixture.checking
         #expect(draft.shownProblem == nil)
 
-        draft.amount = Money(cents: 10_00)
+        draft.entry = AmountEntry(cents: 10_00)
         draft.category = try fixture.store.category("Restaurants")
         #expect(draft.shownProblem as? TransactionRuleError == .missingCard)
     }
@@ -108,7 +108,7 @@ struct EditorRulesTests {
         let dinner = try fixture.dinner(60_00)
         var split = SplitDraft(splitting: dinner)
         var part = split.newPart()
-        part.amount = Money(cents: 20_00)
+        part.entry = AmountEntry(cents: 20_00)
         split.addPart(part)
 
         #expect(split.capacity(of: nil)?.cents == 40_00)
@@ -119,7 +119,7 @@ struct EditorRulesTests {
         #expect(!split.leavesNothingOnOriginal)
         #expect(part.canSave)
 
-        part.amount = Money(cents: 0)
+        part.entry = AmountEntry(cents: 0)
         #expect(!part.canSave)
     }
 
@@ -198,13 +198,13 @@ struct EditorRulesTests {
         let loan = try fixture.store.category("Loan", .debtLoan)
         var draft = TransactionDraft(type: .debtLoan, day: day(2026, 10, 3))
         draft.wallet = fixture.checking
-        draft.amount = Money(cents: 50_00)
+        draft.entry = AmountEntry(cents: 50_00)
         draft.category = loan
         draft.people = [try fixture.person("Alex")]
         let lent = try Transaction.create(draft, in: context)
 
         var payment = try DebtPaymentDraft(settling: lent, on: day(2026, 10, 9), in: context)
-        payment.amount = Money(cents: 70_00)
+        payment.entry = AmountEntry(cents: 70_00)
         #expect(payment.signedOverpaid.cents == 20_00)
     }
 

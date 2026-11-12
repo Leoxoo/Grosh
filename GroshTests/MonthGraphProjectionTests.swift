@@ -28,7 +28,7 @@ struct MonthGraphProjectionTests {
     ) throws -> RecurringTransaction {
         var draft = RecurringDraft(startDay: start)
         draft.name = name
-        draft.amount = Money(cents: cents)
+        draft.entry = AmountEntry(cents: cents)
         draft.type = type
         draft.wallet = wallet ?? checking
         draft.category = try store.category(categoryName, type)

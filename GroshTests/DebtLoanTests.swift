@@ -112,7 +112,7 @@ struct DebtLoanTests {
         #expect(try outstanding(loan) == Money(cents: 40_00))
 
         var draft = try DebtPaymentDraft(settling: loan, on: paidOn.adding(days: 7), in: context)
-        draft.amount = Money(cents: 70_00)
+        draft.entry = AmountEntry(cents: 70_00)
         draft.overpaymentCategory = try store.category("Collect Interest", .income)
         #expect(draft.overpaid == Money(cents: 30_00))
         let recorded = try DebtPayment.record(draft, in: context)
@@ -135,7 +135,7 @@ struct DebtLoanTests {
         let debt = try borrow(100_00)
 
         var draft = try DebtPaymentDraft(settling: debt, on: paidOn, in: context)
-        draft.amount = Money(cents: 120_00)
+        draft.entry = AmountEntry(cents: 120_00)
         draft.overpaymentCategory = try store.category("Gifts & Donations")
         let recorded = try DebtPayment.record(draft, in: context)
 
@@ -165,7 +165,7 @@ struct DebtLoanTests {
         let loan = try lend(100_00)
 
         var draft = try DebtPaymentDraft(settling: loan, on: paidOn, in: context)
-        draft.amount = Money(cents: 100_00)
+        draft.entry = AmountEntry(cents: 100_00)
 
         #expect(draft.overpaid == Money(cents: 0))
         #expect(try DebtPayment.record(draft, in: context).overpayment == nil)
@@ -176,7 +176,7 @@ struct DebtLoanTests {
     @Test func aPaymentOfNothingIsRefused() throws {
         let loan = try lend(100_00)
         var draft = try DebtPaymentDraft(settling: loan, on: paidOn, in: context)
-        draft.amount = Money(cents: 0)
+        draft.entry = AmountEntry(cents: 0)
 
         #expect(!draft.canSave)
         #expect(throws: TransactionRuleError.missingAmount) { try DebtPayment.record(draft, in: context) }
@@ -196,7 +196,7 @@ struct DebtLoanTests {
     @Test func anOverpaymentNeedsACategoryOfTheMatchingType() throws {
         let loan = try lend(100_00)
         var draft = try DebtPaymentDraft(settling: loan, on: paidOn, in: context)
-        draft.amount = Money(cents: 120_00)
+        draft.entry = AmountEntry(cents: 120_00)
 
         draft.overpaymentCategory = try store.category("Café")
         #expect(!draft.canSave)
@@ -354,7 +354,7 @@ struct DebtLoanTests {
         #expect(editing.isLockedByPayments)
 
         var otherAmount = editing
-        otherAmount.amount = Money(cents: 120_00)
+        otherAmount.entry = AmountEntry(cents: 120_00)
         var otherCategory = editing
         otherCategory.category = try context.lockedCategory(.debt)
         #expect(throws: DebtLoanRuleError.lockedByForgiveness) { try loan.update(with: otherAmount) }
@@ -420,7 +420,7 @@ struct DebtLoanTests {
         try context.addCard(paidFrom: checking)
         let debt = try borrow(100_00)
         var payment = try DebtPaymentDraft(settling: debt, on: paidOn, in: context)
-        payment.amount = Money(cents: 120_00)
+        payment.entry = AmountEntry(cents: 120_00)
         let overpaid = try #require(try DebtPayment.record(payment, in: context).overpayment)
         let coffee = store.spend(4_50, on: try store.category("Café"))
 
@@ -436,7 +436,7 @@ struct DebtLoanTests {
     @Test func paymentsOverpaymentsAndForgivingNeverChangeTheOriginal() throws {
         var entered = TransactionDraft(type: .debtLoan, day: lentOn)
         entered.wallet = checking
-        entered.amount = Money(cents: 100_00)
+        entered.entry = AmountEntry(cents: 100_00)
         entered.category = try context.lockedCategory(.loan)
         entered.people = [try Person.add(named: "Pasha", in: context)]
         entered.note = "Rent help"
@@ -471,7 +471,7 @@ struct DebtLoanTests {
         #expect(loan.editFlow == .addSheet)
 
         var editing = TransactionDraft(editing: loan)
-        editing.amount = Money(cents: 150_00)
+        editing.entry = AmountEntry(cents: 150_00)
         editing.day = lentOn.adding(days: -2)
         editing.people = [try Person.add(named: "Pavel", in: context)]
         editing.note = "Rent help"
@@ -516,12 +516,12 @@ struct DebtLoanTests {
         try pay(60_00, on: loan)
         var editing = TransactionDraft(editing: loan)
 
-        editing.amount = Money(cents: 59_99)
+        editing.entry = AmountEntry(cents: 59_99)
         #expect(!editing.canSave)
         #expect(throws: DebtLoanRuleError.amountBelowPaid) { try loan.update(with: editing) }
         #expect(loan.amountCents == -100_00)
 
-        editing.amount = Money(cents: 60_00)
+        editing.entry = AmountEntry(cents: 60_00)
         try loan.update(with: editing)
         #expect(try isSettled(loan))
     }

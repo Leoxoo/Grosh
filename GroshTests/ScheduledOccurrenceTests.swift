@@ -107,7 +107,7 @@ struct ScheduledOccurrenceTests {
         let utilities = context.addCategory("Utilities")
         var draft = RecurringDraft(startDay: day(2026, 10, 12))
         draft.name = "Electricity"
-        draft.amount = Money(cents: 2_500)
+        draft.entry = AmountEntry(cents: 2_500)
         draft.wallet = store.checking
         draft.category = utilities
         draft.kind = .bill
@@ -135,7 +135,7 @@ struct ScheduledOccurrenceTests {
         try context.save()
         var draft = RecurringDraft(startDay: day(2026, 10, 12))
         draft.name = "Water"
-        draft.amount = Money(cents: 0)
+        draft.entry = AmountEntry(cents: 0)
         draft.wallet = store.checking
         draft.category = water
         draft.kind = .bill

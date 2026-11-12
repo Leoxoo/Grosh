@@ -33,7 +33,7 @@ struct SnapshotTests {
         var draft = TransferDraft(day: fixture.today)
         draft.from = fixture.checking
         draft.to = savings
-        draft.amount = Money(cents: 20_000)
+        draft.entry = AmountEntry(cents: 20_000)
         let transfer = try Transfer.create(draft, in: fixture.context)
         assertLooks(of: TransactionRow(transaction: transfer.outgoing).padding(), in: fixture)
     }
@@ -44,7 +44,7 @@ struct SnapshotTests {
         let original = try fixture.record(-8_610, "Products", on: fixture.today)
         var draft = SplitDraft(splitting: original)
         var restaurants = draft.newPart()
-        restaurants.amount = Money(cents: 2_610)
+        restaurants.entry = AmountEntry(cents: 2_610)
         restaurants.category = try fixture.category("Restaurants")
         draft.addPart(restaurants)
         let part = try original.split(draft)[0]

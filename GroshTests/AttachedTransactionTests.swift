@@ -140,7 +140,7 @@ struct AttachedTransactionTests {
         let savings = context.addWallet("Savings")
         var draft = RecurringDraft(startDay: day(2026, 10, 12))
         draft.name = "App subscription"
-        draft.amount = Money(cents: 499)
+        draft.entry = AmountEntry(cents: 499)
         draft.wallet = store.checking
         draft.category = apps
         draft.card = chase

@@ -102,7 +102,7 @@ struct RecentlyDeletedTests {
         #expect(throws: DebtLoanRuleError.lockedByPayments) { try loan.update(with: editing) }
 
         var smaller = TransactionDraft(editing: loan)
-        smaller.amount = Money(cents: 10_00)
+        smaller.entry = AmountEntry(cents: 10_00)
         #expect(throws: DebtLoanRuleError.amountBelowPaid) { try loan.update(with: smaller) }
         #expect(loan.amountCents == -100_00)
     }
