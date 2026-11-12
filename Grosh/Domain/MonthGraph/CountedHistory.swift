@@ -1,5 +1,7 @@
 /// What counts on the Month graph and in the Report for one wallet selection, worked out once for a screen: each
 /// transaction's ``Transaction/countedAmount(in:otherIncome:)``, and the first day anything counts, on either side.
+/// A figure is in one currency, so only what counts in ``currencyCode`` is in it: a Total holding wallets in two
+/// currencies counts those of the one it is labelled with, never adding a currency to another.
 /// Every figure a Report screen shows, its strip, its Month graph and its lists, comes from it, so they all count alike.
 ///
 /// The Report builds it from every transaction outside Recently Deleted. Home's Month graph builds it from the few months
@@ -40,7 +42,9 @@ struct CountedHistory {
         var counted: [CountedAmount] = []
         var sources: [Transaction] = []
         for transaction in transactions {
-            guard let amount = transaction.countedAmount(in: selection, otherIncome: otherIncome) else { continue }
+            guard let amount = transaction.countedAmount(in: selection, otherIncome: otherIncome),
+                amount.amount.currencyCode == currencyCode
+            else { continue }
             counted.append(amount)
             sources.append(transaction)
         }

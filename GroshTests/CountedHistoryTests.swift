@@ -61,4 +61,26 @@ struct CountedHistoryTests {
         )
         #expect(week?.headline == Money(cents: 15_00))
     }
+
+    /// A figure is in one currency: the Total of a USD and a EUR wallet counts the USD wallet's transactions under the
+    /// USD label, and leaves the EUR wallet's out instead of adding euros to dollars.
+    @Test func theTotalCountsOnlyTheTransactionsInItsCurrency() throws {
+        let euros = try Wallet.create(
+            name: "Euros", startingBalance: Money(cents: 300_00, currencyCode: "EUR"), on: day(2026, 5, 1), in: context
+        )
+        try store.record(-15_00, "Café", on: day(2026, 10, 4))
+        try store.record(-40_00, "Café", on: day(2026, 10, 5), in: euros)
+        let wallets = try context.fetch(Wallet.unarchived)
+        let total = try CountedHistory(
+            store.transactions(), in: .total, currencyCode: WalletSelection.total.currencyCode(among: wallets),
+            otherIncome: store.otherIncome()
+        )
+
+        #expect(total.currencyCode == "USD")
+        #expect(total.counted.map(\.amount) == [Money(cents: 15_00)])
+        let inEuros = try CountedHistory(
+            store.transactions(), in: .wallet(euros), currencyCode: "EUR", otherIncome: store.otherIncome()
+        )
+        #expect(inEuros.counted.map(\.amount) == [Money(cents: 40_00, currencyCode: "EUR")])
+    }
 }

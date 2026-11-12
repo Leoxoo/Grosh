@@ -12,8 +12,8 @@ nonisolated enum WalletSelection: Hashable {
     /// The currency the selection's figures are written in: the wallet's own, or for the Total that of the first wallet
     /// counted in it (``Wallet/countsInTotal``) in `wallets`' order, the user's, or the default one while none is. The
     /// Total's balance keeps each currency apart (``WalletBalances/total(of:)``); a figure that adds up what counts,
-    /// such as the Report's and the Month graph's, is one number, so wallets in another currency are added in as they
-    /// are and the figure is labelled with this one.
+    /// such as the Report's and the Month graph's, is one number, so it counts only the transactions in this currency
+    /// (``CountedHistory``).
     func currencyCode(among wallets: [Wallet]) -> String {
         switch self {
         case .total: wallets.first(where: \.countsInTotal).currencyCodeOrDefault
