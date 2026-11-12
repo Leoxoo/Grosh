@@ -10,15 +10,13 @@ struct TransactionPickerSheet: View {
     let candidates: [Transaction]
     let emptyTitle: LocalizedStringResource
     let emptyDescription: LocalizedStringResource
-    let errorTitle: LocalizedStringResource
-    /// What picking is called in `log` when `pick` fails.
+    /// What picking is called in the log when `pick` fails.
     let failure: String
-    let log: Logger
     let pick: (Transaction) throws -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var filter: TransactionFilter
-    @State private var errorMessage: String?
+    private var saver: SheetSaver
 
     init(
         _ title: LocalizedStringResource,
@@ -35,9 +33,8 @@ struct TransactionPickerSheet: View {
         self.candidates = candidates
         self.emptyTitle = emptyTitle
         self.emptyDescription = emptyDescription
-        self.errorTitle = errorTitle
         self.failure = failure
-        self.log = log
+        saver = SheetSaver(errorTitle, log: log)
         self.pick = pick
         _filter = State(initialValue: startingFilter)
     }
@@ -62,7 +59,7 @@ struct TransactionPickerSheet: View {
                 } else {
                     List(listing.transactions) { transaction in
                         Button {
-                            choose(transaction)
+                            saver.save(failure) { try pick(transaction) }
                         } label: {
                             TransactionRow(
                                 transaction: transaction,
@@ -88,13 +85,7 @@ struct TransactionPickerSheet: View {
                     TransactionFilterButton(filter: $filter)
                 }
             }
-            .errorAlert(errorTitle, message: $errorMessage)
-        }
-    }
-
-    private func choose(_ transaction: Transaction) {
-        if log.perform(failure, errorMessage: &errorMessage, { try pick(transaction) }) {
-            dismiss()
+            .failureAlert(saver)
         }
     }
 }
