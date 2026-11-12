@@ -49,9 +49,8 @@ private struct WalletForm: View {
         _startingDay = State(initialValue: startingDay)
     }
 
-    private var canSave: Bool { mode.isAdding ? RuleCheck(draft.validateNew).passes : draft.canSave }
-
     var body: some View {
+        let check = draft.check
         NavigationStack {
             Form {
                 Section {
@@ -62,7 +61,12 @@ private struct WalletForm: View {
                     }
                     Toggle(Strings.Wallets.includeInTotal, isOn: $draft.includeInTotal)
                 } footer: {
-                    Text(Strings.Wallets.includeFooter)
+                    if let problem = check.shownProblem {
+                        Text(problem.localizedDescription)
+                            .foregroundStyle(.invalid)
+                    } else {
+                        Text(Strings.Wallets.includeFooter)
+                    }
                 }
 
                 if mode.isAdding {
@@ -122,7 +126,7 @@ private struct WalletForm: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(mode.isAdding ? Strings.Common.add : Strings.Common.save, action: save)
-                        .disabled(!canSave)
+                        .disabled(!check.passes)
                 }
             }
             .failureAlert(saver)

@@ -117,10 +117,10 @@ struct EditorRulesTests {
         #expect(part.leftOver(from: Money(cents: 60_00)).cents == 40_00)
         #expect(split.partType == .expense)
         #expect(!split.leavesNothingOnOriginal)
-        #expect(part.isComplete)
+        #expect(part.canSave)
 
         part.amount = Money(cents: 0)
-        #expect(!part.isComplete)
+        #expect(!part.canSave)
     }
 
     // MARK: Card
@@ -128,11 +128,16 @@ struct EditorRulesTests {
     @Test func onlyACreditCardKeepsTheStatementDateTheFormRemembers() {
         var draft = CardDraft.new
         #expect(draft.offersStatementDate)
-        #expect(draft.withStatementDay(15).statementDay == 15)
+        draft.hasStatementDate = true
+        draft.statementDayChoice = 15
+        #expect(draft.statementDay == 15)
 
         draft.kind = .debit
         #expect(!draft.offersStatementDate)
-        #expect(draft.withStatementDay(15).statementDay == nil)
+        #expect(draft.statementDay == nil)
+
+        draft.kind = .credit
+        #expect(draft.statementDay == 15)
     }
 
     @Test func theLastFourDigitsKeepOnlyTheFirstFourDigitsTyped() {

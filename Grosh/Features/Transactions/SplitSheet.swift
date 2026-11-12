@@ -219,7 +219,7 @@ private struct SplitPartEditor: View {
 
     var body: some View {
         KeypadSheet(
-            title: Text(title), entry: $part.entry, canSave: part.isComplete,
+            title: Text(title), entry: $part.entry, canSave: part.canSave,
             saving: "Keeping a part of a Split", failureTitle: Strings.Transactions.couldntSplit,
             save: { save(part) }
         ) { fields in

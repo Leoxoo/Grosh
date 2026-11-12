@@ -62,6 +62,8 @@ extension CardDraft: ValidatedDraft {}
 extension DebtPaymentDraft: ValidatedDraft {}
 extension ForgiveDraft: ValidatedDraft {}
 extension SplitDraft: ValidatedDraft {}
+extension SplitPart: ValidatedDraft {}
+extension StartingBalanceDraft: ValidatedDraft {}
 
 extension TransactionRuleError: EmptyFieldError {
     /// No amount or category yet, or a Loan or Debt with nobody in With, which With's own footer asks for.

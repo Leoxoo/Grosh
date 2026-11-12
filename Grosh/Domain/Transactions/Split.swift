@@ -25,9 +25,12 @@ nonisolated struct SplitPart {
         eventName = transaction.eventName
     }
 
-    /// Whether the part can be kept: an amount above zero and a category, as every part of a split needs
-    /// (``SplitDraft/validate()``).
-    var isComplete: Bool { amount.cents > 0 && category != nil }
+    /// Checks what every part of a split needs, the transaction being split included: an amount above zero and a
+    /// category.
+    func validate() throws {
+        guard amount.cents > 0 else { throw SplitRuleError.missingAmount }
+        guard category != nil else { throw SplitRuleError.missingCategory }
+    }
 
     /// What is left on the transaction being split once this part takes its amount out of `capacity`
     /// (``SplitDraft/capacity(of:)``).
@@ -143,10 +146,10 @@ nonisolated struct SplitDraft {
     /// Checks the draft against the split rules before anything is changed: at least one new part, every part (the
     /// original too) with an amount above zero and a category, and every Reimbursement assigned to a part.
     func validate() throws {
-        let everyPart = [original] + parts
         guard !parts.isEmpty else { throw SplitRuleError.noParts }
-        guard everyPart.allSatisfy({ $0.amount.cents > 0 }) else { throw SplitRuleError.missingAmount }
-        guard everyPart.allSatisfy({ $0.category != nil }) else { throw SplitRuleError.missingCategory }
+        for part in [original] + parts {
+            try part.validate()
+        }
         guard reimbursements.allSatisfy({ $0.part != nil }) else { throw SplitRuleError.unassignedReimbursement }
     }
 }

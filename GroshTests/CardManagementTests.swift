@@ -64,14 +64,13 @@ struct CardManagementTests {
         #expect(try Set(context.fetch(Card.listed)) == [archived, unpaid])
     }
 
-    @Test func theStatementDateCanOnlyBeSetOnCreditCards() throws {
-        #expect(throws: CardRuleError.statementDateRequiresCredit) {
-            try Card.create(
-                CardDraft(name: "Navy Federal Debit", kind: .debit, payingWallet: checking, statementDay: 15),
-                in: context
-            )
-        }
-        #expect(try allCards().isEmpty)
+    /// Only a Credit card has a statement; a Debit card spends straight from its wallet, so it saves no statement date.
+    @Test func aDebitCardSavesNoStatementDate() throws {
+        let card = try Card.create(
+            CardDraft(name: "Navy Federal Debit", kind: .debit, payingWallet: checking, statementDay: 15),
+            in: context
+        )
+        #expect(card.statementDay == nil)
     }
 
     @Test(arguments: [0, 32, -1])
@@ -81,22 +80,17 @@ struct CardManagementTests {
         }
     }
 
-    @Test func editingACardRefusesAStatementDateOnDebitAndLeavesTheCardAsItWas() throws {
+    @Test func turningACreditCardIntoDebitDropsItsStatementDate() throws {
         let card = try Card.create(
             CardDraft(name: "Navy Federal", kind: .credit, payingWallet: checking, statementDay: 12),
             in: context
         )
         var details = CardDraft(card)
         details.kind = .debit
-
-        #expect(throws: CardRuleError.statementDateRequiresCredit) { try card.update(with: details) }
-        #expect(card.kind == .credit)
-        #expect(card.statementDay == 12)
-
-        details.statementDay = nil
         details.name = "Navy Federal Debit"
         details.lastFourDigits = "4821"
         try card.update(with: details)
+
         #expect(card.name == "Navy Federal Debit")
         #expect(card.kind == .debit)
         #expect(card.statementDay == nil)

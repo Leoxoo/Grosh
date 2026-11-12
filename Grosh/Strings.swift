@@ -308,7 +308,6 @@ nonisolated enum Strings {
     enum Cards {
         static let missingName: LocalizedStringResource = "Give the Card a name."
         static let missingPayingWallet: LocalizedStringResource = "Choose the wallet this Card is paid from."
-        static let statementDateRequiresCredit: LocalizedStringResource = "Only Credit cards have a statement date."
         static let statementDayOutOfRange: LocalizedStringResource = "A statement date is a day from 1 to 31."
         static let invalidLastFourDigits: LocalizedStringResource = "Enter all 4 last digits, or leave them blank."
         static let mergeIntoItself: LocalizedStringResource = "Choose another Card to merge into."

@@ -5,32 +5,40 @@ import SwiftUI
 struct CardEditor: View {
     let mode: EditorMode<Card>
 
+    var body: some View {
+        MadeOnce {
+            (
+                draft: mode.editing.map { CardDraft($0) } ?? CardDraft.new,
+                hasTransactions: mode.editing.map { card in
+                    Log.store.attempt("Counting a Card's transactions") { try card.hasTransactions() } ?? true
+                } ?? false
+            )
+        } content: { start in
+            CardForm(mode: mode, startingDraft: start.draft, hasTransactions: start.hasTransactions)
+        }
+    }
+}
+
+/// The form behind ``CardEditor``, holding the draft from the moment the sheet opens.
+private struct CardForm: View {
+    let mode: EditorMode<Card>
+    /// Whether the Card being edited paid for anything, counted in the store once when the sheet opens. When the
+    /// store can't be read it counts as having paid, so nothing is offered on a guess.
+    let hasTransactions: Bool
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query(Wallet.unarchived) private var wallets: [Wallet]
 
     @State private var draft: CardDraft
-    /// Whether a Credit card has a statement date. The day is remembered while the user flips the kind back and forth.
-    @State private var hasStatementDate: Bool
-    @State private var statementDay: Int
     @State private var isMerging = false
     @State private var isConfirmingDelete = false
     private var saver = SheetSaver(Strings.Cards.couldntSave)
-    /// Whether the Card being edited paid for anything, counted in the store once when the sheet opens. When the
-    /// store can't be read it counts as having paid, so nothing is offered on a guess.
-    @State private var hasTransactions: Bool
 
-    init(mode: EditorMode<Card>) {
+    init(mode: EditorMode<Card>, startingDraft: CardDraft, hasTransactions: Bool) {
         self.mode = mode
-        let draft = mode.editing.map { CardDraft($0) } ?? CardDraft.new
-        _draft = State(initialValue: draft)
-        _hasTransactions = State(
-            initialValue: mode.editing.map { card in
-                Log.store.attempt("Counting a Card's transactions") { try card.hasTransactions() } ?? true
-            } ?? false
-        )
-        _hasStatementDate = State(initialValue: draft.statementDay != nil)
-        _statementDay = State(initialValue: draft.statementDay ?? 1)
+        self.hasTransactions = hasTransactions
+        _draft = State(initialValue: startingDraft)
     }
 
     /// The Card being edited, until it is merged away or deleted (the sheet may draw once more while closing).
@@ -42,10 +50,8 @@ struct CardEditor: View {
     /// A Card that paid for transactions keeps its paying wallet.
     private var isPayingWalletFixed: Bool { editedCard != nil && hasTransactions }
 
-    private var draftToSave: CardDraft { draft.withStatementDay(hasStatementDate ? statementDay : nil) }
-
     var body: some View {
-        let check = draftToSave.check
+        let check = draft.check
         NavigationStack {
             Form {
                 Section {
@@ -141,16 +147,16 @@ struct CardEditor: View {
 
     private var statementSection: some View {
         Section {
-            Toggle(Strings.Cards.statementDate, isOn: $hasStatementDate)
-            if hasStatementDate {
-                Picker(Strings.Cards.closesOnThe, selection: $statementDay) {
+            Toggle(Strings.Cards.statementDate, isOn: $draft.hasStatementDate)
+            if draft.hasStatementDate {
+                Picker(Strings.Cards.closesOnThe, selection: $draft.statementDayChoice) {
                     ForEach(1...31, id: \.self) { day in
                         Text(CalendarDay.ordinal(day)).tag(day)
                     }
                 }
             }
         } footer: {
-            if hasStatementDate {
+            if draft.hasStatementDate {
                 Text(Strings.Cards.statementDayFooter)
             } else {
                 Text(Strings.Cards.addStatementDayFooter)
@@ -194,9 +200,9 @@ struct CardEditor: View {
         saver.save("Changing a card") {
             switch mode {
             case .add:
-                try Card.create(draftToSave, in: context)
+                try Card.create(draft, in: context)
             case .edit(let card):
-                try card.update(with: draftToSave)
+                try card.update(with: draft)
             }
         }
     }

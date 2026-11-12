@@ -151,7 +151,7 @@ struct DraftRulesTests {
         draft.startingBalanceEntry.press(.operation(.divide))
         draft.startingBalanceEntry.press(.digit(0))
         draft.startingBalanceEntry.press(.equals)
-        #expect(throws: WalletRuleError.invalidStartingBalance) { try draft.validateNew() }
+        #expect(throws: WalletRuleError.invalidStartingBalance) { try draft.validate() }
     }
 
     @Test func aNewCategoryStartsAsATagOnBlueAndNeedsAName() {
@@ -195,7 +195,7 @@ struct DraftRulesTests {
         let original = try context.recordLoanOrDebt(
             .loan, 100_00, with: fixture.person("Pasha"), on: today, in: fixture.checking
         )
-        let loan = try #require(try LoanOrDebt(original, in: context))
+        let loan = try #require(try LoanOrDebt(original))
         #expect(loan.title == "Pasha")
 
         original.withName = ""

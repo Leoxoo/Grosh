@@ -10,10 +10,13 @@ nonisolated struct WalletDraft {
     var includeInTotal = true
     /// The wallet's currency. A new wallet takes the one in Settings → Currency; an existing one keeps its own.
     var currencyCode: String
+    /// Whether the draft is a wallet being added, which also needs its Starting balance.
+    let isNew: Bool
 
     /// A new wallet in `currencyCode`.
     init(currencyCode: String) {
         self.currencyCode = currencyCode
+        isNew = true
     }
 
     @MainActor init(_ wallet: Wallet) {
@@ -22,6 +25,7 @@ nonisolated struct WalletDraft {
         color = wallet.color
         includeInTotal = wallet.includeInTotal
         currencyCode = wallet.currencyCode
+        isNew = false
     }
 
     /// A new wallet's Starting balance as typed on the Keypad: the money it holds now, typed with a leading minus when
@@ -36,14 +40,10 @@ nonisolated struct WalletDraft {
 
     fileprivate var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
+    /// Checks the wallet: a name, and for a new one a Starting balance the Keypad can work out.
     func validate() throws {
         guard !trimmedName.isEmpty else { throw WalletRuleError.missingName }
-    }
-
-    /// Checks a new wallet: a name, and a Starting balance the Keypad can work out.
-    func validateNew() throws {
-        try validate()
-        guard startingBalance != nil else { throw WalletRuleError.invalidStartingBalance }
+        guard !isNew || startingBalance != nil else { throw WalletRuleError.invalidStartingBalance }
     }
 }
 
@@ -69,7 +69,7 @@ extension Wallet {
     /// Saves.
     @discardableResult
     static func create(_ draft: WalletDraft, startingOn day: CalendarDay, in context: ModelContext) throws -> Wallet {
-        try draft.validateNew()
+        try draft.validate()
         guard let startingBalance = draft.startingBalance else { throw WalletRuleError.invalidStartingBalance }
         return try create(draft, startingBalance: startingBalance, on: day, in: context)
     }

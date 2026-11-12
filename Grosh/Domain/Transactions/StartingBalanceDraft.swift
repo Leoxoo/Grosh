@@ -17,15 +17,18 @@ nonisolated struct StartingBalanceDraft {
         note = transaction.note
     }
 
-    /// Whether it can be saved: whenever the Keypad shows an amount, zero included, and not an error such as a division
-    /// by zero.
-    var canSave: Bool { entry.cents != nil }
+    /// Checks that it can be saved: whenever the Keypad shows an amount, zero included, and not an error such as a
+    /// division by zero.
+    func validate() throws {
+        guard entry.cents != nil else { throw TransactionRuleError.missingAmount }
+    }
 }
 
 extension Transaction {
     /// Saves an edited Starting balance. It stays under the Starting balance category and excluded from report.
     func update(with draft: StartingBalanceDraft) throws {
         guard editFlow == .startingBalance else { throw TransactionRuleError.notAStartingBalance }
+        try draft.validate()
         amountCents = draft.amount.cents
         day = draft.day
         note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)

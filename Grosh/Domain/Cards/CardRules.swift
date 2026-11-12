@@ -8,10 +8,27 @@ nonisolated struct CardDraft {
     var payingWallet: Wallet?
     var color: PaletteColor = .blue
     var lastFourDigits: String?
-    /// The day of the month (1–31) a Credit card's statement closes.
-    var statementDay: Int?
+    /// Whether the Card has a statement date. Only a Credit card offers one (``offersStatementDate``), and this choice
+    /// and ``statementDayChoice`` are remembered while the Kind is flipped back and forth.
+    var hasStatementDate: Bool
+    /// The day of the month (1–31) the statement closes, while ``hasStatementDate``.
+    var statementDayChoice: Int
     /// The Card's cropped image as JPEG data. Set it with ``setImage(_:)``, which also sets the color.
     var imageData: Data?
+
+    init(
+        name: String, kind: CardKind, payingWallet: Wallet?, color: PaletteColor = .blue, lastFourDigits: String? = nil,
+        statementDay: Int? = nil, imageData: Data? = nil
+    ) {
+        self.name = name
+        self.kind = kind
+        self.payingWallet = payingWallet
+        self.color = color
+        self.lastFourDigits = lastFourDigits
+        hasStatementDate = statementDay != nil
+        statementDayChoice = statementDay ?? 1
+        self.imageData = imageData
+    }
 }
 
 /// Why a Card change was refused.
@@ -19,8 +36,6 @@ nonisolated enum CardRuleError: RuleRefusal, Equatable {
     case missingName
     /// Every Card is paid from a wallet; it is only offered on that wallet's transactions.
     case missingPayingWallet
-    /// Only Credit cards have a statement; a Debit card spends straight from its wallet.
-    case statementDateRequiresCredit
     /// A statement date is a day of the month, 1–31.
     case statementDayOutOfRange
     /// The last digits of a card number are exactly four digits, 0–9.
@@ -42,7 +57,6 @@ extension CardRuleError: LocalizedError {
         switch self {
         case .missingName: String(localized: Strings.Cards.missingName)
         case .missingPayingWallet: String(localized: Strings.Cards.missingPayingWallet)
-        case .statementDateRequiresCredit: String(localized: Strings.Cards.statementDateRequiresCredit)
         case .statementDayOutOfRange: String(localized: Strings.Cards.statementDayOutOfRange)
         case .invalidLastFourDigits: String(localized: Strings.Cards.invalidLastFourDigits)
         case .mergeIntoItself: String(localized: Strings.Cards.mergeIntoItself)
@@ -74,13 +88,9 @@ nonisolated extension CardDraft {
     /// from its wallet.
     var offersStatementDate: Bool { kind == .credit }
 
-    /// The draft with `day` as its statement date, or none when `day` is `nil`. Only a Credit card keeps one, so the
-    /// form can remember a day while the Kind is flipped back and forth.
-    func withStatementDay(_ day: Int?) -> CardDraft {
-        var result = self
-        result.statementDay = offersStatementDate ? day : nil
-        return result
-    }
+    /// The day of the month (1–31) the Card's statement closes, as it is saved: only a Credit card with a statement
+    /// date has one.
+    var statementDay: Int? { offersStatementDate && hasStatementDate ? statementDayChoice : nil }
 
     /// Starts a Card with no paying wallet in the first of `wallets`, the user's wallets in their order.
     mutating func startPaying(from wallets: [Wallet]) {
@@ -120,7 +130,6 @@ nonisolated extension CardDraft {
             }
         }
         if let statementDay {
-            guard kind == .credit else { throw CardRuleError.statementDateRequiresCredit }
             guard (1...31).contains(statementDay) else { throw CardRuleError.statementDayOutOfRange }
         }
     }

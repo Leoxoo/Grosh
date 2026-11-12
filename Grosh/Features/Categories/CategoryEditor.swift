@@ -33,8 +33,30 @@ struct CategoryEditor: View {
         "star.fill", "questionmark.circle.fill", "ellipsis.circle.fill", "flag.fill",
     ]
 
-
     let mode: Mode
+
+    @Environment(\.modelContext) private var context
+
+    var body: some View {
+        MadeOnce {
+            switch mode {
+            case .add(let type):
+                (draft: CategoryDraft.new(type), inUse: Set<PersistentIdentifier>())
+            case .edit(let category):
+                (draft: CategoryDraft(category), inUse: CategoryCatalog(context: context).inUse([category]))
+            }
+        } content: { start in
+            CategoryForm(mode: mode, startingDraft: start.draft, inUse: start.inUse)
+        }
+    }
+}
+
+/// The form behind ``CategoryEditor``, holding the draft from the moment the sheet opens.
+private struct CategoryForm: View {
+    let mode: CategoryEditor.Mode
+    /// Whether the category being edited (or a subcategory) has transactions, counted in the store once when the sheet
+    /// opens rather than each time it draws.
+    let inUse: Set<PersistentIdentifier>
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
@@ -42,24 +64,13 @@ struct CategoryEditor: View {
     @State private var draft: CategoryDraft
     @State private var isMerging = false
     @State private var isConfirmingDelete = false
+    @State private var parentOptions = ParentOptions()
     private var saver = SheetSaver(Strings.Categories.couldntSave)
-    /// Whether the category being edited (or a subcategory) has transactions, counted in the store once when the sheet
-    /// opens rather than each time it draws.
-    @State private var inUse: Set<PersistentIdentifier>
 
-    init(mode: Mode) {
+    init(mode: CategoryEditor.Mode, startingDraft: CategoryDraft, inUse: Set<PersistentIdentifier>) {
         self.mode = mode
-        switch mode {
-        case .add(let type):
-            _draft = State(initialValue: .new(type))
-            _inUse = State(initialValue: [])
-        case .edit(let category):
-            _draft = State(initialValue: CategoryDraft(category))
-            _inUse = State(
-                initialValue: category.modelContext.map { CategoryCatalog(context: $0).inUse([category]) }
-                    ?? [category.persistentModelID]
-            )
-        }
+        self.inUse = inUse
+        _draft = State(initialValue: startingDraft)
     }
 
     private var catalog: CategoryCatalog { CategoryCatalog(context: context) }
@@ -76,16 +87,31 @@ struct CategoryEditor: View {
         return !editing.isLocked && !inUse.contains(editing.persistentModelID)
     }
 
-    private var parentOptions: [Category] {
-        Log.store.attempt("Reading the parent categories to choose from") {
-            try catalog.parentOptions(of: draft.type, for: editing)
-        } ?? []
+    /// The parent categories offered for each type, read from the store the first time the type is shown rather than
+    /// on every draw, which is every keystroke in Name. Filling it in doesn't redraw anything, so it is safe while
+    /// drawing.
+    private final class ParentOptions {
+        private var byType: [CategoryType: [Category]] = [:]
+
+        func of(_ type: CategoryType, for editing: Category?, in catalog: CategoryCatalog) -> [Category] {
+            if let options = byType[type] { return options }
+            let options = Log.store.attempt("Reading the parent categories to choose from") {
+                try catalog.parentOptions(of: type, for: editing)
+            } ?? []
+            byType[type] = options
+            return options
+        }
     }
 
     var body: some View {
+        let check = draft.check
         NavigationStack {
             Form {
-                detailsSection(canChangeType: canChangeType, parentOptions: parentOptions)
+                detailsSection(
+                    canChangeType: canChangeType,
+                    parentOptions: parentOptions.of(draft.type, for: editing, in: catalog),
+                    check: check
+                )
                 if !isLocked {
                     kindSection
                 }
@@ -103,7 +129,7 @@ struct CategoryEditor: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(editing == nil ? Strings.Common.add : Strings.Common.save, action: save)
-                        .disabled(!draft.canSave)
+                        .disabled(!check.passes)
                 }
             }
             .sheet(isPresented: $isMerging) {
@@ -128,8 +154,8 @@ struct CategoryEditor: View {
         }
     }
 
-    /// The name, type and parent. `parentOptions` is read from the store once per draw.
-    private func detailsSection(canChangeType: Bool, parentOptions: [Category]) -> some View {
+    /// The name, type and parent.
+    private func detailsSection(canChangeType: Bool, parentOptions: [Category], check: RuleCheck) -> some View {
         Section {
             HStack(spacing: 12) {
                 SymbolCircle(symbolName: draft.symbolName, color: draft.color, size: 40)
@@ -154,6 +180,9 @@ struct CategoryEditor: View {
         } footer: {
             if isLocked {
                 Text(CategoryRuleError.locked.localizedDescription)
+            } else if let problem = check.shownProblem {
+                Text(problem.localizedDescription)
+                    .foregroundStyle(.invalid)
             } else if !canChangeType {
                 Text(Strings.Categories.typeLockedFooter)
             } else if !(editing?.children ?? []).isEmpty {
@@ -188,7 +217,7 @@ struct CategoryEditor: View {
 
     private var iconSection: some View {
         Section(Strings.Common.icon) {
-            SymbolGrid(symbols: Self.symbolChoices, selection: $draft.symbolName, color: draft.color)
+            SymbolGrid(symbols: CategoryEditor.symbolChoices, selection: $draft.symbolName, color: draft.color)
         }
     }
 
