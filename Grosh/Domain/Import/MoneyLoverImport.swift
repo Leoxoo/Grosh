@@ -5,9 +5,11 @@ import SwiftData
 /// transaction. The categories are kept.
 enum MoneyLoverImport {
     /// Replaces the wallets, Cards, people and transactions in `context` with the rows of `export`, a MoneyLover export
-    /// as ``MoneyLoverCSV/read(_:)`` reads it, entered at `now`, its notes naming Cards by the hashtags of `cards`:
+    /// as ``MoneyLoverCSV/read(_:currencyCode:)`` reads it, entered at `now`, its notes naming Cards by the hashtags of
+    /// `cards`:
     ///
-    /// - Each wallet is created once by name, with a $0 Starting balance on its first day.
+    /// - Each wallet is created once by name, in the currency of its first row, with a Starting balance of nothing on
+    ///   its first day.
     /// - Each row is filed under the category of its name; a name no category has becomes a new top-level category.
     /// - A card hashtag in a note becomes the row's Card (``MoneyLoverCardTag``), where the app would offer that Card:
     ///   not on a transfer row, and only in the Card's paying wallet. Elsewhere the hashtag stays in the note.
@@ -40,7 +42,6 @@ enum MoneyLoverImport {
                 return summary
             }
         } catch {
-            Log.importing.failed("Importing from MoneyLover", error)
             context.rollback()
             throw error
         }
@@ -154,10 +155,11 @@ private struct Importer {
         )
     }
 
-    /// Adds the wallet `row` names, at the end of the order, and when `withStartingBalance`, a $0 Starting balance on
-    /// the earliest day any row of it is dated, entered before every row.
+    /// Adds the wallet `row` names, in the currency of `row`, the first of it, at the end of the order, and when
+    /// `withStartingBalance`, a Starting balance of nothing on the earliest day any row of it is dated, entered before
+    /// every row.
     private mutating func addWallet(firstSeenIn row: MoneyLoverRow, withStartingBalance: Bool) throws {
-        var draft = WalletDraft()
+        var draft = WalletDraft(currencyCode: row.amount.currencyCode)
         draft.name = row.walletName
         guard withStartingBalance else {
             wallets[row.walletName] = try Wallet.insertWithoutStartingBalance(draft, in: context)
@@ -166,7 +168,7 @@ private struct Importer {
         }
         let firstDay = rows.filter { $0.walletName == row.walletName }.map(\.day).min() ?? row.day
         wallets[row.walletName] = try Wallet.insert(
-            draft, startingBalance: Money(cents: 0), on: firstDay,
+            draft, startingBalance: Money(cents: 0, currencyCode: draft.currencyCode), on: firstDay,
             enteredAt: now.addingTimeInterval(-Double(rows.count + walletOrder.count + 1)), in: context
         )
         walletOrder.append(row.walletName)
@@ -311,7 +313,7 @@ private struct Importer {
         with chosen: [Person]
     ) -> Transaction {
         let transaction = Transaction.insert(
-            row.amount, on: row.day, wallet: wallets[row.walletName], category: category, card: card,
+            cents: row.amount.cents, on: row.day, wallet: wallets[row.walletName], category: category, card: card,
             note: note.trimmingCharacters(in: .whitespacesAndNewlines), in: context
         )
         transaction.createdAt = now.addingTimeInterval(-Double(index))
@@ -351,9 +353,7 @@ private struct Importer {
         var open = oldestFirst.filter(\.isLoanOrDebt)
         var unlinked: [Transaction] = []
         for payment in oldestFirst {
-            guard let role = payment.category?.lockedRole, role == .debtCollection || role == .repayment else {
-                continue
-            }
+            guard payment.paidLoanOrDebtKind != nil else { continue }
             guard let index = open.firstIndex(where: { $0.isPaidBackInFull(by: payment) }) else {
                 unlinked.append(payment)
                 continue

@@ -46,13 +46,13 @@ struct ReportView: View {
                 }
 
                 Section {
-                    NetIncomeCard(totals: PeriodTotals(of: counted))
+                    NetIncomeCard(totals: PeriodTotals(of: counted, currencyCode: history.currencyCode))
                 }
 
                 Section {
                     CategoryReportCard(
-                        income: CategoryBreakdown(side: .income, of: counted),
-                        spent: CategoryBreakdown(side: .spent, of: counted),
+                        income: CategoryBreakdown(side: .income, of: counted, currencyCode: history.currencyCode),
+                        spent: CategoryBreakdown(side: .spent, of: counted, currencyCode: history.currencyCode),
                         onOpen: { path.append(ReportScreen.details(.side($0))) }
                     )
                 }

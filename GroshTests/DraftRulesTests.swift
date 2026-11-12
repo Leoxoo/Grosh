@@ -204,7 +204,7 @@ struct DraftRulesTests {
 
     @Test func theBellListsWhatIsDue() throws {
         try fixture.dinner(owing: [(person: try fixture.person("Ann"), cents: 20_00)])
-        let expectations = try context.fetch(ExpectedReimbursements.all)
+        let expectations = try context.fetch(ExpectedReimbursements.records)
 
         let before = DueReminders(transactions: [], expectations: expectations, estimates: [], on: day(2026, 10, 9))
         let after = DueReminders(transactions: [], expectations: expectations, estimates: [], on: day(2026, 10, 10))

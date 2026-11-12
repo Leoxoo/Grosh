@@ -82,12 +82,12 @@ struct RecentlyDeletedTests {
         let lent = record("lent to Pasha", -100_00, in: checking)
         lent.category = try context.lockedCategory(.loan)
         lent.setPeople([try Person.add(named: "Pasha", in: context)])
-        #expect(try context.fetch(DebtsAndLoans.transactions) == [lent])
+        #expect(try context.fetch(DebtsAndLoans.records) == [lent])
 
         try lent.delete(.onlySelected, in: context, at: deletedAt)
 
         #expect(try context.fetch(Transaction.recent(limit: 5, asOf: today)).isEmpty)
-        #expect(try context.fetch(DebtsAndLoans.transactions).isEmpty)
+        #expect(try context.fetch(DebtsAndLoans.records).isEmpty)
     }
 
     @Test func aLoansPaymentInTheBinStillKeepsItsWalletAndCategory() throws {
@@ -114,7 +114,7 @@ struct RecentlyDeletedTests {
         try collection.delete(.onlySelected, in: context, at: deletedAt)
         try context.forgive(loan, on: today)
 
-        #expect(collection.restoreBlocker() == .loanOrDebtIsForgiven)
+        #expect(collection.restoreBlocker == .loanOrDebtIsForgiven)
         #expect(throws: RecentlyDeletedError.loanOrDebtIsForgiven) { try collection.restore() }
 
         try loan.unforgive()
@@ -133,7 +133,7 @@ struct RecentlyDeletedTests {
         record("to savings", -20_00, in: checking, link: transfer)
         let incoming = record("from checking", 20_00, in: savings, link: transfer)
 
-        try checking.delete(at: deletedAt)
+        try checking.delete(today: CalendarDay(deletedAt), at: deletedAt)
 
         let bin = try bin()
         #expect(bin.wallets == [checking])
@@ -148,10 +148,10 @@ struct RecentlyDeletedTests {
 
     @Test func transactionsDeletedWithAWalletAreRestoredOnlyWithIt() throws {
         let salary = record("salary", 100_00, in: checking)
-        try checking.delete(at: deletedAt)
+        try checking.delete(today: CalendarDay(deletedAt), at: deletedAt)
 
         #expect(throws: RecentlyDeletedError.deletedWithWallet) { try salary.restore() }
-        #expect(throws: RecentlyDeletedError.deletedWithWallet) { try salary.deleteForever(in: context) }
+        #expect(throws: RecentlyDeletedError.deletedWithWallet) { try salary.deleteForever() }
 
         try checking.restore(today: today)
 
@@ -165,10 +165,11 @@ struct RecentlyDeletedTests {
         record("salary", 100_00, in: checking)
         let coffee = record("coffee", -4_50, in: checking)
         try coffee.delete(.onlySelected, in: context, at: deletedAt)
-        try checking.delete(at: deletedAt.addingTimeInterval(days(1)))
+        let nextDay = deletedAt.addingTimeInterval(days(1))
+        try checking.delete(today: CalendarDay(nextDay), at: nextDay)
 
         #expect(try bin().transactions == [coffee])
-        #expect(coffee.restoreBlocker() == .walletIsDeleted)
+        #expect(coffee.restoreBlocker == .walletIsDeleted)
         #expect(throws: RecentlyDeletedError.walletIsDeleted) { try coffee.restore() }
 
         try checking.restore(today: today)
@@ -184,7 +185,7 @@ struct RecentlyDeletedTests {
         let coffee = record("coffee", -4_50, in: checking)
         coffee.card = chase
 
-        try checking.delete(at: deletedAt)
+        try checking.delete(today: CalendarDay(deletedAt), at: deletedAt)
         #expect(try !context.fetch(Card.unarchived).contains(chase))
         #expect(try !context.fetch(Card.listed).contains(chase))
 
@@ -192,8 +193,8 @@ struct RecentlyDeletedTests {
         #expect(try context.fetch(Card.unarchived).contains(chase))
         #expect(try context.fetch(Card.listed).contains(chase))
 
-        try checking.delete(at: deletedAt)
-        try checking.deleteForever(in: context)
+        try checking.delete(today: CalendarDay(deletedAt), at: deletedAt)
+        try checking.deleteForever()
         #expect(try context.fetch(FetchDescriptor<Card>()).isEmpty)
     }
 
@@ -208,7 +209,7 @@ struct RecentlyDeletedTests {
 
     @Test func itemsOlderThan30DaysAreRemovedForGoodWhenPurged() throws {
         record("salary", 100_00, in: checking)
-        try checking.delete(at: deletedAt)
+        try checking.delete(today: CalendarDay(deletedAt), at: deletedAt)
         let coffee = record("coffee", -4_50, in: savings)
         try coffee.delete(.onlySelected, in: context, at: deletedAt.addingTimeInterval(days(10)))
         record("lunch", -12_00, in: savings)
@@ -232,12 +233,12 @@ struct RecentlyDeletedTests {
         let coffee = record("coffee", -4_50, in: savings)
         record("salary", 100_00, in: checking)
         try coffee.delete(.onlySelected, in: context, at: deletedAt)
-        try checking.delete(at: deletedAt)
+        try checking.delete(today: CalendarDay(deletedAt), at: deletedAt)
 
-        try coffee.deleteForever(in: context)
+        try coffee.deleteForever()
         #expect(try context.transactionCount() == 1)
 
-        try checking.deleteForever(in: context)
+        try checking.deleteForever()
         #expect(try context.transactionCount() == 0)
         #expect(try context.fetch(FetchDescriptor<Wallet>()) == [savings])
     }
@@ -247,7 +248,7 @@ struct RecentlyDeletedTests {
         let coffee = record("coffee", -4_50, in: savings)
         record("lunch", -12_00, in: savings)
         try coffee.delete(.onlySelected, in: context, at: deletedAt)
-        try checking.delete(at: deletedAt)
+        try checking.delete(today: CalendarDay(deletedAt), at: deletedAt)
 
         try RecentlyDeleted.empty(in: context)
 
@@ -260,7 +261,7 @@ struct RecentlyDeletedTests {
         let coffee = record("coffee", -4_50, in: checking)
 
         #expect(throws: RecentlyDeletedError.notDeleted) { try coffee.restore() }
-        #expect(throws: RecentlyDeletedError.notDeleted) { try coffee.deleteForever(in: context) }
+        #expect(throws: RecentlyDeletedError.notDeleted) { try coffee.deleteForever() }
         #expect(throws: RecentlyDeletedError.notDeleted) { try checking.restore(today: today) }
     }
 }

@@ -10,3 +10,14 @@ nonisolated extension ModelContext {
         return try fetch(descriptor).first.map { $0[keyPath: sortOrder] + 1 } ?? 0
     }
 }
+
+nonisolated extension Array {
+    /// The elements in the order a list's drag leaves them: those at `source` moved to `destination`, the offsets the
+    /// list reports. What a wallet's or category's new `sortOrder` numbers follow.
+    func reordered(fromOffsets source: IndexSet, toOffset destination: Int) -> [Element] {
+        let moving = source.map { self[$0] }
+        var reordered = enumerated().filter { !source.contains($0.offset) }.map(\.element)
+        reordered.insert(contentsOf: moving, at: destination - source.count(in: 0..<destination))
+        return reordered
+    }
+}

@@ -66,7 +66,7 @@ struct TextReminderTests {
         alex.phone = "555 0100"
         try fixture.dinner(owing: [(alex, 30_00)])
         let listing = DebtsAndLoansByPerson(
-            DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions)), try fixture.owesMe()
+            DebtsAndLoans(try context.fetch(DebtsAndLoans.records)), try fixture.owesMe()
         )
         let entry = try #require((listing.open + listing.settled).first { $0.person === alex })
 
@@ -122,7 +122,7 @@ struct TextReminderTests {
         try remind(.loan, 40_00, with: pasha, on: today)
         try remind(.debt, 50_00, with: anna, on: today)
 
-        let reminders = DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions)).reminders(from: today)
+        let reminders = DebtsAndLoans(try context.fetch(DebtsAndLoans.records)).reminders(from: today)
 
         let loan = try #require(reminders.first { $0.withName == "Pasha" })
         let debt = try #require(reminders.first { $0.withName == "Anna" })

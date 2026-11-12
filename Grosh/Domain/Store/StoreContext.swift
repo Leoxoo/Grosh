@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// Why a change to a model couldn't be saved.
-nonisolated enum StoreError: Error, Equatable {
+nonisolated enum StoreError: GroshError, Equatable {
     /// The model isn't in the store any more: it was removed for good, or never added. A change to it would be lost.
     case notInStore
 }

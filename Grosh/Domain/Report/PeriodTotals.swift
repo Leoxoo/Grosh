@@ -10,8 +10,8 @@ struct PeriodTotals: Equatable {
         self.spent = spent
     }
 
-    /// The totals of what `counted` adds up to on each side.
-    init(of counted: [CountedAmount]) {
+    /// The totals of what `counted` adds up to on each side, in `currencyCode` (``CountedHistory/currencyCode``).
+    init(of counted: [CountedAmount], currencyCode: String) {
         var incomeCents = 0
         var spentCents = 0
         for amount in counted {
@@ -20,12 +20,15 @@ struct PeriodTotals: Equatable {
             case .spent: spentCents += amount.amount.cents
             }
         }
-        self.init(income: Money(cents: incomeCents), spent: Money(cents: spentCents))
+        self.init(
+            income: Money(cents: incomeCents, currencyCode: currencyCode),
+            spent: Money(cents: spentCents, currencyCode: currencyCode)
+        )
     }
 
     /// Income less Spent: what the period came to, positive when more came in than went out.
     var netIncome: Money {
-        Money(cents: income.cents - spent.cents)
+        Money(cents: income.cents - spent.cents, currencyCode: income.currencyCode)
     }
 
     /// The side's total, as its tab, bar and row show it.

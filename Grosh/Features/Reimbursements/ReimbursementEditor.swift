@@ -65,7 +65,7 @@ private struct ReimbursementForm: View {
         if let editing {
             try editing.update(with: draft)
         } else {
-            try expense.recordPayback(draft, into: wallet, in: context)
+            try expense.recordPayback(draft, into: wallet)
         }
     }
 }

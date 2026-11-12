@@ -8,7 +8,6 @@ struct RelatedTransactionsSection: View {
     let transaction: Transaction
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
     @State private var isConfirmingUndoSplit = false
     @State private var errorMessage: String?
 
@@ -54,7 +53,7 @@ struct RelatedTransactionsSection: View {
     private func undoSplit() {
         let id = transaction.persistentModelID
         Log.store.perform("Undoing a split", errorMessage: &errorMessage) {
-            if try transaction.undoSplit(in: context).persistentModelID != id {
+            if try transaction.undoSplit().persistentModelID != id {
                 dismiss()
             }
         }

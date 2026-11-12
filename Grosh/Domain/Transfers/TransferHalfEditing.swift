@@ -42,9 +42,10 @@ extension Transaction {
     /// Saves an edited transfer half, and with ``TransferUpdateScope/bothHalves`` carries a new amount or date over
     /// to the other half: a date-only change keeps a fee the halves already differ by. The note is this half's
     /// own. Saves.
-    func update(with draft: TransferHalfDraft, scope: TransferUpdateScope, in context: ModelContext) throws {
+    func update(with draft: TransferHalfDraft, scope: TransferUpdateScope) throws {
         guard editFlow == .transferHalf else { throw TransferRuleError.notATransferHalf }
         try draft.validate()
+        let context = try storeContext()
         let changesAmount = draft.amount.cents != abs(amountCents)
         let changesDay = draft.day != day
         amountCents = draft.amount.cents * (category?.sign ?? 1)

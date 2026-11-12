@@ -9,8 +9,8 @@ import SwiftUI
 /// (Debts), apart and never netted, the ones with something outstanding first and then Settled. A row opens the Person's
 /// Loans, Debts and Owes me, and has a Text button while something is outstanding (ADR-0009, ADR-0010).
 struct DebtsLoansView: View {
-    @Query(DebtsAndLoans.transactions) private var transactions: [Transaction]
-    @Query(ExpectedReimbursements.all) private var expectations: [ExpectedReimbursement]
+    @Query(DebtsAndLoans.records) private var transactions: [Transaction]
+    @Query(ExpectedReimbursements.records) private var expectations: [ExpectedReimbursement]
     @AppStorage(AppSettings.debtsLoansGroupingKey) private var grouping = AppSettings.debtsLoansGroupingDefault
     /// The message being texted, while Text them is open.
     @State private var texting: TextReminder?

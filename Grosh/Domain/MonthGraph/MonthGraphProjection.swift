@@ -26,9 +26,15 @@ struct MonthGraphProjection {
         guard !scheduled.isEmpty else { return nil }
         self.scheduled = scheduled
         mostOnADay = Dictionary(grouping: scheduled, by: \.day).values.map(\.count).max() ?? 0
-        dailyTotals = scheduled.compactMap(\.countedAmount).dailyTotals(side, in: span, through: span.last)
+        let currencyCode = todaysTotal.currencyCode
+        dailyTotals = scheduled.compactMap(\.countedAmount)
+            .dailyTotals(side, in: span, through: span.last, currencyCode: currencyCode)
             .filter { $0.day >= today }
-            .map { DailyTotal(day: $0.day, total: Money(cents: todaysTotal.cents + $0.total.cents)) }
+            .map { daily in
+                DailyTotal(
+                    day: daily.day, total: Money(cents: todaysTotal.cents + daily.total.cents, currencyCode: currencyCode)
+                )
+            }
     }
 
     /// What is due on `day`, the most recently added schedule first.

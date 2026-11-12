@@ -50,14 +50,14 @@ enum GroshCSVExport {
             let original: Int? = transaction.linkID.flatMap { originals[$0] }
             let splitFrom: String = original.map { $0 == lines.count ? "" : String($0) } ?? ""
             let reimbursement: String = transaction.orderedReimbursements
-                .map { "\(Money(cents: $0.amountCents).decimalString) \(GroshCSVFormat.date($0.day))" }
+                .map { "\($0.amount.decimalString) \(GroshCSVFormat.date($0.day))" }
                 .joined(separator: "; ")
             // In the order of `GroshCSVFormat.columns`.
             let row = [
                 String(lines.count),
                 GroshCSVFormat.date(day),
                 category.name,
-                Money(cents: transaction.amountCents).decimalString,
+                transaction.amount.decimalString,
                 wallet.currencyCode,
                 wallet.name,
                 transaction.note,
@@ -67,7 +67,7 @@ enum GroshCSVExport {
                 "",
                 transaction.card?.name ?? "",
                 link.map { String($0) } ?? "",
-                forgiveness.map { Money(cents: $0.amount.cents).decimalString } ?? "",
+                forgiveness.map { $0.amount.decimalString } ?? "",
                 forgiveness.map { GroshCSVFormat.date($0.day) } ?? "",
                 forgiveness?.category?.name ?? "",
                 forgiveness?.note ?? "",

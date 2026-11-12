@@ -13,6 +13,16 @@ nonisolated struct EstimateReminder: PendingReminder {
     /// The estimate the transaction holds, without its sign.
     let estimate: Money
     var arrival = ReminderArrival.onItsDay
+
+    /// "Amount to confirm", the notification's title.
+    var title: String {
+        String(localized: Strings.Recurring.amountToConfirm)
+    }
+
+    /// What was estimated, and that the real amount is to be entered.
+    var body: String {
+        String(localized: Strings.Recurring.estimatedAt(name, estimate.formatted()))
+    }
 }
 
 /// Every Estimated transaction, which the Home bell and the reminders track until their real amounts are entered.
@@ -22,11 +32,9 @@ struct EstimatedAmounts: ReminderSource {
 
     /// Every Estimated transaction outside Recently Deleted. A new estimate, or a change to one, changes what this
     /// fetches.
-    static var transactions: FetchDescriptor<Transaction> {
+    static var records: FetchDescriptor<Transaction> {
         FetchDescriptor(predicate: #Predicate { $0.isEstimated && $0.deletedAt == nil })
     }
-
-    static var records: FetchDescriptor<Transaction> { transactions }
 
     init(_ transactions: some Sequence<Transaction>) {
         open = transactions.filter { $0.isEstimated && $0.deletedAt == nil }

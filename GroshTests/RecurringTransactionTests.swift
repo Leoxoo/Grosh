@@ -119,7 +119,7 @@ struct RecurringTransactionTests {
         let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 10, 12)), today: today, in: context)
         try RecurringTransaction.catchUp(through: day(2026, 10, 12), in: context)
 
-        try recurring.delete(today: day(2026, 10, 12), in: context)
+        try recurring.delete(today: day(2026, 10, 12))
         try RecurringTransaction.catchUp(through: day(2026, 12, 31), in: context)
 
         let transactions = try context.fetch(FetchDescriptor<Transaction>())
@@ -142,7 +142,7 @@ struct RecurringTransactionTests {
     @Test func deletingMakesWhatFellDueFirst() throws {
         let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 10, 12)), today: today, in: context)
 
-        try recurring.delete(today: day(2026, 10, 12), in: context)
+        try recurring.delete(today: day(2026, 10, 12))
 
         let transactions = try context.fetch(FetchDescriptor<Transaction>())
         #expect(transactions.map(\.amountCents) == [-1599])
@@ -211,13 +211,13 @@ struct RecurringTransactionTests {
         let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 9, 1)), today: today, in: context)
         #expect(recurring.unenteredOccurrences(through: today) == [day(2026, 9, 1), day(2026, 10, 1)])
 
-        try recurring.makeTransactions(on: [day(2026, 9, 1)], in: context)
+        try recurring.makeTransactions(on: [day(2026, 9, 1)])
         #expect(recurring.unenteredOccurrences(through: today) == [day(2026, 10, 1)])
     }
 
     @Test func aTransactionInRecentlyDeletedStillCountsAsEntered() throws {
         let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 9, 1)), today: today, in: context)
-        try recurring.makeTransactions(on: [day(2026, 9, 1)], in: context)
+        try recurring.makeTransactions(on: [day(2026, 9, 1)])
         let made = try #require(recurring.transactions?.first)
         made.deletedAt = .now
 
@@ -240,10 +240,10 @@ struct RecurringTransactionTests {
     @Test func confirmingMakesOnlyThePickedOccurrences() throws {
         let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 9, 1)), today: today, in: context)
 
-        try recurring.makeTransactions(on: [], in: context)
+        try recurring.makeTransactions(on: [])
         #expect(recurring.attachedTransactions.isEmpty)
 
-        try recurring.makeTransactions(on: [day(2026, 10, 1)], in: context)
+        try recurring.makeTransactions(on: [day(2026, 10, 1)])
         #expect(recurring.attachedTransactions.map(\.day) == [day(2026, 10, 1)])
         #expect(recurring.attachedTransactions.map(\.amountCents) == [-1599])
     }
@@ -252,7 +252,7 @@ struct RecurringTransactionTests {
     @Test func savingWithNothingPickedMakesNothingAndKeepsTheSchedule() throws {
         let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 9, 1)), today: today, in: context)
 
-        try recurring.makeTransactions(on: [], in: context)
+        try recurring.makeTransactions(on: [])
 
         #expect(recurring.attachedTransactions.isEmpty)
         #expect(try context.fetch(FetchDescriptor<Transaction>()).isEmpty)
@@ -270,7 +270,7 @@ struct RecurringTransactionTests {
     @Test func addingATransactionNowMakesOneTodayAndSkipsNoOccurrence() throws {
         let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 10, 12)), today: today, in: context)
 
-        try recurring.addTransactionNow(today: today, in: context)
+        try recurring.addTransactionNow(today: today)
         #expect(recurring.attachedTransactions.map(\.day) == [today])
         #expect(recurring.attachedTransactions.map(\.amountCents) == [-1599])
 
@@ -285,7 +285,7 @@ struct RecurringTransactionTests {
         draft.remindAfterDays = 2
         let recurring = try RecurringTransaction.create(draft, today: today, in: context)
 
-        try recurring.addTransactionNow(today: today, in: context)
+        try recurring.addTransactionNow(today: today)
 
         let transaction = try #require(recurring.attachedTransactions.first)
         #expect(transaction.isEstimated)
@@ -297,7 +297,7 @@ struct RecurringTransactionTests {
         store.checking.isArchived = true
 
         #expect(throws: AddTransactionNowError.inactive) {
-            try recurring.addTransactionNow(today: today, in: context)
+            try recurring.addTransactionNow(today: today)
         }
         #expect(recurring.attachedTransactions.isEmpty)
     }
@@ -309,14 +309,14 @@ struct RecurringTransactionTests {
         recurring.category = nil
         #expect(!recurring.canAddTransactionNow)
         #expect(throws: AddTransactionNowError.incomplete) {
-            try recurring.addTransactionNow(today: today, in: context)
+            try recurring.addTransactionNow(today: today)
         }
 
         recurring.category = context.addCategory("Subscriptions")
         recurring.wallet = nil
         #expect(!recurring.canAddTransactionNow)
         #expect(throws: AddTransactionNowError.incomplete) {
-            try recurring.addTransactionNow(today: today, in: context)
+            try recurring.addTransactionNow(today: today)
         }
         #expect(recurring.attachedTransactions.isEmpty)
     }
@@ -326,7 +326,7 @@ struct RecurringTransactionTests {
     @Test func addingOnADueDayLeavesThatDaysOccurrenceToBeMade() throws {
         let recurring = try RecurringTransaction.create(netflix(starting: today), today: day(2026, 10, 8), in: context)
 
-        try recurring.addTransactionNow(today: today, in: context)
+        try recurring.addTransactionNow(today: today)
         try RecurringTransaction.catchUp(through: today, in: context)
 
         #expect(recurring.attachedTransactions.map(\.day) == [today, today])

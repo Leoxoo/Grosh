@@ -16,13 +16,13 @@ struct CountedHistoryTests {
     }
 
     private func history(_ selection: WalletSelection = .total) throws -> CountedHistory {
-        try CountedHistory(store.transactions(), in: selection, otherIncome: store.otherIncome())
+        try CountedHistory(store.transactions(), in: selection, currencyCode: "USD", otherIncome: store.otherIncome())
     }
 
     /// A wallet named `name` whose Starting balance is dated `day`.
     @discardableResult
     private func wallet(_ name: String, startingOn day: CalendarDay) throws -> Wallet {
-        var draft = WalletDraft()
+        var draft = WalletDraft(currencyCode: Money.defaultCurrencyCode)
         draft.name = name
         return try Wallet.create(draft, startingBalance: Money(cents: 300_00), on: day, in: context)
     }

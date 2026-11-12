@@ -6,7 +6,7 @@ import Testing
 @Suite(.namedInTheLog)
 struct MoneyLoverCSVTests {
     private func onlyRow(of csv: String) throws -> MoneyLoverRow {
-        let rows = try MoneyLoverCSV.read(csv).rows
+        let rows = try MoneyLoverCSV.read(csv, currencyCode: "USD").rows
         try #require(rows.count == 1)
         return rows[0]
     }
@@ -34,7 +34,7 @@ struct MoneyLoverCSVTests {
         let rows = try MoneyLoverCSV.read(moneyLoverExport(
             "1,10/05/2026,Loan,-50,USD,Cash,Lunch money,Sam,Road trip,✅,",
             "2,10/04/2026,Café,-3.00,USD,Cash,,,,,"
-        )).rows
+        ), currencyCode: "USD").rows
 
         #expect(rows.map(\.withName) == ["Sam", ""])
         #expect(rows.map(\.eventName) == ["Road trip", ""])
@@ -45,7 +45,7 @@ struct MoneyLoverCSVTests {
         let rows = try MoneyLoverCSV.read(moneyLoverExport(
             "1,10/05/2026,Café,-3.00,USD,Cash,\"Lunch, then \"\"dessert\"\"\nwith friends\",,,,",
             "2,10/04/2026,Products,-8.20,USD,Cash,Groceries,,,,"
-        )).rows
+        ), currencyCode: "USD").rows
 
         #expect(rows.map(\.note) == ["Lunch, then \"dessert\"\nwith friends", "Groceries"])
         #expect(rows.map(\.amount) == [Money(cents: -3_00), Money(cents: -8_20)])
@@ -70,7 +70,7 @@ struct MoneyLoverCSVTests {
         let file = try MoneyLoverCSV.read(([moneyLoverHeader + ",Card,Linked"] + [
             "1,10/05/2026,Café,-3.00,USD,Cash,,,,,, Chase ,1",
             "2,10/04/2026,Café,-3.00,USD,Cash,,,,,,,",
-        ]).joined(separator: "\r\n"))
+        ]).joined(separator: "\r\n"), currencyCode: "USD")
 
         #expect(file.rows.map(\.cardName) == ["Chase", ""])
         #expect(file.rows.map(\.link) == ["1", ""])
@@ -78,7 +78,7 @@ struct MoneyLoverCSVTests {
     }
 
     @Test func aMoneyLoverExportHasNoCardOrLinkedColumn() throws {
-        let file = try MoneyLoverCSV.read(moneyLoverExport("1,10/05/2026,Café,-3.00,USD,Cash,,,,,"))
+        let file = try MoneyLoverCSV.read(moneyLoverExport("1,10/05/2026,Café,-3.00,USD,Cash,,,,,"), currencyCode: "USD")
 
         #expect(file.rows.map(\.cardName) == [nil])
         #expect(file.rows.map(\.link) == [nil])
@@ -89,13 +89,13 @@ struct MoneyLoverCSVTests {
 
     @Test func aFileWithoutMoneyLoversColumnsIsRefused() {
         #expect(throws: MoneyLoverImportError.notAMoneyLoverExport) {
-            try MoneyLoverCSV.read("Date,Description,Amount\r\n10/05/2026,Coffee,-3.00\r\n")
+            try MoneyLoverCSV.read("Date,Description,Amount\r\n10/05/2026,Coffee,-3.00\r\n", currencyCode: "USD")
         }
     }
 
     @Test func aFileWithNoTransactionsIsRefused() {
         #expect(throws: MoneyLoverImportError.noTransactions) {
-            try MoneyLoverCSV.read(moneyLoverExport())
+            try MoneyLoverCSV.read(moneyLoverExport(), currencyCode: "USD")
         }
     }
 
@@ -113,7 +113,7 @@ struct MoneyLoverCSVTests {
                 "1,10/05/2026,Café,-3.00,USD,Cash,\"Two\nlines\",,,,",
                 "2,10/04/2026,Café,-3.00,USD,Cash,,,,,",
                 row
-            ))
+            ), currencyCode: "USD")
         }
     }
 

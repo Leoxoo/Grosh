@@ -24,11 +24,7 @@ extension Wallet {
     /// Applies a drag in `ordered` (a list in the user's order) by renumbering the wallets in their new order.
     /// Saves.
     static func move(_ ordered: [Wallet], fromOffsets source: IndexSet, toOffset destination: Int) throws {
-        let moving = source.map { ordered[$0] }
-        var reordered = ordered.enumerated().filter { !source.contains($0.offset) }.map(\.element)
-        let insertionIndex = destination - source.count(in: 0..<destination)
-        reordered.insert(contentsOf: moving, at: insertionIndex)
-        for (position, wallet) in reordered.enumerated() {
+        for (position, wallet) in ordered.reordered(fromOffsets: source, toOffset: destination).enumerated() {
             wallet.sortOrder = position
         }
         try ordered.first?.saveToStore()
@@ -88,9 +84,9 @@ nonisolated struct WalletBalances {
     /// currency as ``Swift/Sequence/totalsPerCurrency`` adds them, a currency never added to another. With nothing to
     /// add up, or everything adding up to nothing, it is nothing in the currency of the first wallet in the Total.
     func total(of wallets: [Wallet]) -> [Money] {
-        let counted = wallets.filter(\.countsInTotal)
-        let totals = counted.map(balance(of:)).totalsPerCurrency
-        return totals.isEmpty ? [Money(cents: 0, currencyCode: counted.first.currencyCodeOrDefault)] : totals
+        let totals = wallets.filter(\.countsInTotal).map(balance(of:)).totalsPerCurrency
+        guard totals.isEmpty else { return totals }
+        return [Money(cents: 0, currencyCode: WalletSelection.total.currencyCode(among: wallets))]
     }
 
     /// The balance of `selection`: the Total of `wallets`, or the one wallet's balance.

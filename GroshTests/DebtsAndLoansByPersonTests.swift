@@ -34,8 +34,8 @@ struct DebtsAndLoansByPersonTests {
 
     private func listing() throws -> DebtsAndLoansByPerson {
         DebtsAndLoansByPerson(
-            DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions)),
-            ExpectedReimbursements(try context.fetch(ExpectedReimbursements.all))
+            DebtsAndLoans(try context.fetch(DebtsAndLoans.records)),
+            ExpectedReimbursements(try context.fetch(ExpectedReimbursements.records))
         )
     }
 

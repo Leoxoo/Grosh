@@ -64,13 +64,13 @@ struct TransferHalfEditor: View {
             isAskingScope = true
             return .stayOpen
         }
-        try transaction.update(with: draft, scope: .onlyThisOne, in: context)
+        try transaction.update(with: draft, scope: .onlyThisOne)
         return .close
     }
 
     private func save(_ scope: TransferUpdateScope, with saver: SheetSaver) {
         saver.save("Saving a transfer") {
-            try transaction.update(with: draft, scope: scope, in: context)
+            try transaction.update(with: draft, scope: scope)
         }
     }
 }

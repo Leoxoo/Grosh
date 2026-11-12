@@ -15,7 +15,7 @@ struct CategoryTransactionsTests {
     }
 
     private func history() throws -> CountedHistory {
-        try CountedHistory(store.transactions(), in: .total, otherIncome: store.otherIncome())
+        try CountedHistory(store.transactions(), in: .total, currencyCode: "USD", otherIncome: store.otherIncome())
     }
 
     private func listed(_ parent: String, _ side: SpentOrIncome = .spent) throws -> ReportTransactions {
@@ -36,7 +36,7 @@ struct CategoryTransactionsTests {
 
         let breakdown = CategoryBreakdown(
             side: .spent,
-            of: try history().during(.custom(october), today: today)
+            of: try history().during(.custom(october), today: today), currencyCode: "USD"
         )
         let row = try #require(breakdown.categories.first { $0.category.name == "Bills & Utilities" })
         #expect(rows.total == row.total)

@@ -8,12 +8,12 @@ nonisolated extension LinkKind {
     /// link, are the parts of a Split, as they were taken to be before. Also how an import tells what a Grosh export's
     /// links join.
     init(of members: some Sequence<Transaction>) {
-        let roles = members.map { (role: $0.category?.lockedRole, paidBack: $0.hasPaybacksElsewhere) }
-        if roles.contains(where: { $0.role == .outgoingTransfer || $0.role == .incomingTransfer }) {
+        let members = Array(members)
+        if members.contains(where: { $0.category?.isTransferHalf == true }) {
             self = .transfer
-        } else if roles.contains(where: { [.loan, .debt, .debtCollection, .repayment].contains($0.role) }) {
+        } else if members.contains(where: { $0.isLoanOrDebt || $0.paidLoanOrDebtKind != nil }) {
             self = .loanOrDebt
-        } else if roles.contains(where: { $0.role == .reimbursement || $0.paidBack }) {
+        } else if members.contains(where: { $0.isFiledAsPayback || $0.hasPaybacksElsewhere }) {
             self = .payback
         } else {
             self = .split

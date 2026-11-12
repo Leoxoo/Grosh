@@ -47,8 +47,10 @@ struct DebtPaymentDraft {
         guard overpaymentCategory.type == overpaymentType else { throw DebtLoanRuleError.categoryDoesNotMatch }
     }
 
-    /// Whether Save can be enabled.
-    var canSave: Bool { (try? validate(against: loanOrDebt)) != nil }
+    /// Checks the payment against the Loan or Debt as it stood when the sheet opened.
+    func validate() throws {
+        try validate(against: loanOrDebt)
+    }
 }
 
 /// What Record payment adds: the part that was owed, filed as a Debt Collection (Loan) or Repayment (Debt), and any

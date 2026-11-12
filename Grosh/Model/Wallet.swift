@@ -4,8 +4,11 @@ import SwiftData
 /// A place the user's money is held. Its balance is always derived from its transactions, never stored.
 @Model
 final class Wallet {
+    /// The symbol a wallet starts with: a wallet.
+    nonisolated static let defaultSymbolName = "wallet.bifold.fill"
+
     var name: String = ""
-    var symbolName: String = "wallet.bifold.fill"
+    var symbolName: String = Wallet.defaultSymbolName
     var colorName: String = PaletteColor.green.rawValue
     var currencyCode: String = Money.defaultCurrencyCode
     var includeInTotal: Bool = true
@@ -24,7 +27,9 @@ final class Wallet {
     @Relationship(deleteRule: .nullify, inverse: \RecurringTransaction.wallet)
     var recurringTransactions: [RecurringTransaction]? = []
 
-    init(name: String, symbolName: String = "wallet.bifold.fill", color: PaletteColor = .green, sortOrder: Int = 0) {
+    init(
+        name: String, symbolName: String = Wallet.defaultSymbolName, color: PaletteColor = .green, sortOrder: Int = 0
+    ) {
         self.name = name
         self.symbolName = symbolName
         self.color = color

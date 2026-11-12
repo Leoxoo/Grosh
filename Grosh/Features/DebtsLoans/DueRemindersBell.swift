@@ -12,9 +12,9 @@ extension View {
 /// The bell and the sheet it opens. The sheet hangs off the screen rather than the toolbar button, so rebuilding the
 /// toolbar never closes it.
 private struct DueRemindersBell: ViewModifier {
-    @Query(DebtsAndLoans.transactions) private var transactions: [Transaction]
-    @Query(EstimatedAmounts.transactions) private var estimates: [Transaction]
-    @Query(ExpectedReimbursements.all) private var expectations: [ExpectedReimbursement]
+    @Query(DebtsAndLoans.records) private var transactions: [Transaction]
+    @Query(EstimatedAmounts.records) private var estimates: [Transaction]
+    @Query(ExpectedReimbursements.records) private var expectations: [ExpectedReimbursement]
     @Environment(\.today) private var today
     @State private var isShowingList = false
 

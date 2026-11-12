@@ -149,13 +149,10 @@ nonisolated struct SplitDraft {
         guard everyPart.allSatisfy({ $0.category != nil }) else { throw SplitRuleError.missingCategory }
         guard reimbursements.allSatisfy({ $0.part != nil }) else { throw SplitRuleError.unassignedReimbursement }
     }
-
-    /// Whether every required field is filled, so Split can be enabled.
-    var canSplit: Bool { (try? validate()) != nil }
 }
 
 /// Why a split can't be made or undone.
-nonisolated enum SplitRuleError: Error, Equatable {
+nonisolated enum SplitRuleError: RuleRefusal, Equatable {
     /// Only an ordinary Expense or Income can be split (``Transaction/canBeSplit``).
     case notSplittable
     case noParts
@@ -194,15 +191,16 @@ extension Transaction {
     /// is ever shared with the other parts.
     var isSplitPart: Bool { linkKind == .split }
 
-    /// Splits this transaction as `draft` has it, in `context`: it keeps its identity, creation time and Recurring
+    /// Splits this transaction as `draft` has it: it keeps its identity, creation time and Recurring
     /// attachment and takes the draft's remainder and fields, and each new part is made as a copy in its wallet and
     /// Card with its own fields. All the parts share a link, so they show as Related transactions. Returns the new
     /// parts. A Reimbursement goes to the part the draft assigns it to; those assigned to the original stay. Saves.
     /// Nothing changes when the transaction can't be split or the draft breaks a split rule.
     @discardableResult
-    func split(_ draft: SplitDraft, in context: ModelContext) throws -> [Transaction] {
+    func split(_ draft: SplitDraft) throws -> [Transaction] {
         guard canBeSplit else { throw SplitRuleError.notSplittable }
         try draft.validate()
+        let context = try storeContext()
         draft.original.apply(to: self)
         // Typing over the original so the total changes confirms an Estimated transaction, as editing it does. Only
         // moving parts of it elsewhere leaves the estimate as it was.
@@ -211,7 +209,7 @@ extension Transaction {
         }
         let created = draft.parts.map { part -> Transaction in
             let transaction = Transaction.insert(
-                Money(cents: 0), on: part.day, wallet: wallet, category: nil, card: card, in: context
+                cents: 0, on: part.day, wallet: wallet, category: nil, card: card, in: context
             )
             part.apply(to: transaction)
             transaction.isExcludedFromReport = isExcludedFromReport
@@ -232,7 +230,8 @@ extension Transaction {
     /// Deleted is left where it is and isn't counted. Returns the original. Saves. Throws when there is no other part
     /// to merge.
     @discardableResult
-    func undoSplit(in context: ModelContext) throws -> Transaction {
+    func undoSplit() throws -> Transaction {
+        let context = try storeContext()
         let parts = try context.fetch(linkedTransactions)
         guard isSplitPart, parts.contains(self), let original = parts.splitOriginal, parts.count > 1
         else { throw SplitRuleError.notSplit }

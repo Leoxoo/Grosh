@@ -9,7 +9,6 @@ struct SplitSheet: View {
     let transaction: Transaction
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
 
     @State private var draft: SplitDraft
     /// The part the editor is open on, while it is open.
@@ -64,9 +63,9 @@ struct SplitSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(Strings.Transactions.split) {
-                        saver.save("Splitting a transaction") { try transaction.split(draft, in: context) }
+                        saver.save("Splitting a transaction") { try transaction.split(draft) }
                     }
-                        .disabled(!draft.canSplit)
+                        .disabled(!draft.canSave)
                 }
             }
         }

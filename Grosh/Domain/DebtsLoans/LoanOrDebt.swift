@@ -83,7 +83,7 @@ struct LoanOrDebt: Equatable {
         isExcludedFromReport: Bool, in context: ModelContext
     ) throws -> Transaction {
         let transaction = Transaction.insert(
-            Money(cents: cents), on: day, wallet: original.wallet, category: category,
+            cents: cents, on: day, wallet: original.wallet, category: category,
             note: note.trimmingCharacters(in: .whitespacesAndNewlines), in: context
         )
         transaction.setPeople(original.orderedPeople)
@@ -115,13 +115,25 @@ nonisolated enum LoanOrDebtKind: Hashable, Sendable {
         }
     }
 
-    /// How a payment moves the wallet: a Debt Collection brings money in (`1`), a Repayment takes it out (`-1`).
-    var paymentSign: Int {
+    /// The kind whose payments are filed under `role`: Loan for Debt Collection, Debt for Repayment, `nil` for any
+    /// other role.
+    init?(paymentRole role: LockedRole?) {
+        guard let kind = [LoanOrDebtKind.loan, .debt].first(where: { $0.paymentRole == role }) else { return nil }
+        self = kind
+    }
+
+    /// How the Loan or Debt itself moves the wallet: a Loan (you lent) takes money out (`-1`), a Debt (you borrowed)
+    /// brings it in (`1`).
+    var sign: Int {
         switch self {
-        case .loan: 1
-        case .debt: -1
+        case .loan: -1
+        case .debt: 1
         }
     }
+
+    /// How a payment moves the wallet, back the other way: a Debt Collection brings money in (`1`), a Repayment takes
+    /// it out (`-1`).
+    var paymentSign: Int { -sign }
 
     /// Income for money collected beyond a Loan, Expense for money repaid beyond a Debt.
     var overpaymentType: CategoryType {
@@ -161,25 +173,22 @@ extension Transaction {
     func isPayment(of kind: LoanOrDebtKind) -> Bool { category?.lockedRole == kind.paymentRole }
 
     /// The kind of Loan or Debt this pays: Loan for a Debt Collection, Debt for a Repayment, `nil` for anything else.
-    var paidLoanOrDebtKind: LoanOrDebtKind? {
-        [LoanOrDebtKind.loan, .debt].first { isPayment(of: $0) }
-    }
+    var paidLoanOrDebtKind: LoanOrDebtKind? { LoanOrDebtKind(paymentRole: category?.lockedRole) }
 
     /// Whether this is a Debt Collection or Repayment on the link of a Loan or Debt that is forgiven. Restoring such a
     /// payment from Recently Deleted would count it a second time, since the forgiven amount already settles what it
     /// paid (ADR-0004). Reads the transactions on its link.
-    func paysForgivenLoanOrDebt(in context: ModelContext) throws -> Bool {
+    func paysForgivenLoanOrDebt() throws -> Bool {
         guard let kind = paidLoanOrDebtKind, linkKind == .loanOrDebt else { return false }
-        return try context.fetch(linkedTransactions).contains { $0.isForgiven && $0.loanOrDebtKind == kind }
+        return try storeContext().fetch(linkedTransactions).contains { $0.isForgiven && $0.loanOrDebtKind == kind }
     }
 
     /// Its payments, those in Recently Deleted too: restoring one brings it back against this Loan or Debt, so until
     /// then it still holds the wallet, category and lowest amount in place (``TransactionDraft/isLockedByPayments``).
     /// Empty for anything but a Loan or Debt with a link.
-    func paymentsWithRecentlyDeleted(in context: ModelContext) throws -> [Transaction] {
-        guard let kind = loanOrDebtKind, let link = linkID else { return [] }
-        let linked = FetchDescriptor<Transaction>(predicate: #Predicate { $0.linkID == link })
-        return try context.fetch(linked).filter { $0.isPayment(of: kind) }
+    func paymentsWithRecentlyDeleted() throws -> [Transaction] {
+        guard let kind = loanOrDebtKind, linkID != nil else { return [] }
+        return try storeContext().fetch(linkedTransactionsWithRecentlyDeleted).filter { $0.isPayment(of: kind) }
     }
 
     /// Links `payment`, a Debt Collection (for a Loan) or Repayment (for a Debt) recorded without one, such as by an

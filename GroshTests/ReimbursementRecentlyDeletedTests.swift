@@ -51,8 +51,8 @@ struct ReimbursementRecentlyDeletedTests {
         #expect(walletBalance(checking, asOf: today) == Money(cents: 0))
         #expect(dinner.countedAmount(otherIncome: try store.otherIncome()) == nil)
         #expect(try PeriodTotals(
-            of: CountedHistory(store.transactions(), in: .total, otherIncome: store.otherIncome())
-                .during(.month(CalendarMonth(today)), today: today)
+            of: CountedHistory(store.transactions(), in: .total, currencyCode: "USD", otherIncome: store.otherIncome())
+                .during(.month(CalendarMonth(today)), today: today), currencyCode: "USD"
         ) == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
         #expect(try store.graph(.spent).headline == Money(cents: 0))
     }
@@ -75,7 +75,7 @@ struct ReimbursementRecentlyDeletedTests {
         let kept = try dinnerPaidBackTwice()
         try dinner.delete(.onlySelected, in: context, at: deletedAt)
 
-        try dinner.deleteForever(in: context)
+        try dinner.deleteForever()
 
         #expect(try storedReimbursementCount() == 2)
         #expect(kept.reimbursements?.count == 2)
@@ -112,11 +112,11 @@ struct ReimbursementRecentlyDeletedTests {
         try context.payBack(10_00, on: today, to: lunch)
         try dinnerPaidBackTwice()
 
-        try savings.delete(at: deletedAt)
+        try savings.delete(today: CalendarDay(deletedAt), at: deletedAt)
         #expect(lunch.orderedReimbursements.count == 1)
         #expect(try storedReimbursementCount() == 3)
 
-        try savings.deleteForever(in: context)
+        try savings.deleteForever()
 
         #expect(try storedReimbursementCount() == 2)
     }

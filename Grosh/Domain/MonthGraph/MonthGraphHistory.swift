@@ -9,8 +9,8 @@ import SwiftData
 /// strip starts and the Average counts months from.
 ///
 /// Home reads these with `@Query` and puts them together with ``firstDay(earliest:forgiven:otherIncome:)`` and
-/// ``history(read:forgiven:firstDay:otherIncome:)``. ``read(_:in:otherIncome:)`` does the same from a model context, for
-/// tests and the benchmark, so they go through Home's own wiring.
+/// ``history(read:forgiven:firstDay:wallets:otherIncome:)``. ``read(_:in:otherIncome:)`` does the same from a model
+/// context, for tests and the benchmark, so they go through Home's own wiring.
 enum MonthGraphHistory {
     /// The months the graph of `month` sums, oldest first: those its comparisons read, then `month` itself.
     static func months(for month: CalendarMonth) -> [CalendarMonth] {
@@ -121,11 +121,15 @@ enum MonthGraphHistory {
     }
 
     /// The history Home draws a month's graph from: what counts in the Total among `read`, the month's
-    /// ``transactions(for:)``, and `forgiven`, counting from `firstDay`.
+    /// ``transactions(for:)``, and `forgiven`, counting from `firstDay`, in the Total's currency among `wallets`, the
+    /// unarchived wallets in the user's order (``WalletSelection/currencyCode(among:)``).
     static func history(
-        read: [Transaction], forgiven: [Transaction], firstDay: CalendarDay?, otherIncome: Category
+        read: [Transaction], forgiven: [Transaction], firstDay: CalendarDay?, wallets: [Wallet], otherIncome: Category
     ) -> CountedHistory {
-        CountedHistory(read + forgiven, otherIncome: otherIncome, firstDay: firstDay)
+        CountedHistory(
+            read + forgiven, currencyCode: WalletSelection.total.currencyCode(among: wallets), otherIncome: otherIncome,
+            firstDay: firstDay
+        )
     }
 
     /// The history of `month`, read from `context` as Home's queries read it.
@@ -134,7 +138,7 @@ enum MonthGraphHistory {
         let firstDay = firstDay(earliest: try context.fetch(earliestCounted), forgiven: forgiven, otherIncome: otherIncome)
         return history(
             read: try context.fetch(transactions(for: month)), forgiven: forgiven, firstDay: firstDay,
-            otherIncome: otherIncome
+            wallets: try context.fetch(Wallet.unarchived), otherIncome: otherIncome
         )
     }
 }

@@ -34,7 +34,7 @@ struct CardMergeView: View {
             },
             emptyDescription: String(localized: Strings.Cards.mergeEmpty),
             row: { CardRow(card: $0) },
-            merge: { try source.merge(into: $0, in: context) },
+            merge: { try source.merge(into: $0) },
             onMerged: onMerged
         )
     }

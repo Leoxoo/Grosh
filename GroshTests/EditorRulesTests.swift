@@ -167,10 +167,10 @@ struct EditorRulesTests {
     @Test func moneyPaidBackIntoTheExpensesWalletIsKeptOnItAndIntoAnotherIsATransactionThere() throws {
         let dinner = try fixture.dinner(60_00)
         try dinner.recordPayback(
-            ReimbursementDraft(amount: Money(cents: 10_00), day: day(2026, 10, 5)), into: fixture.checking, in: context
+            ReimbursementDraft(amount: Money(cents: 10_00), day: day(2026, 10, 5)), into: fixture.checking
         )
         try dinner.recordPayback(
-            ReimbursementDraft(amount: Money(cents: 5_00), day: day(2026, 10, 6)), into: fixture.cash, in: context
+            ReimbursementDraft(amount: Money(cents: 5_00), day: day(2026, 10, 6)), into: fixture.cash
         )
 
         #expect(dinner.orderedReimbursements.map(\.amountCents) == [10_00])
@@ -183,7 +183,7 @@ struct EditorRulesTests {
         #expect(dinner.paidBackSummary(.net).isEmpty)
 
         try dinner.recordPayback(
-            ReimbursementDraft(amount: Money(cents: 20_00), day: day(2026, 10, 5)), into: fixture.checking, in: context
+            ReimbursementDraft(amount: Money(cents: 20_00), day: day(2026, 10, 5)), into: fixture.checking
         )
         #expect(dinner.paidBackNet(.net)?.cents == -40_00)
         #expect(dinner.paidBackSummary(.net, locale: Locale(identifier: "en_US")) == "+20")

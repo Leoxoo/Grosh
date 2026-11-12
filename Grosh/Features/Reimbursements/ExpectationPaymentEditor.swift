@@ -39,7 +39,7 @@ private struct ExpectationPaymentForm: View {
             canSave: check.passes,
             saving: "Recording a payment on Owes me",
             failureTitle: Strings.DebtsLoans.couldntRecordPayment,
-            save: { try expectation.recordPayment(draft, in: context) }
+            save: { try expectation.recordPayment(draft) }
         ) { fields in
             Section {
                 LabeledContent(Strings.Common.from, value: expectation.personName)

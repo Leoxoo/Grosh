@@ -257,7 +257,7 @@ struct MoneyLoverImportTests {
             let original = loanOrDebt.original
             return "\(original.wallet?.name ?? "") \(original.day.month)/\(original.day.day) \(original.amountCents)"
         }
-        let all = DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions))
+        let all = DebtsAndLoans(try context.fetch(DebtsAndLoans.records))
         return (Set(all.open.map { describe($0) }), Set(all.settled.map { describe($0) }))
     }
 
@@ -331,7 +331,7 @@ struct MoneyLoverImportTests {
         let card = try Card.create(CardDraft(name: "Old card", kind: .debit, payingWallet: old), in: context)
         try CategoryCatalog(context: context).add(CategoryDraft(name: "Hobbies", type: .expense))
         let spent = Transaction.insert(
-            Money(cents: -2_00), on: today, wallet: old, category: try context.otherCategory(.expense), card: card,
+            cents: -2_00, on: today, wallet: old, category: try context.otherCategory(.expense), card: card,
             in: context
         )
         try context.save()
@@ -525,7 +525,7 @@ struct MoneyLoverImportTests {
             with: MoneyLoverCSV.read(moneyLoverExport(
                 "1,10/05/2026,Café,-3.00,USD,Checking,First,Sam,,,",
                 "2,10/04/2026,Café,-4.00,USD,Checking,Second,Kim,,,"
-            )),
+            ), currencyCode: "USD"),
             cards: .none, in: context, now: now
         )
 

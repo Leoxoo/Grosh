@@ -121,12 +121,12 @@ nonisolated struct TransactionDraft {
     /// What holds a Loan or Debt in place while it is edited, or `nil` when nothing does. When its payments can't be
     /// read, it is held as if paid in full: a lock lifted by a failed read would let it change under its payments.
     @MainActor private static func paymentLock(editing transaction: Transaction) -> PaymentLock? {
-        guard transaction.isLoanOrDebt, let context = transaction.modelContext else { return nil }
+        guard transaction.isLoanOrDebt, transaction.modelContext != nil else { return nil }
         let owed = Money(cents: abs(transaction.amountCents), currencyCode: transaction.amount.currencyCode)
         let forgivenOwed = transaction.isForgiven ? owed : nil
         let payments: [Transaction]
         do {
-            payments = try transaction.paymentsWithRecentlyDeleted(in: context)
+            payments = try transaction.paymentsWithRecentlyDeleted()
         } catch {
             Log.store.failed("Reading the payments of a Loan or Debt", error)
             return PaymentLock(
@@ -171,7 +171,7 @@ nonisolated struct TransactionDraft {
 }
 
 /// Why a transaction can't be saved yet.
-nonisolated enum TransactionRuleError: Error, Equatable {
+nonisolated enum TransactionRuleError: RuleRefusal, Equatable {
     case missingWallet
     /// The amount must be above zero; the category sets the sign.
     case missingAmount
@@ -285,6 +285,6 @@ nonisolated extension TransactionDraft {
     /// Whether the amount adds to the wallet (`1`) or takes from it (`-1`): the category's ``Category/sign``, or
     /// before one is chosen, the type's. `0` while a Debt/Loan has neither Loan nor Debt picked.
     var sign: Int {
-        category?.sign ?? (type == .expense ? -1 : type == .income ? 1 : 0)
+        category?.sign ?? type.sign ?? 0
     }
 }

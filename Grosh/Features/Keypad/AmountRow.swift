@@ -9,7 +9,8 @@ struct AmountRow<Label: View>: View {
     let field: AnyHashable
     /// Keep it in `@State` (the row's own or its form's), which the Keypad can type into after the row is gone.
     @Binding var entry: AmountEntry
-    var currencyCode = Money.defaultCurrencyCode
+    /// The currency the amount is shown in: its wallet's.
+    let currencyCode: String
     var tint: Color = .primary
     /// Shown, dimmed, while nothing is typed, for an amount that may be left open, such as "Any"; `nil` shows 0.
     var placeholder: LocalizedStringResource?
@@ -87,7 +88,7 @@ struct AmountRow<Label: View>: View {
 extension AmountRow where Label == Text {
     init(
         _ title: LocalizedStringResource, field: AnyHashable, entry: Binding<AmountEntry>,
-        currencyCode: String = Money.defaultCurrencyCode, tint: Color = .primary,
+        currencyCode: String, tint: Color = .primary,
         placeholder: LocalizedStringResource? = nil, font: Font = .title2.weight(.semibold)
     ) {
         self.init(

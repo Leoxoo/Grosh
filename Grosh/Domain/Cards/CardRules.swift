@@ -15,7 +15,7 @@ nonisolated struct CardDraft {
 }
 
 /// Why a Card change was refused.
-nonisolated enum CardRuleError: Error, Equatable {
+nonisolated enum CardRuleError: RuleRefusal, Equatable {
     case missingName
     /// Every Card is paid from a wallet; it is only offered on that wallet's transactions.
     case missingPayingWallet
@@ -215,7 +215,8 @@ extension Card {
     }
 
     /// Moves every transaction and Recurring transaction paid with this Card to `target`, then removes this Card. Saves.
-    func merge(into target: Card, in context: ModelContext) throws {
+    func merge(into target: Card) throws {
+        let context = try storeContext()
         guard target != self else { throw CardRuleError.mergeIntoItself }
         guard target.payingWallet == payingWallet else { throw CardRuleError.mergeIntoAnotherWallet }
         guard !target.isArchived else { throw CardRuleError.mergeIntoArchived }
@@ -243,7 +244,8 @@ extension Card {
     }
 
     /// Removes a Card that never paid for anything. A Card with transactions must be merged instead. Saves.
-    func delete(in context: ModelContext) throws {
+    func delete() throws {
+        let context = try storeContext()
         guard try !hasTransactions() else { throw CardRuleError.hasTransactions }
         context.delete(self)
         try context.save()

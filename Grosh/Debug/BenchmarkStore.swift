@@ -11,8 +11,7 @@ import UniformTypeIdentifiers
 /// carries it.
 enum BenchmarkStore {
     static func open(at url: URL) throws -> ModelContainer {
-        let configuration = ModelConfiguration(schema: GroshStore.schema, url: url, cloudKitDatabase: .none)
-        return try ModelContainer(for: GroshStore.schema, configurations: configuration)
+        try GroshStore.makeContainer(at: url)
     }
 
     static func prepare(at url: URL, years: Int) throws {
@@ -71,7 +70,7 @@ enum BenchmarkStore {
             for _ in 0..<random.next(in: 4...10) {
                 let wallet = wallets[random.next(in: 0...9) < 7 ? 0 : random.next(in: 1...3)]
                 let transaction = Transaction.insert(
-                    Money(cents: -random.next(in: 150...15_000)), on: day, wallet: wallet,
+                    cents: -random.next(in: 150...15_000), on: day, wallet: wallet,
                     category: expenses[random.next(in: 0...(expenses.count - 1))],
                     note: notes[random.next(in: 0...(notes.count - 1))], in: context
                 )
@@ -85,21 +84,21 @@ enum BenchmarkStore {
             }
             if day.day == 1 || day.day == 15 {
                 Transaction.insert(
-                    Money(cents: random.next(in: 250_000...400_000)), on: day, wallet: wallets[0],
+                    cents: random.next(in: 250_000...400_000), on: day, wallet: wallets[0],
                     category: incomes[0], in: context
                 )
                 let out = Transaction.insert(
-                    Money(cents: -50_000), on: day, wallet: wallets[0], category: role(.outgoingTransfer), in: context
+                    cents: -50_000, on: day, wallet: wallets[0], category: role(.outgoingTransfer), in: context
                 )
                 let into = Transaction.insert(
-                    Money(cents: 50_000), on: day, wallet: wallets[1], category: role(.incomingTransfer), in: context
+                    cents: 50_000, on: day, wallet: wallets[1], category: role(.incomingTransfer), in: context
                 )
                 Transaction.link([out, into], as: .transfer)
                 count += 3
             }
             if day.day == 10, random.next(in: 0...2) == 0 {
                 let loan = Transaction.insert(
-                    Money(cents: -random.next(in: 2_000...50_000)), on: day, wallet: wallets[2], category: role(.loan),
+                    cents: -random.next(in: 2_000...50_000), on: day, wallet: wallets[2], category: role(.loan),
                     in: context
                 )
                 loan.isExcludedFromReport = true

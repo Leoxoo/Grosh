@@ -178,7 +178,7 @@ struct CardEditor: View {
                     isConfirmingDelete = true
                 }
                 .confirmationDialog(Strings.Common.deleteNamed(card.name), isPresented: $isConfirmingDelete, titleVisibility: .visible) {
-                    Button(Strings.Cards.deleteCard, role: .destructive) { saver.save("Changing a card") { try card.delete(in: context) } }
+                    Button(Strings.Cards.deleteCard, role: .destructive) { saver.save("Changing a card") { try card.delete() } }
                 }
             }
         } footer: {

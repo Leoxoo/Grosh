@@ -33,8 +33,8 @@ struct AttachedTransactionTests {
         let older = entered(on: day(2026, 9, 20), cents: -499)
         let newer = entered(on: day(2026, 10, 15), cents: -1000)
 
-        try recurring.attach(older, in: context)
-        try recurring.attach(newer, in: context)
+        try recurring.attach(older)
+        try recurring.attach(newer)
 
         #expect(recurring.attachedTransactions.map(\.day) == [day(2026, 10, 15), day(2026, 10, 12), day(2026, 9, 20)])
         #expect(older.recurring == recurring)
@@ -43,7 +43,7 @@ struct AttachedTransactionTests {
     @Test func attachingNeverMovesTheScheduleOrMakesAnOccurrence() throws {
         let recurring = try store.netflix(starting: day(2026, 10, 12))
 
-        try recurring.attach(entered(on: day(2026, 10, 1), cents: -1599), in: context)
+        try recurring.attach(entered(on: day(2026, 10, 1), cents: -1599))
 
         #expect(recurring.nextDueDay == day(2026, 10, 12))
         #expect(recurring.attachedTransactions.count == 1)
@@ -52,9 +52,9 @@ struct AttachedTransactionTests {
     @Test func unlinkingDetachesATransactionWithoutDeletingIt() throws {
         let recurring = try store.netflix(starting: day(2026, 10, 12))
         let transaction = entered(on: day(2026, 10, 1), cents: -1599)
-        try recurring.attach(transaction, in: context)
+        try recurring.attach(transaction)
 
-        try recurring.unlink(transaction, in: context)
+        try recurring.unlink(transaction)
 
         #expect(recurring.attachedTransactions.isEmpty)
         #expect(transaction.recurring == nil)
@@ -69,7 +69,7 @@ struct AttachedTransactionTests {
         try RecurringTransaction.catchUp(through: day(2026, 10, 12), in: context)
         let made = try #require(recurring.attachedTransactions.first)
 
-        try recurring.unlink(made, in: context)
+        try recurring.unlink(made)
 
         #expect(recurring.attachedTransactions.isEmpty)
         #expect(made.wallet == store.checking)
@@ -81,9 +81,9 @@ struct AttachedTransactionTests {
         let recurring = try store.netflix(starting: day(2026, 10, 12))
         let other = try store.netflix(starting: day(2026, 10, 12))
         let transaction = entered(on: day(2026, 10, 1), cents: -1599)
-        try other.attach(transaction, in: context)
+        try other.attach(transaction)
 
-        try recurring.unlink(transaction, in: context)
+        try recurring.unlink(transaction)
 
         #expect(transaction.recurring == other)
         #expect(other.attachedTransactions == [transaction])
@@ -92,7 +92,7 @@ struct AttachedTransactionTests {
     @Test func aTransactionInRecentlyDeletedLeavesTheListAndReturnsOnRestore() throws {
         let recurring = try store.netflix(starting: day(2026, 10, 12))
         let transaction = entered(on: day(2026, 10, 1), cents: -1599)
-        try recurring.attach(transaction, in: context)
+        try recurring.attach(transaction)
 
         transaction.deletedAt = .now
         #expect(recurring.attachedTransactions.isEmpty)
@@ -108,7 +108,7 @@ struct AttachedTransactionTests {
         let free = entered(on: day(2026, 10, 1), cents: -500)
         let held = entered(on: day(2026, 10, 2), cents: -600)
         let deleted = entered(on: day(2026, 10, 3), cents: -700)
-        try schedule.attach(held, in: context)
+        try schedule.attach(held)
         deleted.deletedAt = .now
 
         #expect(free.isAttachable)
@@ -122,10 +122,10 @@ struct AttachedTransactionTests {
         let deleted = entered(on: day(2026, 10, 1), cents: -500)
         deleted.deletedAt = .now
         let held = entered(on: day(2026, 10, 2), cents: -600)
-        try other.attach(held, in: context)
+        try other.attach(held)
 
-        #expect(throws: AttachError.notAttachable) { try recurring.attach(deleted, in: context) }
-        #expect(throws: AttachError.notAttachable) { try recurring.attach(held, in: context) }
+        #expect(throws: AttachError.notAttachable) { try recurring.attach(deleted) }
+        #expect(throws: AttachError.notAttachable) { try recurring.attach(held) }
 
         #expect(deleted.recurring == nil)
         #expect(held.recurring == other)
@@ -168,9 +168,9 @@ struct AttachedTransactionTests {
     @Test func deletingTheScheduleLeavesItsAttachedTransactionsAsOrdinaryOnes() throws {
         let recurring = try store.netflix(starting: day(2026, 10, 12))
         let transaction = entered(on: day(2026, 10, 1), cents: -1599)
-        try recurring.attach(transaction, in: context)
+        try recurring.attach(transaction)
 
-        try recurring.delete(today: today, in: context)
+        try recurring.delete(today: today)
 
         #expect(transaction.recurring == nil)
         #expect(transaction.isAttachable)

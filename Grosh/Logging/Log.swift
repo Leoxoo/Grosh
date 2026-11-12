@@ -21,26 +21,31 @@ nonisolated enum Log {
     static let contacts = Logger(subsystem: subsystem, category: "Contacts")
 }
 
+/// An error Grosh declares. Its case names what went wrong and quotes no record, so the log names it as it is.
+nonisolated protocol GroshError: Error {}
+
+/// One of Grosh's rules refusing a change: an invalid draft, a locked category, a bad import file. The person sees it
+/// in an alert and the tests exercise it on purpose, so it is logged as `info`, never as an error.
+nonisolated protocol RuleRefusal: GroshError {}
+
 nonisolated extension Logger {
     /// Logs that `what` didn't happen, because of `cause`.
     ///
-    /// An error Grosh declares is one of its rules refusing a change, such as an invalid draft, a locked or missing
-    /// category or a bad import file. The person sees it in an alert and the tests exercise it, so it is logged as
-    /// `info`, and so is any error from something the person chose, such as a file, when it is `expected`. Any other
-    /// error is the store or the system failing, which should never happen, and is logged as an `error`: `tools/check`
-    /// fails a test run that logs one.
+    /// A ``RuleRefusal`` is logged as `info`, and so is any error from something the person chose, such as a file,
+    /// when it is `expected`. Any other error, such as a model the store no longer holds or a locked category gone
+    /// missing, is the store or the system failing, which should never happen, and is logged as an `error`:
+    /// `tools/check` fails a test run that logs one.
     ///
     /// The log names the kind of error and never its message or user info, which can quote the record that failed.
     func failed(_ what: String, _ cause: Error, expected: Bool = false) {
-        let isGroshError = String(reflecting: type(of: cause)).hasPrefix("Grosh.")
         let kind: String
-        if isGroshError {
+        if cause is GroshError {
             kind = String(describing: cause)
         } else {
             let system = cause as NSError
             kind = "\(system.domain) \(system.code)"
         }
-        if isGroshError || expected {
+        if cause is RuleRefusal || expected {
             self.info("\(what, privacy: .public) was refused: \(kind, privacy: .public)")
         } else {
             self.error("\(what, privacy: .public) failed: \(kind, privacy: .public)")

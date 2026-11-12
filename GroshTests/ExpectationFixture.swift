@@ -57,19 +57,19 @@ struct ExpectationFixture {
         draft.amount = Money(cents: cents)
         if let wallet { draft.wallet = wallet }
         draft.note = note
-        try expectation.recordPayment(draft, in: context)
+        try expectation.recordPayment(draft)
     }
 
     /// What the Report counts for `selection` in October.
     func totals(in selection: WalletSelection = .total) throws -> PeriodTotals {
         try PeriodTotals(
-            of: CountedHistory(store.transactions(), in: selection, otherIncome: store.otherIncome())
-                .during(.month(CalendarMonth(today)), today: today)
+            of: CountedHistory(store.transactions(), in: selection, currencyCode: "USD", otherIncome: store.otherIncome())
+                .during(.month(CalendarMonth(today)), today: today), currencyCode: "USD"
         )
     }
 
     /// Every Expected reimbursement the way Debts & Loans reads them.
     func owesMe() throws -> ExpectedReimbursements {
-        ExpectedReimbursements(try context.fetch(ExpectedReimbursements.all))
+        ExpectedReimbursements(try context.fetch(ExpectedReimbursements.records))
     }
 }

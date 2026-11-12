@@ -22,7 +22,7 @@ struct LinkKindTests {
     private func paidBackIntoCash() throws -> (dinner: Transaction, payback: Transaction) {
         let dinner = try fixture.dinner()
         let draft = ReimbursementDraft(amount: Money(cents: 20_00), day: today)
-        return (dinner, try dinner.recordPaybackElsewhere(draft, into: cash, in: context))
+        return (dinner, try dinner.recordPaybackElsewhere(draft, into: cash))
     }
 
     // MARK: Made by the rule that links
@@ -68,11 +68,11 @@ struct LinkKindTests {
         var part = draft.newPart()
         part.amount = Money(cents: 10_00)
         draft.addPart(part)
-        let parts = try dinner.split(draft, in: context)
+        let parts = try dinner.split(draft)
 
         #expect(([dinner] + parts).allSatisfy { $0.linkKind == .split })
 
-        let original = try parts[0].undoSplit(in: context)
+        let original = try parts[0].undoSplit()
 
         #expect(original === dinner)
         #expect(dinner.linkKind == nil)
@@ -85,7 +85,7 @@ struct LinkKindTests {
         func kind(of roles: LockedRole?...) throws -> LinkKind {
             let members = try roles.map { role in
                 Transaction.insert(
-                    Money(cents: -1_00), on: today, wallet: checking,
+                    cents: -1_00, on: today, wallet: checking,
                     category: try role.map(context.lockedCategory) ?? fixture.store.category("Restaurants"), in: context
                 )
             }
@@ -122,7 +122,7 @@ struct LinkKindTests {
         #expect(dinner.hasPaybacksElsewhere)
         #expect(!dinner.canBeSplit)
 
-        try payback.deleteForever(in: context)
+        try payback.deleteForever()
 
         #expect(!dinner.hasPaybacksElsewhere)
         #expect(dinner.linkID == nil)
@@ -136,11 +136,11 @@ struct LinkKindTests {
     @Test func anExpenseKeepsItsMarkWhileAnotherPaybackIsLeft() throws {
         let (dinner, first) = try paidBackIntoCash()
         let second = try dinner.recordPaybackElsewhere(
-            ReimbursementDraft(amount: Money(cents: 5_00), day: today), into: cash, in: context
+            ReimbursementDraft(amount: Money(cents: 5_00), day: today), into: cash
         )
         try first.delete(.onlySelected, in: context)
 
-        try first.deleteForever(in: context)
+        try first.deleteForever()
 
         #expect(dinner.hasPaybacksElsewhere)
         #expect(dinner.linkID == second.linkID)

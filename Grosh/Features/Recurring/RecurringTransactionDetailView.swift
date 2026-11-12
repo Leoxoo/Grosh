@@ -11,7 +11,6 @@ struct RecurringTransactionDetailView: View {
     let recurring: RecurringTransaction
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
     @Environment(\.today) private var today
     @State private var isEditing = false
     @State private var isDuplicating = false
@@ -177,13 +176,13 @@ struct RecurringTransactionDetailView: View {
 
     private func addTransactionNow() {
         Log.recurring.perform("Adding a transaction now", errorMessage: &errorMessage) {
-            try recurring.addTransactionNow(today: today, in: context)
+            try recurring.addTransactionNow(today: today)
         }
     }
 
     private func delete() {
         let succeeded = Log.recurring.perform("Deleting a Recurring transaction", errorMessage: &errorMessage) {
-            try recurring.delete(today: today, in: context)
+            try recurring.delete(today: today)
         }
         if succeeded {
             dismiss()
@@ -192,7 +191,7 @@ struct RecurringTransactionDetailView: View {
 
     private func unlink(_ transaction: Transaction) {
         Log.recurring.perform("Unlinking a transaction", errorMessage: &errorMessage) {
-            try recurring.unlink(transaction, in: context)
+            try recurring.unlink(transaction)
         }
     }
 }

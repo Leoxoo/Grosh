@@ -21,17 +21,23 @@ struct NetIncomeDetailsView: View {
     @ViewBuilder
     private func content(_ history: CountedHistory) -> some View {
         let counted = history.during(period, today: today)
-        let rows = StepRow.rows(of: counted, for: timeRange, over: history.days(of: period, today: today), today: today)
+        let rows = StepRow.rows(
+            of: counted, currencyCode: history.currencyCode, for: timeRange,
+            over: history.days(of: period, today: today), today: today
+        )
         List {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(Strings.Screens.netIncome)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    AmountText(amount: PeriodTotals(of: counted).netIncome, showsPlusSign: true)
+                    AmountText(
+                        amount: PeriodTotals(of: counted, currencyCode: history.currencyCode).netIncome,
+                        showsPlusSign: true
+                    )
                         .font(.largeTitle.bold())
                         .contentTransition(.numericText())
-                    StepColumns(steps: rows)
+                    StepColumns(steps: rows, currencyCode: history.currencyCode)
                 }
                 .padding(.vertical, 4)
             }
@@ -86,6 +92,7 @@ private struct StepTotalsRow: View {
 /// rows below the chart list them with their totals.
 private struct StepColumns: View {
     let steps: [StepRow]
+    let currencyCode: String
 
     var body: some View {
         Chart {
@@ -98,6 +105,6 @@ private struct StepColumns: View {
             RuleMark(y: .value(Strings.Common.zero, 0))
                 .foregroundStyle(.secondary.opacity(0.4))
         }
-        .stepBarAxes()
+        .stepBarAxes(currencyCode: currencyCode)
     }
 }

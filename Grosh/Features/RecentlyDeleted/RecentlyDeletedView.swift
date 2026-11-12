@@ -74,7 +74,7 @@ struct RecentlyDeletedView: View {
             if !bin.transactions.isEmpty {
                 Section {
                     ForEach(bin.transactions) { transaction in
-                        let blocker = transaction.restoreBlocker()
+                        let blocker = transaction.restoreBlocker
                         DeletedTransactionRow(transaction: transaction, blocker: blocker, now: now)
                             .recentlyDeletedActions(canRestore: blocker == nil) {
                                 Log.store.perform("Changing Recently Deleted", errorMessage: &errorMessage) { try transaction.restore() }
@@ -122,9 +122,9 @@ struct RecentlyDeletedView: View {
     private func remove(_ removal: PendingRemoval) {
         Log.store.perform("Changing Recently Deleted", errorMessage: &errorMessage) {
             switch removal {
-            case .wallet(let wallet): try wallet.deleteForever(in: context)
-            case .recurring(let schedule): try schedule.deleteForever(in: context)
-            case .transaction(let transaction): try transaction.deleteForever(in: context)
+            case .wallet(let wallet): try wallet.deleteForever()
+            case .recurring(let schedule): try schedule.deleteForever()
+            case .transaction(let transaction): try transaction.deleteForever()
             case .everything: try RecentlyDeleted.empty(in: context)
             }
         }

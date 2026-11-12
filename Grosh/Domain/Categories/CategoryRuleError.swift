@@ -1,7 +1,7 @@
 import Foundation
 
 /// Why ``CategoryCatalog`` refused a change.
-nonisolated enum CategoryRuleError: Error, Equatable {
+nonisolated enum CategoryRuleError: RuleRefusal, Equatable {
     /// Locked categories keep everything but their icon: no delete, merge, rename, retype, move or hide.
     case locked
     /// A category can only be merged into, or nested under, a category of its own type.

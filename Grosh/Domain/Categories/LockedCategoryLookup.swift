@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// Thrown when a locked category the app depends on isn't in the store (it is seeded on first launch and can't be deleted).
-nonisolated struct MissingLockedCategory: Error, Equatable {
+nonisolated struct MissingLockedCategory: GroshError, Equatable {
     let role: LockedRole
 }
 

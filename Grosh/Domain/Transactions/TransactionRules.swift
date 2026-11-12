@@ -6,7 +6,7 @@ extension Transaction {
     @discardableResult
     static func create(_ draft: TransactionDraft, in context: ModelContext) throws -> Transaction {
         try draft.validate()
-        let transaction = Transaction.insert(Money(cents: 0), on: draft.day, wallet: nil, category: nil, in: context)
+        let transaction = Transaction.insert(cents: 0, on: draft.day, wallet: nil, category: nil, in: context)
         try transaction.apply(draft)
         try context.save()
         return transaction
@@ -39,14 +39,25 @@ extension Transaction {
 }
 
 extension Category {
-    /// How a transaction filed here moves its wallet: `1` adds the amount, `-1` takes it away. Expense takes
-    /// money out and Income brings it in; a Loan (you lent) and a Repayment take it out, a Debt (you borrowed)
-    /// and a Debt Collection bring it in.
+    /// How a transaction filed here moves its wallet: `1` adds the amount, `-1` takes it away. A Loan or Debt moves it
+    /// as ``LoanOrDebtKind/sign`` says and a Debt Collection or Repayment as ``LoanOrDebtKind/paymentSign`` says;
+    /// anything else as its type does (``CategoryType/sign``), and the app's own System categories, such as Starting
+    /// balance, add.
     var sign: Int {
-        switch lockedRole {
-        case .loan, .repayment: return -1
-        case .debt, .debtCollection: return 1
-        default: return type == .expense ? -1 : 1
+        if let kind = LoanOrDebtKind(lockedRole) { return kind.sign }
+        if let kind = LoanOrDebtKind(paymentRole: lockedRole) { return kind.paymentSign }
+        return type.sign ?? 1
+    }
+}
+
+nonisolated extension CategoryType {
+    /// How money filed under a category of this type moves its wallet, when the type alone says: an Expense takes it
+    /// out (`-1`), an Income brings it in (`1`). `nil` for Debt/Loan, where the category's role decides, and System.
+    var sign: Int? {
+        switch self {
+        case .expense: -1
+        case .income: 1
+        case .debtLoan, .system: nil
         }
     }
 }

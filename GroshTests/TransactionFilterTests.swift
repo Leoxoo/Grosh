@@ -165,10 +165,10 @@ struct TransactionFilterTests {
             record(-100_01, "over"),
         ]
 
-        #expect(notes(TransactionFilter(minimumAmount: Money(cents: 50_00), maximumAmount: Money(cents: 100_00)), in: all)
+        #expect(notes(TransactionFilter(minimumCents: 50_00, maximumCents: 100_00), in: all)
             == ["lowest", "refund", "highest"])
-        #expect(notes(TransactionFilter(minimumAmount: Money(cents: 100_00)), in: all) == ["highest", "over"])
-        #expect(notes(TransactionFilter(maximumAmount: Money(cents: 50_00)), in: all) == ["under", "lowest"])
+        #expect(notes(TransactionFilter(minimumCents: 100_00), in: all) == ["highest", "over"])
+        #expect(notes(TransactionFilter(maximumCents: 50_00), in: all) == ["under", "lowest"])
     }
 
     @Test func excludedOnlyListsTransactionsExcludedFromReport() {
@@ -192,7 +192,7 @@ struct TransactionFilterTests {
             record(-30_00, "last month", on: day(2026, 8, 12), under: restaurants, card: amex),
             record(-30_00, "other wallet", on: day(2026, 9, 12), under: restaurants, in: cash),
         ]
-        let filter = TransactionFilter(category: restaurants, card: amex, maximumAmount: Money(cents: 100_00))
+        let filter = TransactionFilter(category: restaurants, card: amex, maximumCents: 100_00)
 
         let listed = TransactionListing(all, showing: .wallet(checking), on: month(9), filter: filter).transactions
 
@@ -224,7 +224,7 @@ struct TransactionFilterTests {
         #expect(TransactionFilter(searchText: "973").isOn)
         #expect(TransactionFilter(card: card("Amex")).isOn)
         #expect(TransactionFilter(dateRange: DayRange(first: day(2026, 9, 1))).isOn)
-        #expect(TransactionFilter(minimumAmount: Money(cents: 0)).isOn)
+        #expect(TransactionFilter(minimumCents: 0).isOn)
         #expect(TransactionFilter(excludedOnly: true).isOn)
     }
 }

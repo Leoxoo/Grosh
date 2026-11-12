@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// Why a Recurring transaction can't be saved yet.
-nonisolated enum RecurringRuleError: Error, Equatable {
+nonisolated enum RecurringRuleError: RuleRefusal, Equatable {
     case missingName
     case missingWallet
     /// The amount must be above zero, unless a varying Bill has an estimate to start from. The category sets the sign.
@@ -34,7 +34,7 @@ extension RecurringRuleError: LocalizedError {
 }
 
 /// Why a Recurring transaction can't make one now, with Add the Transaction.
-nonisolated enum AddTransactionNowError: Error, Equatable {
+nonisolated enum AddTransactionNowError: RuleRefusal, Equatable {
     /// A paused or deleted schedule makes nothing.
     case inactive
     /// A transaction needs a wallet and a category, which the schedule can lose when they are deleted.
@@ -309,7 +309,8 @@ extension RecurringTransaction {
     /// Moves the schedule to Recently Deleted, after making what has fallen due by `today` so no due day is lost. The
     /// transactions it made stay as ordinary transactions: they lose their link to it. Saves.
     @MainActor
-    func delete(today: CalendarDay, at now: Date = .now, in context: ModelContext) throws {
+    func delete(today: CalendarDay, at now: Date = .now) throws {
+        let context = try storeContext()
         makeDueTransactions(through: today, in: context)
         deletedAt = now
         for transaction in transactions ?? [] {
@@ -361,7 +362,8 @@ extension RecurringTransaction {
     func makeTransaction(on day: CalendarDay, estimateCents: Int?, in context: ModelContext) -> Transaction? {
         guard let wallet = self.wallet, let category = self.category else { return nil }
         let transaction = Transaction.insert(
-            startingAmount(estimateCents: estimateCents), on: day, wallet: wallet, category: category, card: card,
+            cents: startingAmount(estimateCents: estimateCents).cents, on: day, wallet: wallet, category: category,
+            card: card,
             note: note, in: context
         )
         transaction.recurring = self
@@ -382,7 +384,8 @@ extension RecurringTransaction {
 
     /// Makes a transaction on each of `days`, the occurrences the user picked from the start-date prompt, and saves.
     /// Nothing is made for an empty list.
-    func makeTransactions(on days: [CalendarDay], in context: ModelContext) throws {
+    func makeTransactions(on days: [CalendarDay]) throws {
+        let context = try storeContext()
         let estimate = currentEstimateCents()
         for day in days {
             makeTransaction(on: day, estimateCents: estimate, in: context)
@@ -405,8 +408,9 @@ extension RecurringTransaction {
     /// consumes or skips nothing: the next occurrence still falls on its day. Throws its ``addBlocker`` rather than
     /// saving nothing. Saves.
     @MainActor
-    func addTransactionNow(today: CalendarDay, in context: ModelContext) throws {
+    func addTransactionNow(today: CalendarDay) throws {
         if let addBlocker { throw addBlocker }
+        let context = try storeContext()
         makeTransaction(on: today, estimateCents: currentEstimateCents(), in: context)
         try context.save()
     }

@@ -52,15 +52,16 @@ struct CategoryBreakdown {
     /// What the categories above zero add up to, which every share is of.
     private let shareBase: Int
 
-    /// The breakdown of `side` in `counted`, what the period counts (``CountedHistory/during(_:today:)``).
-    init(side: SpentOrIncome, of counted: [CountedAmount]) {
+    /// The breakdown of `side` in `counted`, what the period counts (``CountedHistory/during(_:today:)``), in
+    /// `currencyCode` (``CountedHistory/currencyCode``).
+    init(side: SpentOrIncome, of counted: [CountedAmount], currencyCode: String) {
         var centsByParent: [Category: Int] = [:]
         for amount in counted where amount.side == side {
             let parent = amount.category.parentOrSelf
             centsByParent[parent, default: 0] += amount.amount.cents
         }
         let categories = centsByParent
-            .map { CategoryTotal(category: $0.key, total: Money(cents: $0.value)) }
+            .map { CategoryTotal(category: $0.key, total: Money(cents: $0.value, currencyCode: currencyCode)) }
             .sorted { lhs, rhs in
                 lhs.total.cents != rhs.total.cents
                     ? lhs.total.cents > rhs.total.cents
@@ -69,7 +70,7 @@ struct CategoryBreakdown {
         let aboveZero = categories.filter { $0.total.cents > 0 }
 
         self.side = side
-        self.total = Money(cents: categories.reduce(0) { $0 + $1.total.cents })
+        self.total = Money(cents: categories.reduce(0) { $0 + $1.total.cents }, currencyCode: currencyCode)
         self.categories = categories
         self.aboveZero = aboveZero
         self.shareBase = aboveZero.reduce(0) { $0 + $1.total.cents }
@@ -93,7 +94,9 @@ struct CategoryBreakdown {
         let rest = aboveZero.filter { !ownCategories.contains($0.category) }
         var slices = own.map { Slice.category($0) }
         if !rest.isEmpty {
-            slices.append(.everythingElse(Money(cents: rest.reduce(0) { $0 + $1.total.cents })))
+            slices.append(.everythingElse(
+                Money(cents: rest.reduce(0) { $0 + $1.total.cents }, currencyCode: total.currencyCode)
+            ))
         }
         return slices
     }

@@ -34,8 +34,10 @@ struct ForgiveDraft {
         guard category.type == forgivenType else { throw DebtLoanRuleError.categoryDoesNotMatch }
     }
 
-    /// Whether Forgive can be enabled.
-    var canSave: Bool { (try? validate(against: loanOrDebt)) != nil }
+    /// Checks the forgive against the Loan or Debt as it stood when the sheet opened.
+    func validate() throws {
+        try validate(against: loanOrDebt)
+    }
 }
 
 /// The mark a forgiven Loan or Debt carries (ADR-0004): how much was forgiven, when, and under which category it counts
@@ -51,10 +53,11 @@ nonisolated struct Forgiveness {
     /// A forgiven Loan or a forgiven Debt.
     let kind: LoanOrDebtKind
 
-    /// How the forgiven amount counts in reports on ``day``: as income (above zero) for a forgiven Debt, as expense
-    /// (below zero) for a forgiven Loan.
+    /// How the forgiven amount counts in reports on ``day``: the way the Loan or Debt moved its wallet
+    /// (``LoanOrDebtKind/sign``), so as income (above zero) for a forgiven Debt, whose money the user keeps, and as
+    /// expense (below zero) for a forgiven Loan, whose money the user gives up.
     var reportAmount: Money {
-        Money(cents: kind == .debt ? amount.cents : -amount.cents, currencyCode: amount.currencyCode)
+        Money(cents: amount.cents * kind.sign, currencyCode: amount.currencyCode)
     }
 }
 

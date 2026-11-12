@@ -60,7 +60,7 @@ struct MonthGraphEarlierMonthTests {
         let cash = context.addWallet("Cash")
         let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 8, 3))
         try dinner.recordPaybackElsewhere(
-            ReimbursementDraft(amount: Money(cents: 60_00), day: day(2026, 8, 5)), into: cash, in: context
+            ReimbursementDraft(amount: Money(cents: 60_00), day: day(2026, 8, 5)), into: cash
         )
         try store.record(-25_00, "Café", on: day(2026, 9, 5))
 
@@ -73,7 +73,7 @@ struct MonthGraphEarlierMonthTests {
         let cash = context.addWallet("Cash")
         let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 8, 10))
         try dinner.recordPaybackElsewhere(
-            ReimbursementDraft(amount: Money(cents: 20_00), day: day(2026, 7, 28)), into: cash, in: context
+            ReimbursementDraft(amount: Money(cents: 20_00), day: day(2026, 7, 28)), into: cash
         )
 
         #expect(try store.strip() == [.month(month(2026, 8)), .month(month(2026, 9)), .month(month(2026, 10))])

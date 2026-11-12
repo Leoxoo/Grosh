@@ -548,7 +548,7 @@ struct DebtLoanTests {
 
     /// A Debt Collection that came in without a link, as an import brings them.
     private func unlinkedPayment(_ role: LockedRole, _ cents: Int) throws -> Transaction {
-        let payment = Transaction.insert(Money(cents: cents), on: paidOn, wallet: checking, category: nil, in: context)
+        let payment = Transaction.insert(cents: cents, on: paidOn, wallet: checking, category: nil, in: context)
         payment.category = try context.lockedCategory(role)
         payment.isExcludedFromReport = true
         return payment
@@ -590,7 +590,7 @@ struct DebtLoanTests {
         try pay(60_00, on: pasha)
         store.spend(4_50, on: try store.category("Café"))
 
-        let list = DebtsAndLoans(try context.fetch(DebtsAndLoans.transactions))
+        let list = DebtsAndLoans(try context.fetch(DebtsAndLoans.records))
 
         #expect(list.open.map(\.original) == [anna, pasha])
         #expect(list.open.map(\.outstanding) == [Money(cents: 50_00), Money(cents: 40_00)])

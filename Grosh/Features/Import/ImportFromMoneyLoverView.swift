@@ -6,6 +6,8 @@ import UniformTypeIdentifiers
 /// replaces every wallet, Card and transaction with it, keeping the categories. Then shows what was imported.
 struct ImportFromMoneyLoverView: View {
     @Environment(\.modelContext) private var context
+    /// The currency of a row that names none, and so of its wallet.
+    @AppStorage(AppSettings.currencyCodeKey) private var currencyCode = AppSettings.currencyCodeDefault
     @State private var isPickingFile = false
     /// The export read from the picked file, waiting for the user to confirm.
     @State private var picked: PickedExport?
@@ -68,7 +70,9 @@ struct ImportFromMoneyLoverView: View {
                 if isAccessing { url.stopAccessingSecurityScopedResource() }
             }
             let text = try String(contentsOf: url, encoding: .utf8)
-            picked = PickedExport(fileName: url.lastPathComponent, export: try MoneyLoverCSV.read(text))
+            picked = PickedExport(
+                fileName: url.lastPathComponent, export: try MoneyLoverCSV.read(text, currencyCode: currencyCode)
+            )
         }
     }
 
@@ -79,13 +83,10 @@ struct ImportFromMoneyLoverView: View {
         withAnimation {
             isImporting = true
         } completion: {
-            // The import logs its own failure, so this only shows it.
-            do {
+            Log.importing.perform("Importing from MoneyLover", errorMessage: &errorMessage) {
                 summary = try MoneyLoverImport.replaceAllData(
                     with: export.export, cards: .ownersCards, in: context
                 )
-            } catch {
-                errorMessage = error.localizedDescription
             }
             isImporting = false
         }

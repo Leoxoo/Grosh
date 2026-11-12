@@ -89,19 +89,19 @@ final class Transaction {
     var paybacks: [Transaction]? = []
 
     /// A transaction in no context yet, with no wallet, category or Card.
-    /// ``insert(_:on:wallet:category:card:note:in:)`` is how one is made.
-    private init(amount: Money, day: CalendarDay, note: String) {
-        self.amountCents = amount.cents
+    /// ``insert(cents:on:wallet:category:card:note:in:)`` is how one is made.
+    private init(amountCents: Int, day: CalendarDay, note: String) {
+        self.amountCents = amountCents
         self.dayRaw = day.rawValue
         self.note = note
     }
 
-    /// Makes a transaction of `amount` on `day` in `context`, in `wallet`, filed under `category` and paid with `card`.
-    /// It is inserted before its relationships are set: SwiftData relates two models only once both are in the same
-    /// context. Doesn't save.
+    /// Makes a transaction of `cents` (in `wallet`'s currency, signed as it moves the wallet) on `day` in `context`, in
+    /// `wallet`, filed under `category` and paid with `card`. It is inserted before its relationships are set:
+    /// SwiftData relates two models only once both are in the same context. Doesn't save.
     @discardableResult
     static func insert(
-        _ amount: Money,
+        cents: Int,
         on day: CalendarDay,
         wallet: Wallet?,
         category: Category?,
@@ -109,7 +109,7 @@ final class Transaction {
         note: String = "",
         in context: ModelContext
     ) -> Transaction {
-        let transaction = Transaction(amount: amount, day: day, note: note)
+        let transaction = Transaction(amountCents: cents, day: day, note: note)
         context.insert(transaction)
         transaction.wallet = wallet
         transaction.category = category

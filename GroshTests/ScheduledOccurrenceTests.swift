@@ -99,7 +99,7 @@ struct ScheduledOccurrenceTests {
         let recurring = try makeSchedule(starting: day(2026, 10, 12), preset: .daily)
         #expect(recurring.scheduledDays(today: today) == [day(2026, 10, 12)])
 
-        try recurring.delete(today: today, in: context)
+        try recurring.delete(today: today)
         #expect(recurring.scheduledDays(today: today).isEmpty)
     }
 
@@ -129,7 +129,7 @@ struct ScheduledOccurrenceTests {
         let water = context.addCategory("Water")
         for _ in 0..<2 {
             Transaction.insert(
-                Money(cents: -50_00), on: day(2026, 9, 1), wallet: store.checking, category: water, in: context
+                cents: -50_00, on: day(2026, 9, 1), wallet: store.checking, category: water, in: context
             )
         }
         try context.save()
@@ -177,7 +177,7 @@ struct ScheduledOccurrenceTests {
         let netflix = try makeSchedule(starting: day(2026, 10, 20), end: .afterCount(3))
         let rows = [netflix].scheduledOccurrences(selection: .total, today: today)
         let lunch = Transaction.insert(
-            Money(cents: -5_00), on: day(2026, 10, 20), wallet: store.checking, category: nil, in: context
+            cents: -5_00, on: day(2026, 10, 20), wallet: store.checking, category: nil, in: context
         )
 
         let days = TransactionDay.days(of: [lunch], scheduled: rows)
@@ -195,7 +195,7 @@ struct ScheduledOccurrenceTests {
         let netflix = try makeSchedule(starting: day(2026, 10, 20), end: .afterCount(3))
         let rows = [netflix].scheduledOccurrences(selection: .total, today: today)
         let dinner = Transaction.insert(
-            Money(cents: -40_00), on: day(2026, 11, 3), wallet: store.checking, category: nil, in: context
+            cents: -40_00, on: day(2026, 11, 3), wallet: store.checking, category: nil, in: context
         )
 
         let future = Period.future.days(today: today)

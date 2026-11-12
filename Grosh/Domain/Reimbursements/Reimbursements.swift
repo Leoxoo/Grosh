@@ -17,7 +17,7 @@ nonisolated struct ReimbursementDraft {
         note = reimbursement.note
     }
 
-    init(amount: Money = Money(cents: 0), day: CalendarDay, note: String = "") {
+    init(amount: Money, day: CalendarDay, note: String = "") {
         entry = AmountEntry(cents: amount.cents)
         currencyCode = amount.currencyCode
         self.day = day
@@ -35,7 +35,7 @@ nonisolated struct ReimbursementDraft {
 }
 
 /// Why a Reimbursement can't be saved.
-nonisolated enum ReimbursementRuleError: Error, Equatable {
+nonisolated enum ReimbursementRuleError: RuleRefusal, Equatable {
     /// The amount paid back must be above zero.
     case missingAmount
     /// Only an Expense can be paid back.
@@ -105,7 +105,7 @@ extension Reimbursement {
     ) throws -> Reimbursement {
         try draft.validate()
         guard expense.canBeReimbursed else { throw ReimbursementRuleError.notAnExpense }
-        let reimbursement = Reimbursement(amount: Money(cents: 0), day: draft.day)
+        let reimbursement = Reimbursement(amountCents: 0, day: draft.day)
         context.insert(reimbursement)
         reimbursement.expense = expense
         reimbursement.expectation = expectation

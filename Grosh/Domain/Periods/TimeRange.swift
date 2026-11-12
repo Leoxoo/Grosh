@@ -72,3 +72,18 @@ nonisolated enum TimeRange: Hashable, Sendable {
         }
     }
 }
+
+extension Period {
+    /// The time range whose periods this period is one of: the range a strip of its length steps through, or `nil` for a
+    /// period that isn't a fixed length.
+    var timeRange: TimeRange? {
+        switch self {
+        case .day: .day
+        case .week: .week
+        case .month: .month
+        case .quarter: .quarter
+        case .year: .year
+        case .all, .custom, .future: nil
+        }
+    }
+}

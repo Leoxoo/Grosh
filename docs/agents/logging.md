@@ -13,11 +13,10 @@ One subsystem, `Leoxo.Grosh` (the bundle identifier), and a category per area:
 | `Recurring` | `Log.recurring` | Recurring transactions: making what came due, and saving them. |
 | `Reminders` | `Log.reminders` | Scheduling Loan, Debt and Estimated-amount reminders, and saving a Loan's or Debt's reminder day. |
 | `Contacts` | `Log.contacts` | Asking for Contacts access and reading contacts for With. |
-| `Reports` | `Log.reports` | The Report. Nothing logs here yet. |
 
 In a `catch`, `Log.store.failed("Saving a transaction", error)`. Where a `try?` dropped the error, `Log.store.attempt("Reading every transaction") { try … } ?? []` gives the same value and logs why it failed. Log only on save, fetch, import and reminder paths, never in a row, a per-transaction loop or anything that runs per frame.
 
-**Levels.** `error` is the store or the system failing, which should never happen, and `tools/check` fails a test run that logs one (`docs/agents/log-check.md`). `info` is a failure the tests exercise on purpose: one of Grosh's own rules refusing a change (an invalid draft, a locked or missing category, a bad import file), or a file the person picked that can't be read. `failed` chooses by the error's type, so a call site does not. `fault` is not used.
+**Levels.** `error` is the store or the system failing, which should never happen, and `tools/check` fails a test run that logs one (`docs/agents/log-check.md`). `info` is a failure the tests exercise on purpose: one of Grosh's own rules refusing a change (an invalid draft, a locked or missing category, a bad import file), or a file the person picked that can't be read. `failed` chooses by the error's type, so a call site does not: an error that conforms to `RuleRefusal` (every Domain rule error) is `info`, anything else, a `StoreError` or `MissingLockedCategory` too, is an `error`. A new rule error conforms to `RuleRefusal`; a new error that means the store is broken conforms to `GroshError` only. `fault` is not used.
 
 **Privacy.** A message names what failed and the kind of error: Grosh's error case, or a system error's domain and code. Never an amount, note, payee, name, account detail or file name, and never an error's message or user info, which can quote the record that failed.
 
@@ -43,7 +42,7 @@ From a device, in Console.app: select the device in the sidebar, click Start, fi
 | `Launch` | `GroshApp` | The startup work: `RecentlyDeleted.purgeExpired` and `RecurringTransaction.catchUp`. It runs again each time the app returns to the foreground. |
 | `Save transaction` | `TransactionEditor` | The editor's save: validating the draft and saving it to the store, not the Success cue or closing the sheet. |
 | `Import CSV` | `MoneyLoverImport` | Deleting the old data, adding the imported rows and saving. |
-| `Search` | `TransactionFilter.listed` | Working out the Transactions tab's search results over every transaction, each time they are worked out while there is search text. |
+| `Search` | `TransactionListing` | Working out the search results over every transaction, each time they are worked out while there is search text. |
 | `Open Home` | `HomeView` | Home appearing, from when SwiftUI reports it to the next turn of the main actor. |
 | `Open Transactions` | `TransactionsView` | The Transactions tab appearing, measured the same way. |
 | `Open Report` | `ReportView` | The Report appearing, measured the same way. |

@@ -7,8 +7,8 @@ struct DueReminders {
     let expectations: [ExpectedReimbursement]
     let estimates: [Transaction]
 
-    /// What is due on `today` among `transactions` (``DebtsAndLoans/transactions``), `expectations`
-    /// (``ExpectedReimbursements/all``) and `estimates` (``EstimatedAmounts/transactions``).
+    /// What is due on `today` among `transactions` (``DebtsAndLoans/records``), `expectations`
+    /// (``ExpectedReimbursements/records``) and `estimates` (``EstimatedAmounts/records``).
     init(
         transactions: [Transaction], expectations: [ExpectedReimbursement], estimates: [Transaction],
         on today: CalendarDay

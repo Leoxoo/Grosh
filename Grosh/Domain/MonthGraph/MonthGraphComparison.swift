@@ -62,21 +62,22 @@ enum MonthGraphComparison {
 
     /// The comparison of `side` through the end of each day of `period`, the first day first, from `counted`, which holds
     /// at least what counts in the periods it compares with; or `nil` when no period counts toward it. `firstDay` is the
-    /// first day anything counts on the Month graph, on either tab, or `nil` when nothing does.
+    /// first day anything counts on the Month graph, on either tab, or `nil` when nothing does. In `currencyCode`.
     func dailyTotals(
-        _ side: SpentOrIncome, of counted: [CountedAmount], countingFrom firstDay: CalendarDay?, for period: Period
+        _ side: SpentOrIncome, of counted: [CountedAmount], countingFrom firstDay: CalendarDay?, for period: Period,
+        currencyCode: String
     ) -> [DailyTotal]? {
         guard let span = GraphSpan(period) else { return nil }
         let spans = earlierSpans(side, of: counted, countingFrom: firstDay, for: period)
         guard !spans.isEmpty else { return nil }
         let spansCents = spans.map { earlier in
-            counted.dailyTotals(side, in: earlier, through: earlier.last).map { $0.total.cents }
+            counted.dailyTotals(side, in: earlier, through: earlier.last, currencyCode: currencyCode).map(\.total.cents)
         }
         let dayCount = span.dayCount
         return (1...dayCount).map { number in
             let sum = spansCents.reduce(0) { $0 + Self.stretchedCents($1, atEndOfDay: number, of: dayCount) }
             let cents = Int((Double(sum) / Double(spansCents.count * dayCount)).rounded())
-            return DailyTotal(day: span.day(number), total: Money(cents: cents))
+            return DailyTotal(day: span.day(number), total: Money(cents: cents, currencyCode: currencyCode))
         }
     }
 

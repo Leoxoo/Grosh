@@ -42,7 +42,7 @@ struct WalletSelectorChoicesTests {
         let oldBank = context.addWallet("Old bank")
         try oldBank.archive(today: today)
         let closed = context.addWallet("Closed")
-        try closed.delete()
+        try closed.delete(today: TestStore.today)
 
         let choices = choices([checking, oldBank, closed])
 

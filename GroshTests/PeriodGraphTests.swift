@@ -22,7 +22,7 @@ struct PeriodGraphTests {
         let counted = try store.transactions().compactMap { $0.countedAmount(in: selection, otherIncome: otherIncome) }
         return MonthGraph(
             side, of: counted, countingFrom: counted.firstDay, recurring: [], in: period, today: today,
-            comparingWith: .average, selection: selection
+            comparingWith: .average, selection: selection, currencyCode: "USD"
         )
     }
 

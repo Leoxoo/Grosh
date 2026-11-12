@@ -93,7 +93,7 @@ struct TransactionOrderAcrossLaunchesTests {
             let sameMoment = Date(timeIntervalSinceReferenceDate: 800_000_000)
             for (index, note) in ["a", "b", "c", "d", "e", "f"].enumerated() {
                 let transaction = Transaction.insert(
-                    Money(cents: -100), on: CalendarDay(year: 2026, month: 10, day: 3), wallet: nil, category: nil,
+                    cents: -100, on: CalendarDay(year: 2026, month: 10, day: 3), wallet: nil, category: nil,
                     note: note, in: container.mainContext
                 )
                 transaction.wallet = wallet

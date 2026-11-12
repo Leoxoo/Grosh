@@ -5,14 +5,14 @@ import SwiftData
 /// A new wallet's Starting balance is given to ``Wallet/create(_:startingBalance:on:in:)`` alongside it.
 nonisolated struct WalletDraft {
     var name = ""
-    var symbolName = "wallet.bifold.fill"
+    var symbolName = Wallet.defaultSymbolName
     var color = PaletteColor.green
     var includeInTotal = true
     /// The wallet's currency. A new wallet takes the one in Settings → Currency; an existing one keeps its own.
-    var currencyCode = Money.defaultCurrencyCode
+    var currencyCode: String
 
     /// A new wallet in `currencyCode`.
-    init(currencyCode: String = Money.defaultCurrencyCode) {
+    init(currencyCode: String) {
         self.currencyCode = currencyCode
     }
 
@@ -48,7 +48,7 @@ nonisolated struct WalletDraft {
 }
 
 /// Why a wallet change was refused.
-nonisolated enum WalletRuleError: Error, Equatable {
+nonisolated enum WalletRuleError: RuleRefusal, Equatable {
     case missingName
     /// The Starting balance typed can't be worked out, as when it divides by zero.
     case invalidStartingBalance
@@ -101,7 +101,9 @@ extension Wallet {
         let category = try context.lockedCategory(.startingBalance)
         let wallet = try insertWithoutStartingBalance(draft, in: context)
 
-        let starting = Transaction.insert(startingBalance, on: day, wallet: wallet, category: category, in: context)
+        let starting = Transaction.insert(
+            cents: startingBalance.cents, on: day, wallet: wallet, category: category, in: context
+        )
         starting.isExcludedFromReport = true
         starting.createdAt = enteredAt
         return wallet

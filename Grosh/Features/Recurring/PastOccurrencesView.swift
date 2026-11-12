@@ -12,7 +12,6 @@ struct PastOccurrencesView: View {
     private let startingAmount: Money
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
     @State private var selected: Set<CalendarDay> = []
     private var saver = SheetSaver(Strings.Recurring.couldntAddTransactions, log: Log.recurring)
 
@@ -81,7 +80,7 @@ struct PastOccurrencesView: View {
 
     private func save() {
         saver.save("Making transactions for past days") {
-            try recurring.makeTransactions(on: days.filter { selected.contains($0) }, in: context)
+            try recurring.makeTransactions(on: days.filter { selected.contains($0) })
         }
     }
 }
