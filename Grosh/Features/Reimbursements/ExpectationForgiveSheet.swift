@@ -7,28 +7,14 @@ struct ExpectationForgiveSheet: View {
     let expectation: ExpectedReimbursement
 
     @Environment(\.today) private var today
-
-    var body: some View {
-        MadeOnce {
-            today
-        } content: { day in
-            ExpectationForgiveForm(expectation: expectation, startingDay: day)
-        }
-    }
-}
-
-/// The form behind ``ExpectationForgiveSheet``, holding the day from the moment the sheet opens.
-private struct ExpectationForgiveForm: View {
-    let expectation: ExpectedReimbursement
-
     @Environment(\.dismiss) private var dismiss
-    @State private var day: CalendarDay
+    /// The day the user picked, or `nil` while it is still today.
+    @State private var pickedDay: CalendarDay?
     @State private var note = ""
     private var saver = SheetSaver(Strings.DebtsLoans.couldntForgive)
 
-    init(expectation: ExpectedReimbursement, startingDay: CalendarDay) {
-        self.expectation = expectation
-        _day = State(initialValue: startingDay)
+    private var day: Binding<CalendarDay> {
+        Binding(get: { pickedDay ?? today }, set: { pickedDay = $0 })
     }
 
     var body: some View {
@@ -40,7 +26,7 @@ private struct ExpectationForgiveForm: View {
                         Text(expectation.outstanding.formattedOrUnknown)
                             .monospacedDigit()
                     }
-                    DayStepper(title: Strings.Common.date, day: $day)
+                    DayStepper(title: Strings.Common.date, day: day)
                     TextField(Strings.Common.note, text: $note, axis: .vertical)
                 } footer: {
                     Text(Strings.OwesMe.forgiveFooter)
@@ -57,7 +43,7 @@ private struct ExpectationForgiveForm: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(Strings.DebtsLoans.forgive) {
-                        saver.save("Forgiving Owes me") { try expectation.forgive(on: day, note: note) }
+                        saver.save("Forgiving Owes me") { try expectation.forgive(on: day.wrappedValue, note: note) }
                     }
                 }
             }

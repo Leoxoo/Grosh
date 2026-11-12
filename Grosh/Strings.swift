@@ -398,7 +398,6 @@ nonisolated enum Strings {
         static func subcategoriesDeletedToo(_ count: Int) -> LocalizedStringResource { "Its \(count) subcategories are deleted too. This can't be undone." }
         static func sameAsParent(_ parent: String, _ kind: String) -> LocalizedStringResource { "Same as \(parent) (\(kind))" }
         static func nothingToMergeInto(_ type: String) -> LocalizedStringResource { "There's no other \(type) category this one can be merged into." }
-        static func subcategoriesMoveUnder(_ count: Int) -> LocalizedStringResource { " and its \(count) subcategories move under it" }
         static func missingLockedCategory(_ name: String) -> LocalizedStringResource { "Grosh can't do this without its “\(name)” category, which is missing." }
     }
 
@@ -410,9 +409,22 @@ nonisolated enum Strings {
         static func title(_ name: String) -> LocalizedStringResource { "Merge “\(name)”" }
         static func quoted(_ name: String) -> LocalizedStringResource { "“\(name)”" }
         static func confirmation(_ source: String, _ target: String) -> LocalizedStringResource { "Merge “\(source)” into “\(target)”?" }
-        static func itsTransactionMovesTo(_ destination: String) -> LocalizedStringResource { "Its transaction moves to \(destination)" }
-        static func itsTransactionsMoveTo(_ count: Int, _ destination: String) -> LocalizedStringResource { "Its \(count) transactions move to \(destination)" }
-        static func thenRemoved(_ name: String) -> LocalizedStringResource { ". Then “\(name)” is removed." }
+        static func itsTransactionMovesTo(_ destination: String, thenRemoved name: String) -> LocalizedStringResource {
+            "Its transaction moves to \(destination). Then “\(name)” is removed."
+        }
+        static func itsTransactionsMoveTo(_ count: Int, _ destination: String, thenRemoved name: String) -> LocalizedStringResource {
+            "Its \(count) transactions move to \(destination). Then “\(name)” is removed."
+        }
+        static func itsTransactionAndSubcategoriesMoveTo(
+            _ destination: String, subcategories: Int, thenRemoved name: String
+        ) -> LocalizedStringResource {
+            "Its transaction moves to \(destination) and its \(subcategories) subcategories move under it. Then “\(name)” is removed."
+        }
+        static func itsTransactionsAndSubcategoriesMoveTo(
+            _ count: Int, _ destination: String, subcategories: Int, thenRemoved name: String
+        ) -> LocalizedStringResource {
+            "Its \(count) transactions move to \(destination) and its \(subcategories) subcategories move under it. Then “\(name)” is removed."
+        }
     }
 
     /// Loans and Debts: payments, forgiving and reminders.
@@ -558,7 +570,6 @@ nonisolated enum Strings {
         static let everyWeek: LocalizedStringResource = "Every week"
         static let everyMonth: LocalizedStringResource = "Every month"
         static let everyYear: LocalizedStringResource = "Every year"
-        static let onceLowercase: LocalizedStringResource = "once"
         static let onTheLastDay: LocalizedStringResource = "on the last day"
         static func paid(_ amount: String) -> LocalizedStringResource { "\(amount) paid" }
         static func paidOfTotal(_ paid: String, _ total: String) -> LocalizedStringResource { "\(paid) of \(total) paid" }
@@ -576,8 +587,10 @@ nonisolated enum Strings {
         static func everyWeeks(_ count: Int) -> LocalizedStringResource { "Every \(count) weeks" }
         static func everyMonths(_ count: Int) -> LocalizedStringResource { "Every \(count) months" }
         static func everyYears(_ count: Int) -> LocalizedStringResource { "Every \(count) years" }
-        static func onDate(_ date: String) -> LocalizedStringResource { "on \(date)" }
-        static func until(_ date: String) -> LocalizedStringResource { "until \(date)" }
+        static func repeatOnDate(_ repeatPhrase: String, _ date: String) -> LocalizedStringResource { "\(repeatPhrase) on \(date)" }
+        static func repeatUntil(_ repeatPhrase: String, _ date: String) -> LocalizedStringResource { "\(repeatPhrase), until \(date)" }
+        static func repeatOnce(_ repeatPhrase: String) -> LocalizedStringResource { "\(repeatPhrase), once" }
+        static func repeatTimes(_ repeatPhrase: String, _ count: Int) -> LocalizedStringResource { "\(repeatPhrase), \(count) times" }
         static func onThe(_ day: String) -> LocalizedStringResource { "on the \(day)" }
         static func onTheFirst(_ weekday: String) -> LocalizedStringResource { "on the first \(weekday)" }
         static func onTheSecond(_ weekday: String) -> LocalizedStringResource { "on the second \(weekday)" }

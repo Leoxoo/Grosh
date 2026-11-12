@@ -10,6 +10,13 @@ struct TransactionFilterSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var keypad = KeypadTarget()
+    @Query(Wallet.unarchived) private var wallets: [Wallet]
+
+    /// The currency the amount range is shown in: the filtered wallet's, or the Total's
+    /// (``WalletSelection/currencyCode(among:)``). The bounds themselves hold in each transaction's own currency.
+    private var currencyCode: String {
+        (filter.wallet.map(WalletSelection.wallet) ?? .total).currencyCode(among: wallets)
+    }
 
     var body: some View {
         NavigationStack {
@@ -39,11 +46,11 @@ struct TransactionFilterSheet: View {
                 Section {
                     AmountBoundField(
                         title: Strings.Search.atLeast, field: "minimum", cents: $filter.minimumCents,
-                        currencyCode: filter.wallet.currencyCodeOrDefault
+                        currencyCode: currencyCode
                     )
                     AmountBoundField(
                         title: Strings.Search.atMost, field: "maximum", cents: $filter.maximumCents,
-                        currencyCode: filter.wallet.currencyCodeOrDefault
+                        currencyCode: currencyCode
                     )
                 } header: {
                     Text(Strings.Search.amountRange)
@@ -108,12 +115,14 @@ private struct OptionalDayRow: View {
     }
 }
 
-/// One end of the amount range, typed on the Keypad. Empty, until a digit is typed and again after C, means any.
+/// One end of the amount range, typed on the Keypad. Empty, until a digit is typed and again after C, means any. The
+/// filter holds only the bound in cents, so what is being typed (a calculation half done) is this field's own, kept in
+/// step with the bound both ways.
 private struct AmountBoundField: View {
     let title: LocalizedStringResource
     let field: String
     @Binding var cents: Int?
-    /// The currency the bound is shown in: the filtered wallet's, or the default one across wallets.
+    /// The currency the bound is shown in.
     let currencyCode: String
 
     @State private var entry: AmountEntry

@@ -11,13 +11,20 @@ nonisolated enum MergeConsequences {
         sourceName: String, transactionCount: Int, subcategoryCount: Int = 0, targetName: String?, unchosen: String
     ) -> String {
         let destination = targetName.map { String(localized: Strings.Merge.quoted($0)) } ?? unchosen
-        var text = transactionCount == 1
-            ? String(localized: Strings.Merge.itsTransactionMovesTo(destination))
-            : String(localized: Strings.Merge.itsTransactionsMoveTo(transactionCount, destination))
-        if subcategoryCount > 0 {
-            text += String(localized: Strings.Categories.subcategoriesMoveUnder(subcategoryCount))
+        switch (transactionCount, subcategoryCount) {
+        case (1, 0):
+            return String(localized: Strings.Merge.itsTransactionMovesTo(destination, thenRemoved: sourceName))
+        case (_, 0):
+            return String(localized: Strings.Merge.itsTransactionsMoveTo(transactionCount, destination, thenRemoved: sourceName))
+        case (1, _):
+            return String(localized: Strings.Merge.itsTransactionAndSubcategoriesMoveTo(
+                destination, subcategories: subcategoryCount, thenRemoved: sourceName
+            ))
+        default:
+            return String(localized: Strings.Merge.itsTransactionsAndSubcategoriesMoveTo(
+                transactionCount, destination, subcategories: subcategoryCount, thenRemoved: sourceName
+            ))
         }
-        return text + String(localized: Strings.Merge.thenRemoved(sourceName))
     }
 }
 

@@ -58,24 +58,28 @@ extension RepeatRule {
 extension RepeatSchedule {
     /// How the repeat reads, with its day and its end: "Every 2 months on the 4th, until Dec 2027".
     var summary: String {
-        var text = rule.phrase
-        switch rule.unit {
+        let repeats = switch rule.unit {
         case .month:
-            text = rule.phrase(on: monthlyDay, startingOn: start)
+            rule.phrase(on: monthlyDay, startingOn: start)
         case .year:
-            text += " " + String(localized: Strings.Recurring.onDate(start.date().formatted(.dateTime.month(.abbreviated).day())))
+            String(localized: Strings.Recurring.repeatOnDate(
+                rule.phrase, start.date().formatted(.dateTime.month(.abbreviated).day())
+            ))
         case .day, .week:
-            break
+            rule.phrase
         }
-        switch end {
+        return switch end {
         case .forever:
-            break
+            repeats
         case .until(let last):
-            text += ", " + String(localized: Strings.Recurring.until(last.date().formatted(.dateTime.month(.abbreviated).year())))
+            String(localized: Strings.Recurring.repeatUntil(
+                repeats, last.date().formatted(.dateTime.month(.abbreviated).year())
+            ))
+        case .afterCount(1):
+            String(localized: Strings.Recurring.repeatOnce(repeats))
         case .afterCount(let count):
-            text += ", " + (count == 1 ? String(localized: Strings.Recurring.onceLowercase) : String(localized: Strings.Recurring.times(count)))
+            String(localized: Strings.Recurring.repeatTimes(repeats, count))
         }
-        return text
     }
 }
 
