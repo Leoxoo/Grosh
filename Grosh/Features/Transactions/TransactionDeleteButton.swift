@@ -2,20 +2,19 @@ import SwiftData
 import SwiftUI
 
 /// Deletes a transaction after asking how: a plain confirmation for a transaction on its own, or whether to
-/// delete its related transactions too. Every delete goes through ``Swift/Collection/delete(_:in:at:)``.
+/// delete its related transactions too. Every delete goes through ``Swift/Collection/delete(_:at:)``.
 struct TransactionDeleteButton: View {
     let transaction: Transaction
     /// Called once the transaction is gone, so the screen showing it can close.
     var didDelete: () -> Void = {}
 
-    @Environment(\.modelContext) private var context
     @State private var prompt: TransactionDeletePrompt?
     @State private var errorMessage: String?
 
     var body: some View {
         Button(Strings.Transactions.deleteTransaction, systemImage: "trash", role: .destructive) {
             Log.store.perform("Reading what deleting a transaction takes", errorMessage: &errorMessage) {
-                prompt = try TransactionDeletePrompt(for: [transaction], in: context)
+                prompt = try TransactionDeletePrompt(for: [transaction])
             }
         }
         .foregroundStyle(.destructive)
@@ -26,7 +25,7 @@ struct TransactionDeleteButton: View {
 
 extension View {
     /// Asks how to delete the transactions of `prompt` while it is set, then deletes them through
-    /// ``Swift/Collection/delete(_:in:at:)`` and calls `didDelete`.
+    /// ``Swift/Collection/delete(_:at:)`` and calls `didDelete`.
     func transactionDeleteDialog(
         _ prompt: Binding<TransactionDeletePrompt?>,
         didDelete: @escaping () -> Void
@@ -39,7 +38,6 @@ private struct TransactionDeleteDialog: ViewModifier {
     @Binding var prompt: TransactionDeletePrompt?
     let didDelete: () -> Void
 
-    @Environment(\.modelContext) private var context
     @State private var errorMessage: String?
 
     func body(content: Content) -> some View {
@@ -66,7 +64,7 @@ private struct TransactionDeleteDialog: ViewModifier {
 
     private func delete(_ transactions: [Transaction], _ scope: TransactionDeleteScope) {
         let succeeded = Log.store.perform("Deleting a transaction", errorMessage: &errorMessage) {
-            try transactions.delete(scope, in: context)
+            try transactions.delete(scope)
         }
         if succeeded {
             didDelete()

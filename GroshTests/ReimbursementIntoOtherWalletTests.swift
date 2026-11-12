@@ -81,8 +81,8 @@ struct ReimbursementIntoOtherWalletTests {
         #expect(payback.linkID == dinner.linkID)
         #expect(dinner.hasPaybacksElsewhere)
         #expect(dinner.reimbursedCents == 0)
-        #expect(try payback.related(in: context) == [dinner])
-        #expect(try dinner.related(in: context) == [payback])
+        #expect(try payback.related() == [dinner])
+        #expect(try dinner.related() == [payback])
     }
 
     @Test func thePaybackCountsInTheExpectation() throws {
@@ -254,8 +254,8 @@ struct ReimbursementIntoOtherWalletTests {
     @Test func deletingTheExpenseOffersToDeleteThePaybackToo() throws {
         let (dinner, _, payback) = try paidBackIntoCash()
 
-        #expect(try dinner.deleteScopes(in: context) == [.withRelated, .onlySelected])
-        try dinner.delete(.withRelated, in: context, at: deletedAt)
+        #expect(try dinner.deleteScopes() == [.withRelated, .onlySelected])
+        try dinner.delete(.withRelated, at: deletedAt)
 
         #expect(dinner.isInRecentlyDeleted)
         #expect(payback.isInRecentlyDeleted)
@@ -267,7 +267,7 @@ struct ReimbursementIntoOtherWalletTests {
 
     @Test func restoringBringsBackBothTheExpenseAndThePayback() throws {
         let (dinner, owed, payback) = try paidBackIntoCash()
-        try dinner.delete(.withRelated, in: context, at: deletedAt)
+        try dinner.delete(.withRelated, at: deletedAt)
 
         try dinner.restore()
         try payback.restore()
@@ -284,7 +284,7 @@ struct ReimbursementIntoOtherWalletTests {
     @Test func deletingOnlyThePaybackLeavesTheExpenseAtItsFullAmountUntilItIsRestored() throws {
         let (dinner, owed, payback) = try paidBackIntoCash()
 
-        try payback.delete(.onlySelected, in: context, at: deletedAt)
+        try payback.delete(.onlySelected, at: deletedAt)
 
         #expect(dinner.totalViewNetCents == -60_00)
         #expect(walletBalance(cash, asOf: today) == Money(cents: 0))
@@ -302,7 +302,7 @@ struct ReimbursementIntoOtherWalletTests {
     @Test func aPaybackWhoseExpenseIsDeletedOnItsOwnStaysInTheTotalAsMoneyIn() throws {
         let (dinner, _, payback) = try paidBackIntoCash()
 
-        try dinner.delete(.onlySelected, in: context, at: deletedAt)
+        try dinner.delete(.onlySelected, at: deletedAt)
 
         #expect(!payback.isHiddenInTotal)
         #expect(try listed(in: .total) == [payback])
@@ -367,7 +367,7 @@ struct ReimbursementIntoOtherWalletTests {
         #expect(payback.orderedPeople.isEmpty)
         #expect(dinner.paybacksElsewhere == [payback])
         #expect(dinner.reimbursedCents == 0)
-        #expect(try payback.related(in: context) == [dinner])
+        #expect(try payback.related() == [dinner])
         #expect(try listed(in: .total) == [dinner])
         #expect(dinner.totalViewNetCents == -40_00)
         #expect(walletBalance(cash, asOf: today) == Money(cents: 20_00))

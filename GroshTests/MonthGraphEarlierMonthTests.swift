@@ -31,7 +31,7 @@ struct MonthGraphEarlierMonthTests {
     @Test func theStripRunsFromTheMonthOfTheFirstTransactionThatCountsThroughThisMonth() throws {
         try Wallet.create(name: "Cash", startingBalance: Money(cents: 300_00), on: day(2026, 5, 1), in: context)
         let deleted = try store.record(-15_00, "Café", on: day(2026, 6, 4))
-        try [deleted].delete(.onlySelected, in: context)
+        try [deleted].delete(.onlySelected)
         let excluded = try store.record(-40_00, "Café", on: day(2026, 7, 3))
         excluded.isExcludedFromReport = true
         try store.record(1_500_00, "Salary", .income, on: day(2026, 8, 20))
@@ -87,7 +87,7 @@ struct MonthGraphEarlierMonthTests {
         var july = Period.month(month(2026, 7))
         var september = Period.month(month(2026, 9))
 
-        try [coffee].delete(.onlySelected, in: context)
+        try [coffee].delete(.onlySelected)
         let strip = try store.strip()
         july.showCurrentPeriod(.month(month(2026, 10)), unlessOfferedBy: strip)
         september.showCurrentPeriod(.month(month(2026, 10)), unlessOfferedBy: strip)

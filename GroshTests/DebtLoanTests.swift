@@ -33,11 +33,11 @@ struct DebtLoanTests {
 
     /// What is still outstanding on `original`, a Loan or Debt, as every screen works it out.
     private func outstanding(_ original: Transaction) throws -> Money {
-        try #require(try LoanOrDebt(original, in: context)).outstanding
+        try #require(try LoanOrDebt(original)).outstanding
     }
 
     private func isSettled(_ original: Transaction) throws -> Bool {
-        try #require(try LoanOrDebt(original, in: context)).isSettled
+        try #require(try LoanOrDebt(original)).isSettled
     }
 
     // MARK: Outstanding
@@ -75,7 +75,7 @@ struct DebtLoanTests {
         #expect(loan.orderedPeople.count == 1)
         #expect(collection.isExcludedFromReport)
         #expect(recorded.overpayment == nil)
-        #expect(try loan.related(in: context) == [collection])
+        #expect(try loan.related() == [collection])
         #expect(walletBalance(checking, asOf: paidOn) == Money(cents: -40_00))
     }
 
@@ -88,7 +88,7 @@ struct DebtLoanTests {
         #expect(repayment.amountCents == -25_00)
         #expect(repayment.withName == "Anna")
         #expect(repayment.isExcludedFromReport)
-        #expect(try debt.related(in: context) == [repayment])
+        #expect(try debt.related() == [repayment])
         #expect(try outstanding(debt) == Money(cents: 75_00))
         #expect(walletBalance(checking, asOf: paidOn) == Money(cents: 75_00))
     }
@@ -125,7 +125,7 @@ struct DebtLoanTests {
         #expect(income.countsInReport)
         #expect(income.day == paidOn.adding(days: 7))
         #expect(income.withName == "Pasha")
-        #expect(try loan.related(in: context).contains(income))
+        #expect(try loan.related().contains(income))
         #expect(try outstanding(loan) == Money(cents: 0))
         #expect(try isSettled(loan))
         #expect(walletBalance(checking, asOf: paidOn.adding(days: 7)) == Money(cents: 30_00))
@@ -230,7 +230,7 @@ struct DebtLoanTests {
         #expect(loan.isForgiven)
         #expect(try isSettled(loan))
         #expect(try outstanding(loan) == Money(cents: 0))
-        #expect(try loan.related(in: context) == [collection])
+        #expect(try loan.related() == [collection])
         #expect(collection.amountCents == 30_00)
         #expect(walletBalance(checking, asOf: forgivenOn) == balanceBefore)
     }
@@ -243,7 +243,7 @@ struct DebtLoanTests {
         draft.category = try store.category("Gifts", .income)
         try Forgiveness.record(draft, in: context)
 
-        let settled = try #require(try LoanOrDebt(debt, in: context))
+        let settled = try #require(try LoanOrDebt(debt))
         #expect(settled.isSettled)
         #expect(settled.paid == Money(cents: 200_00))
         #expect(settled.forgiveness?.amount == Money(cents: 50_00))
@@ -292,7 +292,7 @@ struct DebtLoanTests {
         draft.category = try context.lockedCategory(.otherExpense)
         try Forgiveness.record(draft, in: context)
 
-        try collection.delete(.onlySelected, in: context)
+        try collection.delete(.onlySelected)
 
         #expect(try outstanding(loan) == Money(cents: 60_00))
         #expect(loan.forgiveness?.amount == Money(cents: 40_00))
@@ -398,14 +398,14 @@ struct DebtLoanTests {
         let loan = try lend(100_00)
         try pay(60_00, on: loan)
         // Before ADR-0004, forgiving added a Debt Collection of what was outstanding and an offsetting expense.
-        let legacy = try LoanOrDebt(loan, in: context)
+        let legacy = try LoanOrDebt(loan)
         let collection = try #require(legacy).addLinked(
             40_00, filedUnder: try context.lockedCategory(.debtCollection), on: paidOn, note: "",
-            isExcludedFromReport: true, in: context
+            isExcludedFromReport: true
         )
         let expense = try #require(legacy).addLinked(
             -40_00, filedUnder: try context.lockedCategory(.otherExpense), on: paidOn, note: "",
-            isExcludedFromReport: false, in: context
+            isExcludedFromReport: false
         )
 
         #expect(try isSettled(loan))
@@ -484,7 +484,7 @@ struct DebtLoanTests {
         #expect(loan.note == "Rent help")
         #expect(loan.reminderDay == paidOn.adding(days: 30))
         #expect(try outstanding(loan) == Money(cents: 90_00))
-        #expect(try loan.related(in: context) == [collection])
+        #expect(try loan.related() == [collection])
         #expect(collection.amountCents == 60_00)
         #expect(collection.day == paidOn)
     }
@@ -563,7 +563,7 @@ struct DebtLoanTests {
         try context.save()
 
         #expect(try isSettled(loan))
-        #expect(try loan.related(in: context) == [collection])
+        #expect(try loan.related() == [collection])
         #expect(loan.amountCents == -100_00)
     }
 

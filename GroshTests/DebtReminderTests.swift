@@ -34,7 +34,7 @@ struct DebtReminderTests {
 
     /// What is still outstanding on `original`, a Loan or Debt, as every screen works it out.
     private func outstanding(_ original: Transaction) throws -> Money {
-        try #require(try LoanOrDebt(original, in: context)).outstanding
+        try #require(try LoanOrDebt(original)).outstanding
     }
 
     // MARK: Due (the Home bell)

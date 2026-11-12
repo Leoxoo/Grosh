@@ -200,7 +200,7 @@ struct GroshCSVExportTests {
         #expect(forgiveness.category?.name == "Friends & Lover")
         #expect(forgiveness.category?.type == .expense)
         #expect(forgiveness.note == "Birthday, late")
-        #expect(try #require(try LoanOrDebt(loan, in: context)).isSettled)
+        #expect(try #require(try LoanOrDebt(loan)).isSettled)
     }
 
     /// Each wallet is restored in the currency its rows name, so a store with a euro wallet round-trips.

@@ -180,7 +180,7 @@ extension Wallet {
         let context = try storeContext()
         let schedules = (recurringTransactions ?? []).filter { !$0.isInRecentlyDeleted }
         for schedule in schedules {
-            schedule.makeDueTransactions(through: today, in: context)
+            try schedule.makeDueTransactions(through: today)
         }
         deletedAt = now
         for transaction in (transactions ?? []).notDeleted {

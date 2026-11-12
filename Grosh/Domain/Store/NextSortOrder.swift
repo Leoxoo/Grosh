@@ -21,3 +21,19 @@ nonisolated extension Array {
         return reordered
     }
 }
+
+nonisolated extension Array where Element: PersistentModel {
+    /// Applies a drag in this list, which is in the user's order: numbers each model's `sortOrder` afresh in the order
+    /// the drag leaves them (``reordered(fromOffsets:toOffset:)``), so one added later goes after them all, and saves.
+    /// Wallets and categories are reordered this one way.
+    func move(
+        fromOffsets source: IndexSet, toOffset destination: Int, renumbering sortOrder: ReferenceWritableKeyPath<Element, Int>
+    ) throws {
+        // A drag always moves something, so an empty list has nothing to number or save.
+        guard let first else { return }
+        for (position, model) in reordered(fromOffsets: source, toOffset: destination).enumerated() {
+            model[keyPath: sortOrder] = position
+        }
+        try first.saveToStore()
+    }
+}

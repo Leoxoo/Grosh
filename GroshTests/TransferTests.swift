@@ -83,8 +83,8 @@ struct TransferTests {
         let transfer = try Transfer.create(draft(250_00), in: context)
         try Transfer.create(draft(10_00), in: context)
 
-        #expect(try transfer.outgoing.related(in: context) == [transfer.incoming])
-        #expect(try transfer.incoming.related(in: context) == [transfer.outgoing])
+        #expect(try transfer.outgoing.related() == [transfer.incoming])
+        #expect(try transfer.incoming.related() == [transfer.outgoing])
     }
 
     // MARK: Required fields
@@ -142,7 +142,7 @@ struct TransferTests {
         let transfer = try Transfer.create(draft(250_00), in: context)
 
         for half in [transfer.outgoing, transfer.incoming] {
-            let wallets = try half.transferWallets(in: context)
+            let wallets = try half.transferWallets()
             #expect(wallets.from == checking)
             #expect(wallets.to == savings)
         }
@@ -150,9 +150,9 @@ struct TransferTests {
 
     @Test func aHalfWhoseOtherHalfWasDeletedShowsOnlyItsOwnWallet() throws {
         let transfer = try Transfer.create(draft(250_00), in: context)
-        try transfer.outgoing.delete(.onlySelected, in: context)
+        try transfer.outgoing.delete(.onlySelected)
 
-        let wallets = try transfer.incoming.transferWallets(in: context)
+        let wallets = try transfer.incoming.transferWallets()
 
         #expect(wallets.from == nil)
         #expect(wallets.to == savings)
@@ -163,7 +163,7 @@ struct TransferTests {
         var edited = TransferHalfDraft(editing: transfer.outgoing)
         edited.amount = Money(cents: 255_00)
 
-        #expect(try transfer.outgoing.offersToUpdateOtherHalf(with: edited, in: context))
+        #expect(try transfer.outgoing.offersToUpdateOtherHalf(with: edited))
     }
 
     @Test func changingTheDateAsksWhetherToUpdateBothHalves() throws {
@@ -171,7 +171,7 @@ struct TransferTests {
         var edited = TransferHalfDraft(editing: transfer.incoming)
         edited.day = CalendarDay(year: 2026, month: 10, day: 8)
 
-        #expect(try transfer.incoming.offersToUpdateOtherHalf(with: edited, in: context))
+        #expect(try transfer.incoming.offersToUpdateOtherHalf(with: edited))
     }
 
     @Test func changingOnlyTheNoteChangesThisHalfWithoutAsking() throws {
@@ -179,7 +179,7 @@ struct TransferTests {
         var edited = TransferHalfDraft(editing: transfer.incoming)
         edited.note = "Emergency fund"
 
-        #expect(try !transfer.incoming.offersToUpdateOtherHalf(with: edited, in: context))
+        #expect(try !transfer.incoming.offersToUpdateOtherHalf(with: edited))
         try transfer.incoming.update(with: edited, scope: .onlyThisOne)
         #expect(transfer.incoming.note == "Emergency fund")
         #expect(transfer.outgoing.note == "Rainy day fund")
@@ -187,12 +187,12 @@ struct TransferTests {
 
     @Test func aHalfWhoseOtherHalfWasDeletedIsChangedWithoutAsking() throws {
         let transfer = try Transfer.create(draft(250_00), in: context)
-        try transfer.incoming.delete(.onlySelected, in: context)
+        try transfer.incoming.delete(.onlySelected)
         var edited = TransferHalfDraft(editing: transfer.outgoing)
         edited.amount = Money(cents: 255_00)
 
         #expect(transfer.outgoing.editFlow == .transferHalf)
-        #expect(try !transfer.outgoing.offersToUpdateOtherHalf(with: edited, in: context))
+        #expect(try !transfer.outgoing.offersToUpdateOtherHalf(with: edited))
     }
 
     @Test func changingOnlyThisOneLeavesTheHalvesDifferentLikeAFee() throws {
@@ -261,14 +261,14 @@ struct TransferTests {
     @Test func deletingAHalfAsksWhetherToDeleteBoth() throws {
         let transfer = try Transfer.create(draft(250_00), in: context)
 
-        #expect(try transfer.incoming.deleteScopes(in: context) == [.withRelated, .onlySelected])
+        #expect(try transfer.incoming.deleteScopes() == [.withRelated, .onlySelected])
         #expect(TransactionDeleteScope.withRelated.buttonTitle(selectedCount: 1, relatedCount: 1) == "Delete Both")
     }
 
     @Test func deletingBothHalvesUndoesTheTransfer() throws {
         let transfer = try Transfer.create(draft(250_00), in: context)
 
-        try transfer.outgoing.delete(.withRelated, in: context)
+        try transfer.outgoing.delete(.withRelated)
 
         #expect(walletBalance(checking, asOf: today) == Money(cents: 1_000_00))
         #expect(walletBalance(savings, asOf: today) == Money(cents: 0))
@@ -277,11 +277,11 @@ struct TransferTests {
     @Test func deletingOnlyThisOneKeepsTheOtherHalf() throws {
         let transfer = try Transfer.create(draft(250_00), in: context)
 
-        try transfer.outgoing.delete(.onlySelected, in: context)
+        try transfer.outgoing.delete(.onlySelected)
 
         #expect(walletBalance(checking, asOf: today) == Money(cents: 1_000_00))
         #expect(walletBalance(savings, asOf: today) == Money(cents: 250_00))
-        #expect(try transfer.incoming.related(in: context).isEmpty)
+        #expect(try transfer.incoming.related().isEmpty)
     }
 
     // MARK: Income, spending and the Total

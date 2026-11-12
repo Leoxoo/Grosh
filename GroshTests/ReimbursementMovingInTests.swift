@@ -98,7 +98,7 @@ struct ReimbursementMovingInTests {
         let dinner = try store.dinner()
         let deposit = try deposit()
         try Reimbursement.moveIn(deposit, to: dinner, in: context, at: deletedAt)
-        try dinner.delete(.onlySelected, in: context, at: deletedAt)
+        try dinner.delete(.onlySelected, at: deletedAt)
 
         try deposit.restore()
         try dinner.restore()
@@ -147,7 +147,7 @@ struct ReimbursementMovingInTests {
         let incomingTransfer = try store.record(10_00, "Incoming transfer", .income, on: day(2026, 10, 5))
         let loan = try store.lendOrBorrow(.debt, 50_00, on: day(2026, 10, 5))
         let deleted = try deposit()
-        try deleted.delete(.onlySelected, in: context, at: deletedAt)
+        try deleted.delete(.onlySelected, at: deletedAt)
 
         #expect(salary.canBeMovedIntoReimbursement(of: dinner))
         #expect(!expense.canBeMovedIntoReimbursement(of: dinner))

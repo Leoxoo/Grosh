@@ -166,7 +166,7 @@ struct ExpectedReimbursementTests {
         let alex = try fixture.person("Alex")
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
 
-        try dinner.delete(.onlySelected, in: context, at: deletedAt)
+        try dinner.delete(.onlySelected, at: deletedAt)
 
         #expect(try fixture.owesMe().open.isEmpty)
         #expect(try fixture.owesMe().totals.outstanding.isEmpty)
@@ -177,7 +177,7 @@ struct ExpectedReimbursementTests {
     @Test func restoringTheExpenseRestoresItsExpectations() throws {
         let alex = try fixture.person("Alex")
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
-        try dinner.delete(.onlySelected, in: context, at: deletedAt)
+        try dinner.delete(.onlySelected, at: deletedAt)
 
         try dinner.restore()
 
@@ -189,7 +189,7 @@ struct ExpectedReimbursementTests {
     @Test func deletingTheExpenseForeverRemovesItsExpectationsButNotThePerson() throws {
         let alex = try fixture.person("Alex")
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
-        try dinner.delete(.onlySelected, in: context, at: deletedAt)
+        try dinner.delete(.onlySelected, at: deletedAt)
 
         try dinner.deleteForever()
 

@@ -24,10 +24,7 @@ extension Wallet {
     /// Applies a drag in `ordered` (a list in the user's order) by renumbering the wallets in their new order.
     /// Saves.
     static func move(_ ordered: [Wallet], fromOffsets source: IndexSet, toOffset destination: Int) throws {
-        for (position, wallet) in ordered.reordered(fromOffsets: source, toOffset: destination).enumerated() {
-            wallet.sortOrder = position
-        }
-        try ordered.first?.saveToStore()
+        try ordered.move(fromOffsets: source, toOffset: destination, renumbering: \.sortOrder)
     }
 
     /// Retires the wallet: it leaves the Total and every picker, but keeps all of its transactions. Its Recurring
@@ -36,7 +33,7 @@ extension Wallet {
     func archive(today: CalendarDay) throws {
         let context = try storeContext()
         for schedule in recurringTransactions ?? [] {
-            schedule.makeDueTransactions(through: today, in: context)
+            try schedule.makeDueTransactions(through: today)
         }
         isArchived = true
         try context.save()

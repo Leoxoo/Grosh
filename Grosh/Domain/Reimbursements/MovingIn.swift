@@ -68,7 +68,7 @@ extension Reimbursement {
         if let blocker = deposit.reimbursementMoveInBlocker(into: expense) { throw blocker }
         let reimbursement = try add(ReimbursementDraft(movingIn: deposit), to: expense, in: context)
         reimbursement.movedFrom = deposit
-        try deposit.delete(.onlySelected, in: context, at: now)
+        try deposit.delete(.onlySelected, at: now)
         return reimbursement
     }
 }

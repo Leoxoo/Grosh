@@ -197,9 +197,9 @@ struct MoneyLoverImportTests {
 
         let outgoing = try #require(try transferRows(in: "Checking").first)
         let incoming = try #require(try transferRows(in: "Savings").first)
-        #expect(try outgoing.otherHalf(in: context) == incoming)
-        #expect(try incoming.otherHalf(in: context) == outgoing)
-        let wallets = try incoming.transferWallets(in: context)
+        #expect(try outgoing.otherHalf() == incoming)
+        #expect(try incoming.otherHalf() == outgoing)
+        let wallets = try incoming.transferWallets()
         #expect(wallets.from == (try context.wallet(named: "Checking")))
         #expect(wallets.to == (try context.wallet(named: "Savings")))
         #expect(!outgoing.isBalanceAdjustment && !incoming.isBalanceAdjustment)
@@ -218,7 +218,7 @@ struct MoneyLoverImportTests {
 
         let checking = try rows(in: "Checking")
         let savings = try rows(in: "Savings")
-        #expect(try checking[0].otherHalf(in: context) == savings[0])
+        #expect(try checking[0].otherHalf() == savings[0])
         #expect(checking.filter { $0.linkID != nil }.count == 1)
         #expect(savings.filter { $0.linkID != nil }.count == 1)
     }
@@ -275,7 +275,7 @@ struct MoneyLoverImportTests {
         #expect(loans.settled == ["Cash 9/1 -10000", "Cash 9/5 -5000"])
         #expect(loans.open == ["Cash 9/10 -10000", "Checking 9/2 -10000"])
         let collection = try #require(try rows(in: "Cash").first { $0.amountCents == 100_00 })
-        #expect(try collection.related(in: context).map(\.day) == [CalendarDay(year: 2026, month: 9, day: 1)])
+        #expect(try collection.related().map(\.day) == [CalendarDay(year: 2026, month: 9, day: 1)])
     }
 
     @Test func aDebtCollectionNeverSettlesALoanMadeAfterIt() throws {
@@ -355,7 +355,7 @@ struct MoneyLoverImportTests {
     /// Every transaction in list order, described by what the user sees of it.
     private func everything() throws -> [String] {
         try context.fetch(FetchDescriptor<Transaction>()).inListOrder().map { transaction in
-            let related = (try? transaction.related(in: context).map(\.amountCents)) ?? []
+            let related = (try? transaction.related().map(\.amountCents)) ?? []
             return [
                 transaction.wallet?.name ?? "", "\(transaction.dayRaw)", "\(transaction.amountCents)",
                 transaction.category?.name ?? "", transaction.note, transaction.card?.name ?? "",

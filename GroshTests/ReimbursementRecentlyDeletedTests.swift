@@ -35,7 +35,7 @@ struct ReimbursementRecentlyDeletedTests {
     @Test func deletingAnExpenseKeepsItsReimbursementsWithItInRecentlyDeleted() throws {
         let dinner = try dinnerPaidBackTwice()
 
-        try dinner.delete(.onlySelected, in: context, at: deletedAt)
+        try dinner.delete(.onlySelected, at: deletedAt)
 
         #expect(dinner.isInRecentlyDeleted)
         #expect(dinner.orderedReimbursements.map(\.amountCents) == [20_00, 15_00])
@@ -46,7 +46,7 @@ struct ReimbursementRecentlyDeletedTests {
     @Test func aDeletedExpenseAndItsReimbursementsCountInNoBalanceOrReport() throws {
         let dinner = try dinnerPaidBackTwice()
 
-        try dinner.delete(.onlySelected, in: context, at: deletedAt)
+        try dinner.delete(.onlySelected, at: deletedAt)
 
         #expect(walletBalance(checking, asOf: today) == Money(cents: 0))
         #expect(dinner.countedAmount(otherIncome: try store.otherIncome()) == nil)
@@ -59,7 +59,7 @@ struct ReimbursementRecentlyDeletedTests {
 
     @Test func restoringAnExpenseBringsItsReimbursementsBack() throws {
         let dinner = try dinnerPaidBackTwice()
-        try dinner.delete(.onlySelected, in: context, at: deletedAt)
+        try dinner.delete(.onlySelected, at: deletedAt)
 
         try dinner.restore()
 
@@ -73,7 +73,7 @@ struct ReimbursementRecentlyDeletedTests {
     @Test func deletingAnExpenseForeverRemovesItsReimbursementsToo() throws {
         let dinner = try dinnerPaidBackTwice()
         let kept = try dinnerPaidBackTwice()
-        try dinner.delete(.onlySelected, in: context, at: deletedAt)
+        try dinner.delete(.onlySelected, at: deletedAt)
 
         try dinner.deleteForever()
 
@@ -84,7 +84,7 @@ struct ReimbursementRecentlyDeletedTests {
 
     @Test func theThirtyDayPurgeRemovesAnExpensesReimbursementsToo() throws {
         let dinner = try dinnerPaidBackTwice()
-        try dinner.delete(.onlySelected, in: context, at: deletedAt)
+        try dinner.delete(.onlySelected, at: deletedAt)
         let thirtyDays: TimeInterval = 30 * 24 * 60 * 60
 
         try RecentlyDeleted.purgeExpired(in: context, now: deletedAt.addingTimeInterval(thirtyDays - 1))
@@ -98,7 +98,7 @@ struct ReimbursementRecentlyDeletedTests {
     @Test func emptyingTheBinRemovesReimbursementsOnlyOfWhatIsInIt() throws {
         let deleted = try dinnerPaidBackTwice()
         let kept = try dinnerPaidBackTwice()
-        try deleted.delete(.onlySelected, in: context, at: deletedAt)
+        try deleted.delete(.onlySelected, at: deletedAt)
 
         try RecentlyDeleted.empty(in: context)
 

@@ -118,7 +118,7 @@ struct MonthGraphTests {
         let loan = try store.lendOrBorrow(.loan, 100_00, on: day(2026, 9, 20))
         try context.forgive(loan, on: day(2026, 10, 6))
 
-        try [coffee, salary, loan].delete(.onlySelected, in: context)
+        try [coffee, salary, loan].delete(.onlySelected)
 
         #expect(try store.graph(.spent).headline == Money(cents: 0))
         #expect(try store.graph(.income).headline == Money(cents: 0))

@@ -60,7 +60,7 @@ struct NotDeletedTransactionsTests {
         try context.save()
         _ = shared
 
-        try [coffee].delete(.onlySelected, in: context)
+        try [coffee].delete(.onlySelected)
         #expect(try notes().shared == ["lunch"])
 
         try coffee.restore()
@@ -75,7 +75,7 @@ struct NotDeletedTransactionsTests {
         try context.save()
         _ = shared
 
-        try [coffee].delete(.onlySelected, in: context)
+        try [coffee].delete(.onlySelected)
         try coffee.deleteForever()
 
         let notes = try notes()

@@ -14,7 +14,7 @@ struct ForgiveDraft {
 
     /// Forgiving the rest of `original`, a Loan or Debt, on `day`. Throws when `original` is neither.
     init(forgiving original: Transaction, on day: CalendarDay, in context: ModelContext) throws {
-        guard let loanOrDebt = try LoanOrDebt(original, in: context) else { throw DebtLoanRuleError.notALoanOrDebt }
+        guard let loanOrDebt = try LoanOrDebt(original) else { throw DebtLoanRuleError.notALoanOrDebt }
         self.loanOrDebt = loanOrDebt
         self.day = day
         self.category = try context.otherCategory(loanOrDebt.kind.forgivenType)
@@ -68,7 +68,7 @@ extension Forgiveness {
     /// forgiven, now dated and filed as this draft says. Saves.
     @discardableResult
     static func record(_ draft: ForgiveDraft, in context: ModelContext) throws -> Forgiveness {
-        try draft.loanOrDebt.settle(in: context, check: draft.validate(against:)) { current in
+        try draft.loanOrDebt.settle(check: draft.validate(against:)) { current in
             guard let category = draft.category else { throw TransactionRuleError.missingCategory }
             let original = current.original
             original.forgivenCents = (original.forgivenCents ?? 0) + current.outstanding.cents

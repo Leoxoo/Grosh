@@ -26,10 +26,10 @@ struct LoanOrDebt: Equatable {
             .inListOrder()
     }
 
-    /// `original` with its payments, or `nil` when it isn't a Loan or a Debt.
-    init?(_ original: Transaction, in context: ModelContext) throws {
+    /// `original` with its payments, read from the store, or `nil` when it isn't a Loan or a Debt.
+    init?(_ original: Transaction) throws {
         guard original.isLoanOrDebt else { return nil }
-        self.init(original, among: try original.related(in: context))
+        self.init(original, among: try original.related())
     }
 
     /// The Person it is with: a Loan or Debt is with exactly one (ADR-0009, ``TransactionRuleError/tooManyWith``).
@@ -64,14 +64,13 @@ struct LoanOrDebt: Equatable {
     /// as it stands now (a payment may have been recorded since the sheet opened), lets `check` refuse, has `record`
     /// add the payment or the Forgiven mark to it, then saves.
     func settle<Recorded>(
-        in context: ModelContext,
         check: (_ current: LoanOrDebt) throws -> Void,
         record: (_ current: LoanOrDebt) throws -> Recorded
     ) throws -> Recorded {
-        guard let current = try LoanOrDebt(original, in: context) else { throw DebtLoanRuleError.notALoanOrDebt }
+        guard let current = try LoanOrDebt(original) else { throw DebtLoanRuleError.notALoanOrDebt }
         try check(current)
         let recorded = try record(current)
-        try context.save()
+        try original.saveToStore()
         return recorded
     }
 
@@ -80,11 +79,11 @@ struct LoanOrDebt: Equatable {
     /// Doesn't save.
     func addLinked(
         _ cents: Int, filedUnder category: Category, on day: CalendarDay, note: String,
-        isExcludedFromReport: Bool, in context: ModelContext
+        isExcludedFromReport: Bool
     ) throws -> Transaction {
         let transaction = Transaction.insert(
             cents: cents, on: day, wallet: original.wallet, category: category,
-            note: note.trimmingCharacters(in: .whitespacesAndNewlines), in: context
+            note: note.trimmingCharacters(in: .whitespacesAndNewlines), in: try original.storeContext()
         )
         transaction.setPeople(original.orderedPeople)
         transaction.isExcludedFromReport = isExcludedFromReport

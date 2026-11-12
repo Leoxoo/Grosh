@@ -28,7 +28,7 @@ struct DebtsAndLoansByPersonTests {
     }
 
     private func settle(_ original: Transaction) throws {
-        let outstanding = try #require(try LoanOrDebt(original, in: context)).outstanding
+        let outstanding = try #require(try LoanOrDebt(original)).outstanding
         try context.pay(outstanding.cents, on: original, on: day(2026, 6, 15))
     }
 
@@ -82,7 +82,7 @@ struct DebtsAndLoansByPersonTests {
         let alex = try fixture.person("Alex")
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
 
-        try dinner.delete(.onlySelected, in: context, at: .now)
+        try dinner.delete(.onlySelected, at: .now)
 
         #expect(try listing().entry(for: alex) == nil)
     }

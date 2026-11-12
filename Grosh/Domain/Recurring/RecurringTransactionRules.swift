@@ -300,7 +300,7 @@ extension RecurringTransaction {
         try draft.validate()
         let context = try storeContext()
         // What fell due under the old schedule is made under it first, before the edit reshapes what is still to come.
-        makeDueTransactions(through: today, in: context)
+        try makeDueTransactions(through: today)
         apply(draft)
         skipOccurrences(through: today)
         try context.save()
@@ -311,7 +311,7 @@ extension RecurringTransaction {
     @MainActor
     func delete(today: CalendarDay, at now: Date = .now) throws {
         let context = try storeContext()
-        makeDueTransactions(through: today, in: context)
+        try makeDueTransactions(through: today)
         deletedAt = now
         for transaction in transactions ?? [] {
             transaction.recurring = nil
@@ -322,13 +322,13 @@ extension RecurringTransaction {
     /// Makes a transaction for each occurrence that has come due by `today` and hasn't been dealt with yet, then
     /// marks them dealt with, so each occurrence is made once however often this runs. A schedule that is deleted or
     /// paused makes none.
-    func makeDueTransactions(through today: CalendarDay, in context: ModelContext) {
+    func makeDueTransactions(through today: CalendarDay) throws {
         guard isActive, wallet != nil, category != nil else { return }
         let due = schedule.occurrences(after: handledThrough, through: today)
         guard !due.isEmpty else { return }
         let estimate = currentEstimateCents()
         for day in due {
-            makeTransaction(on: day, estimateCents: estimate, in: context)
+            try makeTransaction(on: day, estimateCents: estimate)
         }
         if let last = due.last {
             handledThrough = last
@@ -359,12 +359,11 @@ extension RecurringTransaction {
     /// varies starts Estimated, at `estimateCents` (``currentEstimateCents()``). Nothing is made without a wallet and a
     /// category, which the schedule can lose when they are deleted.
     @discardableResult
-    func makeTransaction(on day: CalendarDay, estimateCents: Int?, in context: ModelContext) -> Transaction? {
+    func makeTransaction(on day: CalendarDay, estimateCents: Int?) throws -> Transaction? {
         guard let wallet = self.wallet, let category = self.category else { return nil }
         let transaction = Transaction.insert(
             cents: startingAmount(estimateCents: estimateCents).cents, on: day, wallet: wallet, category: category,
-            card: card,
-            note: note, in: context
+            card: card, note: note, in: try storeContext()
         )
         transaction.recurring = self
         if estimatesAmount {
@@ -388,7 +387,7 @@ extension RecurringTransaction {
         let context = try storeContext()
         let estimate = currentEstimateCents()
         for day in days {
-            makeTransaction(on: day, estimateCents: estimate, in: context)
+            try makeTransaction(on: day, estimateCents: estimate)
         }
         try context.save()
     }
@@ -411,7 +410,7 @@ extension RecurringTransaction {
     func addTransactionNow(today: CalendarDay) throws {
         if let addBlocker { throw addBlocker }
         let context = try storeContext()
-        makeTransaction(on: today, estimateCents: currentEstimateCents(), in: context)
+        try makeTransaction(on: today, estimateCents: currentEstimateCents())
         try context.save()
     }
 
@@ -439,7 +438,7 @@ extension RecurringTransaction {
     @MainActor
     static func catchUp(through today: CalendarDay, in context: ModelContext) throws {
         for recurring in try context.fetch(FetchDescriptor<RecurringTransaction>()) {
-            recurring.makeDueTransactions(through: today, in: context)
+            try recurring.makeDueTransactions(through: today)
         }
         if context.hasChanges {
             try context.save()

@@ -5,8 +5,9 @@ extension Transaction {
     /// The transactions linked to this one, shown as its Related transactions: the other half of a transfer, the other
     /// parts of a Split, a Loan or Debt and its payments, or an Expense and its paybacks into other wallets (ADR-0012).
     /// Listed newest first.
-    func related(in context: ModelContext) throws -> [Transaction] {
-        related(among: try context.fetch(linkedTransactions))
+    func related() throws -> [Transaction] {
+        guard linkID != nil else { return [] }
+        return related(among: try storeContext().fetch(linkedTransactions))
     }
 
     /// Every transaction sharing this one's link, this one included, outside Recently Deleted; nothing when it has no

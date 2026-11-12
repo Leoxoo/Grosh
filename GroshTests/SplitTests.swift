@@ -129,7 +129,7 @@ struct SplitTests {
 
     @Test func aTransactionInRecentlyDeletedCannotBeSplit() throws {
         let coffee = try record(25_00)
-        try coffee.delete(.onlySelected, in: context)
+        try coffee.delete(.onlySelected)
 
         #expect(!coffee.canBeSplit)
     }
@@ -246,8 +246,8 @@ struct SplitTests {
 
         let link = try #require(coffee.linkID)
         #expect(parts.allSatisfy { $0.linkID == link })
-        #expect(try Set(coffee.related(in: context)) == Set(parts))
-        #expect(try Set(parts[0].related(in: context)) == [coffee, parts[1]])
+        #expect(try Set(coffee.related()) == Set(parts))
+        #expect(try Set(parts[0].related()) == [coffee, parts[1]])
         #expect(other.linkID == nil)
     }
 
@@ -499,7 +499,7 @@ struct SplitTests {
         let coffee = try record(25_00)
         let part = try #require(try split(coffee, off: [10_00]).first)
         // A Debt in Recently Deleted still holds its link.
-        try debt.delete(.onlySelected, in: context)
+        try debt.delete(.onlySelected)
 
         #expect(overpaid.linkKind == .loanOrDebt && debt.linkKind == .loanOrDebt)
         #expect(overpaid.isDebtWriteOff && !overpaid.isSplitPart)
@@ -517,7 +517,7 @@ struct SplitTests {
 
         #expect(second.linkID == coffee.linkID)
         #expect(first.amountCents == -6_00)
-        #expect(try Set(coffee.related(in: context)) == [first, second])
+        #expect(try Set(coffee.related()) == [first, second])
     }
 
     // MARK: Deleting a part
@@ -527,9 +527,9 @@ struct SplitTests {
         let parts = try split(coffee, off: [10_00, 5_00])
         let balanceBefore = balance()
 
-        try parts[0].delete(.onlySelected, in: context)
+        try parts[0].delete(.onlySelected)
 
-        #expect(try coffee.related(in: context) == [parts[1]])
+        #expect(try coffee.related() == [parts[1]])
         #expect(balance() == Money(cents: balanceBefore.cents + 10_00))
     }
 
@@ -547,7 +547,7 @@ struct SplitTests {
         #expect(try allTransactions().count == 1)
         #expect(coffee.amountCents == -25_00)
         #expect(coffee.linkID == nil)
-        #expect(try coffee.related(in: context).isEmpty)
+        #expect(try coffee.related().isEmpty)
         #expect(balance() == balanceBefore)
     }
 
@@ -599,7 +599,7 @@ struct SplitTests {
     @Test func undoSplitLeavesPartsInRecentlyDeletedWhereTheyAreAndDoesNotCountThem() throws {
         let coffee = try record(25_00)
         let parts = try split(coffee, off: [10_00, 5_00])
-        try parts[0].delete(.onlySelected, in: context)
+        try parts[0].delete(.onlySelected)
 
         try coffee.undoSplit()
 
@@ -619,7 +619,7 @@ struct SplitTests {
     @Test func undoSplitIsRefusedOnceEveryOtherPartIsDeleted() throws {
         let coffee = try record(25_00)
         let parts = try split(coffee, off: [10_00])
-        try parts[0].delete(.onlySelected, in: context)
+        try parts[0].delete(.onlySelected)
 
         #expect(throws: SplitRuleError.notSplit) { try coffee.undoSplit() }
         #expect(coffee.amountCents == -15_00)
@@ -628,7 +628,7 @@ struct SplitTests {
     @Test func undoSplitMergesTheRemainingPartsWhenTheOriginalWasDeleted() throws {
         let coffee = try record(25_00)
         let parts = try split(coffee, off: [10_00, 5_00])
-        try coffee.delete(.onlySelected, in: context)
+        try coffee.delete(.onlySelected)
 
         try parts[1].undoSplit()
 

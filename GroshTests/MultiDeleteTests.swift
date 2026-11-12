@@ -31,8 +31,8 @@ struct MultiDeleteTests {
         record("salary", 100_00, in: checking)
         let selection = [record("coffee", -4_50, in: checking), record("lunch", -12_00, in: checking)]
 
-        #expect(try selection.deleteScopes(in: context) == [.onlySelected])
-        try selection.delete(.onlySelected, in: context)
+        #expect(try selection.deleteScopes() == [.onlySelected])
+        try selection.delete(.onlySelected)
 
         #expect(try context.notDeletedNotes() == ["salary"])
         #expect(walletBalance(checking, asOf: today) == Money(cents: 100_00))
@@ -45,8 +45,8 @@ struct MultiDeleteTests {
             record("from checking", 500_00, in: savings, link: transfer),
         ]
 
-        #expect(try selection.related(in: context).isEmpty)
-        #expect(try selection.deleteScopes(in: context) == [.onlySelected])
+        #expect(try selection.related().isEmpty)
+        #expect(try selection.deleteScopes() == [.onlySelected])
     }
 
     @Test func aSelectionHoldingOneHalfOfATransferAsksWhetherToDeleteTheOtherHalfToo() throws {
@@ -55,8 +55,8 @@ struct MultiDeleteTests {
         let incoming = record("from checking", 500_00, in: savings, link: transfer)
         let selection = [outgoing, record("coffee", -4_50, in: checking)]
 
-        #expect(try selection.related(in: context) == [incoming])
-        #expect(try selection.deleteScopes(in: context) == [.withRelated, .onlySelected])
+        #expect(try selection.related() == [incoming])
+        #expect(try selection.deleteScopes() == [.withRelated, .onlySelected])
     }
 
     @Test func deletingWithRelatedAlsoDeletesTheLinkedTransactionsLeftOutOfTheSelection() throws {
@@ -66,7 +66,7 @@ struct MultiDeleteTests {
         let coffee = record("coffee", -4_50, in: checking)
         record("another transfer", -10_00, in: checking, link: UUID())
 
-        try [outgoing, coffee].delete(.withRelated, in: context)
+        try [outgoing, coffee].delete(.withRelated)
 
         #expect(try context.notDeletedNotes() == ["another transfer"])
         #expect(walletBalance(savings, asOf: today) == Money(cents: 0))
@@ -78,7 +78,7 @@ struct MultiDeleteTests {
         record("from checking", 500_00, in: savings, link: transfer)
         let coffee = record("coffee", -4_50, in: checking)
 
-        try [outgoing, coffee].delete(.onlySelected, in: context)
+        try [outgoing, coffee].delete(.onlySelected)
 
         #expect(try context.notDeletedNotes() == ["from checking"])
     }
@@ -89,9 +89,9 @@ struct MultiDeleteTests {
         let firstPayment = record("Pasha paid 60", 60_00, in: checking, link: loan)
         let secondPayment = record("Pasha paid 40", 40_00, in: checking, link: loan)
 
-        #expect(try [firstPayment, secondPayment].related(in: context) == [lent])
+        #expect(try [firstPayment, secondPayment].related() == [lent])
 
-        try [firstPayment, secondPayment].delete(.withRelated, in: context)
+        try [firstPayment, secondPayment].delete(.withRelated)
 
         #expect(try context.notDeletedNotes().isEmpty)
     }

@@ -154,10 +154,7 @@ struct CategoryCatalog {
     /// ones included: a parent moves with its subcategories, and a subcategory stays within its parent. They are
     /// numbered afresh, so a category added later goes after them all.
     func move(_ siblings: [Category], fromOffsets source: IndexSet, toOffset destination: Int) throws {
-        for (position, category) in siblings.reordered(fromOffsets: source, toOffset: destination).enumerated() {
-            category.sortOrder = position
-        }
-        try context.save()
+        try siblings.move(fromOffsets: source, toOffset: destination, renumbering: \.sortOrder)
     }
 
     // MARK: Hiding

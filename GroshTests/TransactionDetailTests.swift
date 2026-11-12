@@ -35,7 +35,7 @@ struct TransactionDetailTests {
         let coffee = record("coffee", -4_50, in: checking)
         record("lunch", -12_00, in: checking)
 
-        #expect(try coffee.related(in: context).isEmpty)
+        #expect(try coffee.related().isEmpty)
     }
 
     @Test func transactionsSharingALinkListEachOtherButNotThemselves() throws {
@@ -44,8 +44,8 @@ struct TransactionDetailTests {
         let incoming = record("from checking", 500_00, in: savings, link: transfer, enteredAt: 2)
         record("another transfer", -10_00, in: checking, link: UUID())
 
-        #expect(try outgoing.related(in: context) == [incoming])
-        #expect(try incoming.related(in: context) == [outgoing])
+        #expect(try outgoing.related() == [incoming])
+        #expect(try incoming.related() == [outgoing])
     }
 
     // MARK: Edit and Duplicate
@@ -111,7 +111,7 @@ struct TransactionDetailTests {
         record("Pasha paid 60", 60_00, in: checking, link: loan, kind: .loanOrDebt)
         record("Pasha paid 40", 40_00, in: checking, link: loan, kind: .loanOrDebt)
 
-        try lent.delete(.onlySelected, in: context)
+        try lent.delete(.onlySelected)
 
         #expect(try context.notDeletedNotes() == ["Pasha paid 60", "Pasha paid 40"])
     }
@@ -123,7 +123,7 @@ struct TransactionDetailTests {
         record("coffee", -4_50, in: checking)
         record("another transfer", -10_00, in: checking, link: UUID())
 
-        try outgoing.delete(.withRelated, in: context)
+        try outgoing.delete(.withRelated)
 
         #expect(try context.notDeletedNotes() == ["coffee", "another transfer"])
         #expect(walletBalance(savings, asOf: today) == Money(cents: 0))
@@ -132,7 +132,7 @@ struct TransactionDetailTests {
     @Test func aTransactionWithNothingRelatedIsDeletedOnItsOwn() throws {
         let coffee = record("coffee", -4_50, in: checking)
 
-        #expect(try coffee.deleteScopes(in: context) == [.onlySelected])
+        #expect(try coffee.deleteScopes() == [.onlySelected])
     }
 
     @Test func aTransactionWithRelatedTransactionsOffersToDeleteThemToo() throws {
@@ -140,6 +140,6 @@ struct TransactionDetailTests {
         let outgoing = record("to savings", -500_00, in: checking, link: transfer)
         record("from checking", 500_00, in: savings, link: transfer)
 
-        #expect(try outgoing.deleteScopes(in: context) == [.withRelated, .onlySelected])
+        #expect(try outgoing.deleteScopes() == [.withRelated, .onlySelected])
     }
 }

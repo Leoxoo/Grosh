@@ -187,7 +187,7 @@ struct ExpectedReimbursementReminderTests {
         #expect(try fixture.owesMe().reminders(from: today).map(\.personName).sorted() == ["Olga", "Sam"])
 
         // Its Expense deleted, and back.
-        try lunch.delete(.onlySelected, in: context)
+        try lunch.delete(.onlySelected)
         #expect(try fixture.owesMe().reminders(from: today).map(\.personName) == ["Sam"])
         try lunch.restore()
         #expect(try fixture.owesMe().reminders(from: today).map(\.personName).sorted() == ["Olga", "Sam"])

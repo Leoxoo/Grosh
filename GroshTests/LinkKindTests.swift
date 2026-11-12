@@ -116,7 +116,7 @@ struct LinkKindTests {
 
     @Test func anExpenseWhoseLastPaybackIsRemovedForGoodCanBeSplitAndMovedAgain() throws {
         let (dinner, payback) = try paidBackIntoCash()
-        try payback.delete(.onlySelected, in: context)
+        try payback.delete(.onlySelected)
 
         // Waiting in Recently Deleted, the payback still holds the Expense in its wallet.
         #expect(dinner.hasPaybacksElsewhere)
@@ -138,7 +138,7 @@ struct LinkKindTests {
         let second = try dinner.recordPaybackElsewhere(
             ReimbursementDraft(amount: Money(cents: 5_00), day: today), into: cash
         )
-        try first.delete(.onlySelected, in: context)
+        try first.delete(.onlySelected)
 
         try first.deleteForever()
 

@@ -16,7 +16,7 @@ struct DebtPaymentDraft {
 
     /// A payment against `original`, a Loan or Debt, dated `day`. Throws when `original` is neither.
     init(settling original: Transaction, on day: CalendarDay, in context: ModelContext) throws {
-        guard let loanOrDebt = try LoanOrDebt(original, in: context) else { throw DebtLoanRuleError.notALoanOrDebt }
+        guard let loanOrDebt = try LoanOrDebt(original) else { throw DebtLoanRuleError.notALoanOrDebt }
         self.loanOrDebt = loanOrDebt
         entry = AmountEntry(cents: loanOrDebt.outstanding.cents)
         self.day = day
@@ -69,19 +69,19 @@ extension DebtPayment {
     /// Saves.
     @discardableResult
     static func record(_ draft: DebtPaymentDraft, in context: ModelContext) throws -> DebtPayment {
-        try draft.loanOrDebt.settle(in: context, check: draft.validate(against:)) { current in
+        try draft.loanOrDebt.settle(check: draft.validate(against:)) { current in
             let paymentCategory = try context.lockedCategory(current.kind.paymentRole)
             let sign = current.kind.paymentSign
             let split = current.split(draft.amount)
             let payment = try current.addLinked(
                 split.owed.cents * sign, filedUnder: paymentCategory,
-                on: draft.day, note: draft.note, isExcludedFromReport: true, in: context
+                on: draft.day, note: draft.note, isExcludedFromReport: true
             )
             var overpayment: Transaction?
             if split.overpaid.cents > 0, let category = draft.overpaymentCategory {
                 overpayment = try current.addLinked(
                     split.overpaid.cents * sign, filedUnder: category,
-                    on: draft.day, note: draft.note, isExcludedFromReport: false, in: context
+                    on: draft.day, note: draft.note, isExcludedFromReport: false
                 )
             }
             return DebtPayment(payment: payment, overpayment: overpayment)

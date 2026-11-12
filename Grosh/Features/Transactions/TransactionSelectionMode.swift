@@ -17,7 +17,6 @@ private struct TransactionSelectionMode: ViewModifier {
     @Binding var chosen: Set<Transaction>
     let title: String
 
-    @Environment(\.modelContext) private var context
     @State private var deletePrompt: TransactionDeletePrompt?
     @State private var errorMessage: String?
 
@@ -50,7 +49,7 @@ private struct TransactionSelectionMode: ViewModifier {
 
     private func confirmDeletingChosen() {
         Log.store.perform("Reading what deleting transactions takes", errorMessage: &errorMessage) {
-            deletePrompt = try TransactionDeletePrompt(for: Array(chosen).inListOrder(), in: context)
+            deletePrompt = try TransactionDeletePrompt(for: Array(chosen).inListOrder())
         }
     }
 }

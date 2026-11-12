@@ -10,10 +10,10 @@ struct TransactionDeletePrompt {
     /// The answers offered, the default first.
     let scopes: [TransactionDeleteScope]
 
-    init(for transactions: [Transaction], in context: ModelContext) throws {
+    init(for transactions: [Transaction]) throws {
         self.transactions = transactions
-        relatedCount = try transactions.related(in: context).count
-        scopes = try transactions.deleteScopes(in: context)
+        relatedCount = try transactions.related().count
+        scopes = try transactions.deleteScopes()
     }
 
     var title: String {

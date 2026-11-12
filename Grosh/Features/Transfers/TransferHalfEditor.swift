@@ -7,7 +7,6 @@ import SwiftUI
 struct TransferHalfEditor: View {
     let transaction: Transaction
 
-    @Environment(\.modelContext) private var context
 
     @State private var draft: TransferHalfDraft
     @State private var isAskingScope = false
@@ -51,7 +50,7 @@ struct TransferHalfEditor: View {
     /// when the sheet opens.
     private var wallets: some View {
         MadeOnce {
-            Log.store.attempt("Reading the wallets of a transfer") { try transaction.transferWallets(in: context) }
+            Log.store.attempt("Reading the wallets of a transfer") { try transaction.transferWallets() }
         } content: { wallets in
             WalletLabel(title: Strings.Common.from, wallet: wallets?.from)
             WalletLabel(title: Strings.Common.to, wallet: wallets?.to)
@@ -60,7 +59,7 @@ struct TransferHalfEditor: View {
 
     /// Saves straight away, or first asks whether to update both halves when the amount or date changed.
     private func saveOrAsk() throws -> AfterSaving {
-        if try transaction.offersToUpdateOtherHalf(with: draft, in: context) {
+        if try transaction.offersToUpdateOtherHalf(with: draft) {
             isAskingScope = true
             return .stayOpen
         }
