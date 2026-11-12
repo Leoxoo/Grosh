@@ -46,12 +46,10 @@ struct AdjustBalanceEditor: View {
 
 /// The form behind ``AdjustBalanceEditor``, holding the draft from the moment the sheet opens.
 private struct AdjustBalanceForm: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @NotDeletedTransactions private var transactions: [Transaction]
 
     @State private var draft: BalanceAdjustmentDraft
-    @State private var errorMessage: String?
 
     init(startingDraft: BalanceAdjustmentDraft) {
         _draft = State(initialValue: startingDraft)
@@ -60,17 +58,18 @@ private struct AdjustBalanceForm: View {
     var body: some View {
         KeypadSheet(
             title: Text(Strings.BalanceAdjustment.adjustBalance),
-            entry: $draft.realBalanceEntry,
+            entry: $draft.entry,
             canSave: draft.canSave,
-            save: save,
-            macHeight: (640, 720)
+            size: .tallKeypadForm,
+            saving: "Adjusting a balance",
+            failureTitle: Strings.BalanceAdjustment.couldntAdjust,
+            save: { try Transaction.adjustBalance(draft, in: context) }
         ) { fields in
             balanceSection(fields)
             reasonSection(fields)
         }
         .onChange(of: draft.wallet) { draft.readRecordedBalance(from: $transactions) }
         .onChange(of: draft.day) { draft.readRecordedBalance(from: $transactions) }
-        .errorAlert(Strings.BalanceAdjustment.couldntAdjust, message: $errorMessage)
     }
 
     private func balanceSection(_ fields: KeypadSheetFields) -> some View {
@@ -115,12 +114,6 @@ private struct AdjustBalanceForm: View {
             } else {
                 Text(Strings.BalanceAdjustment.reasonFooter)
             }
-        }
-    }
-
-    private func save() {
-        if Log.store.perform("Adjusting a balance", errorMessage: &errorMessage, { try Transaction.adjustBalance(draft, in: context) }) {
-            dismiss()
         }
     }
 }

@@ -6,8 +6,8 @@ import SwiftData
 struct DebtPaymentDraft {
     /// The Loan or Debt being paid, as it stood when the sheet opened.
     let loanOrDebt: LoanOrDebt
-    /// Entered positive. Starts at what is outstanding, so paying in full is one tap.
-    var amount: Money
+    /// The amount as typed, entered positive. Starts at what is outstanding, so paying in full is one tap.
+    var entry: AmountEntry
     var day: CalendarDay
     var note = ""
     /// The category an overpayment is filed under: any category of ``overpaymentType``. Starts at Other Income for a
@@ -18,10 +18,13 @@ struct DebtPaymentDraft {
     init(settling original: Transaction, on day: CalendarDay, in context: ModelContext) throws {
         guard let loanOrDebt = try LoanOrDebt(original, in: context) else { throw DebtLoanRuleError.notALoanOrDebt }
         self.loanOrDebt = loanOrDebt
-        self.amount = loanOrDebt.outstanding
+        entry = AmountEntry(cents: loanOrDebt.outstanding.cents)
         self.day = day
         self.overpaymentCategory = try context.otherCategory(loanOrDebt.kind.overpaymentType)
     }
+
+    /// The amount is in the Loan or Debt's currency.
+    var currencyCode: String { loanOrDebt.owed.currencyCode }
 
     /// Income for money collected beyond a Loan, Expense for money repaid beyond a Debt.
     var overpaymentType: CategoryType { loanOrDebt.kind.overpaymentType }

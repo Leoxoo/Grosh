@@ -23,37 +23,30 @@ struct RecordPaymentEditor: View {
 
 /// The form behind ``RecordPaymentEditor``, holding the draft from the moment the sheet opens.
 private struct RecordPaymentForm: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
     @State private var draft: DebtPaymentDraft
-    @State private var entry: AmountEntry
-    @State private var errorMessage: String?
 
     init(startingDraft: DebtPaymentDraft) {
         _draft = State(initialValue: startingDraft)
-        _entry = State(initialValue: AmountEntry(cents: startingDraft.amount.cents))
     }
 
     private var loanOrDebt: LoanOrDebt { draft.loanOrDebt }
-    private var currencyCode: String { loanOrDebt.owed.currencyCode }
-
-    private var draftToSave: DebtPaymentDraft { draft.withAmount(of: entry, in: currencyCode) }
 
     var body: some View {
-        let draftToSave = self.draftToSave
         KeypadSheet(
             title: Text(Strings.DebtsLoans.recordPayment),
-            entry: $entry,
-            canSave: draftToSave.canSave,
-            save: save
+            entry: $draft.entry,
+            canSave: draft.canSave,
+            saving: "Recording a payment",
+            failureTitle: Strings.DebtsLoans.couldntRecordPayment,
+            save: { try DebtPayment.record(draft, in: context) }
         ) { fields in
             paymentSection(fields)
-            if draftToSave.overpaid.cents > 0 {
-                overpaymentSection(draftToSave.signedOverpaid)
+            if draft.overpaid.cents > 0 {
+                overpaymentSection(draft.signedOverpaid)
             }
         }
-        .errorAlert(Strings.DebtsLoans.couldntRecordPayment, message: $errorMessage)
     }
 
     private func paymentSection(_ fields: KeypadSheetFields) -> some View {
@@ -63,7 +56,7 @@ private struct RecordPaymentForm: View {
                 Text(loanOrDebt.outstanding.formatted())
                     .monospacedDigit()
             }
-            fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: loanOrDebt.kind.paymentDirection.tint)
+            fields.amountRow(Strings.Common.amount, currencyCode: draft.currencyCode, tint: loanOrDebt.kind.paymentDirection.tint)
             DayStepper(title: Strings.Common.date, day: $draft.day)
             fields.noteField($draft.note)
         } footer: {
@@ -79,15 +72,6 @@ private struct RecordPaymentForm: View {
             CategoryPicker(title: Strings.Common.category, type: draft.overpaymentType, selection: $draft.overpaymentCategory)
         } footer: {
             Text(loanOrDebt.kind.overpaymentFooter)
-        }
-    }
-
-    private func save() {
-        let succeeded = Log.store.perform("Recording a payment", errorMessage: &errorMessage) {
-            try DebtPayment.record(draftToSave, in: context)
-        }
-        if succeeded {
-            dismiss()
         }
     }
 }

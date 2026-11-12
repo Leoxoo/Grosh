@@ -6,9 +6,9 @@ import SwiftUI
 /// a `Form` or `List`.
 struct ReminderField: View {
     @Binding var day: CalendarDay?
-    /// The day switching the reminder on starts at: a week from today for a Loan or Debt; an Owes me passes a week after
-    /// its Expense.
-    var turnsOnAt: CalendarDay?
+    /// The day switching the reminder on counts a week from (``ReminderDay/default(after:)``): today for a Loan or Debt,
+    /// which passes `nil`; an Owes me passes its Expense's day.
+    var countingFrom: CalendarDay?
 
     @Environment(\.today) private var today
 
@@ -23,7 +23,7 @@ struct ReminderField: View {
         Binding {
             day != nil
         } set: { isOn in
-            day = isOn ? turnsOnAt ?? ReminderDay.default(after: today) : nil
+            day = isOn ? ReminderDay.default(after: countingFrom ?? today) : nil
         }
     }
 }

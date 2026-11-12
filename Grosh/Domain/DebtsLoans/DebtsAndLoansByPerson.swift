@@ -15,7 +15,7 @@ nonisolated enum DebtsLoansGrouping: String, Hashable, Sendable {
 /// combined into one figure per currency. ``youOwe`` is what the user owes them: the Debts' outstanding amounts. The two
 /// are never netted against each other, and a currency is never added to another. An Expected reimbursement with no
 /// amount is left out of every figure and counted in ``openAmountCount``, which the row flags ("+1 open").
-struct PersonDebtsAndLoans: Identifiable {
+struct PersonDebtsAndLoans: Identifiable, Equatable {
     let person: Person
     /// The Person's Loans, the open ones first, in the order Debts & Loans lists them.
     let loans: [LoanOrDebt]

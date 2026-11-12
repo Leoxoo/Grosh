@@ -21,7 +21,7 @@ struct CardListView: View {
                 ForEach(cards) { card in
                     row(card)
                         .swipeActions {
-                            Button(Strings.Common.archive, systemImage: "archivebox") { perform { try card.archive() } }
+                            Button(Strings.Common.archive, systemImage: "archivebox") { Log.store.perform("Changing a card", errorMessage: &errorMessage) { try card.archive() } }
                                 .tint(.archiveAction)
                         }
                 }
@@ -37,7 +37,7 @@ struct CardListView: View {
                         row(card)
                             .foregroundStyle(.secondary)
                             .swipeActions {
-                                Button(Strings.Common.unarchive, systemImage: "tray.and.arrow.up") { perform { try card.unarchive() } }
+                                Button(Strings.Common.unarchive, systemImage: "tray.and.arrow.up") { Log.store.perform("Changing a card", errorMessage: &errorMessage) { try card.unarchive() } }
                                     .tint(.unarchiveAction)
                             }
                     }
@@ -83,18 +83,11 @@ struct CardListView: View {
         .contextMenu {
             Button(Strings.Common.edit, systemImage: "pencil") { editorMode = .edit(card) }
             if card.isArchived {
-                Button(Strings.Common.unarchive, systemImage: "tray.and.arrow.up") { perform { try card.unarchive() } }
+                Button(Strings.Common.unarchive, systemImage: "tray.and.arrow.up") { Log.store.perform("Changing a card", errorMessage: &errorMessage) { try card.unarchive() } }
             } else {
-                Button(Strings.Common.archive, systemImage: "archivebox") { perform { try card.archive() } }
+                Button(Strings.Common.archive, systemImage: "archivebox") { Log.store.perform("Changing a card", errorMessage: &errorMessage) { try card.archive() } }
             }
             Button(Strings.Cards.mergeIntoAnother, systemImage: "arrow.triangle.merge") { mergeSource = card }
-        }
-    }
-
-    /// Runs a change, or shows why it was refused.
-    private func perform(_ change: () throws -> Void) {
-        Log.store.perform("Changing a card", errorMessage: &errorMessage) {
-            try change()
         }
     }
 }

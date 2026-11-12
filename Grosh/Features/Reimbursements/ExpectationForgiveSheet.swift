@@ -9,7 +9,11 @@ struct ExpectationForgiveSheet: View {
     @Environment(\.today) private var today
 
     var body: some View {
-        ExpectationForgiveForm(expectation: expectation, today: today)
+        MadeOnce {
+            today
+        } content: { day in
+            ExpectationForgiveForm(expectation: expectation, startingDay: day)
+        }
     }
 }
 
@@ -20,12 +24,11 @@ private struct ExpectationForgiveForm: View {
     @Environment(\.dismiss) private var dismiss
     @State private var day: CalendarDay
     @State private var note = ""
-    @State private var errorMessage: String?
+    private var saver = SheetSaver(Strings.DebtsLoans.couldntForgive)
 
-    /// `today` is the day it starts on.
-    init(expectation: ExpectedReimbursement, today: CalendarDay) {
+    init(expectation: ExpectedReimbursement, startingDay: CalendarDay) {
         self.expectation = expectation
-        _day = State(initialValue: today)
+        _day = State(initialValue: startingDay)
     }
 
     var body: some View {
@@ -34,7 +37,7 @@ private struct ExpectationForgiveForm: View {
                 Section {
                     LabeledContent(Strings.Common.from, value: expectation.personName)
                     LabeledContent(Strings.DebtsLoans.outstanding) {
-                        Text(expectation.outstanding?.formatted() ?? "?")
+                        Text(expectation.outstanding.formattedOrUnknown)
                             .monospacedDigit()
                     }
                     DayStepper(title: Strings.Common.date, day: $day)
@@ -53,22 +56,13 @@ private struct ExpectationForgiveForm: View {
                     Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(Strings.DebtsLoans.forgive, action: forgive)
+                    Button(Strings.DebtsLoans.forgive) {
+                        saver.save("Forgiving Owes me") { try expectation.forgive(on: day, note: note) }
+                    }
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 420, idealWidth: 460, minHeight: 320, idealHeight: 380)
-        #endif
-        .errorAlert(Strings.DebtsLoans.couldntForgive, message: $errorMessage)
-    }
-
-    private func forgive() {
-        let forgiven = Log.store.perform("Forgiving Owes me", errorMessage: &errorMessage) {
-            try expectation.forgive(on: day, note: note)
-        }
-        if forgiven {
-            dismiss()
-        }
+        .macSheetSize(.shorterForm)
+        .failureAlert(saver)
     }
 }

@@ -31,8 +31,10 @@ nonisolated struct TransactionDraft {
             }
         }
     }
-    /// Entered positive; the category decides whether it adds to or takes from the wallet.
-    var amount = Money(cents: 0)
+    /// The amount is in the wallet's currency.
+    var currencyCode: String { wallet.currencyCodeOrDefault }
+    /// The amount as typed, entered positive; the category decides whether it adds to or takes from the wallet.
+    var entry = AmountEntry()
     /// Changing it to a Loan or a Debt keeps only the first of the people in With, since those are with one Person.
     var category: Category? {
         didSet {

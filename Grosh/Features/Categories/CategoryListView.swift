@@ -73,7 +73,7 @@ struct CategoryListView: View {
             presenting: deleting
         ) { category in
             Button(Strings.Common.delete, role: .destructive) {
-                perform { try catalog.delete(category) }
+                Log.store.perform("Changing a category", errorMessage: &errorMessage) { try catalog.delete(category) }
             }
         } message: { category in
             Text(category.deleteMessage)
@@ -140,7 +140,7 @@ struct CategoryListView: View {
         Section {
             ForEach(parents) { row(for: $0) }
                 .onMove { source, destination in
-                    perform { try catalog.move(parents, fromOffsets: source, toOffset: destination) }
+                    Log.store.perform("Changing a category", errorMessage: &errorMessage) { try catalog.move(parents, fromOffsets: source, toOffset: destination) }
                 }
         } header: {
             Text(Strings.Screens.categories)
@@ -152,7 +152,7 @@ struct CategoryListView: View {
             Section(parent.name) {
                 ForEach(subcategories) { row(for: $0, indented: false) }
                     .onMove { source, destination in
-                        perform { try catalog.move(subcategories, fromOffsets: source, toOffset: destination) }
+                        Log.store.perform("Changing a category", errorMessage: &errorMessage) { try catalog.move(subcategories, fromOffsets: source, toOffset: destination) }
                     }
             }
         }
@@ -189,15 +189,9 @@ struct CategoryListView: View {
                 category.isHidden ? Strings.Common.unhide : Strings.Common.hide,
                 systemImage: category.isHidden ? "eye" : "eye.slash"
             ) {
-                perform { try catalog.setHidden(category, !category.isHidden) }
+                Log.store.perform("Changing a category", errorMessage: &errorMessage) { try catalog.setHidden(category, !category.isHidden) }
             }
             .tint(.hideAction)
-        }
-    }
-
-    private func perform(_ change: () throws -> Void) {
-        Log.store.perform("Changing a category", errorMessage: &errorMessage) {
-            try change()
         }
     }
 }

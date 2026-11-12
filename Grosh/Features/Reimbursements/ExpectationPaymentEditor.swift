@@ -10,7 +10,11 @@ struct ExpectationPaymentEditor: View {
     @Environment(\.today) private var today
 
     var body: some View {
-        ExpectationPaymentForm(expectation: expectation, today: today)
+        MadeOnce {
+            ExpectationPaymentDraft(paying: expectation, on: today)
+        } content: { draft in
+            ExpectationPaymentForm(expectation: expectation, startingDraft: draft)
+        }
     }
 }
 
@@ -18,59 +22,38 @@ struct ExpectationPaymentEditor: View {
 private struct ExpectationPaymentForm: View {
     let expectation: ExpectedReimbursement
 
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
     @State private var draft: ExpectationPaymentDraft
-    @State private var entry: AmountEntry
-    @State private var errorMessage: String?
 
-    /// `today` is the day the payment starts on.
-    init(expectation: ExpectedReimbursement, today: CalendarDay) {
+    init(expectation: ExpectedReimbursement, startingDraft: ExpectationPaymentDraft) {
         self.expectation = expectation
-        let startingDraft = ExpectationPaymentDraft(paying: expectation, on: today)
         _draft = State(initialValue: startingDraft)
-        // An open amount has nothing outstanding to start from, so the keypad starts blank.
-        _entry = State(
-            initialValue: startingDraft.amount.cents > 0 ? AmountEntry(cents: startingDraft.amount.cents) : AmountEntry()
-        )
     }
 
-    private var currencyCode: String { expectation.currencyCode }
-
-    private var draftToSave: ExpectationPaymentDraft { draft.withAmount(of: entry, in: currencyCode) }
-
     var body: some View {
-        let check = RuleCheck { try expectation.validate(draftToSave) }
+        let check = RuleCheck { try expectation.validate(draft) }
         KeypadSheet(
             title: Text(Strings.DebtsLoans.recordPayment),
-            entry: $entry,
+            entry: $draft.entry,
             canSave: check.passes,
-            save: save
+            saving: "Recording a payment on Owes me",
+            failureTitle: Strings.DebtsLoans.couldntRecordPayment,
+            save: { try expectation.recordPayment(draft, in: context) }
         ) { fields in
             Section {
                 LabeledContent(Strings.Common.from, value: expectation.personName)
                 LabeledContent(Strings.DebtsLoans.outstanding) {
-                    Text(expectation.outstanding?.formatted() ?? "?")
+                    Text(expectation.outstanding.formattedOrUnknown)
                         .monospacedDigit()
                 }
-                fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: MoneyDirection.moneyIn.tint)
+                fields.amountRow(Strings.Common.amount, currencyCode: draft.currencyCode, tint: MoneyDirection.moneyIn.tint)
                 WalletPicker(title: Strings.Reimbursements.receivedIn, selection: $draft.wallet)
                 DayStepper(title: Strings.Common.date, day: $draft.day)
                 fields.noteField($draft.note)
             } footer: {
                 PaybackFooter(problem: check.shownProblem, isElsewhere: expectation.expense?.isElsewhere(draft.wallet) == true)
             }
-        }
-        .errorAlert(Strings.DebtsLoans.couldntRecordPayment, message: $errorMessage)
-    }
-
-    private func save() {
-        let saved = Log.store.perform("Recording a payment on Owes me", errorMessage: &errorMessage) {
-            try expectation.recordPayment(draftToSave, in: context)
-        }
-        if saved {
-            dismiss()
         }
     }
 }

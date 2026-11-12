@@ -55,11 +55,18 @@ nonisolated struct RecentlyDeleted {
     var isEmpty: Bool { wallets.isEmpty && recurring.isEmpty && transactions.isEmpty }
 
     /// How many days an item deleted at `deletedAt` has left at `now` before it is removed for good, rounded up:
-    /// 30 straight after deleting, 1 on its last day, 0 once it is due.
-    static func daysLeft(since deletedAt: Date, now: Date) -> Int {
+    /// 30 straight after deleting, 1 on its last day, 0 once it is due. An item with no deletion time has all 30.
+    static func daysLeft(since deletedAt: Date?, now: Date) -> Int {
+        guard let deletedAt else { return keptDays }
         let remaining = deletedAt.addingTimeInterval(keptInterval).timeIntervalSince(now)
         return max(0, Int((remaining / secondsPerDay).rounded(.up)))
     }
+
+    /// How few days left count as ending soon, which Recently Deleted marks so the item isn't lost unnoticed.
+    static let endingSoonDays = 3
+
+    /// Whether an item with `daysLeft` is about to be removed for good: 3 days left or fewer.
+    static func isEndingSoon(daysLeft: Int) -> Bool { daysLeft <= endingSoonDays }
 
     /// Whether an item deleted at `deletedAt` has waited its 30 days by `now`.
     static func isExpired(since deletedAt: Date, now: Date) -> Bool {

@@ -6,14 +6,17 @@ nonisolated struct TransferDraft {
     var from: Wallet?
     /// The wallet the money goes to: it gets the Incoming transfer.
     var to: Wallet?
-    /// Entered positive.
-    var amount = Money(cents: 0)
+    /// The amount as typed, entered positive. It starts empty.
+    var entry = AmountEntry()
     var day: CalendarDay
     var note = ""
 
     init(day: CalendarDay) {
         self.day = day
     }
+
+    /// The amount is in the currency of the wallet it leaves.
+    var currencyCode: String { from.currencyCodeOrDefault }
 }
 
 /// Why a transfer can't be saved yet.

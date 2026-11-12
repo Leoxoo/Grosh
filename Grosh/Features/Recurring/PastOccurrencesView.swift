@@ -12,7 +12,7 @@ struct PastOccurrencesView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @State private var selected: Set<CalendarDay> = []
-    @State private var errorMessage: String?
+    private var saver = SheetSaver(Strings.Recurring.couldntAddTransactions, log: Log.recurring)
 
     init(recurring: RecurringTransaction, days: [CalendarDay]) {
         self.recurring = recurring
@@ -27,10 +27,7 @@ struct PastOccurrencesView: View {
                         row(day)
                     }
                 } footer: {
-                    Text("""
-                        Pick the days you haven't entered yet. Each one becomes a transaction with this schedule's \
-                        amount, wallet, Category, Card and note.
-                        """)
+                    Text(Strings.Recurring.pastOccurrencesFooter)
                 }
             }
             .navigationTitle(Strings.Recurring.pastOccurrences)
@@ -50,7 +47,7 @@ struct PastOccurrencesView: View {
                 }
             }
         }
-        .errorAlert(Strings.Recurring.couldntAddTransactions, message: $errorMessage)
+        .failureAlert(saver)
     }
 
     private func row(_ day: CalendarDay) -> some View {
@@ -80,11 +77,8 @@ struct PastOccurrencesView: View {
     }
 
     private func save() {
-        let succeeded = Log.recurring.perform("Making transactions for past days", errorMessage: &errorMessage) {
+        saver.save("Making transactions for past days") {
             try recurring.makeTransactions(on: days.filter { selected.contains($0) }, in: context)
-        }
-        if succeeded {
-            dismiss()
         }
     }
 }

@@ -14,6 +14,8 @@ nonisolated enum RecurringRuleError: Error, Equatable {
     case untilBeforeStart
     /// An end "after N times" needs at least one occurrence.
     case noOccurrences
+    /// A Purchase's total price can't be worked out, as when it divides by zero.
+    case invalidTotal
 }
 
 extension RecurringRuleError: LocalizedError {
@@ -26,6 +28,7 @@ extension RecurringRuleError: LocalizedError {
         case .cardNotInWallet: String(localized: Strings.Recurring.cardNotInWallet)
         case .untilBeforeStart: String(localized: Strings.Recurring.untilBeforeStart)
         case .noOccurrences: String(localized: Strings.Recurring.noOccurrences)
+        case .invalidTotal: String(localized: Strings.Common.enterAmountAboveZero)
         }
     }
 }
@@ -50,15 +53,16 @@ extension AddTransactionNowError: LocalizedError {
 /// The editable fields of a Recurring transaction, as its form holds them before the rules check and save them.
 nonisolated struct RecurringDraft {
     var name = ""
-    /// Entered positive; the category sets the sign.
-    var amount = Money(cents: 0)
-    /// A Purchase's total price, or `nil` for none. A Kind change keeps it, as it keeps the icon.
-    var total: Money?
-    /// Expense or Income. Switching it drops a category of the other type.
+    /// The amount as typed, entered positive; the category sets the sign.
+    var entry = AmountEntry()
+    /// A Purchase's total price as typed. Left empty, or zero, it is no total. A Kind change keeps it, as it keeps the
+    /// icon.
+    var totalEntry = AmountEntry()
+    /// Expense or Income. Switching it drops a category of the other type, and a name that only followed it.
     var type: CategoryType = .expense {
         didSet {
             if category?.type != type {
-                category = nil
+                pickedCategory = nil
             }
         }
     }
@@ -75,6 +79,21 @@ nonisolated struct RecurringDraft {
         didSet {
             if category !== oldValue {
                 readEstimate()
+            }
+        }
+    }
+    /// The category as the form picks it. A Recurring transaction is named after its category until the user types a
+    /// name of their own, and a new one (Add or Duplicate) takes the category's default Kind, which the user can change.
+    var pickedCategory: Category? {
+        get { category }
+        set {
+            let old = category
+            category = newValue
+            if name.isEmpty || name == old?.name {
+                name = newValue?.name ?? ""
+            }
+            if isNew, let newValue {
+                kind = newValue.defaultKind
             }
         }
     }
@@ -138,6 +157,8 @@ nonisolated struct RecurringDraft {
     var untilDay: CalendarDay
     /// The number of occurrences, for an end "after N times".
     var occurrenceCount = 12
+    /// Where the schedule being edited started when the form opened, or `nil` for a new one.
+    private var savedStart: CalendarDay?
 
     init(startDay: CalendarDay) {
         self.startDay = startDay
@@ -148,8 +169,8 @@ nonisolated struct RecurringDraft {
         let schedule = recurring.schedule
         self.init(startDay: schedule.start)
         name = recurring.name
-        amount = Money(cents: recurring.amountCents, currencyCode: recurring.currencyCode)
-        total = recurring.totalCents.map { Money(cents: $0, currencyCode: recurring.currencyCode) }
+        entry = AmountEntry(cents: recurring.amountCents)
+        totalEntry = AmountEntry(cents: recurring.totalCents ?? 0)
         type = recurring.category?.type ?? .expense
         wallet = recurring.wallet
         category = recurring.category
@@ -163,6 +184,7 @@ nonisolated struct RecurringDraft {
         customRule = schedule.rule
         monthlyDay = schedule.monthlyDay
         end = schedule.end
+        savedStart = schedule.start
         readEstimate()
     }
 
@@ -179,6 +201,7 @@ nonisolated struct RecurringDraft {
     /// Purchase's progress starts over.
     init(duplicating recurring: RecurringTransaction, on today: CalendarDay) {
         self.init(editing: recurring)
+        savedStart = nil
         startDay = today
         // A last day already past can't end a schedule that starts today, so the copy gets a year, as a new one does.
         if endKind == .until, untilDay < today {
@@ -187,6 +210,25 @@ nonisolated struct RecurringDraft {
     }
 
     var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// The amounts are in the wallet's currency.
+    var currencyCode: String { wallet.currencyCodeOrDefault }
+
+    /// A Purchase's total price, or `nil` for none: a total left empty or typed as zero is none.
+    var total: Money? {
+        get {
+            guard let cents = totalEntry.cents, cents > 0 else { return nil }
+            return Money(cents: cents, currencyCode: currencyCode)
+        }
+        set { totalEntry = AmountEntry(cents: newValue?.cents ?? 0) }
+    }
+
+    /// Whether it saves a new Recurring transaction, as Add and Duplicate do, rather than changing one.
+    var isNew: Bool { savedStart == nil }
+
+    /// Whether saving offers the occurrences that have already come due: for a new schedule, or one whose start day has
+    /// moved.
+    var offersPastOccurrences: Bool { savedStart != startDay }
 
     /// The repeat the form has picked.
     var rule: RepeatRule { preset.rule ?? customRule }
@@ -221,6 +263,7 @@ nonisolated struct RecurringDraft {
         // A varying Bill may leave its amount empty when there is an estimate to start its transactions from.
         let startsFromEstimate = estimatesAmount && estimateCents != nil
         guard amount.cents > 0 || startsFromEstimate else { throw RecurringRuleError.missingAmount }
+        guard totalEntry.cents != nil else { throw RecurringRuleError.invalidTotal }
         guard category != nil else { throw RecurringRuleError.missingCategory }
         guard card == nil || card?.payingWallet === wallet else { throw RecurringRuleError.cardNotInWallet }
         switch end {

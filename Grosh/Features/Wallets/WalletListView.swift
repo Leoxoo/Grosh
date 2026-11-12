@@ -27,17 +27,17 @@ struct WalletListView: View {
                     .swipeActions {
                         Button(Strings.Common.delete, systemImage: "trash") { deleting = wallet }
                             .tint(.destructive)
-                        Button(Strings.Common.archive, systemImage: "archivebox") { perform { try wallet.archive(today: today) } }
+                        Button(Strings.Common.archive, systemImage: "archivebox") { Log.store.perform("Changing a wallet", errorMessage: &errorMessage) { try wallet.archive(today: today) } }
                             .tint(.archiveAction)
                     }
                     .contextMenu {
                         Button(Strings.Common.edit, systemImage: "pencil") { editorMode = .edit(wallet) }
-                        Button(Strings.Common.archive, systemImage: "archivebox") { perform { try wallet.archive(today: today) } }
+                        Button(Strings.Common.archive, systemImage: "archivebox") { Log.store.perform("Changing a wallet", errorMessage: &errorMessage) { try wallet.archive(today: today) } }
                         Button(Strings.Common.delete, systemImage: "trash", role: .destructive) { deleting = wallet }
                     }
                 }
                 .onMove { source, destination in
-                    perform { try Wallet.move(wallets, fromOffsets: source, toOffset: destination) }
+                    Log.store.perform("Changing a wallet", errorMessage: &errorMessage) { try Wallet.move(wallets, fromOffsets: source, toOffset: destination) }
                 }
             } footer: {
                 if wallets.count > 1 {
@@ -59,13 +59,13 @@ struct WalletListView: View {
                             Button(Strings.Common.delete, systemImage: "trash") { deleting = wallet }
                                 .tint(.destructive)
                             Button(Strings.Common.unarchive, systemImage: "tray.and.arrow.up") {
-                                perform { try wallet.unarchive(today: today) }
+                                Log.store.perform("Changing a wallet", errorMessage: &errorMessage) { try wallet.unarchive(today: today) }
                             }
                             .tint(.unarchiveAction)
                         }
                         .contextMenu {
                             Button(Strings.Common.unarchive, systemImage: "tray.and.arrow.up") {
-                                perform { try wallet.unarchive(today: today) }
+                                Log.store.perform("Changing a wallet", errorMessage: &errorMessage) { try wallet.unarchive(today: today) }
                             }
                             Button(Strings.Common.delete, systemImage: "trash", role: .destructive) { deleting = wallet }
                         }
@@ -104,13 +104,6 @@ struct WalletListView: View {
         }
         .walletDeleteDialog($deleting)
         .errorAlert(Strings.Wallets.couldntChange, message: $errorMessage)
-    }
-
-    /// Runs a change, or shows why it was refused.
-    private func perform(_ change: () throws -> Void) {
-        Log.store.perform("Changing a wallet", errorMessage: &errorMessage) {
-            try change()
-        }
     }
 }
 

@@ -97,7 +97,7 @@ struct BalanceAdjustmentTests {
     @Test func changingTheDayKeepsARealBalanceAlreadyTyped() throws {
         try store.record(500_00, "Salary", .income, on: today)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
-        draft.realBalanceEntry.press(.digit(7))
+        draft.entry.press(.digit(7))
 
         draft.day = today.adding(days: -1)
         draft.readRecordedBalance()
@@ -138,8 +138,8 @@ struct BalanceAdjustmentTests {
         try store.record(500_00, "Salary", .income, on: today)
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
 
-        draft.realBalanceEntry.press(.digit(4))
-        draft.realBalanceEntry.press(.digit(2))
+        draft.entry.press(.digit(4))
+        draft.entry.press(.digit(2))
 
         #expect(draft.realBalance == Money(cents: 42_00))
         #expect(draft.difference == Money(cents: -458_00))
@@ -150,7 +150,7 @@ struct BalanceAdjustmentTests {
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
 
         for key: KeypadKey in [.digit(4), .operation(.divide), .digit(0), .equals] {
-            draft.realBalanceEntry.press(key)
+            draft.entry.press(key)
         }
 
         #expect(draft.realBalance == nil)
@@ -162,7 +162,7 @@ struct BalanceAdjustmentTests {
         var draft = try BalanceAdjustmentDraft(wallet: checking, day: today, in: context)
 
         for key: KeypadKey in [.allClear, .operation(.subtract), .digit(4), .digit(2)] {
-            draft.realBalanceEntry.press(key)
+            draft.entry.press(key)
         }
 
         #expect(draft.realBalance == Money(cents: -42_00))

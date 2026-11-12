@@ -193,7 +193,7 @@ struct CategoryDonut: View {
     }
 
     private static func label(_ name: String, share: Double) -> String {
-        "\(name), \(share.formatted(.percent.precision(.fractionLength(0))))"
+        String(localized: Strings.Report.sliceLabel(name, share.formatted(.percent.precision(.fractionLength(0)))))
     }
 
     /// A point `distance` from `center` at `angle` radians clockwise from the top.

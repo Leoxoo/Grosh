@@ -1,3 +1,4 @@
+import os
 import SwiftUI
 
 /// The fields of a ``KeypadSheet`` that take focus: the amounts, typed on the Keypad, and the text fields, which
@@ -11,25 +12,67 @@ enum KeypadSheetField: Hashable {
 /// puts it away when it is already typing there, and focusing a text field or swiping the form puts it away (see
 /// ``SwiftUI/View/keypad(_:)``). `content` builds the form's sections, with its amount rows and text fields made by the
 /// ``KeypadSheetFields`` it is handed; any other ``AmountRow`` in the form types on the same Keypad.
+///
+/// Save makes the change and closes the sheet, the way a ``SheetSaver`` does: a change refused or failed is logged as
+/// `saving` and an alert titled `failureTitle` says why.
 struct KeypadSheet<Content: View>: View {
     let title: Text
     @Binding var entry: AmountEntry
     /// A second amount the form takes, such as a Purchase's total. Its row types on the same Keypad.
-    var secondEntry: Binding<AmountEntry>? = nil
+    var secondEntry: Binding<AmountEntry>?
     let canSave: Bool
-    let save: () -> Void
-    /// The sheet's smallest and starting height on a Mac.
-    var macHeight: (min: CGFloat, ideal: CGFloat) = (560, 640)
+    /// What Save does, as the log says it.
+    let saving: String
+    let save: () throws -> AfterSaving
+    let size: MacSheetSize
     @ViewBuilder let content: (KeypadSheetFields) -> Content
 
-    @Environment(\.dismiss) private var dismiss
     @State private var keypad = KeypadTarget()
     @FocusState private var focus: KeypadSheetField?
+    private var saver: SheetSaver
+
+    /// A sheet whose Save closes it once `save` has made the change.
+    init(
+        title: Text, entry: Binding<AmountEntry>, secondEntry: Binding<AmountEntry>? = nil, canSave: Bool,
+        size: MacSheetSize = .keypadForm, saving: String, failureTitle: LocalizedStringResource,
+        log: Logger = Log.store, save: @escaping () throws -> Void,
+        @ViewBuilder content: @escaping (KeypadSheetFields) -> Content
+    ) {
+        self.init(
+            title: title, entry: entry, secondEntry: secondEntry, canSave: canSave, size: size, saving: saving,
+            failureTitle: failureTitle, log: log,
+            saveThen: {
+                try save()
+                return .close
+            },
+            content: content
+        )
+    }
+
+    /// A sheet whose `saveThen` says whether it closes once Save has run, for one that asks something more first.
+    init(
+        title: Text, entry: Binding<AmountEntry>, secondEntry: Binding<AmountEntry>? = nil, canSave: Bool,
+        size: MacSheetSize = .keypadForm, saving: String, failureTitle: LocalizedStringResource,
+        log: Logger = Log.store, saveThen: @escaping () throws -> AfterSaving,
+        @ViewBuilder content: @escaping (KeypadSheetFields) -> Content
+    ) {
+        self.title = title
+        _entry = entry
+        self.secondEntry = secondEntry
+        self.canSave = canSave
+        self.size = size
+        self.saving = saving
+        save = saveThen
+        self.content = content
+        saver = SheetSaver(failureTitle, log: log)
+    }
+
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             Form {
-                content(KeypadSheetFields(entry: $entry, secondEntry: secondEntry, focus: $focus))
+                content(KeypadSheetFields(entry: $entry, secondEntry: secondEntry, focus: $focus, saver: saver))
             }
             .formStyle(.grouped)
             .keypad(keypad)
@@ -42,7 +85,7 @@ struct KeypadSheet<Content: View>: View {
                     Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(Strings.Common.save, action: save)
+                    Button(Strings.Common.save) { saver.saveOrStay(saving, save) }
                         .disabled(!canSave)
                 }
             }
@@ -57,9 +100,8 @@ struct KeypadSheet<Content: View>: View {
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 420, idealWidth: 460, minHeight: macHeight.min, idealHeight: macHeight.ideal)
-        #endif
+        .macSheetSize(size)
+        .failureAlert(saver)
     }
 }
 
@@ -70,6 +112,8 @@ struct KeypadSheetFields {
     let secondEntry: Binding<AmountEntry>?
     /// Which text field has focus, for a form that shows something more while one does.
     let focus: FocusState<KeypadSheetField?>.Binding
+    /// Saves as the sheet's Save does, for a form that saves from somewhere else too, such as a question Save asks.
+    let saver: SheetSaver
 
     /// The row showing the amount typed on the Keypad.
     func amountRow(_ title: LocalizedStringResource, currencyCode: String, tint: Color = .primary) -> some View {

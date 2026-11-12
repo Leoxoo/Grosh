@@ -109,7 +109,7 @@ private struct HomeMonthGraphCard: View {
     private func graph(for side: SpentOrIncome, in history: CountedHistory) -> MonthGraph {
         history.graph(
             side, of: month, recurring: recurringTransactions, today: today,
-            comparingWith: comparesWithLastYear ? .lastYear : .average
+            comparingWith: MonthGraphComparison(comparesWithLastYear: comparesWithLastYear)
         )
     }
 }

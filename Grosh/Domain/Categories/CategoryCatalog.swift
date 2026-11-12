@@ -133,8 +133,8 @@ struct CategoryCatalog {
     /// The draft's name without surrounding spaces, once it is known to be unique within the draft's type.
     /// `category` is the one being edited, which may keep its own name.
     private func checkedName(_ draft: CategoryDraft, for category: Category?) throws -> String {
-        let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { throw CategoryRuleError.nameRequired }
+        try draft.validate()
+        let name = draft.trimmedName
         try checkNameIsFree(name, in: draft.type, except: category)
         return name
     }

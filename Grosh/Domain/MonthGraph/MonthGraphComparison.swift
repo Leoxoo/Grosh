@@ -15,6 +15,11 @@ enum MonthGraphComparison {
     case average
     case lastYear
 
+    /// The comparison the "vs last year" switch picks: Last year while it is on, otherwise the Average.
+    init(comparesWithLastYear: Bool) {
+        self = comparesWithLastYear ? .lastYear : .average
+    }
+
     /// The most complete periods the Average is taken over: weeks, months, quarters or years, as the period shown is.
     static let averagePeriodCount = 3
 

@@ -83,7 +83,7 @@ private struct ForgivenRows: View {
 
     var body: some View {
         LabeledContent {
-            Text(forgiveness.day.date().formatted(date: .abbreviated, time: .omitted))
+            Text(forgiveness.day.shortText)
         } label: {
             Label(Strings.Common.forgiven, systemImage: "hand.raised.fill")
                 .foregroundStyle(.settled)

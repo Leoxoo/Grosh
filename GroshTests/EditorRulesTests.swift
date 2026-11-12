@@ -17,12 +17,48 @@ struct EditorRulesTests {
 
     // MARK: The typed amount
 
-    @Test func theDraftTakesTheAmountTheKeypadComesToInItsWalletsCurrency() {
-        let draft = TransferDraft(day: day(2026, 10, 3))
-        #expect(draft.withAmount(of: AmountEntry(), in: "EUR").amount == Money(cents: 0, currencyCode: "EUR"))
-        #expect(
-            draft.withAmount(of: AmountEntry(cents: 12_50), in: "EUR").amount == Money(cents: 12_50, currencyCode: "EUR")
-        )
+    @Test func theDraftsAmountIsWhatItsKeypadComesToInItsWalletsCurrency() {
+        let euros = context.addWallet("Euros")
+        euros.currencyCode = "EUR"
+        var draft = TransferDraft(day: day(2026, 10, 3))
+        draft.from = euros
+        #expect(draft.amount == Money(cents: 0, currencyCode: "EUR"))
+
+        draft.entry.press(.digit(1))
+        draft.entry.press(.digit(2))
+        draft.entry.press(.operation(.divide))
+        draft.entry.press(.digit(4))
+        #expect(draft.amount == Money(cents: 3_00, currencyCode: "EUR"))
+
+        draft.entry = AmountEntry()
+        draft.entry.press(.digit(5))
+        draft.entry.press(.operation(.divide))
+        draft.entry.press(.digit(0))
+        draft.entry.press(.equals)
+        #expect(draft.amount == Money(cents: 0, currencyCode: "EUR"))
+    }
+
+    @Test func eachDraftStartsItsKeypadByItsOwnRule() throws {
+        let restaurants = try fixture.store.category("Restaurants")
+        let dinner = context.record(-42_00, on: day(2026, 10, 1), in: fixture.checking, under: restaurants)
+        try context.save()
+
+        #expect(TransferDraft(day: day(2026, 10, 3)).entry.isEmpty)
+        #expect(ReimbursementDraft(payingBack: dinner, on: day(2026, 10, 3)).entry.isEmpty)
+        #expect(TransactionDraft(editing: dinner).entry == AmountEntry(cents: 42_00))
+        #expect(StartingBalanceDraft(editing: dinner).entry == AmountEntry(cents: -42_00, kind: .balance))
+    }
+
+    @Test func aStartingBalanceSavesAnyAmountTheKeypadCanWorkOutZeroIncluded() throws {
+        var draft = StartingBalanceDraft(editing: try fixture.dinner())
+        draft.entry = AmountEntry()
+        #expect(draft.canSave)
+
+        draft.entry.press(.digit(5))
+        draft.entry.press(.operation(.divide))
+        draft.entry.press(.digit(0))
+        draft.entry.press(.equals)
+        #expect(!draft.canSave)
     }
 
     @Test func anAmountIsTintedTheWayItsCategoryMovesTheWallet() throws {

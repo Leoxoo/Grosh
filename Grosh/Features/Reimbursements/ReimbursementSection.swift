@@ -64,7 +64,7 @@ private struct ReimbursementRow: View {
             AmountText(amount: entry.amount, showsPlusSign: true)
         } label: {
             VStack(alignment: .leading, spacing: 2) {
-                Text(entry.day.date().formatted(date: .abbreviated, time: .omitted))
+                Text(entry.day.shortText)
                 if !entry.note.isEmpty {
                     Text(entry.note)
                         .font(.caption)

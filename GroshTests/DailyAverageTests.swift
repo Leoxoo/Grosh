@@ -23,6 +23,12 @@ struct DailyAverageTests {
         #expect(DailyAverage.of(Money(cents: 200_00), over: days) == Money(cents: 66_67))
     }
 
+    /// A single day's average would only repeat its total, so there is none.
+    @Test func noAverageForASingleDay() {
+        let october16 = DayRange(first: day(2026, 10, 16), last: day(2026, 10, 16))
+        #expect(DailyAverage.of(Money(cents: 100_00), over: october16) == nil)
+    }
+
     /// A span with no start, as All time's before its first transaction, has no days to divide by.
     @Test func noAverageWithoutAStartDay() {
         #expect(DailyAverage.of(Money(cents: 100_00), over: DayRange(first: nil, last: day(2026, 10, 16))) == nil)

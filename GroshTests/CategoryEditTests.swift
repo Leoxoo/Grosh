@@ -160,11 +160,13 @@ struct CategoryEditTests {
 
     @Test func aSubcategoryThatChangesTypeNeedsAParentOfTheNewType() throws {
         let va = try store.category("VA", .income)
-        var keepsParent = CategoryDraft(va)
-        keepsParent.type = .expense
-        var toTop = keepsParent
-        toTop.parent = nil
+        let keepsParent = CategoryDraft(
+            name: va.name, type: .expense, symbolName: va.symbolName, color: va.color, parent: va.parent
+        )
+        var toTop = CategoryDraft(va)
+        toTop.type = .expense
 
+        #expect(toTop.parent == nil)
         #expect(throws: CategoryRuleError.differentType) {
             try catalog.update(va, to: keepsParent)
         }

@@ -1,18 +1,22 @@
 import Foundation
 
 /// A draft whose amount is typed on the Keypad: what a sheet holds before it is saved, such as a transaction, a
-/// transfer or a payment.
+/// transfer or a payment. The draft holds the amount as the Keypad shows it, starting from its own rule, and the sheet's
+/// Keypad types straight into it, so what the sheet checks and saves is always the draft itself.
 nonisolated protocol AmountDraft {
-    var amount: Money { get set }
+    /// The amount as typed on the Keypad.
+    var entry: AmountEntry { get set }
+    /// The currency the amount is in: the wallet's, or the transaction's it pays back or pays toward.
+    var currencyCode: String { get }
 }
 
 nonisolated extension AmountDraft {
-    /// The draft with the amount `entry` comes to, in `currencyCode`: what the sheet checks and saves. An empty entry,
-    /// or one showing an error such as a division by zero, comes to zero, which no draft that needs an amount saves.
-    func withAmount(of entry: AmountEntry, in currencyCode: String) -> Self {
-        var result = self
-        result.amount = Money(cents: entry.cents ?? 0, currencyCode: currencyCode)
-        return result
+    /// What ``entry`` comes to, in ``currencyCode``. An empty entry, or one showing an error such as a division by zero,
+    /// comes to zero, which no draft that needs an amount saves. Setting it shows the amount on the Keypad as one the
+    /// draft starts from, which the first digit replaces; zero shows an empty Keypad.
+    var amount: Money {
+        get { Money(cents: entry.cents ?? 0, currencyCode: currencyCode) }
+        set { entry = AmountEntry(cents: newValue.cents, kind: entry.kind) }
     }
 }
 

@@ -156,15 +156,14 @@ private struct MonthGraphPopup: View {
             ForEach(popup.scheduled) { occurrence in
                 // Each counts toward the tab, by what it adds to the tab's total.
                 if let counted = occurrence.countedAmount {
-                    Text("\(occurrence.recurring.name) \(counted.amount.formatted())")
+                    Text(Strings.Home.namedAmount(occurrence.recurring.name, counted.amount.formatted()))
                         .font(.caption)
                         .monospacedDigit()
                         .lineLimit(1)
                 }
             }
             if let comparison = popup.comparison {
-                // The name is already localized: shown as it is.
-                Text("\(comparisonName) \(comparison.formatted())")
+                Text(Strings.Home.namedAmount(comparisonName, comparison.formatted()))
                     .font(.caption)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)

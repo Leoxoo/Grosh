@@ -84,7 +84,7 @@ extension ShapeStyle where Self == Color {
     /// the brand green itself, stands out from them.
     static var keypadOperator: Color { .brand.opacity(0.35) }
 
-    /// The swipe action that archives a wallet or Card.
+    /// The swipe action that archives a wallet or Card, or hides a Person from With's previous people.
     static var archiveAction: Color { .orange }
 
     /// The swipe action that brings an archived wallet or Card back.

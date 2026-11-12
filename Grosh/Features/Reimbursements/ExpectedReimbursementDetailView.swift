@@ -51,12 +51,12 @@ struct ExpectedReimbursementDetailView: View {
                         }
                     }
                 }
-                LabeledContent(Strings.OwesMe.expected, value: expectation.expected?.formatted() ?? "?")
+                LabeledContent(Strings.OwesMe.expected, value: expectation.expected.formattedOrUnknown)
                 if expectation.hasPayments {
                     LabeledContent(Strings.OwesMe.paidBack, value: expectation.paid.formatted())
                 }
                 LabeledContent(Strings.DebtsLoans.outstanding) {
-                    Text(expectation.outstanding?.formatted() ?? "?")
+                    Text(expectation.outstanding.formattedOrUnknown)
                         .monospacedDigit()
                         .foregroundStyle(expectation.isOpen ? .primary : .secondary)
                 }
@@ -73,12 +73,10 @@ struct ExpectedReimbursementDetailView: View {
                 Section {
                     Button(Strings.DebtsLoans.recordPayment, systemImage: "plus.circle") { isRecordingPayment = true }
                     if expectation.hasOpenAmount {
-                        Button(Strings.Common.close, systemImage: "checkmark.circle") { perform { try expectation.close(on: today) } }
+                        Button(Strings.Common.close, systemImage: "checkmark.circle") { Log.store.perform("Changing Owes me", errorMessage: &errorMessage) { try expectation.close(on: today) } }
                     }
                     Button(Strings.DebtsLoans.forgive, systemImage: "hand.raised") { isForgiving = true }
-                    ReminderField(
-                        day: reminderDay, turnsOnAt: ReminderDay.default(after: expectation.expense?.day ?? today)
-                    )
+                    ReminderField(day: reminderDay, countingFrom: expectation.expense?.day)
                 }
             }
 
@@ -104,12 +102,12 @@ struct ExpectedReimbursementDetailView: View {
                 .foregroundStyle(.settled)
         case .closed:
             if let closed = expectation.closedDay {
-                LabeledContent(Strings.OwesMe.closed, value: closed.date().formatted(date: .abbreviated, time: .omitted))
+                LabeledContent(Strings.OwesMe.closed, value: closed.shortText)
             }
-            Button(Strings.OwesMe.reopen, systemImage: "arrow.uturn.backward") { perform { try expectation.reopen() } }
+            Button(Strings.OwesMe.reopen, systemImage: "arrow.uturn.backward") { Log.store.perform("Changing Owes me", errorMessage: &errorMessage) { try expectation.reopen() } }
         case .forgiven:
             LabeledContent {
-                Text(expectation.forgivenDay?.date().formatted(date: .abbreviated, time: .omitted) ?? "")
+                Text(expectation.forgivenDay?.shortText ?? "")
             } label: {
                 Label(Strings.Common.forgiven, systemImage: "hand.raised.fill")
                     .foregroundStyle(.settled)
@@ -117,7 +115,7 @@ struct ExpectedReimbursementDetailView: View {
             if !expectation.forgivenNote.isEmpty {
                 LabeledContent(Strings.Common.note, value: expectation.forgivenNote)
             }
-            Button(Strings.DebtsLoans.unforgive, systemImage: "arrow.uturn.backward") { perform { try expectation.unforgive() } }
+            Button(Strings.DebtsLoans.unforgive, systemImage: "arrow.uturn.backward") { Log.store.perform("Changing Owes me", errorMessage: &errorMessage) { try expectation.unforgive() } }
         }
     }
 
@@ -126,12 +124,8 @@ struct ExpectedReimbursementDetailView: View {
         Binding {
             expectation.reminderDay
         } set: { day in
-            perform { try expectation.setReminder(day) }
+            Log.store.perform("Changing Owes me", errorMessage: &errorMessage) { try expectation.setReminder(day) }
         }
-    }
-
-    private func perform(_ change: () throws -> Void) {
-        Log.store.perform("Changing Owes me", errorMessage: &errorMessage, change)
     }
 }
 
@@ -145,7 +139,7 @@ private struct PaymentRow: View {
             AmountText(amount: payment.amount, showsPlusSign: true)
         } label: {
             VStack(alignment: .leading, spacing: 2) {
-                Text(payment.day.date().formatted(date: .abbreviated, time: .omitted))
+                Text(payment.day.shortText)
                 if payment.isElsewhere, let wallet = payment.wallet {
                     Text(Strings.OwesMe.into(wallet.name))
                         .font(.caption)

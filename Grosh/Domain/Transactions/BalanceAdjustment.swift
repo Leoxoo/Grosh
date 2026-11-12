@@ -60,7 +60,7 @@ nonisolated struct BalanceAdjustmentDraft {
 
     /// The real balance on the keypad: what the user typed, or until they type, the recorded balance on `day`,
     /// which the first digit replaces.
-    var realBalanceEntry: AmountEntry {
+    var entry: AmountEntry {
         get { typedEntry ?? AmountEntry(cents: recordedBalance?.cents ?? 0, kind: .balance) }
         set { typedEntry = newValue }
     }
@@ -68,7 +68,7 @@ nonisolated struct BalanceAdjustmentDraft {
     /// What the wallet really holds on `day`, or `nil` while the keypad can't work it out (dividing by zero).
     /// Setting it types it; setting `nil` starts again from the recorded balance.
     var realBalance: Money? {
-        get { realBalanceEntry.cents.map { Money(cents: $0, currencyCode: currencyCode) } }
+        get { entry.cents.map { Money(cents: $0, currencyCode: currencyCode) } }
         set { typedEntry = newValue.map { AmountEntry(cents: $0.cents, kind: .balance) } }
     }
 

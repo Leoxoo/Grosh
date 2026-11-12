@@ -180,13 +180,33 @@ struct EstimatedAmountTests {
         #expect(try context.fetch(EstimatedAmounts.transactions).count == 1)
         #expect(EstimatedAmounts([made]).due(on: day(2026, 10, 14)).count == 1)
 
-        try made.confirmAmount(cents: 2_750)
+        var draft = EstimatedAmountDraft(confirming: made)
+        draft.entry = AmountEntry(cents: 2_750)
+        try made.confirmAmount(draft)
 
         #expect(made.amountCents == -2_750)
         #expect(!made.isEstimated)
         #expect(made.estimateReminderDay == nil)
         #expect(EstimatedAmounts([made]).due(on: day(2026, 10, 20)).isEmpty)
         #expect(try context.fetch(EstimatedAmounts.transactions).isEmpty)
+    }
+
+    @Test func confirmingStartsAtTheEstimateWithoutItsSign() throws {
+        let made = try estimatedElectricity()
+
+        #expect(made.amountCents < 0)
+        #expect(EstimatedAmountDraft(confirming: made).amount.cents == -made.amountCents)
+    }
+
+    @Test func confirmingNothingIsRefusedAndKeepsTheEstimate() throws {
+        let made = try estimatedElectricity()
+        let estimate = made.amountCents
+        var draft = EstimatedAmountDraft(confirming: made)
+        draft.entry = AmountEntry()
+
+        #expect(throws: TransactionRuleError.missingAmount) { try made.confirmAmount(draft) }
+        #expect(made.amountCents == estimate)
+        #expect(made.isEstimated)
     }
 
     @Test func editingTheAmountClearsTheMarkButEditingOnlyTheNoteKeepsIt() throws {

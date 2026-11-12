@@ -1,7 +1,16 @@
+import Foundation
+
 /// The editable fields of a category, as the Add/Edit form holds them before ``CategoryCatalog`` checks and saves them.
-struct CategoryDraft {
+nonisolated struct CategoryDraft {
     var name: String
-    var type: CategoryType
+    /// Expense or Income. Switching it drops the parent, which can't hold a category of the other type.
+    var type: CategoryType {
+        didSet {
+            if type != oldValue {
+                parent = nil
+            }
+        }
+    }
     var symbolName: String
     var color: PaletteColor
     /// The parent category, or `nil` for a top-level category.
@@ -35,4 +44,23 @@ struct CategoryDraft {
             ownKind: category.ownKind
         )
     }
+
+    /// A new category of `type`, as Add starts it: no name yet, and a tag on blue until the user picks an icon and color.
+    static func new(_ type: CategoryType) -> CategoryDraft {
+        CategoryDraft(type: type, symbolName: "tag.fill", color: .blue)
+    }
+
+    var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// Checks what the draft can check on its own: a category needs a name. Whether the name is free is checked against
+    /// the store when it is saved (``CategoryCatalog``).
+    func validate() throws {
+        guard !trimmedName.isEmpty else { throw CategoryRuleError.nameRequired }
+    }
+}
+
+extension CategoryDraft: ValidatedDraft {}
+
+extension CategoryRuleError: EmptyFieldError {
+    var isEmptyField: Bool { self == .nameRequired }
 }

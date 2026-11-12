@@ -21,49 +21,38 @@ struct TransferEditor: View {
 
 /// The form behind ``TransferEditor``, holding the draft from the moment the sheet opens.
 private struct TransferForm: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Environment(\.today) private var today
     /// What the pickers' balances add up.
     @NotDeletedTransactions private var transactions: [Transaction]
 
     @State private var draft: TransferDraft
-    @State private var entry = AmountEntry(cents: 0)
-    @State private var errorMessage: String?
 
     init(startingDraft: TransferDraft) {
         _draft = State(initialValue: startingDraft)
     }
 
-    private var currencyCode: String { draft.from.currencyCodeOrDefault }
-
-    private var draftToSave: TransferDraft { draft.withAmount(of: entry, in: currencyCode) }
-
     var body: some View {
         // Always today's balances, whatever the Date: a transfer dated later doesn't move them today.
         let balances = WalletBalances($transactions, asOf: today)
-        let draftToSave = self.draftToSave
-        KeypadSheet(title: Text(Strings.Transfers.transfer), entry: $entry, canSave: draftToSave.canSave, save: save) { fields in
+        KeypadSheet(
+            title: Text(Strings.Transfers.transfer), entry: $draft.entry, canSave: draft.canSave,
+            saving: "Saving a transfer", failureTitle: Strings.Transfers.couldntSave,
+            save: { try Transfer.create(draft, in: context) }
+        ) { fields in
             Section {
                 WalletPicker(title: Strings.Common.from, selection: $draft.from, balances: balances)
                 WalletPicker(title: Strings.Common.to, selection: $draft.to, balances: balances)
-                fields.amountRow(Strings.Common.amount, currencyCode: currencyCode)
+                fields.amountRow(Strings.Common.amount, currencyCode: draft.currencyCode)
                 DayStepper(title: Strings.Common.date, day: $draft.day)
                 fields.noteField($draft.note)
             } footer: {
-                if let problem = draftToSave.shownProblem {
+                if let problem = draft.shownProblem {
                     Text(problem.localizedDescription)
                 } else {
                     Text(Strings.Transfers.footer)
                 }
             }
-        }
-        .errorAlert(Strings.Transfers.couldntSave, message: $errorMessage)
-    }
-
-    private func save() {
-        if Log.store.perform("Saving a transfer", errorMessage: &errorMessage, { try Transfer.create(draftToSave, in: context) }) {
-            dismiss()
         }
     }
 }

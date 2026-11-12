@@ -36,7 +36,7 @@ struct RecentlyDeletedView: View {
                         } label: {
                             DeletedWalletRow(wallet: wallet, transactionCount: deletedWithIt.count, now: now)
                                 .recentlyDeletedActions(canRestore: true) {
-                                    perform { try wallet.restore(today: today) }
+                                    Log.store.perform("Changing Recently Deleted", errorMessage: &errorMessage) { try wallet.restore(today: today) }
                                 } deleteForever: {
                                     pendingRemoval = .wallet(wallet)
                                 }
@@ -57,7 +57,7 @@ struct RecentlyDeletedView: View {
                         let blocker = schedule.restoreBlocker
                         DeletedRecurringRow(recurring: schedule, blocker: blocker, now: now)
                             .recentlyDeletedActions(canRestore: blocker == nil) {
-                                perform { try schedule.restore(today: today) }
+                                Log.store.perform("Changing Recently Deleted", errorMessage: &errorMessage) { try schedule.restore(today: today) }
                             } deleteForever: {
                                 pendingRemoval = .recurring(schedule)
                             }
@@ -77,7 +77,7 @@ struct RecentlyDeletedView: View {
                         let blocker = transaction.restoreBlocker()
                         DeletedTransactionRow(transaction: transaction, blocker: blocker, now: now)
                             .recentlyDeletedActions(canRestore: blocker == nil) {
-                                perform { try transaction.restore() }
+                                Log.store.perform("Changing Recently Deleted", errorMessage: &errorMessage) { try transaction.restore() }
                             } deleteForever: {
                                 pendingRemoval = .transaction(transaction)
                             }
@@ -120,7 +120,7 @@ struct RecentlyDeletedView: View {
     }
 
     private func remove(_ removal: PendingRemoval) {
-        perform {
+        Log.store.perform("Changing Recently Deleted", errorMessage: &errorMessage) {
             switch removal {
             case .wallet(let wallet): try wallet.deleteForever(in: context)
             case .recurring(let schedule): try schedule.deleteForever(in: context)
@@ -128,11 +128,6 @@ struct RecentlyDeletedView: View {
             case .everything: try RecentlyDeleted.empty(in: context)
             }
         }
-    }
-
-    /// Runs a change, or shows why it was refused.
-    private func perform(_ change: () throws -> Void) {
-        Log.store.perform("Changing Recently Deleted", errorMessage: &errorMessage, change)
     }
 }
 
@@ -293,11 +288,11 @@ private struct DaysLeftText: View {
     let now: Date
 
     var body: some View {
-        let days = deletedAt.map { RecentlyDeleted.daysLeft(since: $0, now: now) } ?? RecentlyDeleted.keptDays
+        let days = RecentlyDeleted.daysLeft(since: deletedAt, now: now)
         Text(Strings.RecentlyDeleted.daysLeft(days))
             .font(.caption)
             .monospacedDigit()
-            .foregroundStyle(days <= 3 ? .urgent : .secondary)
+            .foregroundStyle(RecentlyDeleted.isEndingSoon(daysLeft: days) ? .urgent : .secondary)
     }
 }
 

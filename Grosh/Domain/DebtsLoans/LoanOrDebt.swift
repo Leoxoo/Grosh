@@ -6,7 +6,7 @@ import SwiftData
 /// The original transaction is never changed by a payment; what is still owed is worked out from the payments linked
 /// to it. This is the one place Outstanding is worked out: Debts & Loans, the detail, the Home bell and the reminders
 /// all read it from here.
-struct LoanOrDebt {
+struct LoanOrDebt: Equatable {
     /// The Loan or Debt transaction itself.
     let original: Transaction
     /// Which way the money went.
@@ -34,6 +34,9 @@ struct LoanOrDebt {
 
     /// The Person it is with: a Loan or Debt is with exactly one (ADR-0009, ``TransactionRuleError/tooManyWith``).
     var person: Person? { original.people?.first }
+
+    /// What its row is titled: who it is with, or its category's name when nobody is named.
+    var title: String { original.withName.isEmpty ? original.categoryName : original.withName }
 
     /// What the original lent or borrowed, above zero.
     var owed: Money { Money(cents: abs(original.amountCents), currencyCode: original.amount.currencyCode) }

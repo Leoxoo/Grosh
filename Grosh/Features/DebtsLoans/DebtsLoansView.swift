@@ -150,15 +150,13 @@ struct LoanOrDebtRow: View {
         HStack(spacing: 12) {
             CategoryIcon(category: original.category)
             VStack(alignment: .leading, spacing: 2) {
-                Text(original.withName.isEmpty ? original.categoryName : original.withName)
+                Text(loanOrDebt.title)
                     .lineLimit(1)
-                Text(loanOrDebt.kind.summary(lentOrBorrowedOn: original.day.date().formatted(date: .abbreviated, time: .omitted)))
+                Text(loanOrDebt.kind.summary(lentOrBorrowedOn: original.day.shortText))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if let due = loanOrDebt.openReminderDay {
-                    Text("\(Image(systemName: "bell")) \(Text(Strings.DebtsLoans.due(due.date().formatted(date: .abbreviated, time: .omitted))))")
-                        .font(.caption)
-                        .foregroundStyle(loanOrDebt.isReminderDue(on: today) ? .urgent : .secondary)
+                    ReminderDueText(day: due, isDue: loanOrDebt.isReminderDue(on: today))
                 }
             }
             Spacer(minLength: 8)

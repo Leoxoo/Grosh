@@ -37,7 +37,7 @@ struct OwesMeSection: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(payback.wallet?.name ?? "")
-                                Text(payback.day.date().formatted(date: .abbreviated, time: .omitted))
+                                Text(payback.day.shortText)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }

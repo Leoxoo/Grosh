@@ -42,9 +42,7 @@ struct CustomRangeEditor: View {
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 320, minHeight: 160)
-        #endif
+        .macSheetSize(.dayRange)
     }
 
     /// The chosen days, earliest first whichever order the two pickers were set in.

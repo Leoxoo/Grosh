@@ -111,15 +111,10 @@ struct PersonDebtsLoansDetailView: View {
 }
 
 /// Debts & Loans hands the screen a newly made entry each time it redraws, and it redraws whenever the navigation stack
-/// does, which redrawing this screen makes it do. Compared field by field, a new entry always counted as a change, so
-/// the two kept redrawing each other and the app froze. It changes only when it shows something else: another Person,
-/// other figures, or other Loans, Debts or Owes me. Each row updates itself from its own Loan, Debt or Owes me.
+/// does, which redrawing this screen makes it do. Compared as a view, a new entry always counted as a change, so the two
+/// kept redrawing each other and the app froze. Compared as an entry, every field included, a new one is the same until
+/// it shows something else: another Person, other figures, or other Loans, Debts, payments or Owes me. Each row updates
+/// itself from its own Loan, Debt or Owes me.
 extension PersonDebtsLoansDetailView: Equatable {
-    static func == (lhs: Self, rhs: Self) -> Bool {
-        let (old, new) = (lhs.entry, rhs.entry)
-        return old.person === new.person && old.owesYou == new.owesYou && old.youOwe == new.youOwe
-            && old.openAmountCount == new.openAmountCount && old.isSettled == new.isSettled
-            && old.loans.map(\.id) == new.loans.map(\.id) && old.debts.map(\.id) == new.debts.map(\.id)
-            && old.expectations.map(\.id) == new.expectations.map(\.id)
-    }
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.entry == rhs.entry }
 }

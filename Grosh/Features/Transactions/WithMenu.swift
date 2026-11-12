@@ -84,7 +84,7 @@ struct WithMenu: View {
                             row(person)
                                 .swipeActions {
                                     Button(Strings.Common.hide, systemImage: "eye.slash") { hide(person) }
-                                        .tint(.orange)
+                                        .tint(.archiveAction)
                                 }
                         }
                     }
@@ -120,9 +120,7 @@ struct WithMenu: View {
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 340, minHeight: 400)
-        #endif
+        .macSheetSize(.people)
     }
 
     private func row(_ person: Person) -> some View {

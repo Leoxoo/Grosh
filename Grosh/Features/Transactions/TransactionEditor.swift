@@ -58,7 +58,6 @@ struct TransactionEditor: View {
 private struct TransactionForm: View {
     let mode: TransactionEditor.Mode
 
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
     @AppStorage(AppSettings.soundsKey) private var soundsOn = AppSettings.soundsDefault
@@ -66,14 +65,11 @@ private struct TransactionForm: View {
     @AppStorage(AppSettings.chimeKey) private var chime = AppSettings.chimeDefault
 
     @State private var draft: TransactionDraft
-    @State private var entry: AmountEntry
     @State private var isShowingDetails: Bool
-    @State private var errorMessage: String?
 
     init(mode: TransactionEditor.Mode, startingDraft: TransactionDraft) {
         self.mode = mode
         _draft = State(initialValue: startingDraft)
-        _entry = State(initialValue: AmountEntry(cents: startingDraft.amount.cents))
         _isShowingDetails = State(initialValue: startingDraft.hasDetails)
     }
 
@@ -81,17 +77,15 @@ private struct TransactionForm: View {
         if case .edit = mode { true } else { false }
     }
 
-    private var currencyCode: String { draft.wallet.currencyCodeOrDefault }
-
-    private var draftToSave: TransactionDraft { draft.withAmount(of: entry, in: currencyCode) }
-
     var body: some View {
         KeypadSheet(
             title: isEditing ? Text(Strings.Transactions.editTransaction) : Text(Strings.Transactions.addTransaction),
-            entry: $entry,
-            canSave: draftToSave.canSave,
-            save: save,
-            macHeight: (640, 720)
+            entry: $draft.entry,
+            canSave: draft.canSave,
+            size: .tallKeypadForm,
+            saving: "Saving a transaction",
+            failureTitle: Strings.Transactions.couldntSave,
+            save: save
         ) { fields in
             Section {
                 Picker(Strings.Common.type, selection: $draft.type) {
@@ -113,14 +107,13 @@ private struct TransactionForm: View {
                 isShowingDetails = true
             }
         }
-        .errorAlert(Strings.Transactions.couldntSave, message: $errorMessage)
     }
 
     private func mainSection(_ fields: KeypadSheetFields) -> some View {
         Section {
             WalletPicker(title: Strings.Common.wallet, selection: $draft.wallet)
                 .disabled(draft.isLockedByPayments)
-            fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: draft.direction.tint)
+            fields.amountRow(Strings.Common.amount, currencyCode: draft.currencyCode, tint: draft.direction.tint)
             CategoryPicker(title: Strings.Common.category, type: draft.type, selection: $draft.category)
                 .disabled(draft.isLockedByPayments)
                 .accessibilityIdentifier("TransactionEditor.category")
@@ -132,7 +125,7 @@ private struct TransactionForm: View {
                 .accessibilityIdentifier("TransactionEditor.note")
             DayStepper(title: Strings.Common.date, day: $draft.day)
         } footer: {
-            if let problem = draftToSave.shownProblem {
+            if let problem = draft.shownProblem {
                 Text(problem.localizedDescription)
             } else if draft.paymentLock?.forgivenOwed != nil {
                 Text(Strings.Transactions.forgivenLockFooter)
@@ -187,30 +180,25 @@ private struct TransactionForm: View {
         }
     }
 
-    private func save() {
-        let saved = Log.store.perform("Saving a transaction", errorMessage: &errorMessage) {
-            try Signpost.interval("Save transaction") {
-                switch mode {
-                case .add, .duplicate:
-                    try Transaction.create(draftToSave, in: context)
-                case .payment(let recurring):
-                    let transaction = try Transaction.create(draftToSave, in: context)
-                    try recurring.attach(transaction, in: context)
-                case .edit(let transaction):
-                    try transaction.update(with: draftToSave)
-                }
+    private func save() throws {
+        try Signpost.interval("Save transaction") {
+            switch mode {
+            case .add, .duplicate:
+                try Transaction.create(draft, in: context)
+            case .payment(let recurring):
+                let transaction = try Transaction.create(draft, in: context)
+                try recurring.attach(transaction, in: context)
+            case .edit(let transaction):
+                try transaction.update(with: draft)
             }
         }
-        if saved {
-            playSuccessCue()
-            dismiss()
-        }
+        playSuccessCue()
     }
 
     /// Plays the Success cue for a new Expense or Income that just saved, with the chime picked in Settings and as its
     /// switches allow. It never holds up the sheet closing, and a cue that can't play is skipped without a word.
     private func playSuccessCue() {
-        guard let ending = mode.successCueEnding(saving: draftToSave.type) else { return }
+        guard let ending = mode.successCueEnding(saving: draft.type) else { return }
         SuccessCuePlayer.shared.play(
             chime,
             ending: ending,

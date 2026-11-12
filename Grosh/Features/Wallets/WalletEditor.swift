@@ -18,7 +18,11 @@ struct WalletEditor: View {
     @AppStorage(AppSettings.currencyCodeKey) private var currencyCode = AppSettings.currencyCodeDefault
 
     var body: some View {
-        WalletForm(mode: mode, startingDay: today, currencyCode: currencyCode)
+        MadeOnce {
+            (draft: mode.editing.map { WalletDraft($0) } ?? WalletDraft(currencyCode: currencyCode), startingDay: today)
+        } content: { start in
+            WalletForm(mode: mode, startingDraft: start.draft, startingDay: start.startingDay)
+        }
     }
 }
 
@@ -31,29 +35,21 @@ private struct WalletForm: View {
     @Environment(\.today) private var today
 
     @State private var draft: WalletDraft
-    /// The Starting balance, typed on the Keypad; nothing typed is $0.
-    @State private var startingEntry = AmountEntry(kind: .balance)
     @State private var keypad = KeypadTarget()
     @FocusState private var isNameFocused: Bool
     @State private var startingDay: CalendarDay
-    @State private var errorMessage: String?
+    private var saver = SheetSaver(Strings.Wallets.couldntSave)
     @State private var isAdjustingBalance = false
     /// The wallet waiting for the user to confirm deleting it.
     @State private var deleting: Wallet?
 
-    /// `currencyCode` is the one a new wallet starts in.
-    init(mode: EditorMode<Wallet>, startingDay: CalendarDay, currencyCode: String) {
+    init(mode: EditorMode<Wallet>, startingDraft: WalletDraft, startingDay: CalendarDay) {
         self.mode = mode
-        _draft = State(initialValue: mode.editing.map { WalletDraft($0) } ?? WalletDraft(currencyCode: currencyCode))
+        _draft = State(initialValue: startingDraft)
         _startingDay = State(initialValue: startingDay)
     }
 
-    /// The Starting balance typed so far, or `nil` while the Keypad can't work it out.
-    private var startingBalance: Money? {
-        startingEntry.cents.map { Money(cents: $0, currencyCode: draft.currencyCode) }
-    }
-
-    private var canSave: Bool { draft.canSave && (!mode.isAdding || startingBalance != nil) }
+    private var canSave: Bool { mode.isAdding ? RuleCheck(draft.validateNew).passes : draft.canSave }
 
     var body: some View {
         NavigationStack {
@@ -93,11 +89,11 @@ private struct WalletForm: View {
                     Section {
                         if wallet.isArchived {
                             Button(Strings.Wallets.unarchiveWallet, systemImage: "tray.and.arrow.up") {
-                                perform { try wallet.unarchive(today: today) }
+                                saver.save("Changing a wallet") { try wallet.unarchive(today: today) }
                             }
                         } else {
                             Button(Strings.Wallets.archiveWallet, systemImage: "archivebox") {
-                                perform { try wallet.archive(today: today) }
+                                saver.save("Changing a wallet") { try wallet.archive(today: today) }
                             }
                         }
                     } footer: {
@@ -129,7 +125,7 @@ private struct WalletForm: View {
                         .disabled(!canSave)
                 }
             }
-            .errorAlert(Strings.Wallets.couldntSave, message: $errorMessage)
+            .failureAlert(saver)
             .walletDeleteDialog($deleting) { dismiss() }
             .sheet(isPresented: $isAdjustingBalance) {
                 AdjustBalanceEditor(viewedWallet: mode.editing)
@@ -140,8 +136,8 @@ private struct WalletForm: View {
     private var startingBalanceSection: some View {
         Section {
             AmountRow(
-                Strings.Wallets.currentBalance, field: "currentBalance", entry: $startingEntry,
-                tint: (startingBalance?.direction ?? .neither).tint, font: .body
+                Strings.Wallets.currentBalance, field: "currentBalance", entry: $draft.startingBalanceEntry,
+                tint: (draft.startingBalance?.direction ?? .neither).tint, font: .body
             )
             DayStepper(title: Strings.Common.date, day: $startingDay)
         } header: {
@@ -152,24 +148,13 @@ private struct WalletForm: View {
     }
 
     private func save() {
-        perform {
+        saver.save("Changing a wallet") {
             switch mode {
             case .add:
-                let balance = startingBalance ?? Money(cents: 0, currencyCode: draft.currencyCode)
-                try Wallet.create(draft, startingBalance: balance, on: startingDay, in: context)
+                try Wallet.create(draft, startingOn: startingDay, in: context)
             case .edit(let wallet):
                 try wallet.update(with: draft)
             }
-        }
-    }
-
-    /// Runs a change and closes the sheet, or shows why the change was refused.
-    private func perform(_ change: () throws -> Void) {
-        let succeeded = Log.store.perform("Changing a wallet", errorMessage: &errorMessage) {
-            try change()
-        }
-        if succeeded {
-            dismiss()
         }
     }
 }

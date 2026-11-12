@@ -20,7 +20,7 @@ struct MergeSheet<Target: Identifiable & Equatable, Row: View>: View {
     @Environment(\.dismiss) private var dismiss
     @State private var target: Target?
     @State private var isConfirming = false
-    @State private var errorMessage: String?
+    private var saver = SheetSaver(Strings.Merge.couldntMerge)
 
     var body: some View {
         NavigationStack {
@@ -80,16 +80,13 @@ struct MergeSheet<Target: Identifiable & Equatable, Row: View>: View {
             } message: {
                 Text(Strings.Common.cantBeUndone)
             }
-            .errorAlert(Strings.Merge.couldntMerge, message: $errorMessage)
+            .failureAlert(saver)
         }
     }
 
     private func performMerge() {
         guard let target else { return }
-        let succeeded = Log.store.perform("Merging", errorMessage: &errorMessage) {
-            try merge(target)
-        }
-        if succeeded {
+        if saver.keepingOpen("Merging", { try merge(target) }) {
             dismiss()
             onMerged()
         }

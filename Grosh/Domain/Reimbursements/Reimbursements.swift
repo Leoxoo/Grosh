@@ -3,20 +3,30 @@ import SwiftData
 
 /// What a Reimbursement sheet holds: an amount, the day it was paid back and an optional note.
 nonisolated struct ReimbursementDraft {
-    var amount = Money(cents: 0)
+    /// The amount as typed: blank for a new one, the Reimbursement's own when editing.
+    var entry: AmountEntry
+    /// The currency of the Expense paid back.
+    let currencyCode: String
     var day: CalendarDay
     var note = ""
 
     init(editing reimbursement: Reimbursement) {
-        amount = reimbursement.amount
+        entry = AmountEntry(cents: reimbursement.amount.cents)
+        currencyCode = reimbursement.amount.currencyCode
         day = reimbursement.day
         note = reimbursement.note
     }
 
     init(amount: Money = Money(cents: 0), day: CalendarDay, note: String = "") {
-        self.amount = amount
+        entry = AmountEntry(cents: amount.cents)
+        currencyCode = amount.currencyCode
         self.day = day
         self.note = note
+    }
+
+    /// A new payback on `expense`, dated `day`, with nothing typed yet.
+    init(payingBack expense: Transaction, on day: CalendarDay) {
+        self.init(amount: Money(cents: 0, currencyCode: expense.amount.currencyCode), day: day)
     }
 
     func validate() throws {

@@ -89,9 +89,9 @@ private struct CopyOrShare: View {
                         hasCopied = true
                     } label: {
                         if hasCopied {
-                            Label("Copied", systemImage: "checkmark")
+                            Label(Strings.Common.copied, systemImage: "checkmark")
                         } else {
-                            Label("Copy", systemImage: "doc.on.doc")
+                            Label(Strings.Common.copy, systemImage: "doc.on.doc")
                         }
                     }
                     ShareLink(item: text)
@@ -107,9 +107,7 @@ private struct CopyOrShare: View {
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 380, idealWidth: 420, minHeight: 300, idealHeight: 360)
-        #endif
+        .macSheetSize(.message)
     }
 
     private func copy(_ text: String) {

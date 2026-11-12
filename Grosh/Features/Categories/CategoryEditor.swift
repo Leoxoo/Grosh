@@ -42,13 +42,13 @@ struct CategoryEditor: View {
     @State private var draft: CategoryDraft
     @State private var isMerging = false
     @State private var isConfirmingDelete = false
-    @State private var errorMessage: String?
+    private var saver = SheetSaver(Strings.Categories.couldntSave)
 
     init(mode: Mode) {
         self.mode = mode
         switch mode {
         case .add(let type):
-            _draft = State(initialValue: CategoryDraft(type: type, symbolName: "tag.fill", color: .blue))
+            _draft = State(initialValue: .new(type))
         case .edit(let category):
             _draft = State(initialValue: CategoryDraft(category))
         }
@@ -74,8 +74,6 @@ struct CategoryEditor: View {
         } ?? []
     }
 
-    private var canSave: Bool { !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-
     var body: some View {
         NavigationStack {
             Form {
@@ -97,7 +95,7 @@ struct CategoryEditor: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(editing == nil ? Strings.Common.add : Strings.Common.save, action: save)
-                        .disabled(!canSave)
+                        .disabled(!draft.canSave)
                 }
             }
             .sheet(isPresented: $isMerging) {
@@ -111,14 +109,14 @@ struct CategoryEditor: View {
                 titleVisibility: .visible
             ) {
                 Button(Strings.Common.delete, role: .destructive) {
-                    perform {
+                    saver.save("Changing a category") {
                         if let editing { try catalog.delete(editing) }
                     }
                 }
             } message: {
                 if let editing { Text(editing.deleteMessage) }
             }
-            .errorAlert(Strings.Categories.couldntSave, message: $errorMessage)
+            .failureAlert(saver)
         }
     }
 
@@ -136,10 +134,6 @@ struct CategoryEditor: View {
                     Text(CategoryType.income.title).tag(CategoryType.income)
                 }
                 .disabled(!canChangeType)
-                .onChange(of: draft.type) {
-                    // A parent of the old type can't hold a category of the new one.
-                    draft.parent = nil
-                }
 
                 Picker(Strings.Categories.parent, selection: $draft.parent) {
                     Text(Strings.Common.none).tag(Category?.none)
@@ -203,7 +197,7 @@ struct CategoryEditor: View {
                 category.isHidden ? Strings.Categories.unhideCategory : Strings.Categories.hideCategory,
                 systemImage: category.isHidden ? "eye" : "eye.slash"
             ) {
-                perform { try catalog.setHidden(category, !category.isHidden) }
+                saver.save("Changing a category") { try catalog.setHidden(category, !category.isHidden) }
             }
             Button(Strings.Categories.mergeIntoAnother, systemImage: "arrow.triangle.merge") {
                 isMerging = true
@@ -221,22 +215,12 @@ struct CategoryEditor: View {
     }
 
     private func save() {
-        perform {
+        saver.save("Changing a category") {
             if let editing {
                 try catalog.update(editing, to: draft)
             } else {
                 try catalog.add(draft)
             }
-        }
-    }
-
-    /// Runs a change and closes the sheet, or shows why the change was refused.
-    private func perform(_ change: () throws -> Void) {
-        let succeeded = Log.store.perform("Changing a category", errorMessage: &errorMessage) {
-            try change()
-        }
-        if succeeded {
-            dismiss()
         }
     }
 }

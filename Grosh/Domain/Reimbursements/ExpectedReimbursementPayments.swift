@@ -4,8 +4,11 @@ import SwiftData
 /// What the Record payment sheet holds for an Expected reimbursement: an amount, the day the money was received, an
 /// optional note and the wallet it came into.
 nonisolated struct ExpectationPaymentDraft {
-    /// Entered positive. Starts at what is outstanding, so paying in full is one tap; blank (zero) for an open amount.
-    var amount: Money
+    /// The amount as typed, entered positive. Starts at what is outstanding, so paying in full is one tap; blank for an
+    /// open amount, which has nothing outstanding to start from.
+    var entry: AmountEntry
+    /// The currency of the Expense paid back.
+    let currencyCode: String
     var day: CalendarDay
     var note = ""
     /// The wallet the money came into. Starts at the Expense's own wallet, which keeps it a Reimbursement on the Expense
@@ -14,7 +17,8 @@ nonisolated struct ExpectationPaymentDraft {
 
     /// A payment toward `expectation`, received `day`.
     init(paying expectation: ExpectedReimbursement, on day: CalendarDay) {
-        amount = expectation.outstanding ?? Money(cents: 0, currencyCode: expectation.currencyCode)
+        entry = AmountEntry(cents: expectation.outstanding?.cents ?? 0)
+        currencyCode = expectation.currencyCode
         self.day = day
         wallet = expectation.expense?.wallet
     }

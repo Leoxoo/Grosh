@@ -4,8 +4,10 @@ import SwiftData
 /// One part of a Split being set up: what a part takes of its own. Every part shares the wallet and Card of the
 /// transaction split, so a part holds neither.
 nonisolated struct SplitPart {
-    /// Entered positive; the category decides whether it adds to or takes from the wallet.
-    var amount: Money
+    /// The amount as typed, entered positive; the category decides whether it adds to or takes from the wallet.
+    var entry: AmountEntry
+    /// The currency of the transaction being split.
+    let currencyCode: String
     var category: Category?
     var day: CalendarDay
     var note: String
@@ -14,7 +16,8 @@ nonisolated struct SplitPart {
     var eventName: String
 
     init(of transaction: Transaction) {
-        amount = Money(cents: abs(transaction.amountCents), currencyCode: transaction.amount.currencyCode)
+        entry = AmountEntry(cents: abs(transaction.amountCents))
+        currencyCode = transaction.amount.currencyCode
         category = transaction.category
         day = transaction.day
         note = transaction.note
@@ -76,6 +79,8 @@ nonisolated struct SplitDraft {
     init(splitting transaction: Transaction) {
         original = SplitPart(of: transaction)
         was = original.amount
+        // What is left may go below zero while parts take more than the total; Split then refuses it.
+        original.entry = AmountEntry(cents: was.cents, kind: .balance)
         reimbursements = transaction.orderedReimbursements.map { SplitReimbursement(reimbursement: $0) }
         partType = transaction.category?.type ?? .expense
     }
@@ -109,7 +114,7 @@ nonisolated struct SplitDraft {
     /// A part to start from: a copy of the original, with no amount yet.
     func newPart() -> SplitPart {
         var part = original
-        part.amount = Money(cents: 0, currencyCode: was.currencyCode)
+        part.entry = AmountEntry()
         return part
     }
 

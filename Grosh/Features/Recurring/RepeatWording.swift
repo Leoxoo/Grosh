@@ -48,6 +48,11 @@ extension RepeatRule {
         case .year: every == 1 ? String(localized: Strings.Recurring.everyYear) : String(localized: Strings.Recurring.everyYears(every))
         }
     }
+
+    /// How a monthly rule reads with its day: "Every 2 months on the 4th".
+    func phrase(on monthlyDay: MonthlyDay, startingOn start: CalendarDay) -> String {
+        String(localized: Strings.Recurring.repeatOnDay(phrase, monthlyDay.phrase(startingOn: start)))
+    }
 }
 
 extension RepeatSchedule {
@@ -56,7 +61,7 @@ extension RepeatSchedule {
         var text = rule.phrase
         switch rule.unit {
         case .month:
-            text += " " + monthlyDay.phrase(startingOn: start)
+            text = rule.phrase(on: monthlyDay, startingOn: start)
         case .year:
             text += " " + String(localized: Strings.Recurring.onDate(start.date().formatted(.dateTime.month(.abbreviated).day())))
         case .day, .week:
@@ -79,7 +84,7 @@ extension MonthlyDay {
     func phrase(startingOn start: CalendarDay) -> String {
         switch self {
         case .sameDay:
-            return String(localized: Strings.Recurring.onThe(Self.ordinal(start.day)))
+            return String(localized: Strings.Recurring.onThe(CalendarDay.ordinal(start.day)))
         case .nthWeekday:
             let weekday = start.date().formatted(.dateTime.weekday(.wide))
             switch (start.day - 1) / 7 {
@@ -92,12 +97,5 @@ extension MonthlyDay {
         case .lastDay:
             return String(localized: Strings.Recurring.onTheLastDay)
         }
-    }
-
-    /// A day of the month as an ordinal, such as "4th".
-    private static func ordinal(_ number: Int) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .ordinal
-        return formatter.string(from: NSNumber(value: number)) ?? "\(number)"
     }
 }

@@ -43,11 +43,29 @@ struct EstimatedAmounts: ReminderSource {
     }
 }
 
+/// What the amount editor of an Estimated transaction holds: its real amount, entered positive. It starts at the
+/// estimate.
+nonisolated struct EstimatedAmountDraft: AmountDraft, ValidatedDraft {
+    var entry: AmountEntry
+    let currencyCode: String
+
+    init(confirming transaction: Transaction) {
+        entry = AmountEntry(cents: abs(transaction.amountCents))
+        currencyCode = transaction.amount.currencyCode
+    }
+
+    /// The real amount must be above zero.
+    func validate() throws {
+        guard amount.cents > 0 else { throw TransactionRuleError.missingAmount }
+    }
+}
+
 extension Transaction {
-    /// Confirms the amount of an Estimated transaction at `cents`, entered positive. It keeps its direction. Its
-    /// Estimated mark, its reminder and so its bell item go with it. Saves.
-    func confirmAmount(cents: Int) throws {
-        amountCents = cents * (amountCents < 0 ? -1 : 1)
+    /// Confirms the amount of an Estimated transaction at the draft's, which must be above zero. It keeps its direction.
+    /// Its Estimated mark, its reminder and so its bell item go with it. Saves.
+    func confirmAmount(_ draft: EstimatedAmountDraft) throws {
+        try draft.validate()
+        amountCents = draft.amount.cents * (amountCents < 0 ? -1 : 1)
         clearEstimate()
         try saveToStore()
     }

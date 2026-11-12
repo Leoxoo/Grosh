@@ -41,9 +41,7 @@ struct SelectWalletSheet: View {
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 360, idealWidth: 400, minHeight: 360, idealHeight: 480)
-        #endif
+        .macSheetSize(.picker)
     }
 
     /// One row: the choice's icon, its name with its balance underneath, and a checkmark when it is the selection.

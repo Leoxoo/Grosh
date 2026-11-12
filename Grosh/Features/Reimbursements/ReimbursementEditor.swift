@@ -12,7 +12,11 @@ struct ReimbursementEditor: View {
     @Environment(\.today) private var today
 
     var body: some View {
-        ReimbursementForm(expense: expense, editing: editing, startingDay: today)
+        MadeOnce {
+            editing.map(ReimbursementDraft.init(editing:)) ?? ReimbursementDraft(payingBack: expense, on: today)
+        } content: { draft in
+            ReimbursementForm(expense: expense, editing: editing, startingDraft: draft)
+        }
     }
 }
 
@@ -21,38 +25,31 @@ private struct ReimbursementForm: View {
     let expense: Transaction
     let editing: Reimbursement?
 
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
     @State private var draft: ReimbursementDraft
-    @State private var entry: AmountEntry
     /// The wallet the money came into. Starts at the Expense's own.
     @State private var wallet: Wallet?
-    @State private var errorMessage: String?
 
-    init(expense: Transaction, editing: Reimbursement?, startingDay: CalendarDay) {
+    init(expense: Transaction, editing: Reimbursement?, startingDraft: ReimbursementDraft) {
         self.expense = expense
         self.editing = editing
-        let startingDraft = editing.map(ReimbursementDraft.init(editing:)) ?? ReimbursementDraft(day: startingDay)
         _draft = State(initialValue: startingDraft)
-        _entry = State(initialValue: editing == nil ? AmountEntry() : AmountEntry(cents: startingDraft.amount.cents))
         _wallet = State(initialValue: expense.wallet)
     }
 
-    private var currencyCode: String { expense.amount.currencyCode }
-
-    private var draftToSave: ReimbursementDraft { draft.withAmount(of: entry, in: currencyCode) }
-
     var body: some View {
-        let check = RuleCheck { try expense.validatePayback(draftToSave, into: wallet) }
+        let check = RuleCheck { try expense.validatePayback(draft, into: wallet) }
         KeypadSheet(
             title: editing == nil ? Text(Strings.Reimbursements.someonePaidMeBackTitle) : Text(Strings.Reimbursements.editReimbursement),
-            entry: $entry,
+            entry: $draft.entry,
             canSave: check.passes,
+            saving: "Saving a Reimbursement",
+            failureTitle: Strings.Reimbursements.couldntSave,
             save: save
         ) { fields in
             Section {
-                fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: MoneyDirection.moneyIn.tint)
+                fields.amountRow(Strings.Common.amount, currencyCode: draft.currencyCode, tint: MoneyDirection.moneyIn.tint)
                 if editing == nil {
                     WalletPicker(title: Strings.Reimbursements.receivedIn, selection: $wallet)
                 }
@@ -62,19 +59,13 @@ private struct ReimbursementForm: View {
                 PaybackFooter(problem: check.shownProblem, isElsewhere: expense.isElsewhere(wallet))
             }
         }
-        .errorAlert(Strings.Reimbursements.couldntSave, message: $errorMessage)
     }
 
-    private func save() {
-        let saved = Log.store.perform("Saving a Reimbursement", errorMessage: &errorMessage) {
-            if let editing {
-                try editing.update(with: draftToSave)
-            } else {
-                try expense.recordPayback(draftToSave, into: wallet, in: context)
-            }
-        }
-        if saved {
-            dismiss()
+    private func save() throws {
+        if let editing {
+            try editing.update(with: draft)
+        } else {
+            try expense.recordPayback(draft, into: wallet, in: context)
         }
     }
 }

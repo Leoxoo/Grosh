@@ -15,7 +15,7 @@ struct CardEditor: View {
     @State private var statementDay: Int
     @State private var isMerging = false
     @State private var isConfirmingDelete = false
-    @State private var errorMessage: String?
+    private var saver = SheetSaver(Strings.Cards.couldntSave)
 
     init(mode: EditorMode<Card>) {
         self.mode = mode
@@ -111,7 +111,7 @@ struct CardEditor: View {
                     CardMergeView(source: card) { dismiss() }
                 }
             }
-            .errorAlert(Strings.Cards.couldntSave, message: $errorMessage)
+            .failureAlert(saver)
         }
     }
 
@@ -137,7 +137,7 @@ struct CardEditor: View {
             if hasStatementDate {
                 Picker(Strings.Cards.closesOnThe, selection: $statementDay) {
                     ForEach(1...31, id: \.self) { day in
-                        Text(Card.ordinalDay(day)).tag(day)
+                        Text(CalendarDay.ordinal(day)).tag(day)
                     }
                 }
             }
@@ -155,11 +155,11 @@ struct CardEditor: View {
         Section {
             if card.isArchived {
                 Button(Strings.Cards.unarchiveCard, systemImage: "tray.and.arrow.up") {
-                    perform { try card.unarchive() }
+                    saver.save("Changing a card") { try card.unarchive() }
                 }
             } else {
                 Button(Strings.Cards.archiveCard, systemImage: "archivebox") {
-                    perform { try card.archive() }
+                    saver.save("Changing a card") { try card.archive() }
                 }
             }
             Button(Strings.Cards.mergeIntoAnother, systemImage: "arrow.triangle.merge") {
@@ -170,7 +170,7 @@ struct CardEditor: View {
                     isConfirmingDelete = true
                 }
                 .confirmationDialog(Strings.Common.deleteNamed(card.name), isPresented: $isConfirmingDelete, titleVisibility: .visible) {
-                    Button(Strings.Cards.deleteCard, role: .destructive) { perform { try card.delete(in: context) } }
+                    Button(Strings.Cards.deleteCard, role: .destructive) { saver.save("Changing a card") { try card.delete(in: context) } }
                 }
             }
         } footer: {
@@ -183,23 +183,13 @@ struct CardEditor: View {
     }
 
     private func save() {
-        perform {
+        saver.save("Changing a card") {
             switch mode {
             case .add:
                 try Card.create(draftToSave, in: context)
             case .edit(let card):
                 try card.update(with: draftToSave)
             }
-        }
-    }
-
-    /// Runs a change and closes the sheet, or shows why the change was refused.
-    private func perform(_ change: () throws -> Void) {
-        let succeeded = Log.store.perform("Changing a card", errorMessage: &errorMessage) {
-            try change()
-        }
-        if succeeded {
-            dismiss()
         }
     }
 }

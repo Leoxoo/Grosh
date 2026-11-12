@@ -48,7 +48,7 @@ struct SideDetailsView: View {
                         .monospacedDigit()
                         .foregroundStyle(side.color)
                         .contentTransition(.numericText())
-                    if timeRange != .day, let average = DailyAverage.of(total, over: days) {
+                    if let average = DailyAverage.of(total, over: days) {
                         LabeledContent(Strings.Report.dailyAverage) {
                             Text(average.formatted()).monospacedDigit()
                         }
@@ -61,7 +61,7 @@ struct SideDetailsView: View {
             // after the time range changes, the period is still one of the old range.
             if let graph = history.graph(
                 side, in: period, recurring: recurringTransactions, today: today,
-                comparingWith: comparesWithLastYear ? .lastYear : .average
+                comparingWith: MonthGraphComparison(comparesWithLastYear: comparesWithLastYear)
             ) {
                 PeriodComparisonCard(graph: graph, comparesWithLastYear: $comparesWithLastYear)
             }

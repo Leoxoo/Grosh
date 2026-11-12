@@ -17,9 +17,7 @@ struct ExpectedReimbursementRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 if let due = expectation.openReminderDay {
-                    Text("\(Image(systemName: "bell")) \(Text(Strings.DebtsLoans.due(due.date().formatted(date: .abbreviated, time: .omitted))))")
-                        .font(.caption)
-                        .foregroundStyle(expectation.isReminderDue(on: today) ? .urgent : .secondary)
+                    ReminderDueText(day: due, isDue: expectation.isReminderDue(on: today))
                 }
             }
             Spacer(minLength: 8)
@@ -30,7 +28,7 @@ struct ExpectedReimbursementRow: View {
 
     /// "Owes me · Dinner · May 27, 2026".
     private var summary: String {
-        let day = expectation.expense?.day.date().formatted(date: .abbreviated, time: .omitted) ?? ""
+        let day = expectation.expense?.day.shortText ?? ""
         return String(localized: Strings.OwesMe.rowSummary(expectation.expenseTitle, day))
     }
 
@@ -47,7 +45,7 @@ struct ExpectedReimbursementRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
-                    Text(verbatim: "?")
+                    Text(Strings.OwesMe.unknownAmount)
                         .monospacedDigit()
                         .foregroundStyle(.moneyIn)
                     Text(Strings.OwesMe.openAmount)
@@ -69,7 +67,7 @@ struct ExpectedReimbursementRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             case .forgiven:
-                Text(expectation.expected?.formatted() ?? "?")
+                Text(expectation.expected.formattedOrUnknown)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                 ForgivenBadge()
