@@ -1,3 +1,4 @@
+import Combine
 import SwiftData
 import SwiftUI
 
@@ -6,12 +7,31 @@ import SwiftUI
 /// toolbar narrows the list to one wallet's schedules. Tap one to see what it has made, swipe one to duplicate it, and
 /// add one with the plus.
 struct RecurringTransactionsView: View {
-    @Query(filter: #Predicate<RecurringTransaction> { $0.deletedAt == nil }, sort: \RecurringTransaction.createdAt)
-    private var recurring: [RecurringTransaction]
+    @Query(RecurringTransaction.notDeleted) private var recurring: [RecurringTransaction]
     @Query(Wallet.unarchived) private var wallets: [Wallet]
+    @Environment(\.modelContext) private var context
     @State private var editorMode: RecurringTransactionEditor.Mode?
     /// The wallet the list is narrowed to, or `nil` for every wallet. Each time the screen opens it shows every wallet.
     @State private var walletFilter: Wallet?
+    /// How many times the store was saved while the screen is open: a save can change an estimate or a Purchase's
+    /// progress, so it draws the screen again with its figures worked out anew.
+    @State private var saves = 0
+    @State private var figures = FiguresOnce()
+
+    /// The figures of every schedule (``RecurringFigures``), worked out once per save of the store rather than on each
+    /// draw, such as when the wallet filter or a sheet changes. Filling it in doesn't redraw anything, so it is safe
+    /// while drawing.
+    private final class FiguresOnce {
+        private var made: (schedules: [PersistentIdentifier], saves: Int, figures: RecurringFigures)?
+
+        func of(_ schedules: [RecurringTransaction], afterSaves saves: Int) -> RecurringFigures {
+            let ids = schedules.map(\.persistentModelID)
+            if let made, made.schedules == ids, made.saves == saves { return made.figures }
+            let figures = RecurringFigures(schedules)
+            made = (ids, saves, figures)
+            return figures
+        }
+    }
 
     private var groups: [RecurringListing.KindGroup] {
         RecurringListing.groups(of: recurring, wallet: walletFilter)
@@ -19,7 +39,7 @@ struct RecurringTransactionsView: View {
 
     var body: some View {
         let groups = self.groups
-        let figures = RecurringFigures(groups.flatMap(\.items))
+        let figures = self.figures.of(recurring, afterSaves: saves)
         List {
             ForEach(groups) { group in
                 Section(group.kind.sectionTitle) {
@@ -68,6 +88,9 @@ struct RecurringTransactionsView: View {
         }
         .sheet(item: $editorMode) { mode in
             RecurringTransactionEditor(mode: mode)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave, object: context)) { _ in
+            saves += 1
         }
     }
 

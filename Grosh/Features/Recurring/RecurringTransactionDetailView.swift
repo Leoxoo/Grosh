@@ -20,12 +20,10 @@ struct RecurringTransactionDetailView: View {
     @State private var isConfirmingDelete = false
     @State private var errorMessage: String?
 
-    /// Whether the schedule was deleted from this screen. Nothing is read from it then, since a deleted model still on
-    /// screen can't be read.
-    private var isRemoved: Bool { recurring.isGone }
-
     var body: some View {
-        if isRemoved {
+        // Once the schedule is deleted from this screen nothing is read from it, since a deleted model still on screen
+        // can't be read.
+        if recurring.isGone {
             ContentUnavailableView(Strings.Recurring.deleted, systemImage: "trash")
         } else {
             details
@@ -33,8 +31,7 @@ struct RecurringTransactionDetailView: View {
     }
 
     private var details: some View {
-        let figures = RecurringFigures([recurring])
-        return List {
+        List {
             Section {
                 HStack(spacing: 12) {
                     CategoryIcon(category: recurring.category, subscriptionIcon: recurring.subscriptionIcon, size: 44)
@@ -42,7 +39,7 @@ struct RecurringTransactionDetailView: View {
                         Text(recurring.name)
                             .font(.title3.weight(.semibold))
                         HStack(spacing: 6) {
-                            AmountText(amount: figures.startingAmount(of: recurring))
+                            AmountText(amount: recurring.currentStartingAmount())
                             if recurring.estimatesAmount {
                                 EstimatedBadge()
                             }
@@ -73,7 +70,7 @@ struct RecurringTransactionDetailView: View {
                         Text(Strings.Recurring.ended)
                     }
                 }
-                if let progress = figures.purchaseProgress(of: recurring) {
+                if let progress = recurring.purchaseProgress {
                     LabeledContent(Strings.Recurring.progress) {
                         Text(progress.summary)
                             .multilineTextAlignment(.trailing)

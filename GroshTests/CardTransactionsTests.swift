@@ -65,7 +65,7 @@ struct CardTransactionsTests {
         try record(-50_00, on: day(2026, 10, 1), paidWith: amex)
         try record(-9_00, on: day(2026, 10, 1), paidWith: nil)
 
-        let shown = chase.statement(for: chase.period(containing: today), today: today).transactions
+        let shown = try chase.statement(for: chase.period(containing: today), today: today).transactions
 
         #expect(Set(shown) == [first, refund, excluded, last])
         #expect(shown.charged == Money(cents: -137_76))
@@ -77,7 +77,7 @@ struct CardTransactionsTests {
         let august = try record(-40_00, on: day(2026, 8, 16), paidWith: chase)
         try record(-12_76, on: day(2026, 9, 16), paidWith: chase)
 
-        let previous = chase.statement(for: chase.period(containing: today).adding(-1), today: today).transactions
+        let previous = try chase.statement(for: chase.period(containing: today).adding(-1), today: today).transactions
 
         #expect(Set(previous) == [september, august])
         #expect(previous.charged == Money(cents: -60_00))
@@ -89,7 +89,7 @@ struct CardTransactionsTests {
         let first = try record(-12_76, on: day(2026, 10, 1), paidWith: debit)
         let last = try record(-30_00, on: day(2026, 10, 31), paidWith: debit)
 
-        let shown = debit.statement(for: debit.period(containing: today), today: today).transactions
+        let shown = try debit.statement(for: debit.period(containing: today), today: today).transactions
 
         #expect(Set(shown) == [first, last])
         #expect(shown.charged == Money(cents: -42_76))
@@ -110,8 +110,8 @@ struct CardTransactionsTests {
         try record(-20_00, on: day(2026, 9, 30), paidWith: petal)
 
         #expect(debit.period(containing: today).leadInDays == nil)
-        #expect(debit.statement(for: debit.period(containing: today), today: today).leadIns.isEmpty)
-        #expect(petal.statement(for: petal.period(containing: today), today: today).leadIns.isEmpty)
+        #expect(try debit.statement(for: debit.period(containing: today), today: today).leadIns.isEmpty)
+        #expect(try petal.statement(for: petal.period(containing: today), today: today).leadIns.isEmpty)
     }
 
     @Test func leadInTransactionsAreThisCardsFromTheTwoDaysBeforeAndStayOnThePreviousStatement() throws {
@@ -124,10 +124,10 @@ struct CardTransactionsTests {
         try record(-50_00, on: day(2026, 9, 15), paidWith: amex)
         let current = chase.period(containing: today)
 
-        #expect(Set(chase.statement(for: current, today: today).leadIns) == [fourteenth, fifteenth])
-        let previous = chase.statement(for: current.adding(-1), today: today).transactions
+        #expect(Set(try chase.statement(for: current, today: today).leadIns) == [fourteenth, fifteenth])
+        let previous = try chase.statement(for: current.adding(-1), today: today).transactions
         #expect(Set(previous).isSuperset(of: [fourteenth, fifteenth]))
-        #expect(chase.statement(for: current, today: today).transactions == [first])
+        #expect(try chase.statement(for: current, today: today).transactions == [first])
     }
 
     @Test func leadInTransactionsNeverCountInTheStatementTotalUnlessAdded() throws {
@@ -136,10 +136,10 @@ struct CardTransactionsTests {
         try record(-30_00, on: day(2026, 9, 14), paidWith: chase)
         try record(-12_76, on: day(2026, 9, 16), paidWith: chase)
         let current = chase.period(containing: today)
-        let shown = chase.statement(for: current, today: today).transactions
+        let shown = try chase.statement(for: current, today: today).transactions
 
         #expect(shown.charged == Money(cents: -12_76))
-        let added = chase.statement(for: current, today: today).leadIns.filter { $0 == leadIn }
+        let added = try chase.statement(for: current, today: today).leadIns.filter { $0 == leadIn }
         #expect((shown + added).charged == Money(cents: -32_76))
     }
 
@@ -149,7 +149,7 @@ struct CardTransactionsTests {
         let chase = try context.addCard("Chase", paidFrom: checking, statementDay: 15)
         let current = chase.period(containing: today)
 
-        #expect(chase.statement(for: chase.period(containing: today), today: today).periods == current...current)
+        #expect(try chase.statement(for: chase.period(containing: today), today: today).periods == current...current)
     }
 
     @Test func stepsReachBackToTheFirstTransactionsPeriodAndForwardToTheCurrentOne() throws {
@@ -157,7 +157,7 @@ struct CardTransactionsTests {
         try record(-20_00, on: day(2026, 6, 16), paidWith: chase)
         try record(-12_76, on: day(2026, 9, 1), paidWith: chase)
 
-        let periods = chase.statement(for: chase.period(containing: today), today: today).periods
+        let periods = try chase.statement(for: chase.period(containing: today), today: today).periods
 
         #expect(periods.lowerBound.days == DayRange(first: day(2026, 6, 16), last: day(2026, 7, 15)))
         #expect(periods.upperBound == chase.period(containing: today))
@@ -167,7 +167,7 @@ struct CardTransactionsTests {
         let chase = try context.addCard("Chase", paidFrom: checking, statementDay: 15)
         try record(-20_00, on: day(2026, 12, 1), paidWith: chase)
 
-        let periods = chase.statement(for: chase.period(containing: today), today: today).periods
+        let periods = try chase.statement(for: chase.period(containing: today), today: today).periods
 
         #expect(periods.lowerBound == chase.period(containing: today))
         #expect(periods.upperBound.days == DayRange(first: day(2026, 11, 16), last: day(2026, 12, 15)))

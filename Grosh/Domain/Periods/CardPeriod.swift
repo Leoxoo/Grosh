@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 /// The span of days a Card's transactions are shown in when the user taps the Card: a statement period for a Credit
 /// card with a statement date, a calendar month for any other Card.
@@ -96,15 +97,49 @@ extension Card {
         CardPeriod(containing: day, statementDay: kind == .credit ? statementDay : nil)
     }
 
-    /// What the Card's statement screen shows for `period` on `today`, read in one pass over the Card's transactions.
-    func statement(for period: CardPeriod, today: CalendarDay) -> CardStatement {
-        CardStatement(of: self, for: period, today: today)
+    /// The Card's transactions outside Recently Deleted dated from `first` through `last`: what a statement reads for
+    /// its period and lead-in days (``CardStatement/days(for:)``), found by the store rather than by walking every
+    /// transaction the Card paid for, which run into thousands for a main Card.
+    func paidTransactions(from first: CalendarDay, through last: CalendarDay) -> FetchDescriptor<Transaction> {
+        let id = persistentModelID
+        let firstRaw = first.rawValue
+        let lastRaw = last.rawValue
+        return FetchDescriptor(predicate: #Predicate { transaction in
+            transaction.card?.persistentModelID == id && transaction.deletedAt == nil
+                && transaction.dayRaw >= firstRaw && transaction.dayRaw <= lastRaw
+        })
+    }
+
+    /// The Card's earliest transaction outside Recently Deleted, by day: where its statements' ‹ stops.
+    var earliestTransaction: FetchDescriptor<Transaction> { endTransaction(order: .forward) }
+
+    /// The Card's latest transaction outside Recently Deleted, by day: where its statements' › stops.
+    var latestTransaction: FetchDescriptor<Transaction> { endTransaction(order: .reverse) }
+
+    private func endTransaction(order: SortOrder) -> FetchDescriptor<Transaction> {
+        let id = persistentModelID
+        var descriptor = FetchDescriptor<Transaction>(
+            predicate: #Predicate { $0.card?.persistentModelID == id && $0.deletedAt == nil },
+            sortBy: [SortDescriptor(\.dayRaw, order: order)]
+        )
+        descriptor.fetchLimit = 1
+        return descriptor
+    }
+
+    /// What the Card's statement screen shows for `period` on `today`, read from the store as the screen reads it.
+    func statement(for period: CardPeriod, today: CalendarDay) throws -> CardStatement {
+        let context = try storeContext()
+        let days = CardStatement.days(for: period)
+        return CardStatement(
+            of: self, for: period, read: try context.fetch(paidTransactions(from: days.first, through: days.last)),
+            earliest: try context.fetch(earliestTransaction).first?.day,
+            latest: try context.fetch(latestTransaction).first?.day, today: today
+        )
     }
 }
 
 /// What a Card's statement screen shows for one period: the periods ‹ › step through, the transactions paid with the
-/// Card in the period, and its lead-in transactions. The Card's transactions are read once for all three, rather than
-/// once for each: a main Card pays for thousands.
+/// Card in the period, and its lead-in transactions.
 nonisolated struct CardStatement {
     /// The periods ‹ › step through, oldest first: from the one holding the Card's first transaction through the one
     /// holding `today`, or its last transaction when that is dated later.
@@ -117,22 +152,30 @@ nonisolated struct CardStatement {
     /// in this one's total unless the user adds one for the moment. None for a calendar month.
     let leadIns: [Transaction]
 
-    init(of card: Card, for period: CardPeriod, today: CalendarDay) {
+    /// The days a statement of `period` reads the Card's transactions on: its lead-in days, if it has any, and its own.
+    static func days(for period: CardPeriod) -> (first: CalendarDay, last: CalendarDay) {
+        (period.leadInDays?.first ?? period.firstDay, period.lastDay)
+    }
+
+    /// The statement of `card` for `period` on `today`, from `read`, the Card's transactions on ``days(for:)``, and the
+    /// days of its `earliest` and `latest` transactions.
+    init(
+        of card: Card, for period: CardPeriod, read: [Transaction], earliest: CalendarDay?, latest: CalendarDay?,
+        today: CalendarDay
+    ) {
         let leadInDays = period.leadInDays
-        var first = today
-        var last = today
         var transactions: [Transaction] = []
         var leadIns: [Transaction] = []
-        for transaction in card.transactions ?? [] where !transaction.isInRecentlyDeleted {
+        for transaction in read {
             let day = transaction.day
-            first = min(first, day)
-            last = max(last, day)
             if period.contains(day) {
                 transactions.append(transaction)
             } else if leadInDays?.contains(day) == true {
                 leadIns.append(transaction)
             }
         }
+        let first = min(earliest ?? today, today)
+        let last = max(latest ?? today, today)
         periods = card.period(containing: first)...card.period(containing: last)
         self.transactions = transactions
         self.leadIns = leadIns

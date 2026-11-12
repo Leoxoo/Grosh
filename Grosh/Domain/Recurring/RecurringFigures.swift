@@ -19,9 +19,10 @@ struct RecurringFigures {
         self.progress = progress
     }
 
-    /// What `recurring`'s transactions start at now (``RecurringTransaction/currentStartingAmount()``).
+    /// What `recurring`'s transactions start at now (``RecurringTransaction/currentStartingAmount()``), read from the
+    /// store only when it wasn't among the schedules the figures were worked out for.
     func startingAmount(of recurring: RecurringTransaction) -> Money {
-        startingAmounts[recurring.persistentModelID] ?? recurring.startingAmount(estimateCents: nil)
+        startingAmounts[recurring.persistentModelID] ?? recurring.currentStartingAmount()
     }
 
     /// `recurring`'s progress when it is a Purchase (``RecurringTransaction/purchaseProgress``), otherwise `nil`.

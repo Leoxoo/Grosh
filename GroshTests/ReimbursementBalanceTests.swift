@@ -153,7 +153,7 @@ struct ReimbursementBalanceTests {
         let dinner = try store.dinner()
         dinner.card = chase
         try context.payBack(20_00, on: today, to: dinner)
-        let shown = chase.statement(for: chase.period(containing: today), today: today).transactions
+        let shown = try chase.statement(for: chase.period(containing: today), today: today).transactions
 
         #expect(shown == [dinner])
         #expect(shown.charged == Money(cents: -60_00))
@@ -169,7 +169,7 @@ struct ReimbursementBalanceTests {
         coffee.card = chase
         try context.payBack(20_00, on: today, to: dinner)
 
-        let statement = chase.statement(for: chase.period(containing: today), today: today)
+        let statement = try chase.statement(for: chase.period(containing: today), today: today)
         let days = TransactionDay.days(of: statement.transactions)
 
         #expect(days.map { $0.total(.charged) } == [Money(cents: -64_00)])
@@ -183,10 +183,10 @@ struct ReimbursementBalanceTests {
         dinner.card = chase
         try context.payBack(20_00, on: today, to: dinner)
         let current = chase.period(containing: today)
-        let leadIns = chase.statement(for: current, today: today).leadIns
+        let leadIns = try chase.statement(for: current, today: today).leadIns
 
         #expect(leadIns == [dinner])
-        #expect((chase.statement(for: current, today: today).transactions + leadIns).charged == Money(cents: -60_00))
+        #expect((try chase.statement(for: current, today: today).transactions + leadIns).charged == Money(cents: -60_00))
     }
 
     @Test func theCardFiltersTotalIgnoresReimbursements() throws {
