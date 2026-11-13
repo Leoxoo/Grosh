@@ -30,7 +30,7 @@ enum BenchmarkBudgets {
         "open Transactions": 149,
         "open Wallets": 76,
         "open a Card's transactions": 88,
-        "save a new transaction with Home and Transactions open": 205,
+        "save a new transaction with Home and Transactions open": 184,
         "scroll: a screenful (13) of transaction rows": 40,
         "scroll: a screenful (13) of transaction rows paid with a Card with a photo": 41,
         "search for \"12\" and group the results by day": 83,
