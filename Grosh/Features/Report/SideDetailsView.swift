@@ -18,12 +18,21 @@ struct SideDetailsView: View {
     @AppStorage(AppSettings.comparesWithLastYear) private var comparesWithLastYear
 
     @Query private var recurringTransactions: [RecurringTransaction]
+    /// A save can change a varying Bill's estimate, so the schedules' starting amounts are read anew after each one,
+    /// rather than on every draw.
+    @StoreSaves private var saves
+    @State private var schedules = DrawingCache<AsSaved, RecurringSchedules>()
     @Environment(\.today) private var today
 
     /// The two segments of the screen below its total.
     private enum Shows: Hashable {
         case breakdown
         case trend
+    }
+
+    /// The schedules whose occurrences the comparison card adds, with what each starts at, as of the last save.
+    private var recurringSchedules: RecurringSchedules {
+        schedules.value(for: AsSaved(recurringTransactions, saves: saves)) { RecurringSchedules(recurringTransactions) }
     }
 
     var body: some View {
@@ -60,7 +69,7 @@ struct SideDetailsView: View {
             // Only a week, month, quarter or year has a graph. The period decides, not the time range: for a moment
             // after the time range changes, the period is still one of the old range.
             if let graph = history.graph(
-                side, in: period, recurring: recurringTransactions, today: today,
+                side, in: period, recurring: recurringSchedules, today: today,
                 comparingWith: MonthGraphComparison(comparesWithLastYear: comparesWithLastYear)
             ) {
                 PeriodComparisonCard(graph: graph, comparesWithLastYear: $comparesWithLastYear)

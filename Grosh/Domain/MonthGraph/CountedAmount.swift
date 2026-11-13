@@ -15,12 +15,17 @@ nonisolated struct CountedAmount {
 }
 
 nonisolated extension CountedAmount {
-    /// `amount`, as it moves a wallet, filed under `category` on `day`. Under an Expense category it counts toward Spent
-    /// turned around, so money going out adds to Spent and a refund takes away from it; under an Income category it
-    /// counts toward Income as it is. Under any other category, a Debt/Loan one or one of the app's own such as
-    /// Starting balance, it counts toward neither.
-    fileprivate init?(_ amount: Money, filedUnder category: Category?, on day: CalendarDay) {
-        guard let category else { return nil }
+    /// `amount`, as it moves a wallet, filed under `category` on `day`, in a figure written in `currencyCode`. Under an
+    /// Expense category it counts toward Spent turned around, so money going out adds to Spent and a refund takes away
+    /// from it; under an Income category it counts toward Income as it is. Under any other category, a Debt/Loan one or
+    /// one of the app's own such as Starting balance, it counts toward neither. An amount in another currency counts
+    /// toward neither too: a figure is in one currency, so a Total holding wallets in two counts those of the one it is
+    /// labelled with (``WalletSelection/currencyCode(among:)``), never adding a currency to another. Every
+    /// ``CountedAmount`` is made here, so every figure follows this rule.
+    fileprivate init?(
+        _ amount: Money, filedUnder category: Category?, on day: CalendarDay, countingIn currencyCode: String
+    ) {
+        guard let category, amount.currencyCode == currencyCode else { return nil }
         switch category.type {
         case .expense:
             self.init(
@@ -37,8 +42,8 @@ nonisolated extension CountedAmount {
 
 extension Transaction {
     /// What the transaction counts toward Spent or Income in `selection` (the Total unless another is given), or `nil`
-    /// when it counts toward neither. Only the wallets `selection` holds count, and nothing in Recently Deleted does.
-    /// Home's Month graph counts the Total.
+    /// when it counts toward neither. Only the wallets `selection` holds count, only in `currencyCode`, the selection's,
+    /// and nothing in Recently Deleted does. Home's Month graph counts the Total.
     ///
     /// A forgiven Loan or Debt counts what was forgiven, on the day it was forgiven and under the category that amount
     /// is filed under (ADR-0004). Its own Exclude from report flag doesn't matter: a Loan or Debt starts excluded, and is
@@ -51,10 +56,14 @@ extension Transaction {
     /// less those paybacks (``Transaction/totalViewNetCents``) and the payback itself counts nothing
     /// (``Transaction/isHiddenInTotal``), while a single wallet's report counts the Expense net of what came into that
     /// wallet and a payback into it as money in, under the Reimbursement category.
-    func countedAmount(in selection: WalletSelection = .total, otherIncome: Category) -> CountedAmount? {
+    func countedAmount(
+        in selection: WalletSelection = .total, currencyCode: String, otherIncome: Category
+    ) -> CountedAmount? {
         guard selection.includes(self), !isInRecentlyDeleted else { return nil }
         if let forgiveness {
-            return CountedAmount(forgiveness.reportAmount, filedUnder: forgiveness.category, on: forgiveness.day)
+            return CountedAmount(
+                forgiveness.reportAmount, filedUnder: forgiveness.category, on: forgiveness.day, countingIn: currencyCode
+            )
         }
         guard countsInReport else { return nil }
         let inTotal = selection == .total
@@ -63,17 +72,17 @@ extension Transaction {
         let net = Money(cents: cents, currencyCode: amount.currencyCode)
         if category?.type == .expense, amountCents < 0, cents >= 0 {
             guard cents > 0 else { return nil }
-            return CountedAmount(net, filedUnder: otherIncome, on: day)
+            return CountedAmount(net, filedUnder: otherIncome, on: day, countingIn: currencyCode)
         }
-        return CountedAmount(net, filedUnder: category, on: day)
+        return CountedAmount(net, filedUnder: category, on: day, countingIn: currencyCode)
     }
 }
 
 extension ScheduledOccurrence {
     /// What the occurrence would count on the Month graph: what the transaction it makes would count on its due day,
-    /// by its Recurring transaction's category, or `nil` when that counts toward neither tab. Which schedules and
-    /// wallets count is up to whoever picks the occurrences.
-    var countedAmount: CountedAmount? {
-        CountedAmount(amount, filedUnder: recurring.category, on: day)
+    /// by its Recurring transaction's category, or `nil` when that counts toward neither tab or isn't in `currencyCode`.
+    /// Which schedules and wallets count is up to whoever picks the occurrences.
+    func countedAmount(in currencyCode: String) -> CountedAmount? {
+        CountedAmount(amount, filedUnder: recurring.category, on: day, countingIn: currencyCode)
     }
 }

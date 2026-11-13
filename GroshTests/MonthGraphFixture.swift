@@ -81,7 +81,7 @@ struct MonthGraphFixture {
     ) throws -> MonthGraph {
         let month = month ?? CalendarMonth(today)
         try context.save()
-        let recurring = try context.fetch(FetchDescriptor<RecurringTransaction>())
+        let recurring = RecurringSchedules(try context.fetch(FetchDescriptor<RecurringTransaction>()))
         return try MonthGraphHistory.read(month, in: context, otherIncome: otherIncome())
             .graph(side, of: month, recurring: recurring, today: today, comparingWith: choice)
     }

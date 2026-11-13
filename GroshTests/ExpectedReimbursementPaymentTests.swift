@@ -104,7 +104,7 @@ struct ExpectedReimbursementPaymentTests {
         #expect(owed.status == .paidBack)
         #expect(owed.outstanding == Money(cents: 0))
         #expect(dinner.netCents == 10_00)
-        let counted = try #require(dinner.countedAmount(otherIncome: fixture.store.otherIncome()))
+        let counted = try #require(dinner.countedAmount(currencyCode: "USD", otherIncome: fixture.store.otherIncome()))
         #expect(counted.side == .income)
         #expect(counted.amount == Money(cents: 10_00))
         #expect(counted.category.name == "Other Income")

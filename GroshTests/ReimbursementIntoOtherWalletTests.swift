@@ -226,10 +226,10 @@ struct ReimbursementIntoOtherWalletTests {
 
         #expect(try fixture.totals(in: .wallet(checking)) == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 60_00)))
         #expect(try fixture.totals(in: .wallet(cash)) == PeriodTotals(income: Money(cents: 20_00), spent: Money(cents: 0)))
-        let counted = try #require(payback.countedAmount(in: .wallet(cash), otherIncome: otherIncome))
+        let counted = try #require(payback.countedAmount(in: .wallet(cash), currencyCode: "USD", otherIncome: otherIncome))
         #expect(counted.side == .income)
         #expect(counted.category.lockedRole == .reimbursement)
-        #expect(payback.countedAmount(in: .total, otherIncome: otherIncome) == nil)
+        #expect(payback.countedAmount(in: .total, currencyCode: "USD", otherIncome: otherIncome) == nil)
     }
 
     @Test func paybacksBeyondTheExpenseCountTheExtraAsOtherIncomeInTheTotal() throws {
@@ -237,7 +237,7 @@ struct ReimbursementIntoOtherWalletTests {
         let dinner = try fixture.dinner(40_00, owing: [(alex, 30_00)])
         try fixture.pay(50_00, on: fixture.expectation(of: alex, on: dinner), day: receivedDay, into: cash)
 
-        let counted = try #require(dinner.countedAmount(otherIncome: fixture.store.otherIncome()))
+        let counted = try #require(dinner.countedAmount(currencyCode: "USD", otherIncome: fixture.store.otherIncome()))
 
         #expect(counted.side == .income)
         #expect(counted.amount == Money(cents: 10_00))

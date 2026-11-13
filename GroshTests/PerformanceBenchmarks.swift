@@ -153,7 +153,7 @@ struct PerformanceBenchmarks {
         try time("Home Month graph work for a month 2½ years back") {
             let context = container.mainContext
             let month = CalendarMonth(today).adding(months: -30)
-            let recurring = try context.fetch(FetchDescriptor<RecurringTransaction>())
+            let recurring = RecurringSchedules(try context.fetch(FetchDescriptor<RecurringTransaction>()))
             let history = try MonthGraphHistory.read(month, in: context, otherIncome: context.otherCategory(.income))
             _ = history.strip(.month, today: today)
             for side in SpentOrIncome.allCases {

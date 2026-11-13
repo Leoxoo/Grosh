@@ -8,8 +8,6 @@ struct PastOccurrencesView: View {
     let recurring: RecurringTransaction
     /// The days offered, in order.
     let days: [CalendarDay]
-    /// What each picked day's transaction is for, a varying Bill's estimate read once when the prompt opens.
-    private let startingAmount: Money
 
     @Environment(\.dismiss) private var dismiss
     @State private var selected: Set<CalendarDay> = []
@@ -18,15 +16,22 @@ struct PastOccurrencesView: View {
     init(recurring: RecurringTransaction, days: [CalendarDay]) {
         self.recurring = recurring
         self.days = days
-        startingAmount = recurring.currentStartingAmount()
     }
 
     var body: some View {
+        // What each picked day's transaction is for, a varying Bill's estimate read once when the prompt opens.
+        MadeOnce { recurring.currentStartingAmount() } content: { startingAmount in
+            list(startingAmount: startingAmount)
+        }
+        .failureAlert(saver)
+    }
+
+    private func list(startingAmount: Money) -> some View {
         NavigationStack {
             List {
                 Section {
                     ForEach(days, id: \.self) { day in
-                        row(day)
+                        row(day, startingAmount: startingAmount)
                     }
                 } footer: {
                     Text(Strings.Recurring.pastOccurrencesFooter)
@@ -49,10 +54,9 @@ struct PastOccurrencesView: View {
                 }
             }
         }
-        .failureAlert(saver)
     }
 
-    private func row(_ day: CalendarDay) -> some View {
+    private func row(_ day: CalendarDay, startingAmount: Money) -> some View {
         let isSelected = selected.contains(day)
         return Button {
             if isSelected {

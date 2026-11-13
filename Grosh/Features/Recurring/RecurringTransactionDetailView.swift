@@ -19,6 +19,10 @@ struct RecurringTransactionDetailView: View {
     @State private var isLinking = false
     @State private var isConfirmingDelete = false
     @State private var errorMessage: String?
+    /// A save can change a varying Bill's estimate, so what its transactions start at is read anew after each one,
+    /// rather than on every draw.
+    @StoreSaves private var saves
+    @State private var startingAmount = DrawingCache<AsSaved, Money>()
 
     var body: some View {
         // Once the schedule is deleted from this screen nothing is read from it, since a deleted model still on screen
@@ -39,7 +43,9 @@ struct RecurringTransactionDetailView: View {
                         Text(recurring.name)
                             .font(.title3.weight(.semibold))
                         HStack(spacing: 6) {
-                            AmountText(amount: recurring.currentStartingAmount())
+                            AmountText(amount: startingAmount.value(for: AsSaved([recurring], saves: saves)) {
+                                recurring.currentStartingAmount()
+                            })
                             if recurring.estimatesAmount {
                                 EstimatedBadge()
                             }

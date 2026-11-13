@@ -95,7 +95,7 @@ struct MonthGraphProjectionTests {
 
         let scheduled = spent.popup(on: day(2026, 10, 20)).scheduled
         #expect(scheduled.map(\.recurring.name) == ["Electricity"])
-        #expect(scheduled.compactMap(\.countedAmount?.amount) == [Money(cents: 60_00)])
+        #expect(scheduled.compactMap { $0.countedAmount(in: "USD")?.amount } == [Money(cents: 60_00)])
         #expect(spent.expectedByPeriodEnd == Money(cents: 60_00))
     }
 
@@ -132,6 +132,21 @@ struct MonthGraphProjectionTests {
             #expect(card.scheduledLine == nil)
             #expect(card.expectedByPeriodEnd == nil)
         }
+    }
+
+    /// The Total is labelled in dollars, Checking's currency, so a schedule paid in euros adds nothing to its dotted
+    /// line or its popup, as a transaction in euros adds nothing to its line.
+    @Test func aScheduleInAnotherCurrencyThanTheTotalsAddsNothing() throws {
+        let euros = try Wallet.create(
+            name: "Euros", startingBalance: Money(cents: 300_00, currencyCode: "EUR"), on: day(2026, 5, 1), in: context
+        )
+        try schedule("Netflix", 15_99, "Streaming Service", starting: day(2026, 10, 20))
+        try schedule("Spotify", 9_99, "Streaming Service", starting: day(2026, 10, 20), wallet: euros)
+
+        let spent = try store.graph(.spent)
+
+        #expect(spent.popup(on: day(2026, 10, 20)).scheduled.map(\.recurring.name) == ["Netflix"])
+        #expect(spent.expectedByPeriodEnd == Money(cents: 15_99))
     }
 
     /// Weekly from October 31: the month's last day counts, November 7 doesn't. One starting November 1 adds nothing.
@@ -192,7 +207,7 @@ struct MonthGraphProjectionTests {
         #expect(twentieth.total == nil)
         let twentiethByName = twentieth.scheduled.sorted { $0.recurring.name < $1.recurring.name }
         #expect(twentiethByName.map(\.recurring.name) == ["Gym", "Netflix"])
-        #expect(twentiethByName.compactMap(\.countedAmount?.amount) == [Money(cents: 30_00), Money(cents: 15_99)])
+        #expect(twentiethByName.compactMap { $0.countedAmount(in: "USD")?.amount } == [Money(cents: 30_00), Money(cents: 15_99)])
         #expect(twentieth.expected == Money(cents: 85_99))
         #expect(twentyFourth.scheduled.isEmpty)
         #expect(twentyFourth.expected == Money(cents: 85_99))

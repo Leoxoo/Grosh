@@ -18,7 +18,7 @@ struct PeriodGraphTests {
     /// Income and Spent details draw it.
     private func graph(_ side: SpentOrIncome = .spent, _ period: Period) throws -> MonthGraph {
         try #require(
-            store.history().graph(side, in: period, recurring: [], today: today, comparingWith: .average)
+            store.history().graph(side, in: period, recurring: .none, today: today, comparingWith: .average)
         )
     }
 

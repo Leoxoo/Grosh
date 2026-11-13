@@ -125,7 +125,7 @@ struct ExpectedReimbursementTests {
         #expect([plain].net == Money(cents: -60_00))
         #expect(try fixture.totals() == totalsBefore)
         #expect(try fixture.store.graph(.spent).headline == graphBefore)
-        #expect(plain.countedAmount(otherIncome: try fixture.store.otherIncome())?.amount == Money(cents: 60_00))
+        #expect(plain.countedAmount(currencyCode: "USD", otherIncome: try fixture.store.otherIncome())?.amount == Money(cents: 60_00))
     }
 
     @Test func editingAndRemovingAnExpectationChangesNoBalanceOrReport() throws {

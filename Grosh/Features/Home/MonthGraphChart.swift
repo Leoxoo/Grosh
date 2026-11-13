@@ -25,7 +25,9 @@ struct MonthGraphChart: View {
                 .foregroundStyle(Color.secondary.opacity(0.5))
                 .lineStyle(StrokeStyle(lineWidth: 1))
                 .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                    MonthGraphPopup(popup: popup, comparisonName: graph.comparison.name)
+                    MonthGraphPopup(
+                        popup: popup, currencyCode: graph.currencyCode, comparisonName: graph.comparison.name
+                    )
                 }
 
             if let comparisonLine = graph.comparisonLine {
@@ -135,6 +137,8 @@ struct MonthGraphChart: View {
 /// it.
 private struct MonthGraphPopup: View {
     let popup: MonthGraph.Popup
+    /// The currency the graph's totals are in, which what is scheduled counts in.
+    let currencyCode: String
     /// What the legend calls the gray line: "Average" or "Last year".
     let comparisonName: String
 
@@ -155,7 +159,7 @@ private struct MonthGraphPopup: View {
             }
             ForEach(popup.scheduled) { occurrence in
                 // Each counts toward the tab, by what it adds to the tab's total.
-                if let counted = occurrence.countedAmount {
+                if let counted = occurrence.countedAmount(in: currencyCode) {
                     Text(Strings.Home.namedAmount(occurrence.recurring.name, counted.amount.formatted()))
                         .font(.caption)
                         .monospacedDigit()

@@ -27,7 +27,7 @@ struct MonthGraph {
         /// The gray line's total through the end of the day, or `nil` when the tab has no gray line.
         let comparison: Money?
         /// The Occurrences the Recurring transactions have due on the day, the most recently added schedule first, each
-        /// adding its `countedAmount` to the tab's total: only on a day after today in the current period.
+        /// adding its `countedAmount(in:)` to the tab's total: only on a day after today in the current period.
         let scheduled: [ScheduledOccurrence]
         /// Today's total plus what is due through the end of the day, on a day after today once something due has
         /// fallen on or before it; otherwise `nil`.
@@ -64,7 +64,7 @@ struct MonthGraph {
     /// selection's (``WalletSelection/currencyCode(among:)``).
     init(
         _ side: SpentOrIncome, of counted: [CountedAmount], countingFrom firstDay: CalendarDay?,
-        recurring: [RecurringTransaction] = [], in period: Period, today: CalendarDay,
+        recurring: RecurringSchedules = .none, in period: Period, today: CalendarDay,
         comparingWith choice: MonthGraphComparison = .average, selection: WalletSelection = .total,
         currencyCode: String
     ) {

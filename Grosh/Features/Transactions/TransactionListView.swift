@@ -26,6 +26,10 @@ private struct TransactionListContent: View {
 
     @NotDeletedTransactions private var transactions: [Transaction]
     @Query private var recurringTransactions: [RecurringTransaction]
+    /// A save can change a varying Bill's estimate, so Future's Scheduled rows read the schedules' starting amounts
+    /// anew after each one, rather than on every draw.
+    @StoreSaves private var saves
+    @State private var schedules = DrawingCache<AsSaved, RecurringSchedules>()
     @Environment(\.today) private var today
     @State private var walletSelection = WalletSelection.total
     /// How long each period in the strip is, chosen in the "…" menu.
@@ -72,7 +76,10 @@ private struct TransactionListContent: View {
         )
         // Future's Scheduled rows are listed by day, and only while nothing is searched, filtered or being selected.
         let scheduled: [ScheduledOccurrence] = period == .future && grouping == .day && !filter.isOn && !isSelecting
-            ? recurringTransactions.scheduledOccurrences(selection: walletSelection, today: today)
+            ? schedules.value(for: AsSaved(recurringTransactions, saves: saves)) {
+                RecurringSchedules(recurringTransactions)
+            }
+            .scheduledOccurrences(selection: walletSelection, today: today)
             : []
         let highlighted = isSelecting ? chosen : Set([selectedTransaction].compactMap { $0 })
 

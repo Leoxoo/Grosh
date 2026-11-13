@@ -8,21 +8,10 @@ struct MadeOnce<Value, Content: View>: View {
     let make: () -> Value
     @ViewBuilder let content: (Value) -> Content
 
-    @State private var made = Made()
+    /// Kept under one key, so it is made only once.
+    @State private var made = DrawingCache<Bool, Value>()
 
     var body: some View {
-        content(made.value(make))
-    }
-
-    /// Holds the value once it is made. Filling it in doesn't redraw anything, so it is safe to do while drawing.
-    private final class Made {
-        private var value: Value?
-
-        func value(_ make: () -> Value) -> Value {
-            if let value { return value }
-            let made = make()
-            value = made
-            return made
-        }
+        content(made.value(for: true, make: make))
     }
 }

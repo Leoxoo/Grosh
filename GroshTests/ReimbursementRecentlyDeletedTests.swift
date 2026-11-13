@@ -49,7 +49,7 @@ struct ReimbursementRecentlyDeletedTests {
         try dinner.delete(.onlySelected, at: deletedAt)
 
         #expect(walletBalance(checking, asOf: today) == Money(cents: 0))
-        #expect(dinner.countedAmount(otherIncome: try store.otherIncome()) == nil)
+        #expect(dinner.countedAmount(currencyCode: "USD", otherIncome: try store.otherIncome()) == nil)
         #expect(try store.totals() == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
         #expect(try store.graph(.spent).headline == Money(cents: 0))
     }
@@ -63,7 +63,7 @@ struct ReimbursementRecentlyDeletedTests {
         #expect(!dinner.isInRecentlyDeleted)
         #expect(dinner.netCents == -25_00)
         #expect(walletBalance(checking, asOf: today) == Money(cents: -25_00))
-        #expect(dinner.countedAmount(otherIncome: try store.otherIncome())?.amount == Money(cents: 25_00))
+        #expect(dinner.countedAmount(currencyCode: "USD", otherIncome: try store.otherIncome())?.amount == Money(cents: 25_00))
         #expect(try store.graph(.spent).headline == Money(cents: 25_00))
     }
 

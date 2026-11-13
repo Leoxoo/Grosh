@@ -50,10 +50,10 @@ struct CountedHistoryTests {
         try store.record(-15_00, "Café", on: day(2026, 10, 4))
         let total = try store.history()
 
-        #expect(total.graph(.spent, in: .all, recurring: [], today: today, comparingWith: .average) == nil)
-        #expect(total.graph(.spent, in: .day(today), recurring: [], today: today, comparingWith: .average) == nil)
+        #expect(total.graph(.spent, in: .all, recurring: .none, today: today, comparingWith: .average) == nil)
+        #expect(total.graph(.spent, in: .day(today), recurring: .none, today: today, comparingWith: .average) == nil)
         let week = total.graph(
-            .spent, in: .week(startingOn: day(2026, 10, 4)), recurring: [], today: today, comparingWith: .average
+            .spent, in: .week(startingOn: day(2026, 10, 4)), recurring: .none, today: today, comparingWith: .average
         )
         #expect(week?.headline == Money(cents: 15_00))
     }

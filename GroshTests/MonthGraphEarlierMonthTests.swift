@@ -75,6 +75,24 @@ struct MonthGraphEarlierMonthTests {
         #expect(try store.strip() == [.month(month(2026, 8)), .month(month(2026, 9)), .month(month(2026, 10))])
     }
 
+    /// The Total is labelled in dollars, Checking's currency, so the older euro wallet's transactions count on neither
+    /// card: the strip starts in September, with Checking's first, as the Report's does. There are more of them than the
+    /// earliest transactions Home reads, so they would hide September's if the store read them too.
+    @Test func theStripStartsWithTheFirstTransactionInTheTotalsCurrency() throws {
+        let euros = try Wallet.create(
+            name: "Euros", startingBalance: Money(cents: 300_00, currencyCode: "EUR"), on: day(2026, 1, 1), in: context
+        )
+        for number in 1...MonthGraphHistory.earliestCandidateCount + 2 {
+            try store.record(-5_00, "Café", on: day(2026, 1, number), in: euros)
+        }
+        try store.record(-25_00, "Café", on: day(2026, 9, 5))
+
+        let strip = try store.strip()
+
+        #expect(strip == [.month(month(2026, 9)), .month(month(2026, 10))])
+        #expect(try strip == store.history().strip(.month, today: today))
+    }
+
     /// July's only transaction that counts is deleted, so the strip drops July: a card left on July shows this month,
     /// and one on September stays there.
     @Test func aMonthTheStripNoLongerOffersGivesWayToThisMonth() throws {

@@ -4,7 +4,8 @@
 /// It takes every Occurrence after today through the period's last day of every active schedule paid from the wallets
 /// the selection holds, honouring each schedule's end and what has been dealt with: not only the next one Future lists for
 /// a schedule that repeats forever. A varying Bill counts its estimate, and each Occurrence counts by its category as its
-/// transaction would. It is a projection, computed on demand (ADR-0005): it changes no balance, report or transaction.
+/// transaction would. Only what is due in the tab's currency counts, as for its transactions (``CountedAmount``). It
+/// is a projection, computed on demand (ADR-0005): it changes no balance, report or transaction.
 struct MonthGraphProjection {
     /// What is still due for the tab: the Occurrences that count toward it.
     private let scheduled: [ScheduledOccurrence]
@@ -16,18 +17,22 @@ struct MonthGraphProjection {
     /// What `recurring` still has due for `side` in `span` as it stands on `today`, on top of `todaysTotal`, or `nil` when
     /// `today` isn't in the span or nothing is due for the tab. `selection` is the wallets whose Occurrences count.
     init?(
-        _ side: SpentOrIncome, of recurring: [RecurringTransaction],
+        _ side: SpentOrIncome, of recurring: RecurringSchedules,
         in span: GraphSpan, selection: WalletSelection, today: CalendarDay, todaysTotal: Money
     ) {
         guard span.contains(today) else { return nil }
-        let scheduled = recurring
-            .scheduledOccurrences(selection: selection, today: today, through: span.last)
-            .filter { $0.countedAmount?.side == side }
+        let currencyCode = todaysTotal.currencyCode
+        var scheduled: [ScheduledOccurrence] = []
+        var counted: [CountedAmount] = []
+        for occurrence in recurring.scheduledOccurrences(selection: selection, today: today, through: span.last) {
+            guard let amount = occurrence.countedAmount(in: currencyCode), amount.side == side else { continue }
+            scheduled.append(occurrence)
+            counted.append(amount)
+        }
         guard !scheduled.isEmpty else { return nil }
         self.scheduled = scheduled
         mostOnADay = Dictionary(grouping: scheduled, by: \.day).values.map(\.count).max() ?? 0
-        let currencyCode = todaysTotal.currencyCode
-        dailyTotals = scheduled.compactMap(\.countedAmount)
+        dailyTotals = counted
             .dailyTotals(side, in: span, through: span.last, currencyCode: currencyCode)
             .filter { $0.day >= today }
             .map { daily in

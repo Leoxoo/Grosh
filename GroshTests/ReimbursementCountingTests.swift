@@ -28,7 +28,7 @@ struct ReimbursementCountingTests {
         let dinner = try store.recordDinner()
         try payBack(20_00, on: day(2026, 10, 8), to: dinner)
 
-        let counted = try #require(dinner.countedAmount(otherIncome: store.otherIncome()))
+        let counted = try #require(dinner.countedAmount(currencyCode: "USD", otherIncome: store.otherIncome()))
 
         #expect(counted.side == .spent)
         #expect(counted.amount == Money(cents: 40_00))
@@ -40,7 +40,7 @@ struct ReimbursementCountingTests {
         let dinner = try store.recordDinner()
         try payBack(60_00, to: dinner)
 
-        #expect(dinner.countedAmount(otherIncome: try store.otherIncome()) == nil)
+        #expect(dinner.countedAmount(currencyCode: "USD", otherIncome: try store.otherIncome()) == nil)
         #expect(try store.totals() == PeriodTotals(income: Money(cents: 0), spent: Money(cents: 0)))
     }
 
@@ -48,7 +48,7 @@ struct ReimbursementCountingTests {
         let dinner = try store.recordDinner()
         try payBack(100_00, on: day(2026, 10, 8), to: dinner)
 
-        let counted = try #require(dinner.countedAmount(otherIncome: store.otherIncome()))
+        let counted = try #require(dinner.countedAmount(currencyCode: "USD", otherIncome: store.otherIncome()))
 
         #expect(counted.side == .income)
         #expect(counted.amount == Money(cents: 40_00))
@@ -62,7 +62,7 @@ struct ReimbursementCountingTests {
         try payBack(100_00, to: dinner)
         let readOnce = try store.category("Tips", .income)
 
-        #expect(dinner.countedAmount(otherIncome: readOnce)?.category == readOnce)
+        #expect(dinner.countedAmount(currencyCode: "USD", otherIncome: readOnce)?.category == readOnce)
     }
 
     @Test func severalReimbursementsCountTogether() throws {
@@ -70,33 +70,33 @@ struct ReimbursementCountingTests {
         try payBack(20_00, to: dinner)
         try payBack(15_00, to: dinner)
 
-        #expect(dinner.countedAmount(otherIncome: try store.otherIncome())?.amount == Money(cents: 25_00))
+        #expect(dinner.countedAmount(currencyCode: "USD", otherIncome: try store.otherIncome())?.amount == Money(cents: 25_00))
         #expect(try store.totals().spent == Money(cents: 25_00))
 
         try payBack(30_00, to: dinner)
 
-        #expect(dinner.countedAmount(otherIncome: try store.otherIncome())?.side == .income)
-        #expect(dinner.countedAmount(otherIncome: try store.otherIncome())?.amount == Money(cents: 5_00))
+        #expect(dinner.countedAmount(currencyCode: "USD", otherIncome: try store.otherIncome())?.side == .income)
+        #expect(dinner.countedAmount(currencyCode: "USD", otherIncome: try store.otherIncome())?.amount == Money(cents: 5_00))
     }
 
     @Test func removingAReimbursementCountsTheExpenseAgain() throws {
         let dinner = try store.recordDinner()
         let entry = try payBack(60_00, to: dinner)
-        #expect(dinner.countedAmount(otherIncome: try store.otherIncome()) == nil)
+        #expect(dinner.countedAmount(currencyCode: "USD", otherIncome: try store.otherIncome()) == nil)
 
         try entry.delete()
 
-        #expect(dinner.countedAmount(otherIncome: try store.otherIncome())?.side == .spent)
-        #expect(dinner.countedAmount(otherIncome: try store.otherIncome())?.amount == Money(cents: 60_00))
+        #expect(dinner.countedAmount(currencyCode: "USD", otherIncome: try store.otherIncome())?.side == .spent)
+        #expect(dinner.countedAmount(currencyCode: "USD", otherIncome: try store.otherIncome())?.amount == Money(cents: 60_00))
     }
 
     @Test func anExpenseWithoutReimbursementsCountsAsBefore() throws {
         let dinner = try store.recordDinner()
         let refund = try store.record(30_00, "Clothing", on: day(2026, 10, 6))
 
-        #expect(dinner.countedAmount(otherIncome: try store.otherIncome())?.amount == Money(cents: 60_00))
-        #expect(refund.countedAmount(otherIncome: try store.otherIncome())?.side == .spent)
-        #expect(refund.countedAmount(otherIncome: try store.otherIncome())?.amount == Money(cents: -30_00))
+        #expect(dinner.countedAmount(currencyCode: "USD", otherIncome: try store.otherIncome())?.amount == Money(cents: 60_00))
+        #expect(refund.countedAmount(currencyCode: "USD", otherIncome: try store.otherIncome())?.side == .spent)
+        #expect(refund.countedAmount(currencyCode: "USD", otherIncome: try store.otherIncome())?.amount == Money(cents: -30_00))
     }
 
     @Test func aReimbursedExpenseExcludedFromReportCountsInNeither() throws {
@@ -104,7 +104,7 @@ struct ReimbursementCountingTests {
         try payBack(100_00, to: dinner)
         dinner.isExcludedFromReport = true
 
-        #expect(dinner.countedAmount(otherIncome: try store.otherIncome()) == nil)
+        #expect(dinner.countedAmount(currencyCode: "USD", otherIncome: try store.otherIncome()) == nil)
     }
 
     @Test func whenTheMoneyWasPaidBackDoesntMoveWhatCountsToAnotherPeriod() throws {

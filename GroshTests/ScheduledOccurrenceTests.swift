@@ -112,7 +112,7 @@ struct ScheduledOccurrenceTests {
         let electricity = try RecurringTransaction.create(draft, today: today, in: context)
         let netflix = try makeSchedule(starting: day(2026, 10, 12))
 
-        let rows = [electricity, netflix].scheduledOccurrences(selection: .total, today: today)
+        let rows = RecurringSchedules([electricity, netflix]).scheduledOccurrences(selection: .total, today: today)
 
         #expect(rows.filter { $0.recurring === electricity }.map(\.isEstimated) == [true])
         #expect(rows.filter { $0.recurring === netflix }.map(\.isEstimated) == [false])
@@ -132,7 +132,7 @@ struct ScheduledOccurrenceTests {
         draft = store.estimated(draft)
         let bill = try RecurringTransaction.create(draft, today: today, in: context)
 
-        let rows = [bill].scheduledOccurrences(selection: .total, today: today)
+        let rows = RecurringSchedules([bill]).scheduledOccurrences(selection: .total, today: today)
 
         #expect(!rows.isEmpty)
         #expect(rows.allSatisfy { $0.amount.cents == -5_000 && $0.isEstimated })
@@ -144,8 +144,8 @@ struct ScheduledOccurrenceTests {
         let kept = try makeSchedule(starting: day(2026, 10, 12), preset: .weekly, wallet: savings)
         let schedules = [checking, kept]
 
-        let total = schedules.scheduledOccurrences(selection: .total, today: today)
-        let inSavings = schedules.scheduledOccurrences(selection: .wallet(savings), today: today)
+        let total = RecurringSchedules(schedules).scheduledOccurrences(selection: .total, today: today)
+        let inSavings = RecurringSchedules(schedules).scheduledOccurrences(selection: .wallet(savings), today: today)
 
         #expect(total.count == 1)
         #expect(total.allSatisfy { $0.recurring == checking })
@@ -157,7 +157,7 @@ struct ScheduledOccurrenceTests {
         let daily = try makeSchedule(starting: day(2026, 10, 12), preset: .daily, end: .afterCount(3))
         let weekly = try makeSchedule(starting: day(2026, 10, 12), preset: .weekly, end: .afterCount(3))
 
-        let days = [daily, weekly].scheduledOccurrences(selection: .total, today: today).map(\.day)
+        let days = RecurringSchedules([daily, weekly]).scheduledOccurrences(selection: .total, today: today).map(\.day)
 
         #expect(days.first == day(2026, 10, 26))
         #expect(days == days.sorted(by: >))
@@ -165,7 +165,7 @@ struct ScheduledOccurrenceTests {
 
     @Test func aDayListsItsTransactionsThenItsScheduledRowsAndTotalsOnlyTheTransactions() throws {
         let netflix = try makeSchedule(starting: day(2026, 10, 20), end: .afterCount(3))
-        let rows = [netflix].scheduledOccurrences(selection: .total, today: today)
+        let rows = RecurringSchedules([netflix]).scheduledOccurrences(selection: .total, today: today)
         let lunch = Transaction.insert(
             cents: -5_00, on: day(2026, 10, 20), wallet: store.checking, category: nil, in: context
         )
@@ -183,7 +183,7 @@ struct ScheduledOccurrenceTests {
 
     @Test func futureListsTransactionsEnteredForAFutureDayAlongsideScheduledRows() throws {
         let netflix = try makeSchedule(starting: day(2026, 10, 20), end: .afterCount(3))
-        let rows = [netflix].scheduledOccurrences(selection: .total, today: today)
+        let rows = RecurringSchedules([netflix]).scheduledOccurrences(selection: .total, today: today)
         let dinner = Transaction.insert(
             cents: -40_00, on: day(2026, 11, 3), wallet: store.checking, category: nil, in: context
         )

@@ -8,8 +8,8 @@ import SwiftData
 /// (``MonthGraphComparison/monthsRead(for:)``). Everything else it needs is the first day anything counts, where the
 /// strip starts and the Average counts months from.
 ///
-/// Home reads these with `@Query` and puts them together with ``firstDay(earliest:forgiven:otherIncome:)`` and
-/// ``history(read:forgiven:firstDay:wallets:otherIncome:)``. ``read(_:in:otherIncome:)`` does the same from a model
+/// Home reads these with `@Query` and puts them together with ``firstDay(earliest:forgiven:currencyCode:otherIncome:)`` and
+/// ``history(read:forgiven:firstDay:currencyCode:otherIncome:)``. ``read(_:in:otherIncome:)`` does the same from a model
 /// context, for tests and the benchmark, so they go through Home's own wiring.
 enum MonthGraphHistory {
     /// The months the graph of `month` sums, oldest first: those its comparisons read, then `month` itself.
@@ -41,20 +41,20 @@ enum MonthGraphHistory {
         FetchDescriptor(predicate: #Predicate { $0.deletedAt == nil && $0.forgivenCents != nil })
     }
 
-    /// How many of the earliest transactions ``earliestCounted`` reads.
+    /// How many of the earliest transactions ``earliestCounted(currencyCode:)`` reads.
     static let earliestCandidateCount = 10
 
     /// The earliest transactions that may count their own amount on the Month graph, earliest first. Every one
-    /// ``Transaction/countedAmount(in:otherIncome:)`` counts in the Total passes, and every one the store can tell counts
-    /// nothing is left out: it must be outside Recently Deleted, paid from a wallet counted in the Total, counting in the
+    /// ``Transaction/countedAmount(in:currencyCode:otherIncome:)`` counts in the Total passes, and every one the store can tell counts
+    /// nothing is left out: it must be outside Recently Deleted, paid from a wallet counted in the Total in `currencyCode` (the Total's), counting in the
     /// report, filed under an Expense or Income category that isn't a transfer half, and neither a payback the Total
     /// leaves out (``Transaction/isHiddenInTotal``) nor an Expense its Reimbursements cover exactly.
     ///
     /// The store can't add up what was paid back into other wallets (``Transaction/totalViewNetCents``), so an Expense
     /// with such paybacks passes, and counts nothing when they cover it exactly. That is why it reads a few, of which
-    /// ``firstDay(earliest:forgiven:otherIncome:)`` takes the first that counts. A Loan or Debt is filed under a
+    /// ``firstDay(earliest:forgiven:currencyCode:otherIncome:)`` takes the first that counts. A Loan or Debt is filed under a
     /// Debt/Loan category, so a forgiven one is never among them: see ``forgiven``.
-    static var earliestCounted: FetchDescriptor<Transaction> {
+    static func earliestCounted(currencyCode: String) -> FetchDescriptor<Transaction> {
         let expense: String? = CategoryType.expense.rawValue
         let income: String? = CategoryType.income.rawValue
         let outgoingTransfer: String? = LockedRole.outgoingTransfer.rawValue
@@ -62,7 +62,7 @@ enum MonthGraphHistory {
         let reimbursement: String? = LockedRole.reimbursement.rawValue
         let inTotal = #Predicate<Transaction> { transaction in
             transaction.wallet?.isArchived == false && transaction.wallet?.includeInTotal == true
-                && transaction.wallet?.deletedAt == nil
+                && transaction.wallet?.deletedAt == nil && transaction.wallet?.currencyCode == currencyCode
         }
         // The store compares a missing value with nothing, so a missing one is let through by a term of its own.
         let notATransferHalf = #Predicate<Transaction> { transaction in
@@ -115,32 +115,39 @@ enum MonthGraphHistory {
     }
 
     /// The first day anything counts on the Month graph, on either tab, or `nil` when nothing does: the earlier of the
-    /// day of the first ``earliestCounted`` transaction that counts and the day of the first forgiveness that counts.
-    static func firstDay(earliest: [Transaction], forgiven: [Transaction], otherIncome: Category) -> CalendarDay? {
-        (earliest + forgiven).compactMap { $0.countedAmount(otherIncome: otherIncome) }.firstDay
+    /// day of the first ``earliestCounted(currencyCode:)`` transaction that counts and the day of the first forgiveness that counts.
+    static func firstDay(
+        earliest: [Transaction], forgiven: [Transaction], currencyCode: String, otherIncome: Category
+    ) -> CalendarDay? {
+        (earliest + forgiven)
+            .compactMap { $0.countedAmount(currencyCode: currencyCode, otherIncome: otherIncome) }
+            .firstDay
     }
 
     /// The history Home draws a month's graph from: what counts in the Total among `read`, the month's
-    /// ``transactions(for:)``, and `forgiven`, counting from `firstDay`, in the Total's currency among `wallets`, the
-    /// unarchived wallets in the user's order (``WalletSelection/currencyCode(among:)``).
+    /// ``transactions(for:)``, and `forgiven`, counting from `firstDay`, in `currencyCode`, the Total's
+    /// (``WalletSelection/currencyCode(among:)``).
     static func history(
-        read: [Transaction], forgiven: [Transaction], firstDay: CalendarDay?, wallets: [Wallet], otherIncome: Category
+        read: [Transaction], forgiven: [Transaction], firstDay: CalendarDay?, currencyCode: String,
+        otherIncome: Category
     ) -> CountedHistory {
-        CountedHistory(
-            read + forgiven, currencyCode: WalletSelection.total.currencyCode(among: wallets), otherIncome: otherIncome,
-            firstDay: firstDay
-        )
+        CountedHistory(read + forgiven, currencyCode: currencyCode, otherIncome: otherIncome, firstDay: firstDay)
     }
 
-    /// The history of `month`, read from `context` in one call as Home reads it through its queries: the same
-    /// ``firstDay(earliest:forgiven:otherIncome:)`` and ``history(read:forgiven:firstDay:wallets:otherIncome:)`` over
-    /// the same descriptors. Home itself never calls it; the tests and benchmarks read Home's history with it.
+    /// The history of `month`, read from `context` in one call as Home reads it through its queries: the Total's
+    /// currency among the unarchived wallets, then the same ``firstDay(earliest:forgiven:currencyCode:otherIncome:)``
+    /// and ``history(read:forgiven:firstDay:currencyCode:otherIncome:)`` over the same descriptors. Home itself never
+    /// calls it; the tests and benchmarks read Home's history with it.
     static func read(_ month: CalendarMonth, in context: ModelContext, otherIncome: Category) throws -> CountedHistory {
+        let currencyCode = WalletSelection.total.currencyCode(among: try context.fetch(Wallet.unarchived))
         let forgiven = try context.fetch(Self.forgiven)
-        let firstDay = firstDay(earliest: try context.fetch(earliestCounted), forgiven: forgiven, otherIncome: otherIncome)
+        let firstDay = firstDay(
+            earliest: try context.fetch(earliestCounted(currencyCode: currencyCode)), forgiven: forgiven,
+            currencyCode: currencyCode, otherIncome: otherIncome
+        )
         return history(
             read: try context.fetch(transactions(for: month)), forgiven: forgiven, firstDay: firstDay,
-            wallets: try context.fetch(Wallet.unarchived), otherIncome: otherIncome
+            currencyCode: currencyCode, otherIncome: otherIncome
         )
     }
 }
