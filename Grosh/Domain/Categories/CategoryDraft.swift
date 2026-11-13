@@ -59,8 +59,8 @@ nonisolated struct CategoryDraft {
     }
 }
 
-extension CategoryDraft: ValidatedDraft {}
+nonisolated extension CategoryDraft: ValidatedDraft {}
 
-extension CategoryRuleError: EmptyFieldError {
+nonisolated extension CategoryRuleError: EmptyFieldError {
     var isEmptyField: Bool { self == .nameRequired }
 }

@@ -16,12 +16,12 @@ nonisolated extension AmountDraft {
     var amount: Money { Money(cents: entry.cents ?? 0, currencyCode: currencyCode) }
 }
 
-extension TransactionDraft: AmountDraft {}
-extension TransferDraft: AmountDraft {}
-extension TransferHalfDraft: AmountDraft {}
-extension RecurringDraft: AmountDraft {}
-extension ReimbursementDraft: AmountDraft {}
-extension ExpectationPaymentDraft: AmountDraft {}
+nonisolated extension TransactionDraft: AmountDraft {}
+nonisolated extension TransferDraft: AmountDraft {}
+nonisolated extension TransferHalfDraft: AmountDraft {}
+nonisolated extension RecurringDraft: AmountDraft {}
+nonisolated extension ReimbursementDraft: AmountDraft {}
+nonisolated extension ExpectationPaymentDraft: AmountDraft {}
 extension DebtPaymentDraft: AmountDraft {}
-extension StartingBalanceDraft: AmountDraft {}
-extension SplitPart: AmountDraft {}
+nonisolated extension StartingBalanceDraft: AmountDraft {}
+nonisolated extension SplitPart: AmountDraft {}

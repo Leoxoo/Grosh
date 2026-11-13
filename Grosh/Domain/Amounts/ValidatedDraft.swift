@@ -51,41 +51,41 @@ nonisolated extension ValidatedDraft {
     var shownProblem: Error? { check.shownProblem }
 }
 
-extension TransactionDraft: ValidatedDraft {}
-extension TransferDraft: ValidatedDraft {}
-extension TransferHalfDraft: ValidatedDraft {}
-extension RecurringDraft: ValidatedDraft {}
-extension ReimbursementDraft: ValidatedDraft {}
-extension BalanceAdjustmentDraft: ValidatedDraft {}
-extension WalletDraft: ValidatedDraft {}
-extension CardDraft: ValidatedDraft {}
+nonisolated extension TransactionDraft: ValidatedDraft {}
+nonisolated extension TransferDraft: ValidatedDraft {}
+nonisolated extension TransferHalfDraft: ValidatedDraft {}
+nonisolated extension RecurringDraft: ValidatedDraft {}
+nonisolated extension ReimbursementDraft: ValidatedDraft {}
+nonisolated extension BalanceAdjustmentDraft: ValidatedDraft {}
+nonisolated extension WalletDraft: ValidatedDraft {}
+nonisolated extension CardDraft: ValidatedDraft {}
 extension DebtPaymentDraft: ValidatedDraft {}
 extension ForgiveDraft: ValidatedDraft {}
-extension SplitDraft: ValidatedDraft {}
-extension SplitPart: ValidatedDraft {}
-extension StartingBalanceDraft: ValidatedDraft {}
+nonisolated extension SplitDraft: ValidatedDraft {}
+nonisolated extension SplitPart: ValidatedDraft {}
+nonisolated extension StartingBalanceDraft: ValidatedDraft {}
 
-extension TransactionRuleError: EmptyFieldError {
+nonisolated extension TransactionRuleError: EmptyFieldError {
     /// No amount or category yet, or a Loan or Debt with nobody in With, which With's own footer asks for.
     var isEmptyField: Bool { self == .missingAmount || self == .missingCategory || self == .missingWith }
 }
 
-extension TransferRuleError: EmptyFieldError {
+nonisolated extension TransferRuleError: EmptyFieldError {
     var isEmptyField: Bool { self == .missingAmount }
 }
 
-extension RecurringRuleError: EmptyFieldError {
+nonisolated extension RecurringRuleError: EmptyFieldError {
     var isEmptyField: Bool { self == .missingName || self == .missingAmount || self == .missingCategory }
 }
 
-extension ReimbursementRuleError: EmptyFieldError {
+nonisolated extension ReimbursementRuleError: EmptyFieldError {
     var isEmptyField: Bool { self == .missingAmount }
 }
 
-extension CardRuleError: EmptyFieldError {
+nonisolated extension CardRuleError: EmptyFieldError {
     var isEmptyField: Bool { self == .missingName }
 }
 
-extension WalletRuleError: EmptyFieldError {
+nonisolated extension WalletRuleError: EmptyFieldError {
     var isEmptyField: Bool { self == .missingName }
 }
