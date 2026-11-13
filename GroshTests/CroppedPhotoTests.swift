@@ -85,6 +85,15 @@ struct CroppedPhotoTests {
         #expect(shrunk.width == 120)
     }
 
+    @Test func theSamePhotoAtTheSameSizeIsShrunkOnce() throws {
+        let png = try pngData(of: try solidPhoto(width: 1000, height: 400))
+        let first = try #require(CroppedPhoto.shrunkImage(from: png, height: 16, scale: 3))
+        let again = try #require(CroppedPhoto.shrunkImage(from: png, height: 16, scale: 3))
+        let otherSize = try #require(CroppedPhoto.shrunkImage(from: png, height: 16, scale: 2))
+        #expect(first === again)
+        #expect(otherSize.height == 32)
+    }
+
     @Test func dataThatIsNotAPhotoDoesNotDecode() {
         #expect(CroppedPhoto.decode(Data("not a photo".utf8)) == nil)
         #expect(CroppedPhoto.image(from: Data("not a photo".utf8)) == nil)
@@ -131,13 +140,11 @@ struct CroppedPhotoTests {
     }
 
     @Test func theIconIsSavedWithTheRecurringTransactionAndReplacedOrRemovedByEdits() throws {
-        let store = try CategoryFixture()
-        let today = CalendarDay(year: 2026, month: 10, day: 9)
-        var draft = RecurringDraft(startDay: CalendarDay(year: 2026, month: 10, day: 12))
-        draft.name = "Streaming"
-        draft.amount = Money(cents: 1599)
-        draft.wallet = store.wallet
-        draft.category = try store.category("Entertainment")
+        let store = try TestStore()
+        let today = TestStore.today
+        var draft = store.recurringDraft(
+            "Streaming", 15_99, under: try store.category("Entertainment"), starting: day(2026, 10, 12)
+        )
         draft.kind = .subscription
         draft.iconData = Data([1, 2, 3])
         let item = try RecurringTransaction.create(draft, today: today, in: store.context)

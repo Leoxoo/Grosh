@@ -5,6 +5,8 @@ import SwiftUI
 struct WalletListView: View {
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     @Query(Wallet.archived) private var archivedWallets: [Wallet]
+    /// What the wallets' balances add up.
+    @NotDeletedTransactions private var transactions: [Transaction]
     @Environment(\.today) private var today
     @State private var editorMode: EditorMode<Wallet>?
     @State private var errorMessage: String?
@@ -12,29 +14,30 @@ struct WalletListView: View {
     @State private var deleting: Wallet?
 
     var body: some View {
+        let balances = WalletBalances($transactions, asOf: today)
         List {
             Section {
                 ForEach(wallets) { wallet in
                     Button {
                         editorMode = .edit(wallet)
                     } label: {
-                        WalletRow(wallet: wallet, today: today, showsTotalStatus: true)
+                        WalletRow(wallet: wallet, balances: balances, showsTotalStatus: true)
                     }
                     .buttonStyle(.plain)
                     .swipeActions {
                         Button(Strings.Common.delete, systemImage: "trash") { deleting = wallet }
                             .tint(.destructive)
-                        Button(Strings.Common.archive, systemImage: "archivebox") { perform { try wallet.archive(today: today) } }
+                        Button(Strings.Common.archive, systemImage: "archivebox") { Log.store.perform("Changing a wallet", errorMessage: &errorMessage) { try wallet.archive(today: today) } }
                             .tint(.archiveAction)
                     }
                     .contextMenu {
                         Button(Strings.Common.edit, systemImage: "pencil") { editorMode = .edit(wallet) }
-                        Button(Strings.Common.archive, systemImage: "archivebox") { perform { try wallet.archive(today: today) } }
+                        Button(Strings.Common.archive, systemImage: "archivebox") { Log.store.perform("Changing a wallet", errorMessage: &errorMessage) { try wallet.archive(today: today) } }
                         Button(Strings.Common.delete, systemImage: "trash", role: .destructive) { deleting = wallet }
                     }
                 }
                 .onMove { source, destination in
-                    perform { try Wallet.move(wallets, fromOffsets: source, toOffset: destination) }
+                    Log.store.perform("Changing a wallet", errorMessage: &errorMessage) { try Wallet.move(wallets, fromOffsets: source, toOffset: destination) }
                 }
             } footer: {
                 if wallets.count > 1 {
@@ -48,7 +51,7 @@ struct WalletListView: View {
                         Button {
                             editorMode = .edit(wallet)
                         } label: {
-                            WalletRow(wallet: wallet, today: today)
+                            WalletRow(wallet: wallet, balances: balances)
                                 .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
@@ -56,13 +59,13 @@ struct WalletListView: View {
                             Button(Strings.Common.delete, systemImage: "trash") { deleting = wallet }
                                 .tint(.destructive)
                             Button(Strings.Common.unarchive, systemImage: "tray.and.arrow.up") {
-                                perform { try wallet.unarchive(today: today) }
+                                Log.store.perform("Changing a wallet", errorMessage: &errorMessage) { try wallet.unarchive(today: today) }
                             }
                             .tint(.unarchiveAction)
                         }
                         .contextMenu {
                             Button(Strings.Common.unarchive, systemImage: "tray.and.arrow.up") {
-                                perform { try wallet.unarchive(today: today) }
+                                Log.store.perform("Changing a wallet", errorMessage: &errorMessage) { try wallet.unarchive(today: today) }
                             }
                             Button(Strings.Common.delete, systemImage: "trash", role: .destructive) { deleting = wallet }
                         }
@@ -102,21 +105,11 @@ struct WalletListView: View {
         .walletDeleteDialog($deleting)
         .errorAlert(Strings.Wallets.couldntChange, message: $errorMessage)
     }
-
-    /// Runs a change, or shows why it was refused.
-    private func perform(_ change: () throws -> Void) {
-        do {
-            try change()
-        } catch {
-            Log.store.failed("Changing a wallet", error)
-            errorMessage = error.localizedDescription
-        }
-    }
 }
 
 #Preview {
     NavigationStack {
         WalletListView()
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+    .modelContainer(try! StoreOpening.open(inMemory: true))
 }

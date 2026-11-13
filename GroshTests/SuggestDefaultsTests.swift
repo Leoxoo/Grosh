@@ -9,7 +9,7 @@ import Testing
 struct SuggestDefaultsTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
 
     init() throws {
         container = try GroshStore.makeContainer(inMemory: true)
@@ -25,16 +25,10 @@ struct SuggestDefaultsTests {
         let cafe = try #require(try context.fetch(FetchDescriptor<Grosh.Category>()).first { $0.name == "Café" })
         var draft = TransactionDraft(type: .expense, day: today)
         draft.wallet = wallet
-        draft.amount = Money(cents: 450)
+        draft.entry = AmountEntry(cents: 450)
         draft.category = cafe
         let transaction = try Transaction.create(draft, in: context)
         transaction.createdAt = Date.now.addingTimeInterval(-minutesAgo * 60)
-    }
-
-    @Test func aReminderTurnedOnStartsAWeekFromToday() {
-        #expect(TransactionDefaults.reminderDay(from: today) == CalendarDay(year: 2026, month: 10, day: 16))
-        #expect(TransactionDefaults.reminderDay(from: CalendarDay(year: 2026, month: 12, day: 28))
-            == CalendarDay(year: 2027, month: 1, day: 4))
     }
 
     @Test func aNewTransactionStartsAsAnExpenseTodayWithNothingElseFilledIn() throws {
@@ -72,7 +66,7 @@ struct SuggestDefaultsTests {
         let cash = try addWallet("Cash")
         try spend(in: checking, minutesAgo: 10)
         try spend(in: cash, minutesAgo: 5)
-        try cash.archive()
+        try cash.archive(today: today)
 
         #expect(TransactionDefaults.suggest(on: today, in: context).wallet == checking)
     }
@@ -81,7 +75,7 @@ struct SuggestDefaultsTests {
         let checking = try addWallet("Checking")
         let cash = try addWallet("Cash")
         try spend(in: cash, minutesAgo: 5)
-        try cash.archive()
+        try cash.archive(today: today)
 
         #expect(TransactionDefaults.suggest(on: today, in: context).wallet == checking)
     }

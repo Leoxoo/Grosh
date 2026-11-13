@@ -34,11 +34,16 @@ final class ContactsInWith {
         await search("")
     }
 
-    /// Brings the people linked to a contact up to date with it. Nothing changes for a contact that can't be read.
+    /// Brings the people linked to a contact up to date with it. Nothing changes for a contact that can't be read, and
+    /// a save that fails leaves the people as they were, logged: the menu still lists them.
     func refreshPeople(in context: ModelContext) async {
         access = lookup.access
         guard access.showsContacts else { return }
-        try? await Person.refreshFromContacts(using: lookup, in: context)
+        do {
+            try await Person.refreshFromContacts(using: lookup, in: context)
+        } catch {
+            Log.store.failed("Bringing people up to date with their contacts", error)
+        }
     }
 
     /// Lists the contacts matching `typed`, a moment after the last keystroke. Reads off the main actor, so typing stays
@@ -48,6 +53,8 @@ final class ContactsInWith {
             results = []
             return
         }
+        // Waits out the typing, so each keystroke doesn't read every contact again. The sleep throws only when the next
+        // keystroke cancels this search, which the check after it ends.
         if !typed.isEmpty {
             try? await Task.sleep(for: .milliseconds(250))
             if Task.isCancelled { return }
@@ -72,7 +79,7 @@ struct WithContactsSection: View {
     var body: some View {
         let showsAccessButton = contacts.access.offersToShareMore && !typed.isEmpty
         if contacts.access.showsContacts, showsAccessButton || !contacts.results.isEmpty {
-            Section("Contacts") {
+            Section(Strings.People.contacts) {
                 ForEach(contacts.results) { contact in
                     Button {
                         if contact.needsPhoneChoice {
@@ -104,7 +111,7 @@ struct WithContactsSection: View {
                 #endif
             }
             .confirmationDialog(
-                "Which number?",
+                Strings.People.whichNumber,
                 isPresented: Binding(get: { choosingNumberFor != nil }, set: { if !$0 { choosingNumberFor = nil } }),
                 presenting: choosingNumberFor
             ) { contact in
@@ -112,7 +119,7 @@ struct WithContactsSection: View {
                     Button(number) { pick(contact, number) }
                 }
             } message: { contact in
-                Text("\(contact.name) has several numbers.")
+                Text(Strings.People.severalNumbers(contact.name))
             }
         }
     }

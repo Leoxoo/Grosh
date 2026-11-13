@@ -6,18 +6,24 @@ import SwiftUI
 /// toolbar narrows the list to one wallet's schedules. Tap one to see what it has made, swipe one to duplicate it, and
 /// add one with the plus.
 struct RecurringTransactionsView: View {
-    @Query(filter: #Predicate<RecurringTransaction> { $0.deletedAt == nil }, sort: \RecurringTransaction.createdAt)
-    private var recurring: [RecurringTransaction]
+    @Query(RecurringTransaction.notDeleted) private var recurring: [RecurringTransaction]
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     @State private var editorMode: RecurringTransactionEditor.Mode?
-    /// The wallet the list is narrowed to, or `nil` for every wallet. Each time the tab opens it shows every wallet.
+    /// The wallet the list is narrowed to, or `nil` for every wallet. Each time the screen opens it shows every wallet.
     @State private var walletFilter: Wallet?
+    /// A save can change an estimate or a Purchase's progress, so the figures are worked out anew after each one.
+    @StoreSaves private var saves
+    /// The figures of every schedule (``RecurringFigures``), worked out once per save of the store rather than on each
+    /// draw, such as when the wallet filter or a sheet changes.
+    @State private var figures = DrawingCache<AsSaved, RecurringFigures>()
 
     private var groups: [RecurringListing.KindGroup] {
         RecurringListing.groups(of: recurring, wallet: walletFilter)
     }
 
     var body: some View {
+        let groups = self.groups
+        let figures = self.figures.value(for: AsSaved(recurring, saves: saves)) { RecurringFigures(recurring) }
         List {
             ForEach(groups) { group in
                 Section(group.kind.sectionTitle) {
@@ -25,7 +31,10 @@ struct RecurringTransactionsView: View {
                         NavigationLink {
                             RecurringTransactionDetailView(recurring: item)
                         } label: {
-                            RecurringTransactionRow(recurring: item)
+                            RecurringTransactionRow(
+                                recurring: item, startingAmount: figures.startingAmount(of: item),
+                                progress: figures.purchaseProgress(of: item)
+                            )
                         }
                         .swipeActions(edge: .trailing) {
                             Button(Strings.Common.duplicate, systemImage: "doc.on.doc") {
@@ -87,6 +96,10 @@ struct RecurringTransactionsView: View {
 /// estimate while it has one, as the transactions it makes will.
 struct RecurringTransactionRow: View {
     let recurring: RecurringTransaction
+    /// What its transactions start at now, its estimate for a varying Bill (``RecurringFigures``).
+    let startingAmount: Money
+    /// A Purchase's progress, or `nil` for any other Kind.
+    let progress: PurchaseProgress?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -103,7 +116,7 @@ struct RecurringTransactionRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                if let progress = recurring.purchaseProgress {
+                if let progress {
                     Text(progress.summary)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -111,7 +124,7 @@ struct RecurringTransactionRow: View {
                 }
             }
             Spacer(minLength: 8)
-            AmountText(amount: recurring.startingAmount)
+            AmountText(amount: startingAmount)
         }
         .contentShape(Rectangle())
         .opacity(recurring.isPaused ? 0.5 : 1)

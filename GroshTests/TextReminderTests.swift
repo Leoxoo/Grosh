@@ -29,17 +29,9 @@ struct TextReminderTests {
 
     /// A Loan or Debt of `cents` with `person`, reminding on `reminderDay`.
     private func remind(_ role: LockedRole, _ cents: Int, with person: Person, on reminderDay: CalendarDay) throws {
-        var draft = TransactionDraft(type: .debtLoan, day: day(2026, 5, 27))
-        draft.wallet = fixture.checking
-        draft.amount = Money(cents: cents)
-        draft.category = try context.lockedCategory(role)
-        draft.people = [person]
-        draft.reminderDay = reminderDay
-        _ = try Transaction.create(draft, in: context)
-    }
-
-    private func dollars(_ cents: Int) -> String {
-        Money(cents: cents).formatted()
+        try context.recordLoanOrDebt(
+            role, cents, with: person, on: day(2026, 5, 27), in: fixture.checking, remindOn: reminderDay
+        )
     }
 
     // MARK: Wording
@@ -47,44 +39,55 @@ struct TextReminderTests {
     @Test func theMessageNamesWhatThePersonOwesYouWithTheAppsMoneyFormatting() {
         let message = text(owesYou: [Money(cents: 130_00)])
 
-        #expect(message.body == "Hi Alex, a reminder that you owe me \(dollars(130_00)).")
+        #expect(message.body == "Hi Alex, a reminder that you owe me $130.00.")
     }
 
     @Test func theMessageNamesWhatYouOweThemWhenItIsOnlyADebt() {
         let message = text("Anna", youOwe: [Money(cents: 50_00)])
 
-        #expect(message.body == "Hi Anna, I owe you \(dollars(50_00)).")
+        #expect(message.body == "Hi Anna, I owe you $50.00.")
     }
 
     @Test func theMessageKeepsWhatTheyOweYouApartFromWhatYouOweThem() {
         let message = text(owesYou: [Money(cents: 100_00)], youOwe: [Money(cents: 40_00)])
 
-        #expect(message.body == "Hi Alex, you owe me \(dollars(100_00)), and I owe you \(dollars(40_00)).")
+        #expect(message.body == "Hi Alex, you owe me $100.00, and I owe you $40.00.")
     }
 
     @Test func everyCurrencyOwedIsNamedOnceWithoutAddingThemUp() {
         let euros = Money(cents: 25_00, currencyCode: "EUR")
         let message = text(owesYou: [euros, Money(cents: 130_00)])
 
-        #expect(message.body.contains(euros.formatted()))
-        #expect(message.body.contains(dollars(130_00)))
+        #expect(message.body == "Hi Alex, a reminder that you owe me €25.00 and $130.00.")
     }
 
     @Test func aPersonsRowTextsWhatTheyOweAndWhatYouOweThem() throws {
         let alex = try fixture.person("Alex")
         alex.phone = "555 0100"
         try fixture.dinner(owing: [(alex, 30_00)])
-        let entry = try #require(try DebtsAndLoansByPerson(in: context).entry(for: alex))
+        let listing = DebtsAndLoansByPerson(
+            DebtsAndLoans(try context.fetch(DebtsAndLoans.records)), try fixture.owesMe()
+        )
+        let entry = try #require((listing.open + listing.settled).first { $0.person === alex })
 
         let message = TextReminder(entry)
 
         #expect(message.personName == "Alex")
         #expect(message.storedPhone == "555 0100")
         #expect(message.owesYou == [Money(cents: 30_00)])
-        #expect(message.body == "Hi Alex, a reminder that you owe me \(dollars(30_00)).")
+        #expect(message.body == "Hi Alex, a reminder that you owe me $30.00.")
     }
 
     // MARK: From a notification
+
+    /// The Text them message a tap on `reminder`'s action opens, read back from the notification's user info the way
+    /// the app reads it.
+    private func tapTextThem(on reminder: some PendingReminder) throws -> TextReminder? {
+        let payload = try #require(reminder.textThem)
+        let userInfo: [AnyHashable: Any] = try payload.userInfo()
+        let read = try #require(try TextThemPayload(userInfo: userInfo))
+        return try TextReminder(read, in: context)
+    }
 
     @Test func theOwesMeNotificationsActionTextsAboutTheAmountAndTheExpense() throws {
         let alex = try fixture.person("Alex")
@@ -93,11 +96,11 @@ struct TextReminderTests {
         dinner.note = "Dinner"
         let reminder = try #require(fixture.owesMe().reminders(from: dinnerDay).first)
 
-        let message = try #require(TextReminder(userInfo: reminder.userInfo))
+        let message = try #require(try tapTextThem(on: reminder))
 
         #expect(message.personName == "Alex")
         #expect(message.storedPhone == "555 0100")
-        #expect(message.body == "Hi Alex, a reminder that you owe me \(dollars(30_00)) for Dinner.")
+        #expect(message.body == "Hi Alex, a reminder that you owe me $30.00 for Dinner.")
     }
 
     @Test func anOpenAmountNotificationNamesTheExpenseAlone() throws {
@@ -106,7 +109,7 @@ struct TextReminderTests {
         dinner.note = "Dinner"
         let reminder = try #require(fixture.owesMe().reminders(from: dinnerDay).first)
 
-        let message = try #require(TextReminder(userInfo: reminder.userInfo))
+        let message = try #require(try tapTextThem(on: reminder))
 
         #expect(message.body == "Hi Sam, a reminder that you owe me for Dinner.")
     }
@@ -119,17 +122,16 @@ struct TextReminderTests {
         try remind(.loan, 40_00, with: pasha, on: today)
         try remind(.debt, 50_00, with: anna, on: today)
 
-        let reminders = try DebtsAndLoans(in: context).reminders(from: today)
+        let reminders = DebtsAndLoans(try context.fetch(DebtsAndLoans.records)).reminders(from: today)
 
         let loan = try #require(reminders.first { $0.withName == "Pasha" })
         let debt = try #require(reminders.first { $0.withName == "Anna" })
-        let textLoan = try #require(TextReminder(userInfo: loan.userInfo))
-        let textDebt = try #require(TextReminder(userInfo: debt.userInfo))
-        #expect(DebtReminder.categoryIdentifier == "grosh.debt")
+        let textLoan = try #require(try tapTextThem(on: loan))
+        let textDebt = try #require(try tapTextThem(on: debt))
         #expect(textLoan.storedPhone == "555 0111")
-        #expect(textLoan.body == "Hi Pasha, a reminder that you owe me \(dollars(40_00)).")
+        #expect(textLoan.body == "Hi Pasha, a reminder that you owe me $40.00.")
         #expect(textDebt.storedPhone == nil)
-        #expect(textDebt.body == "Hi Anna, I owe you \(dollars(50_00)).")
+        #expect(textDebt.body == "Hi Anna, I owe you $50.00.")
     }
 
     @Test func bothReminderSortsOfferTheActionInTheirOwnCategory() {
@@ -141,20 +143,40 @@ struct TextReminderTests {
 
     @Test func thePersonInTheStoreWinsOverWhatTheNotificationWasScheduledWith() throws {
         let alex = try fixture.person("Alex")
+        alex.phone = "555 0100"
+        let dinner = try fixture.dinner(on: dinnerDay, owing: [(alex, 30_00)])
+        dinner.note = "Dinner"
+        let reminder = try #require(fixture.owesMe().reminders(from: dinnerDay).first)
+        alex.rename(to: "Alexander")
         alex.phone = "555 0200"
         alex.contactIdentifier = "c1"
-        let info = ["person": "alex", "phone": "555 0100", "amountCents": "3000", "currencyCode": "USD"]
 
-        let message = try #require(TextReminder(userInfo: info, person: alex))
+        let message = try #require(try tapTextThem(on: reminder))
 
-        #expect(message.personName == "Alex")
+        #expect(message.personName == "Alexander")
         #expect(message.storedPhone == "555 0200")
         #expect(message.contactIdentifier == "c1")
     }
 
-    @Test func aNotificationWithoutAPersonHasNoOneToText() {
-        #expect(TextReminder(userInfo: [:]) == nil)
-        #expect(TextReminder(userInfo: ["person": "  "]) == nil)
+    @Test func aPersonGoneFromTheStoreIsTextedAsTheNotificationWasScheduled() throws {
+        let alex = try fixture.person("Alex")
+        alex.phone = "555 0100"
+        _ = try fixture.dinner(on: dinnerDay, owing: [(alex, 30_00)])
+        let reminder = try #require(fixture.owesMe().reminders(from: dinnerDay).first)
+        let payload = try #require(reminder.textThem)
+
+        let message = try #require(TextReminder(payload, person: nil))
+
+        #expect(message.personName == "Alex")
+        #expect(message.storedPhone == "555 0100")
+        #expect(message.contactIdentifier == nil)
+    }
+
+    @Test func aNotificationWithoutAPersonHasNoOneToText() throws {
+        let blank = TextThemPayload(person: nil, personName: "  ", phone: nil, outstanding: nil)
+
+        #expect(TextReminder(blank, person: nil) == nil)
+        #expect(try TextThemPayload(userInfo: [:]) == nil)
     }
 
     // MARK: Live or stored phone

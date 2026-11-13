@@ -11,8 +11,8 @@ enum ReimbursementAction: Hashable, Identifiable {
 
 /// The transaction detail's section for an Expense: each Reimbursement with its day and note, opening its sheet to edit
 /// and deleted by swipe or from its menu, then Someone paid me back and Move an existing transaction in. Shows nothing
-/// for any other transaction. Use inside a `List`, with ``SwiftUI/View/reimbursementSheets(for:action:)`` on the screen
-/// to present what `action` opens.
+/// for any other transaction. Use inside a `List`, with the screen presenting ``ReimbursementAction/sheet(for:)`` for
+/// what `action` opens.
 struct ReimbursementSection: View {
     let transaction: Transaction
     @Binding var action: ReimbursementAction?
@@ -49,11 +49,8 @@ struct ReimbursementSection: View {
     }
 
     private func delete(_ entry: Reimbursement) {
-        do {
+        Log.store.perform("Deleting a Reimbursement", errorMessage: &errorMessage) {
             try entry.delete()
-        } catch {
-            Log.store.failed("Deleting a Reimbursement", error)
-            errorMessage = error.localizedDescription
         }
     }
 }
@@ -67,7 +64,7 @@ private struct ReimbursementRow: View {
             AmountText(amount: entry.amount, showsPlusSign: true)
         } label: {
             VStack(alignment: .leading, spacing: 2) {
-                Text(entry.day.date().formatted(date: .abbreviated, time: .omitted))
+                Text(entry.day.shortText)
                 if !entry.note.isEmpty {
                     Text(entry.note)
                         .font(.caption)
@@ -79,16 +76,15 @@ private struct ReimbursementRow: View {
     }
 }
 
-extension View {
-    /// Presents Someone paid me back, Move an existing transaction in or an entry's edit sheet for `transaction` while
-    /// `action` says which. Attach to the screen, outside its `List`, so presenting doesn't depend on the list's rows.
-    func reimbursementSheets(for transaction: Transaction, action: Binding<ReimbursementAction?>) -> some View {
-        sheet(item: action) { action in
-            switch action {
-            case .paidBack: ReimbursementEditor(expense: transaction)
-            case .moveIn: ReimbursementMoveInPicker(expense: transaction)
-            case .edit(let entry): ReimbursementEditor(expense: transaction, editing: entry)
-            }
+extension ReimbursementAction {
+    /// The sheet this opens for `transaction`: Someone paid me back, Move an existing transaction in or an entry's edit
+    /// sheet. Present it from the screen, outside its `List`, so presenting doesn't depend on the list's rows.
+    @ViewBuilder
+    func sheet(for transaction: Transaction) -> some View {
+        switch self {
+        case .paidBack: ReimbursementEditor(expense: transaction)
+        case .moveIn: ReimbursementMoveInPicker(expense: transaction)
+        case .edit(let entry): ReimbursementEditor(expense: transaction, editing: entry)
         }
     }
 }
@@ -101,16 +97,12 @@ struct ReimbursementNetText: View {
     var listed = ListedAmount.net
 
     var body: some View {
-        // Read from the stored figures first, so a row that was never paid back reads nothing else.
-        if transaction.reimbursedCents > 0 || (listed == .netInTotal && transaction.hasPaybacksElsewhere) {
-            let net = listed == .netInTotal ? transaction.totalViewNet : transaction.net
-            if net.cents != transaction.amountCents {
-                Text(verbatim: "= " + net.signedFormatted())
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .foregroundStyle(net.cents > 0 ? net.tint : .secondary)
-            }
+        if let net = transaction.paidBackNet(listed) {
+            Text(verbatim: "= " + net.signedFormatted())
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .foregroundStyle(net.direction == .moneyIn ? net.tint : .secondary)
         }
     }
 }
@@ -123,10 +115,7 @@ struct ReimbursementEntriesText: View {
     var listed = ListedAmount.net
 
     var body: some View {
-        // Read from the stored figures first, so a row without Reimbursements never reads them.
-        let summary = transaction.reimbursedCents > 0 ? transaction.reimbursementSummary() : ""
-        let elsewhere = listed == .net && transaction.hasPaybacksElsewhere ? transaction.elsewhereSummary() : ""
-        let text = [summary, elsewhere].filter { !$0.isEmpty }.joined(separator: ", ")
+        let text = transaction.paidBackSummary(listed)
         if !text.isEmpty {
             Text(text)
                 .font(.caption)

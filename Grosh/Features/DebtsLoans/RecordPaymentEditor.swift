@@ -13,8 +13,8 @@ struct RecordPaymentEditor: View {
         LoanOrDebtSheet(
             unavailableTitle: Strings.DebtsLoans.cantRecordPayment,
             unavailableMessage: Strings.DebtsLoans.onlyLoanOrDebtPaidBack
-        ) { context in
-            try DebtPaymentDraft(settling: original, on: today, in: context)
+        ) {
+            try DebtPaymentDraft(settling: original, on: today)
         } form: { draft in
             RecordPaymentForm(startingDraft: draft)
         }
@@ -23,41 +23,30 @@ struct RecordPaymentEditor: View {
 
 /// The form behind ``RecordPaymentEditor``, holding the draft from the moment the sheet opens.
 private struct RecordPaymentForm: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
     @State private var draft: DebtPaymentDraft
-    @State private var entry: AmountEntry
-    @State private var errorMessage: String?
 
     init(startingDraft: DebtPaymentDraft) {
         _draft = State(initialValue: startingDraft)
-        _entry = State(initialValue: AmountEntry(cents: startingDraft.amount.cents))
     }
 
     private var loanOrDebt: LoanOrDebt { draft.loanOrDebt }
-    private var currencyCode: String { loanOrDebt.owed.currencyCode }
-
-    /// The draft with the amount the keypad comes to.
-    private var draftToSave: DebtPaymentDraft {
-        var result = draft
-        result.amount = Money(cents: entry.cents ?? 0, currencyCode: currencyCode)
-        return result
-    }
 
     var body: some View {
         KeypadSheet(
             title: Text(Strings.DebtsLoans.recordPayment),
-            entry: $entry,
-            canSave: draftToSave.canSave,
-            save: save
+            entry: $draft.entry,
+            canSave: draft.canSave,
+            saving: "Recording a payment",
+            failureTitle: Strings.DebtsLoans.couldntRecordPayment,
+            save: { try DebtPayment.record(draft, in: context) }
         ) { fields in
             paymentSection(fields)
-            if draftToSave.overpaid.cents > 0 {
-                overpaymentSection
+            if draft.overpaid.cents > 0 {
+                overpaymentSection(draft.signedOverpaid)
             }
         }
-        .errorAlert(Strings.DebtsLoans.couldntRecordPayment, message: $errorMessage)
     }
 
     private func paymentSection(_ fields: KeypadSheetFields) -> some View {
@@ -67,7 +56,7 @@ private struct RecordPaymentForm: View {
                 Text(loanOrDebt.outstanding.formatted())
                     .monospacedDigit()
             }
-            fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: Money(cents: loanOrDebt.kind.paymentSign).tint)
+            fields.amountRow(Strings.Common.amount, currencyCode: draft.currencyCode, tint: loanOrDebt.kind.paymentDirection.tint)
             DayStepper(title: Strings.Common.date, day: $draft.day)
             fields.noteField($draft.note)
         } footer: {
@@ -75,29 +64,14 @@ private struct RecordPaymentForm: View {
         }
     }
 
-    private var overpaymentSection: some View {
+    private func overpaymentSection(_ overpaid: Money) -> some View {
         Section {
             LabeledContent(Strings.DebtsLoans.aboveOutstanding) {
-                AmountText(
-                    amount: Money(
-                        cents: draftToSave.overpaid.cents * loanOrDebt.kind.paymentSign, currencyCode: currencyCode
-                    ),
-                    showsPlusSign: true
-                )
+                AmountText(amount: overpaid, showsPlusSign: true)
             }
             CategoryPicker(title: Strings.Common.category, type: draft.overpaymentType, selection: $draft.overpaymentCategory)
         } footer: {
             Text(loanOrDebt.kind.overpaymentFooter)
-        }
-    }
-
-    private func save() {
-        do {
-            try DebtPayment.record(draftToSave, in: context)
-            dismiss()
-        } catch {
-            Log.store.failed("Recording a payment", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

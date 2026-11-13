@@ -6,18 +6,9 @@ import SwiftUI
 /// VoiceOver reads each icon as the category's name and its share. With nothing above zero it is an empty ring.
 struct CategoryDonut: View {
     let breakdown: CategoryBreakdown
-    /// How many parent categories get a slice of their own before the rest share Everything else: the top five on the Report,
-    /// and every parent in the details.
-    var ownSliceLimit = CategoryBreakdown.ownSliceCount
-    /// The smallest share of the side a category can be and still get a slice of its own; smaller ones share Everything else.
-    var minimumShare: Double = 0
-    /// How far the icons' circle sits outside the ring's outer edge: room for the stick. A small donut takes a shorter one.
-    var stickLength: CGFloat = 38
-    /// Whether each percent sits above or below its icon, rather than beside it. A donut in a narrow column takes this, since
-    /// the percent then needs no room beside the icon, and the donut can be bigger.
-    var percentsBelowIcons = false
+    /// Which donut this is: the Category report card's, small and one of two side by side, or the details', on its own.
+    let donut: CategoryBreakdown.Donut
 
-    /// The icon's radius.
     private let iconRadius: CGFloat = 11
     /// The gap between an icon and its percent.
     private let gap: CGFloat = 4
@@ -26,7 +17,23 @@ struct CategoryDonut: View {
     /// The room a percent takes above or below its icon.
     private let percentHeight: CGFloat = 12
 
+    /// How far the icons' circle sits outside the ring's outer edge: room for the stick. The Report's small donuts take
+    /// a short one, so two sit side by side with icons and percents clear of each other.
+    private var stickLength: CGFloat {
+        switch donut {
+        case .report: 18
+        case .details: 38
+        }
+    }
+
+    /// Whether each percent sits above or below its icon, rather than beside it: on the Report's donuts, in narrow
+    /// columns, where the percent then needs no room beside the icon and the donut can be bigger.
+    private var percentsBelowIcons: Bool {
+        donut == .report
+    }
+
     var body: some View {
+        let arcs = placedSlices
         GeometryReader { proxy in
             let side = min(proxy.size.width, proxy.size.height)
             let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
@@ -35,9 +42,9 @@ struct CategoryDonut: View {
             let iconCircle = max(side / 2 - iconRadius - gap - percentRoom - 2, stickLength + 16)
             let radius = max(iconCircle - stickLength, 14)
             let ringWidth = max(10, radius * 0.45)
-            let labels = placedLabels(center: center, iconCircle: iconCircle, ringEnd: radius)
+            let labels = placedLabels(of: arcs, center: center, iconCircle: iconCircle, ringEnd: radius)
             ZStack {
-                ring(radius: radius, ringWidth: ringWidth)
+                ring(of: arcs, radius: radius, ringWidth: ringWidth)
                 Canvas { context, _ in
                     for label in labels {
                         var stick = Path()
@@ -64,7 +71,7 @@ struct CategoryDonut: View {
 
     /// The ring: each slice's arc, or an empty ring when no slice has anything in it.
     @ViewBuilder
-    private func ring(radius: CGFloat, ringWidth: CGFloat) -> some View {
+    private func ring(of placedSlices: [PlacedSlice], radius: CGFloat, ringWidth: CGFloat) -> some View {
         if placedSlices.isEmpty {
             Circle()
                 .stroke(Color.secondary.opacity(0.25), lineWidth: ringWidth)
@@ -99,8 +106,7 @@ struct CategoryDonut: View {
 
     /// Each slice's icon, stick and percent, in the donut's own coordinates: the icons spread around `iconCircle`, and each
     /// stick runs from its icon to the middle of its slice on the ring, which ends at `ringEnd`.
-    private func placedLabels(center: CGPoint, iconCircle: CGFloat, ringEnd: CGFloat) -> [Label] {
-        let arcs = placedSlices
+    private func placedLabels(of arcs: [PlacedSlice], center: CGPoint, iconCircle: CGFloat, ringEnd: CGFloat) -> [Label] {
         // Two icons' centres are kept a little more than an icon's width apart.
         let angles = Self.packedAround(arcs.map(\.angle), minimumGap: (iconRadius * 2 + 2) / iconCircle)
         return zip(arcs, angles).map { arc, angle in
@@ -187,7 +193,7 @@ struct CategoryDonut: View {
     }
 
     private static func label(_ name: String, share: Double) -> String {
-        "\(name), \(share.formatted(.percent.precision(.fractionLength(0))))"
+        String(localized: Strings.Report.sliceLabel(name, share.formatted(.percent.precision(.fractionLength(0)))))
     }
 
     /// A point `distance` from `center` at `angle` radians clockwise from the top.
@@ -227,7 +233,7 @@ struct CategoryDonut: View {
     /// Every slice with its arc, the slices largest first, clockwise from the top. A sliver's gap to its neighbours is
     /// half a degree on each side, so neighbouring slices read as separate.
     private var placedSlices: [PlacedSlice] {
-        let slices = breakdown.donutSlices(ownSliceLimit: ownSliceLimit, minimumShare: minimumShare)
+        let slices = breakdown.slices(for: donut)
         let amounts = slices.map { $0.amount.cents }
         let sum = amounts.reduce(0, +)
         guard sum > 0 else { return [] }

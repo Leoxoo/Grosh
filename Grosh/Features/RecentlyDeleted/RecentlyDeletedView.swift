@@ -35,22 +35,10 @@ struct RecentlyDeletedView: View {
                             }
                         } label: {
                             DeletedWalletRow(wallet: wallet, transactionCount: deletedWithIt.count, now: now)
-                                .swipeActions(edge: .trailing) {
-                                    Button(Strings.RecentlyDeleted.deleteForever, systemImage: "trash", role: .destructive) {
-                                        pendingRemoval = .wallet(wallet)
-                                    }
-                                    Button(Strings.Common.restore, systemImage: "arrow.uturn.backward") {
-                                        perform { try wallet.restore(today: today) }
-                                    }
-                                    .tint(.restoreAction)
-                                }
-                                .contextMenu {
-                                    Button(Strings.Common.restore, systemImage: "arrow.uturn.backward") {
-                                        perform { try wallet.restore(today: today) }
-                                    }
-                                    Button(Strings.RecentlyDeleted.deleteForever, systemImage: "trash", role: .destructive) {
-                                        pendingRemoval = .wallet(wallet)
-                                    }
+                                .recentlyDeletedActions(canRestore: true) {
+                                    Log.store.perform("Changing Recently Deleted", errorMessage: &errorMessage) { try wallet.restore(today: today) }
+                                } deleteForever: {
+                                    pendingRemoval = .wallet(wallet)
                                 }
                         }
                     }
@@ -66,26 +54,12 @@ struct RecentlyDeletedView: View {
             if !bin.recurring.isEmpty {
                 Section {
                     ForEach(bin.recurring) { schedule in
-                        DeletedRecurringRow(recurring: schedule, now: now)
-                            .swipeActions(edge: .trailing) {
-                                Button(Strings.RecentlyDeleted.deleteForever, systemImage: "trash", role: .destructive) {
-                                    pendingRemoval = .recurring(schedule)
-                                }
-                                if schedule.restoreBlocker == nil {
-                                    Button(Strings.Common.restore, systemImage: "arrow.uturn.backward") {
-                                        perform { try schedule.restore(today: today) }
-                                    }
-                                    .tint(.restoreAction)
-                                }
-                            }
-                            .contextMenu {
-                                Button(Strings.Common.restore, systemImage: "arrow.uturn.backward") {
-                                    perform { try schedule.restore(today: today) }
-                                }
-                                .disabled(schedule.restoreBlocker != nil)
-                                Button(Strings.RecentlyDeleted.deleteForever, systemImage: "trash", role: .destructive) {
-                                    pendingRemoval = .recurring(schedule)
-                                }
+                        let blocker = schedule.restoreBlocker
+                        DeletedRecurringRow(recurring: schedule, blocker: blocker, now: now)
+                            .recentlyDeletedActions(canRestore: blocker == nil) {
+                                Log.store.perform("Changing Recently Deleted", errorMessage: &errorMessage) { try schedule.restore(today: today) }
+                            } deleteForever: {
+                                pendingRemoval = .recurring(schedule)
                             }
                     }
                 } header: {
@@ -100,26 +74,12 @@ struct RecentlyDeletedView: View {
             if !bin.transactions.isEmpty {
                 Section {
                     ForEach(bin.transactions) { transaction in
-                        DeletedTransactionRow(transaction: transaction, now: now)
-                            .swipeActions(edge: .trailing) {
-                                Button(Strings.RecentlyDeleted.deleteForever, systemImage: "trash", role: .destructive) {
-                                    pendingRemoval = .transaction(transaction)
-                                }
-                                if transaction.restoreBlocker == nil {
-                                    Button(Strings.Common.restore, systemImage: "arrow.uturn.backward") {
-                                        perform { try transaction.restore() }
-                                    }
-                                    .tint(.restoreAction)
-                                }
-                            }
-                            .contextMenu {
-                                Button(Strings.Common.restore, systemImage: "arrow.uturn.backward") {
-                                    perform { try transaction.restore() }
-                                }
-                                .disabled(transaction.restoreBlocker != nil)
-                                Button(Strings.RecentlyDeleted.deleteForever, systemImage: "trash", role: .destructive) {
-                                    pendingRemoval = .transaction(transaction)
-                                }
+                        let blocker = transaction.restoreBlocker
+                        DeletedTransactionRow(transaction: transaction, blocker: blocker, now: now)
+                            .recentlyDeletedActions(canRestore: blocker == nil) {
+                                Log.store.perform("Changing Recently Deleted", errorMessage: &errorMessage) { try transaction.restore() }
+                            } deleteForever: {
+                                pendingRemoval = .transaction(transaction)
                             }
                     }
                 } header: {
@@ -160,23 +120,34 @@ struct RecentlyDeletedView: View {
     }
 
     private func remove(_ removal: PendingRemoval) {
-        perform {
+        Log.store.perform("Changing Recently Deleted", errorMessage: &errorMessage) {
             switch removal {
-            case .wallet(let wallet): try wallet.deleteForever(in: context)
-            case .recurring(let schedule): try schedule.deleteForever(in: context)
-            case .transaction(let transaction): try transaction.deleteForever(in: context)
+            case .wallet(let wallet): try wallet.deleteForever()
+            case .recurring(let schedule): try schedule.deleteForever()
+            case .transaction(let transaction): try transaction.deleteForever()
             case .everything: try RecentlyDeleted.empty(in: context)
             }
         }
     }
+}
 
-    /// Runs a change, or shows why it was refused.
-    private func perform(_ change: () throws -> Void) {
-        do {
-            try change()
-        } catch {
-            Log.store.failed("Changing Recently Deleted", error)
-            errorMessage = error.localizedDescription
+extension View {
+    /// An item's Restore and Delete Forever, as a trailing swipe and a long-press menu. While the item can't be
+    /// restored, the swipe leaves Restore out and the menu greys it.
+    fileprivate func recentlyDeletedActions(
+        canRestore: Bool, restore: @escaping () -> Void, deleteForever: @escaping () -> Void
+    ) -> some View {
+        swipeActions(edge: .trailing) {
+            Button(Strings.RecentlyDeleted.deleteForever, systemImage: "trash", role: .destructive, action: deleteForever)
+            if canRestore {
+                Button(Strings.Common.restore, systemImage: "arrow.uturn.backward", action: restore)
+                    .tint(.restoreAction)
+            }
+        }
+        .contextMenu {
+            Button(Strings.Common.restore, systemImage: "arrow.uturn.backward", action: restore)
+                .disabled(!canRestore)
+            Button(Strings.RecentlyDeleted.deleteForever, systemImage: "trash", role: .destructive, action: deleteForever)
         }
     }
 }
@@ -224,7 +195,6 @@ private enum PendingRemoval {
 /// A deleted wallet: its icon and name, how many transactions went with it, and the days it has left.
 private struct DeletedWalletRow: View {
     let wallet: Wallet
-    /// How many transactions were deleted with it.
     let transactionCount: Int
     let now: Date
 
@@ -253,21 +223,13 @@ private struct DeletedWalletRow: View {
 /// Recently Deleted too, that the wallet has to be restored first.
 private struct DeletedTransactionRow: View {
     let transaction: Transaction
+    let blocker: RecentlyDeletedError?
     let now: Date
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             TransactionRow(transaction: transaction, showsDay: true)
-            HStack {
-                if transaction.restoreBlocker == .walletIsDeleted {
-                    Text(Strings.RecentlyDeleted.restoreWalletFirst)
-                        .foregroundStyle(.attention)
-                }
-                Spacer()
-                DaysLeftText(deletedAt: transaction.deletedAt, now: now)
-            }
-            .font(.caption)
-            .padding(.leading, 44)
+            DeletedItemFooter(blocker: blocker, deletedAt: transaction.deletedAt, now: now)
         }
     }
 }
@@ -276,6 +238,7 @@ private struct DeletedTransactionRow: View {
 /// wallet is in Recently Deleted too, that the wallet has to be restored first.
 private struct DeletedRecurringRow: View {
     let recurring: RecurringTransaction
+    let blocker: RecentlyDeletedError?
     let now: Date
 
     var body: some View {
@@ -291,18 +254,31 @@ private struct DeletedRecurringRow: View {
                         .lineLimit(1)
                 }
             }
-            HStack {
-                if recurring.restoreBlocker == .walletIsDeleted {
-                    Text(Strings.RecentlyDeleted.restoreWalletFirst)
-                        .foregroundStyle(.attention)
-                }
-                Spacer()
-                DaysLeftText(deletedAt: recurring.deletedAt, now: now)
-            }
-            .font(.caption)
-            .padding(.leading, 44)
+            DeletedItemFooter(blocker: blocker, deletedAt: recurring.deletedAt, now: now)
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// The line under a deleted transaction or Recurring transaction, lined up with its name: that its wallet has to be
+/// restored first, while it is in Recently Deleted too, and the days it has left.
+private struct DeletedItemFooter: View {
+    let blocker: RecentlyDeletedError?
+    let deletedAt: Date?
+    let now: Date
+
+    var body: some View {
+        HStack {
+            if blocker == .walletIsDeleted {
+                Text(Strings.RecentlyDeleted.restoreWalletFirst)
+                    .foregroundStyle(.attention)
+            }
+            Spacer()
+            DaysLeftText(deletedAt: deletedAt, now: now)
+        }
+        .font(.caption)
+        // Past the category icon and its spacing, under the name.
+        .padding(.leading, 44)
     }
 }
 
@@ -312,11 +288,11 @@ private struct DaysLeftText: View {
     let now: Date
 
     var body: some View {
-        let days = deletedAt.map { RecentlyDeleted.daysLeft(since: $0, now: now) } ?? RecentlyDeleted.keptDays
+        let days = RecentlyDeleted.daysLeft(since: deletedAt, now: now)
         Text(Strings.RecentlyDeleted.daysLeft(days))
             .font(.caption)
             .monospacedDigit()
-            .foregroundStyle(days <= 3 ? .urgent : .secondary)
+            .foregroundStyle(RecentlyDeleted.isEndingSoon(daysLeft: days) ? .urgent : .secondary)
     }
 }
 
@@ -324,5 +300,5 @@ private struct DaysLeftText: View {
     NavigationStack {
         RecentlyDeletedView()
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+    .modelContainer(try! StoreOpening.open(inMemory: true))
 }

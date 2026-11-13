@@ -1,12 +1,14 @@
 import Foundation
 
-/// An exact amount of money in minor units (cents). Never stored or computed as a floating-point number.
-nonisolated struct Money: Hashable, Sendable {
-    /// The only currency offered for now; each wallet stores its own code so more can follow.
+/// An exact amount of money in minor units (cents), in a currency. Never stored or computed as a floating-point number.
+/// Its currency is always said where it is made: a wallet's, or that of the figures it is added up with.
+nonisolated struct Money: Hashable, Sendable, Codable {
+    /// The currency a new wallet starts in until the user picks another in Settings → Currency (``AppSettings``).
+    /// Each wallet stores its own code.
     static let defaultCurrencyCode = "USD"
 
     var cents: Int
-    var currencyCode: String = defaultCurrencyCode
+    var currencyCode: String
 
     var decimalValue: Decimal { Decimal(cents) / 100 }
 
@@ -14,11 +16,11 @@ nonisolated struct Money: Hashable, Sendable {
         decimalValue.formatted(.currency(code: currencyCode).locale(locale))
     }
 
-    /// The amount as a plain number, without cents when it is whole: "20", "3.50". How an amount paid back and an Owes me
-    /// amount are written.
-    func plainNumber(locale: Locale = .current) -> String {
+    /// `cents` as a plain number, in no currency and without cents when it is whole: "20", "3.50". How an amount paid
+    /// back and an Owes me amount are written.
+    static func plainNumber(cents: Int, locale: Locale = .current) -> String {
         let fractionLength = cents % 100 == 0 ? 0 : 2
-        return decimalValue.formatted(.number.precision(.fractionLength(fractionLength)).locale(locale))
+        return (Decimal(cents) / 100).formatted(.number.precision(.fractionLength(fractionLength)).locale(locale))
     }
 }
 
@@ -37,10 +39,18 @@ nonisolated extension Sequence where Element == Money {
     }
 }
 
+nonisolated extension Array where Element == Money {
+    /// The amounts one after another, as a balance held in more than one currency is written: "$100.00, €50.00". A
+    /// single amount reads as ``Money/formatted(locale:)`` writes it.
+    func formatted(locale: Locale = .current) -> String {
+        map { $0.formatted(locale: locale) }.formatted(.list(type: .and, width: .narrow).locale(locale))
+    }
+}
+
 nonisolated extension Money {
     /// Parses a plain decimal number such as `-74.910004`, rounding half away from zero to the nearest cent.
     /// No grouping separators or currency symbols are accepted.
-    init?(decimalString text: String, currencyCode: String = defaultCurrencyCode) {
+    init?(decimalString text: String, currencyCode: String) {
         guard text.wholeMatch(of: #/-?[0-9]+(\.[0-9]+)?/#) != nil,
               var amount = Decimal(string: text, locale: Locale(identifier: "en_US_POSIX"))
         else { return nil }

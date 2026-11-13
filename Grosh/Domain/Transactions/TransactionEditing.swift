@@ -12,29 +12,24 @@ nonisolated enum TransactionEditFlow: Hashable, Sendable {
 
 extension Transaction {
     /// How the detail edits this transaction, or `nil` when the flow that recorded it owns it: a Debt Collection
-    /// or Repayment from Record payment, a payback into another wallet (ADR-0010), and every other linked transaction.
+    /// or Repayment from Record payment, what a Loan or Debt writes off beside one, and a payback into another wallet
+    /// (ADR-0010). The link's kind says which (ADR-0012).
     /// A Loan or Debt stays with the Add sheet once it has payments (which share its link), with its wallet and category
     /// locked (``TransactionDraft/isLockedByPayments``), and so does an Expense paid back into another wallet. A part of
     /// a Split (``isSplitPart``) is edited there too, on its own. A Starting balance and a transfer half have their own
     /// editors, since the Add sheet would re-sign their amount by type and never offers their category.
-    var editFlow: TransactionEditFlow? { editFlow(isSplitPart: isSplitPart) }
-
-    /// ``editFlow``, for a screen that has already worked out ``isSplitPart``, which only a linked transaction asks.
-    func editFlow(isSplitPart: @autoclosure () -> Bool) -> TransactionEditFlow? {
-        if category?.isTransferHalf == true { return .transferHalf }
-        if isLoanOrDebt { return .addSheet }
-        guard linkID == nil || hasPaybacksElsewhere || isSplitPart() else { return nil }
+    var editFlow: TransactionEditFlow? {
         switch category?.lockedRole {
-        case .startingBalance: return .startingBalance
-        case .outgoingTransfer, .incomingTransfer, .debtCollection, .repayment, .reimbursement: return nil
-        case .otherIncome, .otherExpense, .loan, .debt, nil: return .addSheet
+        case .outgoingTransfer, .incomingTransfer: return .transferHalf
+        case .loan, .debt: return .addSheet
+        case .debtCollection, .repayment, .reimbursement: return nil
+        case .startingBalance, .otherIncome, .otherExpense, nil:
+            if linkKind == .transfer || linkKind == .loanOrDebt { return nil }
+            return category?.lockedRole == .startingBalance ? .startingBalance : .addSheet
         }
     }
 
     /// Whether the detail offers Duplicate: only for what the Add sheet edits, but never a balance adjustment,
     /// whose copy wouldn't make any balance right.
-    var canBeDuplicated: Bool { canBeDuplicated(editFlow: editFlow) }
-
-    /// ``canBeDuplicated``, for a screen that has already worked out ``editFlow``.
-    func canBeDuplicated(editFlow: TransactionEditFlow?) -> Bool { editFlow == .addSheet && !isBalanceAdjustment }
+    var canBeDuplicated: Bool { editFlow == .addSheet && !isBalanceAdjustment }
 }

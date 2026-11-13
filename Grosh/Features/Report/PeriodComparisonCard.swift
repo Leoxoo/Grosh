@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 /// The comparison card of Income and Spent details, between the totals and the Breakdown | Trend control. Collapsed, it shows
@@ -9,10 +10,7 @@ struct PeriodComparisonCard: View {
     /// Whether the "vs last year" switch, which Home's Month graph shares, is on.
     @Binding var comparesWithLastYear: Bool
 
-    /// Remembers across launches whether the card is shown.
-    @AppStorage("report.comparisonCard.isShown") private var isShown = false
-    /// Whether the ⓘ explanation of the Average is showing.
-    @State private var isExplaining = false
+    @AppStorage(AppSettings.isComparisonCardShown) private var isShown
     /// The day the user last moved the marker to, or `nil` until they move it.
     @State private var scrubbedDay: CalendarDay?
 
@@ -38,21 +36,7 @@ struct PeriodComparisonCard: View {
         HStack(spacing: 6) {
             Text(title)
                 .font(.subheadline.weight(.semibold))
-            Button {
-                isExplaining = true
-            } label: {
-                Image(systemName: "info.circle")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.borderless)
-            .accessibilityLabel(Strings.Report.whatTheAverageIs)
-            .popover(isPresented: $isExplaining) {
-                Text(Self.explanation)
-                    .font(.subheadline)
-                    .padding()
-                    .frame(maxWidth: 320, alignment: .leading)
-                    .presentationCompactAdaptation(.popover)
-            }
+            ExplanationButton(label: Strings.Report.whatTheAverageIs, explanation: explanation)
             Spacer()
             Button(isShown ? Strings.Common.hide : Strings.Common.show) {
                 withAnimation { isShown.toggle() }
@@ -78,24 +62,27 @@ struct PeriodComparisonCard: View {
         Binding(get: { scrubbedDay ?? graph.defaultSelection }, set: { scrubbedDay = $0 })
     }
 
-    /// What the gray line is called in the card's title.
+    /// What the gray line is called in the card's title: Last year, or the Average with how many periods it takes.
     private var title: String {
+        let count = MonthGraphComparison.averagePeriodCount
         switch graph.comparison {
         case .lastYear:
             return String(localized: Strings.Report.comparedToLastYear)
         case .average:
-            switch graph.period {
-            case .week: return String(localized: Strings.Report.comparedTo3WeekAverage)
-            case .month: return String(localized: Strings.Report.comparedTo3MonthAverage)
-            case .quarter: return String(localized: Strings.Report.comparedTo3QuarterAverage)
-            case .year: return String(localized: Strings.Report.comparedTo3YearAverage)
-            case .day, .all, .custom, .future: return String(localized: Strings.Report.comparedToAverage)
+            switch graph.span.length {
+            case .week: return String(localized: Strings.Report.comparedToWeekAverage(count))
+            case .month: return String(localized: Strings.Report.comparedToMonthAverage(count))
+            case .quarter: return String(localized: Strings.Report.comparedToQuarterAverage(count))
+            case .year: return String(localized: Strings.Report.comparedToYearAverage(count))
             }
         }
     }
 
-    /// What the Average is, in one sentence.
-    static let explanation = String(
-        localized: Strings.Report.averageExplanation
-    )
+    /// What the Average is, in one sentence, its period count spelled out.
+    private var explanation: String {
+        let spelling = NumberFormatter()
+        spelling.numberStyle = .spellOut
+        let count = MonthGraphComparison.averagePeriodCount
+        return String(localized: Strings.Report.averageExplanation(spelling.string(from: count as NSNumber) ?? "\(count)"))
+    }
 }

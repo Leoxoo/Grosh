@@ -24,18 +24,7 @@ struct TransactionsMenu: View {
         Menu(Strings.Transactions.more, systemImage: "ellipsis.circle") {
             #if os(iOS)
             Section {
-                Button {
-                    isFiltering = true
-                } label: {
-                    Label(
-                        Strings.Screens.filters,
-                        systemImage: filter.hasFilters
-                            ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
-                    )
-                    if filter.hasFilters {
-                        Text(Strings.Common.on)
-                    }
-                }
+                TransactionFilterButton(filter: $filter, isPresented: $isFiltering)
             }
             #endif
 
@@ -69,9 +58,7 @@ struct TransactionsMenu: View {
         .sheet(isPresented: $isAdjustingBalance) {
             AdjustBalanceEditor(viewedWallet: viewedWallet)
         }
-        .sheet(isPresented: $isFiltering) {
-            TransactionFilterSheet(filter: $filter)
-        }
+        .transactionFilterSheet(isPresented: $isFiltering, filter: $filter)
     }
 
     private var viewsByCategory: Binding<Bool> {

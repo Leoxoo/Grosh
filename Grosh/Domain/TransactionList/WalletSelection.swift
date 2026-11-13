@@ -9,19 +9,23 @@ nonisolated enum WalletSelection: Hashable {
         includesWallet(transaction.wallet)
     }
 
+    /// The currency the selection's figures are written in: the wallet's own, or for the Total that of the first wallet
+    /// counted in it (``Wallet/countsInTotal``) in `wallets`' order, the user's, or the default one while none is. The
+    /// Total's balance keeps each currency apart (``WalletBalances/total(of:)``); a figure that adds up what counts,
+    /// such as the Report's and the Month graph's, is one number, so it counts only the transactions in this currency
+    /// (``CountedHistory``).
+    func currencyCode(among wallets: [Wallet]) -> String {
+        switch self {
+        case .total: wallets.first(where: \.countsInTotal).currencyCodeOrDefault
+        case .wallet(let wallet): wallet.currencyCode
+        }
+    }
+
     /// Whether a transaction or Scheduled row paid from `wallet` belongs to the selection.
     func includesWallet(_ wallet: Wallet?) -> Bool {
         switch self {
         case .total: wallet?.countsInTotal ?? false
         case .wallet(let selected): wallet == selected
-        }
-    }
-
-    /// The selection's balance on `today`: the Total of `wallets`, or the one wallet's balance.
-    func balance(asOf today: CalendarDay, wallets: [Wallet]) -> Money {
-        switch self {
-        case .total: Wallet.total(of: wallets, asOf: today)
-        case .wallet(let wallet): wallet.balance(asOf: today)
         }
     }
 }

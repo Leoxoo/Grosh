@@ -12,61 +12,54 @@ extension View {
 /// The bell and the sheet it opens. The sheet hangs off the screen rather than the toolbar button, so rebuilding the
 /// toolbar never closes it.
 private struct DueRemindersBell: ViewModifier {
-    @Query(DebtsAndLoans.transactions) private var transactions: [Transaction]
-    @Query(EstimatedAmounts.transactions) private var estimates: [Transaction]
-    @Query(ExpectedReimbursements.all) private var expectations: [ExpectedReimbursement]
+    @Query(DebtsAndLoans.records) private var transactions: [Transaction]
+    @Query(EstimatedAmounts.records) private var estimates: [Transaction]
+    @Query(ExpectedReimbursements.records) private var expectations: [ExpectedReimbursement]
     @Environment(\.today) private var today
     @State private var isShowingList = false
 
     func body(content: Content) -> some View {
-        let dueCount = DebtsAndLoans(transactions).due(on: today).count
-            + EstimatedAmounts(estimates).due(on: today).count
-            + ExpectedReimbursements(expectations).due(on: today).count
+        let due = DueReminders(transactions: transactions, expectations: expectations, estimates: estimates, on: today)
         content
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    DueRemindersButton(dueCount: dueCount) { isShowingList = true }
+                    DueRemindersButton(dueCount: due.count) { isShowingList = true }
                 }
             }
             .sheet(isPresented: $isShowingList) {
-                DueRemindersList()
+                DueRemindersList(due: due)
             }
     }
 }
 
-/// The open Loans and Debts whose reminder day has come, the earliest first, then the Owes me whose reminder day has
-/// come, then the estimated amounts waiting for their real figures. A Loan or Debt opens its transaction detail, an Owes
-/// me its own detail; an estimate opens its amount editor.
+/// What is due (``DueReminders``), as the bell reads it. A Loan or Debt opens its transaction detail, an Owes me its own
+/// detail; an estimate opens its amount editor.
 private struct DueRemindersList: View {
-    @Query(DebtsAndLoans.transactions) private var transactions: [Transaction]
-    @Query(EstimatedAmounts.transactions) private var estimates: [Transaction]
-    @Query(ExpectedReimbursements.all) private var expectations: [ExpectedReimbursement]
+    let due: DueReminders
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.today) private var today
     /// The estimate whose amount editor is open, while it is.
     @State private var estimateBeingEntered: Transaction?
 
     var body: some View {
-        let due = DebtsAndLoans(transactions).due(on: today)
-        let estimatesDue = EstimatedAmounts(estimates).due(on: today)
-        let owedDue = ExpectedReimbursements(expectations).due(on: today)
         NavigationStack {
             List {
-                ForEach(due) { loanOrDebt in
+                ForEach(due.loansAndDebts) { loanOrDebt in
                     NavigationLink {
                         TransactionDetailView(transaction: loanOrDebt.original)
                     } label: {
                         LoanOrDebtRow(loanOrDebt: loanOrDebt, today: today)
                     }
                 }
-                ForEach(owedDue) { expectation in
+                ForEach(due.expectations) { expectation in
                     NavigationLink {
                         ExpectedReimbursementDetailView(expectation: expectation)
                     } label: {
                         ExpectedReimbursementRow(expectation: expectation, today: today)
                     }
                 }
-                ForEach(estimatesDue) { estimate in
+                ForEach(due.estimates) { estimate in
                     Button {
                         estimateBeingEntered = estimate
                     } label: {
@@ -76,7 +69,7 @@ private struct DueRemindersList: View {
                 }
             }
             .overlay {
-                if due.isEmpty && owedDue.isEmpty && estimatesDue.isEmpty {
+                if due.isEmpty {
                     ContentUnavailableView(
                         Strings.DebtsLoans.noDueReminders,
                         systemImage: "bell",
@@ -97,8 +90,6 @@ private struct DueRemindersList: View {
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 420, idealWidth: 460, minHeight: 360, idealHeight: 480)
-        #endif
+        .macSheetSize(.reminders)
     }
 }

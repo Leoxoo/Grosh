@@ -9,6 +9,9 @@ import Foundation
 nonisolated enum Strings {
     /// Words and messages that many screens share.
     enum Common {
+        static let notInStore: LocalizedStringResource = "It's no longer in Grosh."
+        /// Stands in for a value there is none of, such as the wallet of a transfer's deleted half.
+        static let noValue: LocalizedStringResource = "—"
         static let cancel: LocalizedStringResource = "Cancel"
         static let done: LocalizedStringResource = "Done"
         static let save: LocalizedStringResource = "Save"
@@ -25,6 +28,8 @@ nonisolated enum Strings {
         static let restore: LocalizedStringResource = "Restore"
         static let duplicate: LocalizedStringResource = "Duplicate"
         static let hide: LocalizedStringResource = "Hide"
+        static let copy: LocalizedStringResource = "Copy"
+        static let copied: LocalizedStringResource = "Copied"
         static let show: LocalizedStringResource = "Show"
         static let unhide: LocalizedStringResource = "Unhide"
         static let remove: LocalizedStringResource = "Remove"
@@ -137,6 +142,8 @@ nonisolated enum Strings {
 
     /// The Home tab and its Month graph.
     enum Home {
+        /// A line of a Month graph day's popup: a scheduled transaction's name, or the comparison's, and its amount.
+        static func namedAmount(_ name: String, _ amount: String) -> LocalizedStringResource { "\(name) \(amount)" }
         static let addAWallet: LocalizedStringResource = "Add a wallet"
         static let myWallets: LocalizedStringResource = "My Wallets"
         static let seeAll: LocalizedStringResource = "See all"
@@ -147,12 +154,10 @@ nonisolated enum Strings {
         static let vsLastYear: LocalizedStringResource = "vs last year"
         static let recentTransactions: LocalizedStringResource = "Recent transactions"
         static let recentTransactionsEmpty: LocalizedStringResource = "Transactions you add show up here."
-        static let dayEnd: LocalizedStringResource = "day end"
         static let weekEnd: LocalizedStringResource = "week end"
         static let monthEnd: LocalizedStringResource = "month end"
         static let quarterEnd: LocalizedStringResource = "quarter end"
         static let yearEnd: LocalizedStringResource = "year end"
-        static let end: LocalizedStringResource = "end"
         static let average: LocalizedStringResource = "Average"
         static func expected(_ amount: String) -> LocalizedStringResource { "Expected \(amount)" }
         static func scheduledExpectedBy(_ end: String, _ amount: String) -> LocalizedStringResource { "Scheduled · Expected by \(end) \(amount)" }
@@ -160,22 +165,22 @@ nonisolated enum Strings {
 
     /// Adding, editing, splitting, listing and deleting transactions.
     enum Transactions {
+        /// A part of a Split to pick for a Reimbursement: its category and amount, such as "Food, $12.00".
+        static func partChoice(_ category: String, _ amount: String) -> LocalizedStringResource { "\(category), \(amount)" }
         static let addTransaction: LocalizedStringResource = "Add Transaction"
         static let editTransaction: LocalizedStringResource = "Edit Transaction"
         static let newTransaction: LocalizedStringResource = "New Transaction"
         static let transaction: LocalizedStringResource = "Transaction"
         static let transactionDeleted: LocalizedStringResource = "Transaction Deleted"
         static let couldntSave: LocalizedStringResource = "Couldn't Save Transaction"
-        static let missingCard: LocalizedStringResource = "Choose the Card this expense was paid with."
-        static let missingWith: LocalizedStringResource = "Choose who you lent to or borrowed from in With."
+        static let missingCard: LocalizedStringResource = "Choose the Card this expense was paid with. Expenses need a Card when their wallet has one."
+        static let missingWith: LocalizedStringResource = "A Loan or Debt needs a With: who you lent to or borrowed from."
         static let tooManyWith: LocalizedStringResource = "A Loan or Debt is with one person. Choose one in With."
         static let notAStartingBalance: LocalizedStringResource = "Only a wallet's Starting balance can be edited here."
         static let forgivenLockFooter: LocalizedStringResource = "It's forgiven, so it keeps its amount, wallet and category until it's un-forgiven."
-        static let cardRequiredFooter: LocalizedStringResource = "Choose the Card this expense was paid with. Expenses need a Card when their wallet has one."
         static let addMoreDetails: LocalizedStringResource = "Add more details"
         static let comingSoon: LocalizedStringResource = "Coming soon"
         static let location: LocalizedStringResource = "Location"
-        static let withRequiredFooter: LocalizedStringResource = "A Loan or Debt needs a With: who you lent to or borrowed from."
         static let enterAmount: LocalizedStringResource = "Enter Amount"
         static let estimatedFooter: LocalizedStringResource = "This amount is the average of recent transactions in its category. Enter the real amount to confirm it."
         static let duplicateFooter: LocalizedStringResource = "Duplicate opens a new transaction with the same details, dated today."
@@ -243,8 +248,6 @@ nonisolated enum Strings {
     /// Transfers between wallets.
     enum Transfers {
         static let transfer: LocalizedStringResource = "Transfer"
-        static let missingSourceWallet: LocalizedStringResource = "Choose the wallet the money leaves."
-        static let missingDestinationWallet: LocalizedStringResource = "Choose the wallet the money goes to."
         static let notATransferHalf: LocalizedStringResource = "Only half of a transfer can be edited here."
         static let twoWalletsNeeded: LocalizedStringResource = "A transfer needs two wallets. Add another in Account → Wallets."
         static let footer: LocalizedStringResource = "Recorded as an Outgoing transfer and an Incoming transfer, linked to each other. A transfer is never income or spending, and the Total doesn't change."
@@ -278,6 +281,7 @@ nonisolated enum Strings {
     /// Wallets: adding, editing, archiving and deleting them.
     enum Wallets {
         static let missingName: LocalizedStringResource = "Give the wallet a name."
+        static let invalidStartingBalance: LocalizedStringResource = "The current balance can't be worked out."
         static let deleteThisWallet: LocalizedStringResource = "Delete this wallet?"
         static let deleteWallet: LocalizedStringResource = "Delete Wallet"
         static let couldntDelete: LocalizedStringResource = "Couldn't Delete Wallet"
@@ -306,7 +310,6 @@ nonisolated enum Strings {
     enum Cards {
         static let missingName: LocalizedStringResource = "Give the Card a name."
         static let missingPayingWallet: LocalizedStringResource = "Choose the wallet this Card is paid from."
-        static let statementDateRequiresCredit: LocalizedStringResource = "Only Credit cards have a statement date."
         static let statementDayOutOfRange: LocalizedStringResource = "A statement date is a day from 1 to 31."
         static let invalidLastFourDigits: LocalizedStringResource = "Enter all 4 last digits, or leave them blank."
         static let mergeIntoItself: LocalizedStringResource = "Choose another Card to merge into."
@@ -397,7 +400,6 @@ nonisolated enum Strings {
         static func subcategoriesDeletedToo(_ count: Int) -> LocalizedStringResource { "Its \(count) subcategories are deleted too. This can't be undone." }
         static func sameAsParent(_ parent: String, _ kind: String) -> LocalizedStringResource { "Same as \(parent) (\(kind))" }
         static func nothingToMergeInto(_ type: String) -> LocalizedStringResource { "There's no other \(type) category this one can be merged into." }
-        static func subcategoriesMoveUnder(_ count: Int) -> LocalizedStringResource { " and its \(count) subcategories move under it" }
         static func missingLockedCategory(_ name: String) -> LocalizedStringResource { "Grosh can't do this without its “\(name)” category, which is missing." }
     }
 
@@ -407,10 +409,24 @@ nonisolated enum Strings {
         static let nothingToMergeInto: LocalizedStringResource = "Nothing to Merge Into"
         static let couldntMerge: LocalizedStringResource = "Couldn't Merge"
         static func title(_ name: String) -> LocalizedStringResource { "Merge “\(name)”" }
+        static func quoted(_ name: String) -> LocalizedStringResource { "“\(name)”" }
         static func confirmation(_ source: String, _ target: String) -> LocalizedStringResource { "Merge “\(source)” into “\(target)”?" }
-        static func itsTransactionMovesTo(_ destination: String) -> LocalizedStringResource { "Its transaction moves to \(destination)" }
-        static func itsTransactionsMoveTo(_ count: Int, _ destination: String) -> LocalizedStringResource { "Its \(count) transactions move to \(destination)" }
-        static func thenRemoved(_ name: String) -> LocalizedStringResource { ". Then “\(name)” is removed." }
+        static func itsTransactionMovesTo(_ destination: String, thenRemoved name: String) -> LocalizedStringResource {
+            "Its transaction moves to \(destination). Then “\(name)” is removed."
+        }
+        static func itsTransactionsMoveTo(_ count: Int, _ destination: String, thenRemoved name: String) -> LocalizedStringResource {
+            "Its \(count) transactions move to \(destination). Then “\(name)” is removed."
+        }
+        static func itsTransactionAndSubcategoriesMoveTo(
+            _ destination: String, subcategories: Int, thenRemoved name: String
+        ) -> LocalizedStringResource {
+            "Its transaction moves to \(destination) and its \(subcategories) subcategories move under it. Then “\(name)” is removed."
+        }
+        static func itsTransactionsAndSubcategoriesMoveTo(
+            _ count: Int, _ destination: String, subcategories: Int, thenRemoved name: String
+        ) -> LocalizedStringResource {
+            "Its \(count) transactions move to \(destination) and its \(subcategories) subcategories move under it. Then “\(name)” is removed."
+        }
     }
 
     /// Loans and Debts: payments, forgiving and reminders.
@@ -424,7 +440,8 @@ nonisolated enum Strings {
         static let notForgiven: LocalizedStringResource = "This Loan or Debt isn't forgiven."
         static let unforgiveFirst: LocalizedStringResource = "Un-forgive this Loan or Debt before changing its amount, wallet or category."
         static let open: LocalizedStringResource = "Open"
-        static let show: LocalizedStringResource = "Show"
+        static let loans: LocalizedStringResource = "Loans"
+        static let debts: LocalizedStringResource = "Debts"
         static let showByPeople: LocalizedStringResource = "Show by people"
         static let showByLoanOrDebt: LocalizedStringResource = "Show by Loan/Debt"
         static let noDebtsOrLoans: LocalizedStringResource = "No Debts or Loans"
@@ -494,6 +511,7 @@ nonisolated enum Strings {
         static let linkTransaction: LocalizedStringResource = "Link Transaction"
         static let couldntLink: LocalizedStringResource = "Couldn't Link Transaction"
         static let pastOccurrences: LocalizedStringResource = "Past Occurrences"
+        static let pastOccurrencesFooter: LocalizedStringResource = "Pick the days you haven't entered yet. Each one becomes a transaction with this schedule's amount, wallet, Category, Card and note."
         static let addAll: LocalizedStringResource = "Add All"
         static let couldntAddTransactions: LocalizedStringResource = "Couldn't Add Transactions"
         static let bill: LocalizedStringResource = "Bill"
@@ -554,7 +572,6 @@ nonisolated enum Strings {
         static let everyWeek: LocalizedStringResource = "Every week"
         static let everyMonth: LocalizedStringResource = "Every month"
         static let everyYear: LocalizedStringResource = "Every year"
-        static let onceLowercase: LocalizedStringResource = "once"
         static let onTheLastDay: LocalizedStringResource = "on the last day"
         static func paid(_ amount: String) -> LocalizedStringResource { "\(amount) paid" }
         static func paidOfTotal(_ paid: String, _ total: String) -> LocalizedStringResource { "\(paid) of \(total) paid" }
@@ -572,14 +589,20 @@ nonisolated enum Strings {
         static func everyWeeks(_ count: Int) -> LocalizedStringResource { "Every \(count) weeks" }
         static func everyMonths(_ count: Int) -> LocalizedStringResource { "Every \(count) months" }
         static func everyYears(_ count: Int) -> LocalizedStringResource { "Every \(count) years" }
-        static func onDate(_ date: String) -> LocalizedStringResource { "on \(date)" }
-        static func until(_ date: String) -> LocalizedStringResource { "until \(date)" }
+        static func repeatOnDate(_ repeatPhrase: String, _ date: String) -> LocalizedStringResource { "\(repeatPhrase) on \(date)" }
+        static func repeatUntil(_ repeatPhrase: String, _ date: String) -> LocalizedStringResource { "\(repeatPhrase), until \(date)" }
+        static func repeatOnce(_ repeatPhrase: String) -> LocalizedStringResource { "\(repeatPhrase), once" }
+        static func repeatTimes(_ repeatPhrase: String, _ count: Int) -> LocalizedStringResource { "\(repeatPhrase), \(count) times" }
         static func onThe(_ day: String) -> LocalizedStringResource { "on the \(day)" }
         static func onTheFirst(_ weekday: String) -> LocalizedStringResource { "on the first \(weekday)" }
         static func onTheSecond(_ weekday: String) -> LocalizedStringResource { "on the second \(weekday)" }
         static func onTheThird(_ weekday: String) -> LocalizedStringResource { "on the third \(weekday)" }
         static func onTheFourth(_ weekday: String) -> LocalizedStringResource { "on the fourth \(weekday)" }
         static func onTheLast(_ weekday: String) -> LocalizedStringResource { "on the last \(weekday)" }
+        /// How often a repeat falls and on which day: "Every month on the 4th".
+        static func repeatOnDay(_ repeatPhrase: String, _ dayPhrase: String) -> LocalizedStringResource {
+            "\(repeatPhrase) \(dayPhrase)"
+        }
     }
 
     /// Money paid back on an expense.
@@ -603,8 +626,85 @@ nonisolated enum Strings {
         static let couldntDelete: LocalizedStringResource = "Couldn't Delete Reimbursement"
     }
 
+    /// Owes me: money someone is expected to pay back on an Expense (an Expected reimbursement).
+    enum OwesMe {
+        static let owesMe: LocalizedStringResource = "Owes Me"
+        static let settledSection: LocalizedStringResource = "Owes Me · Settled"
+        static let couldntChange: LocalizedStringResource = "Couldn't Change Owes Me"
+        static let expectationDeleted: LocalizedStringResource = "Expectation Deleted"
+        static let expected: LocalizedStringResource = "Expected"
+        static let paidBack: LocalizedStringResource = "Paid Back"
+        static let payments: LocalizedStringResource = "Payments"
+        static let closed: LocalizedStringResource = "Closed"
+        static let reopen: LocalizedStringResource = "Reopen"
+        static let openAmount: LocalizedStringResource = "Open amount"
+        /// What an open amount shows in place of a figure, since it isn't known yet.
+        static let unknownAmount: LocalizedStringResource = "?"
+        static let openAmountFooter: LocalizedStringResource = "It has no amount yet, so it is left out of totals. Close it by hand once it is settled."
+        static let detailFooter: LocalizedStringResource = "Owes me never changes a balance or a report. Money that comes back is a reimbursement of the expense."
+        static let sectionFooter: LocalizedStringResource = "Owes me never changes a balance or a report. The expense stays at its full amount until money comes back."
+        static let paidBackIntoOtherWallets: LocalizedStringResource = "Paid Back Into Other Wallets"
+        static let otherWalletsFooter: LocalizedStringResource = "Its own wallet keeps the full amount. The Total shows the expense net of these."
+        static let forgiveFooter: LocalizedStringResource = "Marks it forgiven without adding any transaction. Nothing in your balances or reports changes, because it never counted in either."
+        static let reminderTitle: LocalizedStringResource = "Owes you"
+        static let notAnExpense: LocalizedStringResource = "Only an Expense can have Owes me."
+        static let invalidAmount: LocalizedStringResource = "Enter an amount above zero, or leave it blank if you don't know it yet."
+        static let amountAboveExpense: LocalizedStringResource = "People can't owe you more than the Expense cost."
+        static let notOpen: LocalizedStringResource = "Nothing is expected any more."
+        static let notAnOpenAmount: LocalizedStringResource = "Only an expectation with no amount is closed by hand. One with an amount closes itself once it is paid."
+        static let notClosed: LocalizedStringResource = "It isn't closed."
+        static let notForgiven: LocalizedStringResource = "It isn't forgiven."
+        static let walletLockedByPaybacks: LocalizedStringResource = "Money was paid back into another wallet against this Expense, so it stays in its wallet."
+        static let splitPart: LocalizedStringResource = "A part of a Split can't be paid back into another wallet."
+        static let otherCurrency: LocalizedStringResource = "That wallet is in another currency than the expense. Choose a wallet in the same currency."
+        static func personOwesMe(_ name: String) -> LocalizedStringResource { "\(name) owes me" }
+        /// The button that adds a + Owes me for one Person in With.
+        static func addOwesMe(_ name: String) -> LocalizedStringResource { "+ Owes me: \(name)" }
+        static let removeOwesMe: LocalizedStringResource = "Remove Owes Me"
+        static func into(_ wallet: String) -> LocalizedStringResource { "Into \(wallet)" }
+        static func rowSummary(_ expense: String, _ day: String) -> LocalizedStringResource { "Owes me · \(expense) · \(day)" }
+        static func openCount(_ count: Int) -> LocalizedStringResource { "+\(count) open" }
+        static func paidTo(_ amount: String, _ wallet: String) -> LocalizedStringResource { "\(amount) to \(wallet)" }
+        static func personNotInWith(_ name: String) -> LocalizedStringResource { "\(name) still owes you for this Expense. Put \(name) back in With, or remove Owes me first." }
+        static func hasPayments(_ name: String) -> LocalizedStringResource { "\(name) has paid some of this back, so it can't be removed." }
+        static func reminderBody(_ name: String, _ expense: String) -> LocalizedStringResource { "\(name) owes you for \(expense)." }
+        static func reminderBody(_ name: String, _ amount: String, _ expense: String) -> LocalizedStringResource { "\(name) owes you \(amount) for \(expense)." }
+    }
+
+    /// The people in With, and texting them.
+    enum People {
+        static let couldntUpdate: LocalizedStringResource = "Couldn't Update People"
+        static let phoneOptional: LocalizedStringResource = "Phone (optional)"
+        static let chosen: LocalizedStringResource = "Chosen"
+        static let previous: LocalizedStringResource = "Previous"
+        static let searchOrAddName: LocalizedStringResource = "Search or add a name"
+        static let noOneYet: LocalizedStringResource = "No One Yet"
+        static let addFirstPerson: LocalizedStringResource = "Search for a name to add the first person."
+        static let contacts: LocalizedStringResource = "Contacts"
+        static let whichNumber: LocalizedStringResource = "Which number?"
+        static let anyone: LocalizedStringResource = "Anyone"
+        static let missingName: LocalizedStringResource = "Enter a name."
+        static let text: LocalizedStringResource = "Text"
+        static let textThem: LocalizedStringResource = "Text them"
+        static func add(_ name: String) -> LocalizedStringResource { "Add \(name)" }
+        static func hiddenName(_ name: String) -> LocalizedStringResource { "\(name) (Hidden)" }
+        static func severalNumbers(_ name: String) -> LocalizedStringResource { "\(name) has several numbers." }
+        static func textName(_ name: String) -> LocalizedStringResource { "Text \(name)" }
+        static func cantTextFromHere(_ name: String) -> LocalizedStringResource { "This device can't text \(name) from here. Copy the message or share it instead." }
+        static func owesYou(_ amount: String) -> LocalizedStringResource { "Owes you \(amount)" }
+        static func youOwe(_ amount: String) -> LocalizedStringResource { "You owe \(amount)" }
+        static func bothOwe(_ name: String, _ theirs: String, _ mine: String) -> LocalizedStringResource { "Hi \(name), you owe me \(theirs), and I owe you \(mine)." }
+        static func youOweMe(_ name: String, _ theirs: String) -> LocalizedStringResource { "Hi \(name), a reminder that you owe me \(theirs)." }
+        static func youOweMeFor(_ name: String, _ theirs: String, _ expense: String) -> LocalizedStringResource { "Hi \(name), a reminder that you owe me \(theirs) for \(expense)." }
+        static func iOweYou(_ name: String, _ mine: String) -> LocalizedStringResource { "Hi \(name), I owe you \(mine)." }
+        static func hi(_ name: String) -> LocalizedStringResource { "Hi \(name)," }
+        static func youOweMeForExpense(_ name: String, _ expense: String) -> LocalizedStringResource { "Hi \(name), a reminder that you owe me for \(expense)." }
+    }
+
     /// The Report screen and its cards.
     enum Report {
+        /// A category donut slice as VoiceOver reads it: its name and its share of the total, such as "Food, 32%".
+        static func sliceLabel(_ name: String, _ share: String) -> LocalizedStringResource { "\(name), \(share)" }
         static let everythingElse: LocalizedStringResource = "Everything else"
         static let nothingInCategory: LocalizedStringResource = "Nothing in this category in the period."
         static let whatNetIncomeCounts: LocalizedStringResource = "What Net income counts"
@@ -613,12 +713,12 @@ nonisolated enum Strings {
         static let cantCountIncome: LocalizedStringResource = "Can't Count Income"
         static let whatTheAverageIs: LocalizedStringResource = "What the Average is"
         static let comparedToLastYear: LocalizedStringResource = "Compared to last year"
-        static let comparedTo3WeekAverage: LocalizedStringResource = "Compared to 3-Week Avg"
-        static let comparedTo3MonthAverage: LocalizedStringResource = "Compared to 3-Month Avg"
-        static let comparedTo3QuarterAverage: LocalizedStringResource = "Compared to 3-Quarter Avg"
-        static let comparedTo3YearAverage: LocalizedStringResource = "Compared to 3-Year Avg"
-        static let comparedToAverage: LocalizedStringResource = "Compared to Average"
-        static let averageExplanation: LocalizedStringResource = "The Average is the mean of the running totals of up to three complete earlier periods of this length, counting from the first period with anything in it."
+        static func comparedToWeekAverage(_ count: Int) -> LocalizedStringResource { "Compared to \(count)-Week Avg" }
+        static func comparedToMonthAverage(_ count: Int) -> LocalizedStringResource { "Compared to \(count)-Month Avg" }
+        static func comparedToQuarterAverage(_ count: Int) -> LocalizedStringResource { "Compared to \(count)-Quarter Avg" }
+        static func comparedToYearAverage(_ count: Int) -> LocalizedStringResource { "Compared to \(count)-Year Avg" }
+        /// `count` spelled out: "three".
+        static func averageExplanation(_ count: String) -> LocalizedStringResource { "The Average is the mean of the running totals of up to \(count) complete earlier periods of this length, counting from the first period with anything in it." }
         static let dailyAverage: LocalizedStringResource = "Daily average"
         static let shows: LocalizedStringResource = "Shows"
         static let breakdown: LocalizedStringResource = "Breakdown"
@@ -649,6 +749,7 @@ nonisolated enum Strings {
         static let walletIsDeleted: LocalizedStringResource = "Its wallet is in Recently Deleted. Restore the wallet first."
         static let deletedWithWallet: LocalizedStringResource = "It was deleted with its wallet. Restore or delete the wallet instead."
         static let loanOrDebtIsForgiven: LocalizedStringResource = "Its Loan or Debt was forgiven since. Un-forgive it first."
+        static let couldntCheck: LocalizedStringResource = "Grosh couldn't read what it's linked to, so it stays here for now. Try again."
         static let deleteForever: LocalizedStringResource = "Delete Forever"
         static let nothingRecentlyDeleted: LocalizedStringResource = "Nothing Recently Deleted"
         static let emptyBin: LocalizedStringResource = "Empty Bin"
@@ -696,7 +797,6 @@ nonisolated enum Strings {
     /// The Keypad's keys, as shown and as VoiceOver reads them.
     enum Keypad {
         static let clearKey: LocalizedStringResource = "C"
-        static let clear: LocalizedStringResource = "Clear"
         static let decimalPoint: LocalizedStringResource = "Decimal point"
         static let plus: LocalizedStringResource = "Plus"
         static let minus: LocalizedStringResource = "Minus"
@@ -733,5 +833,22 @@ nonisolated enum Strings {
         static let choosePhoto: LocalizedStringResource = "Choose Photo"
         static let couldntUse: LocalizedStringResource = "Couldn't Use Photo"
         static let unreadable: LocalizedStringResource = "That photo can't be read."
+    }
+
+    /// The palette's colors, as VoiceOver reads them in a color picker.
+    enum Palette {
+        static let red: LocalizedStringResource = "Red"
+        static let orange: LocalizedStringResource = "Orange"
+        static let yellow: LocalizedStringResource = "Yellow"
+        static let green: LocalizedStringResource = "Green"
+        static let mint: LocalizedStringResource = "Mint"
+        static let teal: LocalizedStringResource = "Teal"
+        static let cyan: LocalizedStringResource = "Cyan"
+        static let blue: LocalizedStringResource = "Blue"
+        static let indigo: LocalizedStringResource = "Indigo"
+        static let purple: LocalizedStringResource = "Purple"
+        static let pink: LocalizedStringResource = "Pink"
+        static let brown: LocalizedStringResource = "Brown"
+        static let gray: LocalizedStringResource = "Gray"
     }
 }

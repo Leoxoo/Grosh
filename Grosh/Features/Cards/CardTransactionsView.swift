@@ -18,22 +18,28 @@ struct CardTransactionsView: View {
     /// The lead-in transactions the user added to the statement total for now. Cleared on stepping to another period.
     @State private var addedLeadIns = Set<Transaction>()
 
-    /// Whether the Card was merged into another or deleted, from its editor, while this screen was open.
-    private var isRemoved: Bool { card.isDeleted || card.modelContext == nil }
-
     var body: some View {
+        // The Card can be merged into another or deleted, from its editor, while this screen is open.
         Group {
-            if isRemoved {
+            if card.isGone {
                 ContentUnavailableView(
                     Strings.Cards.cardRemoved,
                     systemImage: Card.symbolName,
                     description: Text(Strings.Cards.cardRemovedDescription)
                 )
             } else {
-                periodList
+                let period = card.period(containing: today).adding(-periodsBack)
+                CardPeriodList(
+                    card: card, period: period, today: today, periodsBack: $periodsBack, addedLeadIns: $addedLeadIns
+                )
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button(Strings.Common.edit) { isEditing = true }
+                    }
+                }
             }
         }
-        .navigationTitle(isRemoved ? "" : card.displayName)
+        .navigationTitle(card.isGone ? "" : card.displayName)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -44,18 +50,50 @@ struct CardTransactionsView: View {
             addedLeadIns = []
         }
     }
+}
 
-    /// The period being shown, its count and total, then its transactions by day and its lead-in transactions.
-    private var periodList: some View {
-        let period = card.period(containing: today).adding(-periodsBack)
-        let shown = card.transactions(in: period)
-        let leadIns = card.leadInTransactions(in: period)
+/// The period being shown, its count and total, then its transactions by day and its lead-in transactions. The Card's
+/// transactions on the period's days, and its first and last, are read by the store for the period shown, rather than by
+/// walking every transaction the Card paid for on each draw.
+private struct CardPeriodList: View {
+    let card: Card
+    let period: CardPeriod
+    let today: CalendarDay
+    @Binding var periodsBack: Int
+    /// The lead-in transactions the user added to the statement total for now.
+    @Binding var addedLeadIns: Set<Transaction>
+
+    @Query private var paid: [Transaction]
+    @Query private var earliest: [Transaction]
+    @Query private var latest: [Transaction]
+
+    init(
+        card: Card, period: CardPeriod, today: CalendarDay, periodsBack: Binding<Int>,
+        addedLeadIns: Binding<Set<Transaction>>
+    ) {
+        self.card = card
+        self.period = period
+        self.today = today
+        _periodsBack = periodsBack
+        _addedLeadIns = addedLeadIns
+        let reads = CardStatement.Reads(card: card, for: period)
+        _paid = Query(reads.paid)
+        _earliest = Query(reads.earliest)
+        _latest = Query(reads.latest)
+    }
+
+    var body: some View {
+        let statement = CardStatement(
+            of: card, for: period, paid: paid, earliest: earliest, latest: latest, today: today
+        )
+        let shown = statement.transactions
+        let leadIns = statement.leadIns
         let added = leadIns.filter { addedLeadIns.contains($0) }
 
-        return List {
+        List {
             Section {
                 CardPeriodStepper(
-                    period: period, periods: card.periods(today: today), today: today, periodsBack: $periodsBack
+                    period: period, periods: statement.periods, today: today, periodsBack: $periodsBack
                 )
                 LabeledContent(Strings.Common.transactions) {
                     Text(shown.count.formatted())
@@ -113,11 +151,6 @@ struct CardTransactionsView: View {
                 } footer: {
                     Text(Strings.Cards.previousStatementFooter(CardPeriod.leadInDayCount))
                 }
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button(Strings.Common.edit) { isEditing = true }
             }
         }
     }

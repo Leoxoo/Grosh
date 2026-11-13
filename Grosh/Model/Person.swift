@@ -8,7 +8,8 @@ import SwiftData
 /// (ADR-0001).
 @Model
 final class Person {
-    var name: String = ""
+    /// Changed only by ``rename(to:)``, which keeps ``Transaction/withName`` in step.
+    private(set) var name: String = ""
     /// The phone number as the user typed it, or `nil` for none.
     var phone: String?
     /// Set by Hide: the Person is left out of the With menu's Previous section but keeps their name and their place on
@@ -32,5 +33,15 @@ final class Person {
         self.name = name
         self.phone = phone
         self.lastUsedAt = lastUsedAt
+    }
+
+    /// Renames the Person and keeps ``Transaction/withName`` in step on every transaction they are in, Recently Deleted
+    /// ones included (ADR-0009). Does nothing when the name is the same. Doesn't save.
+    func rename(to newName: String) {
+        guard name != newName else { return }
+        name = newName
+        for transaction in transactions ?? [] {
+            transaction.refreshWithName()
+        }
     }
 }

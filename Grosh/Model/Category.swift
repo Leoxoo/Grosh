@@ -20,10 +20,13 @@ nonisolated enum LockedRole: String, CaseIterable, Sendable {
 /// What a transaction was for. Categories nest at most two levels deep.
 @Model
 final class Category {
+    /// The symbol of a category that has none of its own yet: a question mark.
+    nonisolated static let placeholderSymbolName = "questionmark"
+
     var name: String = ""
     // The three below were stored under other names before; an upgraded store keeps their values under those names.
     @Attribute(originalName: "typeValue") var typeRaw: String = CategoryType.expense.rawValue
-    @Attribute(originalName: "iconName") var symbolName: String = "questionmark"
+    @Attribute(originalName: "iconName") var symbolName: String = Category.placeholderSymbolName
     var colorName: String = PaletteColor.gray.rawValue
     var isHidden: Bool = false
     @Attribute(originalName: "roleValue") var lockedRoleRaw: String?

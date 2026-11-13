@@ -10,14 +10,14 @@ enum LoanOrDebtAction: Hashable, Identifiable {
 
 /// The transaction detail's section for a Loan or Debt: its story (what was lent or borrowed, paid back and
 /// forgiven), what is outstanding, Record Payment, Forgive the Rest and the reminder, or that it is settled, or
-/// forgiven with Un-forgive. Shows nothing for any other transaction. Use inside a `List`, with
-/// ``SwiftUI/View/loanOrDebtSheets(for:action:)`` on the screen to present what `action` opens.
+/// forgiven with Un-forgive. Shows nothing for any other transaction. Use inside a `List`, with the screen presenting
+/// ``LoanOrDebtAction/sheet(for:)`` for what `action` opens.
 struct LoanOrDebtSection: View {
     let transaction: Transaction
     @Binding var action: LoanOrDebtAction?
 
     /// Every Loan, Debt and payment, so the section is current as soon as a payment is recorded.
-    @Query(DebtsAndLoans.transactions) private var debtLoanTransactions: [Transaction]
+    @Query(DebtsAndLoans.records) private var debtLoanTransactions: [Transaction]
     @State private var errorMessage: String?
 
     var body: some View {
@@ -60,11 +60,8 @@ struct LoanOrDebtSection: View {
     }
 
     private func unforgive() {
-        do {
+        Log.store.perform("Un-forgiving a Loan or Debt", errorMessage: &errorMessage) {
             try transaction.unforgive()
-        } catch {
-            Log.store.failed("Un-forgiving a Loan or Debt", error)
-            errorMessage = error.localizedDescription
         }
     }
 
@@ -73,11 +70,8 @@ struct LoanOrDebtSection: View {
         Binding {
             transaction.reminderDay
         } set: { day in
-            do {
+            Log.reminders.perform("Setting a Loan or Debt reminder", errorMessage: &errorMessage) {
                 try transaction.setReminder(day)
-            } catch {
-                Log.reminders.failed("Setting a Loan or Debt reminder", error)
-                errorMessage = error.localizedDescription
             }
         }
     }
@@ -89,7 +83,7 @@ private struct ForgivenRows: View {
 
     var body: some View {
         LabeledContent {
-            Text(forgiveness.day.date().formatted(date: .abbreviated, time: .omitted))
+            Text(forgiveness.day.shortText)
         } label: {
             Label(Strings.Common.forgiven, systemImage: "hand.raised.fill")
                 .foregroundStyle(.settled)
@@ -106,15 +100,14 @@ private struct ForgivenRows: View {
     }
 }
 
-extension View {
-    /// Presents Record Payment or Forgive the Rest for `transaction` while `action` says which. Attach to the screen,
-    /// outside its `List`, so presenting doesn't depend on the list's rows.
-    func loanOrDebtSheets(for transaction: Transaction, action: Binding<LoanOrDebtAction?>) -> some View {
-        sheet(item: action) { action in
-            switch action {
-            case .recordPayment: RecordPaymentEditor(original: transaction)
-            case .forgive: ForgiveEditor(original: transaction)
-            }
+extension LoanOrDebtAction {
+    /// The sheet this opens for `transaction`: Record Payment or Forgive the Rest. Present it from the screen, outside
+    /// its `List`, so presenting doesn't depend on the list's rows.
+    @ViewBuilder
+    func sheet(for transaction: Transaction) -> some View {
+        switch self {
+        case .recordPayment: RecordPaymentEditor(original: transaction)
+        case .forgive: ForgiveEditor(original: transaction)
         }
     }
 }

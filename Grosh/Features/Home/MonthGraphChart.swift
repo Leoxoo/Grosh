@@ -25,7 +25,9 @@ struct MonthGraphChart: View {
                 .foregroundStyle(Color.secondary.opacity(0.5))
                 .lineStyle(StrokeStyle(lineWidth: 1))
                 .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                    MonthGraphPopup(popup: popup, comparisonName: graph.comparison.name)
+                    MonthGraphPopup(
+                        popup: popup, currencyCode: graph.currencyCode, comparisonName: graph.comparison.name
+                    )
                 }
 
             if let comparisonLine = graph.comparisonLine {
@@ -71,7 +73,7 @@ struct MonthGraphChart: View {
                 AxisGridLine()
                 AxisValueLabel(anchor: .leading) {
                     if let cents = value.as(Double.self) {
-                        Text(Money(cents: Int(cents.rounded())).decimalValue, format: .number.notation(.compactName))
+                        Text(Decimal(Int(cents.rounded())) / 100, format: .number.notation(.compactName))
                     }
                 }
             }
@@ -87,7 +89,8 @@ struct MonthGraphChart: View {
         // The headline already says the amount so far, and the line's positions mean nothing read aloud.
         .accessibilityHidden(true)
         .frame(height: 150)
-        .padding(.top, popupHeight + occurrenceHeight * CGFloat(mostScheduledOnADay))
+        // Room for the longest popup, so the plot stays put as the marker moves.
+        .padding(.top, popupHeight + occurrenceHeight * CGFloat(graph.mostScheduledOnADay))
     }
 
     /// `points` joined into one line, kept apart from the chart's other lines by `series`.
@@ -109,12 +112,6 @@ struct MonthGraphChart: View {
     /// The days named along the bottom: every seventh day from the 1st.
     private var labeledDays: [CalendarDay] {
         stride(from: 1, through: graph.span.dayCount, by: 7).map { graph.span.day($0) }
-    }
-
-    /// The most Occurrences the popup lists on any one day, which the room above the plot is kept for, so the plot
-    /// stays put as the marker moves.
-    private var mostScheduledOnADay: Int {
-        (1...graph.span.dayCount).map { graph.popup(on: graph.span.day($0)).scheduled.count }.max() ?? 0
     }
 
     /// From zero, or below it when refunds take Spent under zero, to the highest total of any line, and at least one
@@ -140,6 +137,8 @@ struct MonthGraphChart: View {
 /// it.
 private struct MonthGraphPopup: View {
     let popup: MonthGraph.Popup
+    /// The currency the graph's totals are in, which what is scheduled counts in.
+    let currencyCode: String
     /// What the legend calls the gray line: "Average" or "Last year".
     let comparisonName: String
 
@@ -160,16 +159,15 @@ private struct MonthGraphPopup: View {
             }
             ForEach(popup.scheduled) { occurrence in
                 // Each counts toward the tab, by what it adds to the tab's total.
-                if let counted = occurrence.countedAmount {
-                    Text("\(occurrence.recurring.name) \(counted.amount.formatted())")
+                if let counted = occurrence.countedAmount(in: currencyCode) {
+                    Text(Strings.Home.namedAmount(occurrence.recurring.name, counted.amount.formatted()))
                         .font(.caption)
                         .monospacedDigit()
                         .lineLimit(1)
                 }
             }
             if let comparison = popup.comparison {
-                // The name is already localized: shown as it is.
-                Text("\(comparisonName) \(comparison.formatted())")
+                Text(Strings.Home.namedAmount(comparisonName, comparison.formatted()))
                     .font(.caption)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)

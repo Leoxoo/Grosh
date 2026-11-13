@@ -35,17 +35,15 @@ struct PerformanceBenchmarks {
         try BenchmarkStore.prepare(at: Self.storeURL, years: Self.years)
         try time("launch: open store + startup work") {
             let container = try BenchmarkStore.open(at: Self.storeURL)
-            try CategorySeeder.seedIfNeeded(in: container.mainContext)
-            try CategorySeeder.restoreMissingDefaults(in: container.mainContext)
+            try StoreOpening.prepare(container.mainContext)
             try RecentlyDeleted.purgeExpired(in: container.mainContext)
-            try RecurringTransaction.catchUp(in: container.mainContext)
+            try RecurringTransaction.catchUp(through: .today, in: container.mainContext)
         }
         try time("launch: open store + startup work + first frame of Home") {
             let container = try BenchmarkStore.open(at: Self.storeURL)
-            try CategorySeeder.seedIfNeeded(in: container.mainContext)
-            try CategorySeeder.restoreMissingDefaults(in: container.mainContext)
+            try StoreOpening.prepare(container.mainContext)
             try RecentlyDeleted.purgeExpired(in: container.mainContext)
-            try RecurringTransaction.catchUp(in: container.mainContext)
+            try RecurringTransaction.catchUp(through: .today, in: container.mainContext)
             _ = Hosted(RootView(), container: container)
         }
     }
@@ -108,8 +106,9 @@ struct PerformanceBenchmarks {
         var samples: [Double] = []
         for _ in 0..<6 {
             let start = ContinuousClock.now
-            let added = Grosh.Transaction(amount: Money(cents: -4_20), day: .today, wallet: wallet, category: category)
-            context.insert(added)
+            let added = Grosh.Transaction.insert(
+                cents: -4_20, on: .today, wallet: wallet, category: category, in: context
+            )
             try context.save()
             home.settle()
             transactions.settle()
@@ -129,8 +128,8 @@ struct PerformanceBenchmarks {
         let all = try container.mainContext.fetch(Grosh.Transaction.notDeleted)
         for text in ["Lunch", "12"] {
             time("search for \"\(text)\" and group the results by day") {
-                let results = all.matching(TransactionFilter(searchText: text))
-                _ = TransactionDay.days(of: results, scheduled: [])
+                let listing = TransactionListing.search(all, filter: TransactionFilter(searchText: text))
+                _ = TransactionDay.days(of: listing.transactions, scheduled: [])
             }
         }
     }
@@ -144,28 +143,25 @@ struct PerformanceBenchmarks {
         let old = Period.month(CalendarMonth(today).adding(months: -30))
         let entries = NotDeletedTransactions.Store.of(container.mainContext).entries
         time("Transactions body work for a month 2½ years back") {
-            let filter = TransactionFilter()
-            let selected = filter.transactions(in: .total, from: entries)
-            _ = TimeRange.month.periods(from: selected.firstDay, today: today)
-            let shown = filter.listed(from: all, selected: selected, on: old.days(today: today))
-            _ = PeriodSummary(of: selected, in: old, today: today)
-            _ = TransactionDay.days(of: shown, scheduled: [])
+            let listing = TransactionListing(
+                all, ledger: entries, showing: .total, on: old.days(today: today), filter: TransactionFilter()
+            )
+            _ = TimeRange.month.periods(from: listing.selected.firstDay, today: today)
+            _ = PeriodSummary(of: listing.selected, in: old, today: today)
+            _ = TransactionDay.days(of: listing.transactions, scheduled: [])
         }
+        // Home hands the Month graph the currency of the wallets it reads for the Total.
+        let currencyCode = WalletSelection.total.currencyCode(among: try container.mainContext.fetch(Wallet.unarchived))
         try time("Home Month graph work for a month 2½ years back") {
             let context = container.mainContext
             let month = CalendarMonth(today).adding(months: -30)
-            let recurring = try context.fetch(FetchDescriptor<RecurringTransaction>())
-            let forgiven = try context.fetch(MonthGraphHistory.forgiven)
-            let otherIncome = try context.otherCategory(.income)
-            let firstDay = MonthGraphHistory.firstDay(
-                earliest: try context.fetch(MonthGraphHistory.earliestCounted), forgiven: forgiven,
-                otherIncome: otherIncome
+            let recurring = RecurringSchedules(try context.fetch(FetchDescriptor<RecurringTransaction>()))
+            let history = try MonthGraphHistory.read(
+                month, in: context, currencyCode: currencyCode, otherIncome: context.otherCategory(.income)
             )
-            _ = MonthGraph.months(from: firstDay, today: today)
-            let history = try context.fetch(MonthGraphHistory.transactions(for: month)) + forgiven
-            let counted = history.compactMap { $0.countedAmount(otherIncome: otherIncome) }
+            _ = history.strip(.month, today: today)
             for side in SpentOrIncome.allCases {
-                _ = MonthGraph(side, of: counted, countingFrom: firstDay, recurring: recurring, in: .month(month), today: today)
+                _ = history.graph(side, of: month, recurring: recurring, today: today)
             }
         }
     }

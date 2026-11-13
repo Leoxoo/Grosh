@@ -5,7 +5,7 @@ import SwiftData
 /// owes you $30 for Dinner." (ADR-0010). It arrives at 09:00 like the other reminders and the Home bell lists the
 /// expectation from that day until it is settled.
 ///
-/// The notification is posted in ``categoryIdentifier`` and carries ``userInfo``, which is everything an action on it
+/// The notification is posted in ``categoryIdentifier`` and carries ``textThem``, which is everything an action on it
 /// (such as Text them) needs: the Person, their phone, the Expense and the amount.
 nonisolated struct ExpectedReimbursementReminder: PendingReminder {
     static let identifierPrefix = "grosh.owes-me-reminder."
@@ -15,6 +15,8 @@ nonisolated struct ExpectedReimbursementReminder: PendingReminder {
     /// The Expected reimbursement it reminds of.
     let original: PersistentIdentifier
     let day: CalendarDay
+    /// The Person who owes, or `nil` for none.
+    let person: PersistentIdentifier?
     /// The name of the Person who owes.
     let personName: String
     /// The Person's phone number, when they have one.
@@ -25,33 +27,35 @@ nonisolated struct ExpectedReimbursementReminder: PendingReminder {
     let outstanding: Money?
     var arrival = ReminderArrival.onItsDay
 
-    var userInfo: [String: String] {
-        typealias Key = TextReminder.InfoKey
-        var info = [Key.person: personName, Key.expense: expense]
-        if let phone { info[Key.phone] = phone }
-        if let outstanding {
-            info[Key.amountCents] = String(outstanding.cents)
-            info[Key.currencyCode] = outstanding.currencyCode
+    var textThem: TextThemPayload? {
+        TextThemPayload(
+            person: person, personName: personName, phone: phone, expense: expense, outstanding: outstanding
+        )
+    }
+
+    /// "Owes you", the notification's title.
+    var title: String {
+        String(localized: Strings.OwesMe.reminderTitle)
+    }
+
+    /// Who owes what for which Expense: "Alex owes you $30 for Dinner.", or "Alex owes you for Dinner." while the
+    /// amount isn't known.
+    var body: String {
+        guard let outstanding else {
+            return String(localized: Strings.OwesMe.reminderBody(personName, expense))
         }
-        return info
+        return String(localized: Strings.OwesMe.reminderBody(personName, outstanding.formatted(), expense))
     }
 }
 
 extension ExpectedReimbursements: ReminderSource {
-    static var records: FetchDescriptor<ExpectedReimbursement> { all }
+    static func reminderDay(of expectation: ExpectedReimbursement) -> CalendarDay? { expectation.openReminderDay }
 
-    /// The notifications that should be pending: one for each open expectation whose reminder day is `today` or later,
-    /// the soonest first. A settled one (paid back, closed or forgiven) has none, and neither has one whose Expense is in
-    /// Recently Deleted; one whose day has passed is listed by the bell instead.
-    func reminders(from today: CalendarDay) -> [ExpectedReimbursementReminder] {
-        open.compactMap { expectation in
-            guard let day = expectation.reminderDay, day >= today else { return nil }
-            return ExpectedReimbursementReminder(
-                original: expectation.persistentModelID, day: day, personName: expectation.personName,
-                phone: expectation.person?.phone, expense: expectation.expenseTitle,
-                outstanding: expectation.outstanding
-            )
-        }
-        .sorted { $0.day < $1.day }
+    static func reminder(for expectation: ExpectedReimbursement, on day: CalendarDay) -> ExpectedReimbursementReminder {
+        ExpectedReimbursementReminder(
+            original: expectation.persistentModelID, day: day, person: expectation.person?.persistentModelID,
+            personName: expectation.personName, phone: expectation.person?.phone, expense: expectation.expenseTitle,
+            outstanding: expectation.outstanding
+        )
     }
 }

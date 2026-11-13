@@ -37,13 +37,12 @@ struct ExportCSVView: View {
 
     /// Writes the export to a temporary file named for today.
     private func write() {
-        do {
-            let url = URL.temporaryDirectory.appending(path: GroshCSVExport.fileName(on: today))
+        let url = URL.temporaryDirectory.appending(path: GroshCSVExport.fileName(on: today))
+        let written = Log.store.perform("Writing the CSV export", errorMessage: &errorMessage) {
             try GroshCSVExport.csv(in: context).write(to: url, atomically: true, encoding: .utf8)
+        }
+        if written {
             file = url
-        } catch {
-            Log.store.failed("Writing the CSV export", error)
-            errorMessage = error.localizedDescription
         }
     }
 }
@@ -52,5 +51,5 @@ struct ExportCSVView: View {
     NavigationStack {
         ExportCSVView()
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+    .modelContainer(try! StoreOpening.open(inMemory: true))
 }

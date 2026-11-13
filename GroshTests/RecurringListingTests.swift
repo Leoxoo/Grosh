@@ -3,16 +3,16 @@ import SwiftData
 import Testing
 @testable import Grosh
 
-/// The Recurring tab's wallet filter: every wallet's schedules, or only those paid from the chosen wallet, still grouped
-/// by Kind. The filter changes only which schedules are listed.
+/// The Recurring tab's list: the schedules grouped by Kind in the tab's order, and its wallet filter, which changes only
+/// which schedules are listed.
 @MainActor
 @Suite(.namedInTheLog)
 struct RecurringListingTests {
-    private let store: CategoryFixture
+    private let store: TestStore
     private var context: ModelContext { store.context }
 
     init() throws {
-        store = try CategoryFixture()
+        store = try TestStore()
     }
 
     private func schedule(named name: String, in wallet: Wallet?, kind: RecurringKind = .regular) -> RecurringTransaction {
@@ -24,15 +24,9 @@ struct RecurringListingTests {
         return item
     }
 
-    private func wallet(named name: String) -> Wallet {
-        let added = Wallet(name: name)
-        context.insert(added)
-        return added
-    }
-
     @Test func noWalletChosenListsEveryWalletsSchedules() {
-        let savings = wallet(named: "Savings")
-        let rent = schedule(named: "Rent", in: store.wallet, kind: .bill)
+        let savings = context.addWallet("Savings")
+        let rent = schedule(named: "Rent", in: store.checking, kind: .bill)
         let gym = schedule(named: "Gym", in: savings)
         let phone = schedule(named: "Phone", in: nil, kind: .subscription)
         let groups = RecurringListing.groups(of: [rent, gym, phone])
@@ -41,18 +35,18 @@ struct RecurringListingTests {
     }
 
     @Test func aChosenWalletListsOnlyItsOwnSchedulesInTheirOrder() {
-        let savings = wallet(named: "Savings")
-        let rent = schedule(named: "Rent", in: store.wallet, kind: .bill)
+        let savings = context.addWallet("Savings")
+        let rent = schedule(named: "Rent", in: store.checking, kind: .bill)
         let gym = schedule(named: "Gym", in: savings)
-        let phone = schedule(named: "Phone", in: store.wallet, kind: .subscription)
-        let groups = RecurringListing.groups(of: [rent, gym, phone], wallet: store.wallet)
+        let phone = schedule(named: "Phone", in: store.checking, kind: .subscription)
+        let groups = RecurringListing.groups(of: [rent, gym, phone], wallet: store.checking)
         #expect(groups.map(\.kind) == [.bill, .subscription])
         #expect(groups.flatMap { $0.items }.map(\.name) == ["Rent", "Phone"])
     }
 
     @Test func sectionsWithNoMatchesAreHiddenUnderAWalletFilter() {
-        let savings = wallet(named: "Savings")
-        let rent = schedule(named: "Rent", in: store.wallet, kind: .bill)
+        let savings = context.addWallet("Savings")
+        let rent = schedule(named: "Rent", in: store.checking, kind: .bill)
         let gym = schedule(named: "Gym", in: savings)
         let groups = RecurringListing.groups(of: [rent, gym], wallet: savings)
         #expect(groups.map(\.kind) == [.regular])
@@ -60,8 +54,26 @@ struct RecurringListingTests {
     }
 
     @Test func aWalletWithNoSchedulesListsNothing() {
-        let cash = wallet(named: "Cash")
-        let rent = schedule(named: "Rent", in: store.wallet, kind: .bill)
+        let cash = context.addWallet("Cash")
+        let rent = schedule(named: "Rent", in: store.checking, kind: .bill)
         #expect(RecurringListing.groups(of: [rent], wallet: cash).isEmpty)
+    }
+
+    @Test func theTabGroupsSchedulesByKindInItsOrderAndLeavesOutEmptyKinds() {
+        let workout = schedule(named: "Gym", in: nil)
+        let couch = schedule(named: "Sofa", in: nil, kind: .purchase)
+        let streaming = schedule(named: "Netflix", in: nil, kind: .subscription)
+        let rent = schedule(named: "Rent", in: nil, kind: .bill)
+        let groups = RecurringListing.groups(of: [workout, couch, streaming, rent])
+        #expect(groups.map(\.kind) == [.bill, .subscription, .purchase, .regular])
+        #expect(groups.map { $0.items.count } == [1, 1, 1, 1])
+        #expect(RecurringListing.groups(of: [workout]).map(\.kind) == [.regular])
+        #expect(RecurringListing.groups(of: []).isEmpty)
+    }
+
+    @Test func aGroupKeepsItsSchedulesInTheOrderGiven() {
+        let first = schedule(named: "Gym", in: nil)
+        let second = schedule(named: "Books", in: nil)
+        #expect(RecurringListing.groups(of: [first, second]).first?.items.map(\.name) == ["Gym", "Books"])
     }
 }

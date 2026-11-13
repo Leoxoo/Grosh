@@ -26,16 +26,23 @@ struct MonthGraphProjectionTests {
         starting start: CalendarDay, preset: RepeatPreset = .monthly, end: RepeatEnd = .forever,
         wallet: Wallet? = nil, configure: (inout RecurringDraft) -> Void = { _ in }
     ) throws -> RecurringTransaction {
-        var draft = RecurringDraft(startDay: start)
-        draft.name = name
-        draft.amount = Money(cents: cents)
-        draft.type = type
-        draft.wallet = wallet ?? checking
-        draft.category = try store.category(categoryName, type)
+        var draft = store.recurringDraft(
+            name, cents, under: try store.category(categoryName, type), starting: start, wallet: wallet
+        )
         draft.preset = preset
         draft.end = end
         configure(&draft)
         return try RecurringTransaction.create(draft, today: today, in: context)
+    }
+
+    /// Lunch club and Gym both fall on the 19th, and Lunch club alone on the 26th, so the popup lists at most two on a
+    /// day: the chart keeps room for two. Nothing due keeps room for none.
+    @Test func theMostScheduledOnADayIsTheBusiestDaysCount() throws {
+        #expect(try store.graph(.spent).mostScheduledOnADay == 0)
+        try schedule("Lunch club", 10_00, "Restaurants", starting: day(2026, 10, 5), preset: .weekly)
+        try schedule("Gym", 30_00, "Health & Fitness", starting: day(2026, 10, 19))
+
+        #expect(try store.graph(.spent).mostScheduledOnADay == 2)
     }
 
     // MARK: What the dotted line adds
@@ -54,7 +61,7 @@ struct MonthGraphProjectionTests {
         #expect(dotted.map(\.total.cents) ==
             Array(repeating: 40_00, count: 7) + Array(repeating: 50_00, count: 7) + Array(repeating: 60_00, count: 6))
         #expect(dotted.first?.position == spent.line.last?.position)
-        #expect(spent.expectedByMonthEnd == Money(cents: 60_00))
+        #expect(spent.expectedByPeriodEnd == Money(cents: 60_00))
     }
 
     /// Daily from October 1 for fifteen days: the first twelve were skipped when it was saved today, so three are left.
@@ -71,7 +78,7 @@ struct MonthGraphProjectionTests {
         #expect(spent.popup(on: day(2026, 10, 15)).scheduled.map(\.recurring.name) == ["Parking"])
         #expect(spent.popup(on: day(2026, 10, 16)).scheduled.isEmpty)
         #expect(spent.popup(on: day(2026, 10, 27)).scheduled.isEmpty)
-        #expect(spent.expectedByMonthEnd == Money(cents: 46_00))
+        #expect(spent.expectedByPeriodEnd == Money(cents: 46_00))
     }
 
     /// Two Electricity Bills averaging 60.00 were paid in September, so the Bill's transactions start at 60.00, not at
@@ -88,38 +95,34 @@ struct MonthGraphProjectionTests {
 
         let scheduled = spent.popup(on: day(2026, 10, 20)).scheduled
         #expect(scheduled.map(\.recurring.name) == ["Electricity"])
-        #expect(scheduled.compactMap(\.countedAmount?.amount) == [Money(cents: 60_00)])
-        #expect(spent.expectedByMonthEnd == Money(cents: 60_00))
+        #expect(scheduled.compactMap { $0.countedAmount(in: "USD")?.amount } == [Money(cents: 60_00)])
+        #expect(spent.expectedByPeriodEnd == Money(cents: 60_00))
     }
 
     // MARK: What adds nothing
 
     @Test func aDeletedScheduleAddsNothing() throws {
         let gym = try schedule("Gym", 30_00, "Sports", starting: day(2026, 10, 20))
-        #expect(try store.graph(.spent).expectedByMonthEnd == Money(cents: 30_00))
+        #expect(try store.graph(.spent).expectedByPeriodEnd == Money(cents: 30_00))
 
-        try gym.delete(today: today, in: context)
+        try gym.delete(today: today)
 
         let spent = try store.graph(.spent)
         #expect(spent.scheduledLine == nil)
-        #expect(spent.expectedByMonthEnd == nil)
+        #expect(spent.expectedByPeriodEnd == nil)
         #expect(spent.popup(on: day(2026, 10, 20)).scheduled.isEmpty)
     }
 
     /// A schedule in an archived wallet is paused. A wallet left out of the Total doesn't count on the cards either.
     @Test func aScheduleInAnArchivedOrDeletedWalletOrOneOutsideTheTotalAddsNothing() throws {
-        let oldBank = Wallet(name: "Old bank")
-        let cash = Wallet(name: "Cash")
-        let savings = Wallet(name: "Savings")
-        savings.includeInTotal = false
-        for wallet in [oldBank, cash, savings] {
-            context.insert(wallet)
-        }
+        let oldBank = context.addWallet("Old bank")
+        let cash = context.addWallet("Cash")
+        let savings = context.addWallet("Savings", includeInTotal: false)
         try schedule("Rent", 900_00, "Rentals", starting: day(2026, 10, 15), wallet: oldBank)
         try schedule("Tips", 20_00, "Tips", .income, starting: day(2026, 10, 16), wallet: cash)
         try schedule("Interest", 5_00, "Collect Interest", .income, starting: day(2026, 10, 17), wallet: savings)
-        #expect(try store.graph(.spent).expectedByMonthEnd == Money(cents: 900_00))
-        #expect(try store.graph(.income).expectedByMonthEnd == Money(cents: 20_00))
+        #expect(try store.graph(.spent).expectedByPeriodEnd == Money(cents: 900_00))
+        #expect(try store.graph(.income).expectedByPeriodEnd == Money(cents: 20_00))
 
         oldBank.isArchived = true
         cash.deletedAt = Date.now
@@ -127,8 +130,23 @@ struct MonthGraphProjectionTests {
         for side in SpentOrIncome.allCases {
             let card = try store.graph(side)
             #expect(card.scheduledLine == nil)
-            #expect(card.expectedByMonthEnd == nil)
+            #expect(card.expectedByPeriodEnd == nil)
         }
+    }
+
+    /// The Total is labelled in dollars, Checking's currency, so a schedule paid in euros adds nothing to its dotted
+    /// line or its popup, as a transaction in euros adds nothing to its line.
+    @Test func aScheduleInAnotherCurrencyThanTheTotalsAddsNothing() throws {
+        let euros = try Wallet.create(
+            name: "Euros", startingBalance: Money(cents: 300_00, currencyCode: "EUR"), on: day(2026, 5, 1), in: context
+        )
+        try schedule("Netflix", 15_99, "Streaming Service", starting: day(2026, 10, 20))
+        try schedule("Spotify", 9_99, "Streaming Service", starting: day(2026, 10, 20), wallet: euros)
+
+        let spent = try store.graph(.spent)
+
+        #expect(spent.popup(on: day(2026, 10, 20)).scheduled.map(\.recurring.name) == ["Netflix"])
+        #expect(spent.expectedByPeriodEnd == Money(cents: 15_99))
     }
 
     /// Weekly from October 31: the month's last day counts, November 7 doesn't. One starting November 1 adds nothing.
@@ -140,13 +158,13 @@ struct MonthGraphProjectionTests {
 
         #expect(spent.popup(on: day(2026, 10, 31)).scheduled.map(\.recurring.name) == ["Cinema"])
         #expect(spent.scheduledLine?.last?.position == 1)
-        #expect(spent.expectedByMonthEnd == Money(cents: 12_00))
+        #expect(spent.expectedByPeriodEnd == Money(cents: 12_00))
     }
 
     // MARK: Expected by month end
 
     /// The Loan's schedule is filed under a Debt/Loan category, so it counts on neither card.
-    @Test func expectedByMonthEndIsTodaysTotalPlusWhatIsScheduledForTheCard() throws {
+    @Test func expectedByPeriodEndIsTodaysTotalPlusWhatIsScheduledForTheCard() throws {
         try store.record(-40_00, "Café", on: day(2026, 10, 3))
         try store.record(1_000_00, "Salary", .income, on: day(2026, 10, 1))
         try schedule("Netflix", 15_99, "Streaming Service", starting: day(2026, 10, 20))
@@ -157,9 +175,9 @@ struct MonthGraphProjectionTests {
         let income = try store.graph(.income)
 
         #expect(spent.headline == Money(cents: 40_00))
-        #expect(spent.expectedByMonthEnd == Money(cents: 55_99))
+        #expect(spent.expectedByPeriodEnd == Money(cents: 55_99))
         #expect(income.headline == Money(cents: 1_000_00))
-        #expect(income.expectedByMonthEnd == Money(cents: 3_000_00))
+        #expect(income.expectedByPeriodEnd == Money(cents: 3_000_00))
     }
 
     @Test(arguments: SpentOrIncome.allCases)
@@ -170,7 +188,7 @@ struct MonthGraphProjectionTests {
         let card = try store.graph(side)
 
         #expect(card.scheduledLine == nil)
-        #expect(card.expectedByMonthEnd == nil)
+        #expect(card.expectedByPeriodEnd == nil)
     }
 
     // MARK: The popup on a day still to come
@@ -189,7 +207,7 @@ struct MonthGraphProjectionTests {
         #expect(twentieth.total == nil)
         let twentiethByName = twentieth.scheduled.sorted { $0.recurring.name < $1.recurring.name }
         #expect(twentiethByName.map(\.recurring.name) == ["Gym", "Netflix"])
-        #expect(twentiethByName.compactMap(\.countedAmount?.amount) == [Money(cents: 30_00), Money(cents: 15_99)])
+        #expect(twentiethByName.compactMap { $0.countedAmount(in: "USD")?.amount } == [Money(cents: 30_00), Money(cents: 15_99)])
         #expect(twentieth.expected == Money(cents: 85_99))
         #expect(twentyFourth.scheduled.isEmpty)
         #expect(twentyFourth.expected == Money(cents: 85_99))
@@ -236,9 +254,9 @@ struct MonthGraphProjectionTests {
         let lastDay = september.popup(on: day(2026, 9, 30))
 
         #expect(september.scheduledLine == nil)
-        #expect(september.expectedByMonthEnd == nil)
+        #expect(september.expectedByPeriodEnd == nil)
         #expect(lastDay.scheduled.isEmpty)
         #expect(lastDay.expected == nil)
-        #expect(try store.graph(side).expectedByMonthEnd != nil)
+        #expect(try store.graph(side).expectedByPeriodEnd != nil)
     }
 }

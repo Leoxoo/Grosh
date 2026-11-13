@@ -13,11 +13,11 @@ struct ForgiveDraft {
     var category: Category?
 
     /// Forgiving the rest of `original`, a Loan or Debt, on `day`. Throws when `original` is neither.
-    init(forgiving original: Transaction, on day: CalendarDay, in context: ModelContext) throws {
-        guard let loanOrDebt = try LoanOrDebt(original, in: context) else { throw DebtLoanRuleError.notALoanOrDebt }
+    init(forgiving original: Transaction, on day: CalendarDay) throws {
+        guard let loanOrDebt = try LoanOrDebt(original) else { throw DebtLoanRuleError.notALoanOrDebt }
         self.loanOrDebt = loanOrDebt
         self.day = day
-        self.category = try context.otherCategory(loanOrDebt.kind.forgivenType)
+        self.category = try original.storeContext().otherCategory(loanOrDebt.kind.forgivenType)
     }
 
     /// Expense for a forgiven Loan (the user gives the money up), Income for a forgiven Debt.
@@ -34,8 +34,10 @@ struct ForgiveDraft {
         guard category.type == forgivenType else { throw DebtLoanRuleError.categoryDoesNotMatch }
     }
 
-    /// Whether Forgive can be enabled.
-    var canSave: Bool { (try? validate(against: loanOrDebt)) != nil }
+    /// Checks the forgive against the Loan or Debt as it stood when the sheet opened.
+    func validate() throws {
+        try validate(against: loanOrDebt)
+    }
 }
 
 /// The mark a forgiven Loan or Debt carries (ADR-0004): how much was forgiven, when, and under which category it counts
@@ -51,10 +53,11 @@ nonisolated struct Forgiveness {
     /// A forgiven Loan or a forgiven Debt.
     let kind: LoanOrDebtKind
 
-    /// How the forgiven amount counts in reports on ``day``: as income (above zero) for a forgiven Debt, as expense
-    /// (below zero) for a forgiven Loan.
+    /// How the forgiven amount counts in reports on ``day``: the way the Loan or Debt moved its wallet
+    /// (``LoanOrDebtKind/sign``), so as income (above zero) for a forgiven Debt, whose money the user keeps, and as
+    /// expense (below zero) for a forgiven Loan, whose money the user gives up.
     var reportAmount: Money {
-        Money(cents: kind == .debt ? amount.cents : -amount.cents, currencyCode: amount.currencyCode)
+        Money(cents: amount.cents * kind.sign, currencyCode: amount.currencyCode)
     }
 }
 
@@ -65,12 +68,11 @@ extension Forgiveness {
     /// forgiven, now dated and filed as this draft says. Saves.
     @discardableResult
     static func record(_ draft: ForgiveDraft, in context: ModelContext) throws -> Forgiveness {
-        try draft.loanOrDebt.settle(in: context, check: draft.validate(against:)) { current in
+        try draft.loanOrDebt.settle(check: draft.validate(against:)) { current in
             guard let category = draft.category else { throw TransactionRuleError.missingCategory }
             let original = current.original
             original.forgivenCents = (original.forgivenCents ?? 0) + current.outstanding.cents
-            original.forgivenDay = draft.day
-            original.forgivenNote = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
+            original.markForgiven(on: draft.day, note: draft.note)
             original.forgivenCategory = category
             guard let forgiveness = original.forgiveness else { throw DebtLoanRuleError.notALoanOrDebt }
             return forgiveness
@@ -88,14 +90,7 @@ extension Transaction {
         )
     }
 
-    /// Whether this Loan or Debt was forgiven.
     var isForgiven: Bool { forgivenCents != nil }
-
-    /// The day this Loan or Debt was forgiven on, or `nil` while it isn't forgiven.
-    var forgivenDay: CalendarDay? {
-        get { forgivenDayRaw.map(CalendarDay.init(rawValue:)) }
-        set { forgivenDayRaw = newValue?.rawValue }
-    }
 
     /// Takes the Forgiven mark off this Loan or Debt, so what was forgiven is outstanding again and stops counting in
     /// reports. Its payments stay as they are. Saves.
@@ -103,9 +98,8 @@ extension Transaction {
         guard isLoanOrDebt else { throw DebtLoanRuleError.notALoanOrDebt }
         guard isForgiven else { throw DebtLoanRuleError.notForgiven }
         forgivenCents = nil
-        forgivenDay = nil
-        forgivenNote = ""
         forgivenCategory = nil
-        try modelContext?.save()
+        clearForgivenMark()
+        try saveToStore()
     }
 }

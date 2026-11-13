@@ -3,31 +3,39 @@ import SwiftData
 
 /// What a Reimbursement sheet holds: an amount, the day it was paid back and an optional note.
 nonisolated struct ReimbursementDraft {
-    var amount = Money(cents: 0)
+    /// The amount as typed: blank for a new one, the Reimbursement's own when editing.
+    var entry: AmountEntry
+    /// The currency of the Expense paid back.
+    let currencyCode: String
     var day: CalendarDay
     var note = ""
 
-    /// The entry as it is now, ready to edit.
     init(editing reimbursement: Reimbursement) {
-        amount = reimbursement.amount
+        entry = AmountEntry(cents: reimbursement.amount.cents)
+        currencyCode = reimbursement.amount.currencyCode
         day = reimbursement.day
         note = reimbursement.note
     }
 
-    init(amount: Money = Money(cents: 0), day: CalendarDay, note: String = "") {
-        self.amount = amount
+    init(amount: Money, day: CalendarDay, note: String = "") {
+        entry = AmountEntry(cents: amount.cents)
+        currencyCode = amount.currencyCode
         self.day = day
         self.note = note
     }
 
-    /// Checks the draft against the Reimbursement rules before anything is saved.
+    /// A new payback on `expense`, dated `day`, with nothing typed yet.
+    init(payingBack expense: Transaction, on day: CalendarDay) {
+        self.init(amount: Money(cents: 0, currencyCode: expense.amount.currencyCode), day: day)
+    }
+
     func validate() throws {
         guard amount.cents > 0 else { throw ReimbursementRuleError.missingAmount }
     }
 }
 
 /// Why a Reimbursement can't be saved.
-nonisolated enum ReimbursementRuleError: Error, Equatable {
+nonisolated enum ReimbursementRuleError: RuleRefusal, Equatable {
     /// The amount paid back must be above zero.
     case missingAmount
     /// Only an Expense can be paid back.
@@ -50,10 +58,22 @@ extension ReimbursementRuleError: LocalizedError {
 }
 
 extension Transaction {
-    /// Whether the transaction is an Expense, so it can have Reimbursements: money going out under an Expense category.
-    /// A transfer's outgoing half, a balance adjustment and a refund aren't.
+    /// Whether the transaction is an Expense, so it can have Reimbursements and + Owes me
+    /// (``isReimbursable(type:category:isBalanceAdjustment:sign:)``).
     var canBeReimbursed: Bool {
-        category?.type == .expense && category?.isTransferHalf != true && !isBalanceAdjustment && amountCents < 0
+        Self.isReimbursable(
+            type: category?.type, category: category, isBalanceAdjustment: isBalanceAdjustment,
+            sign: amountCents.signum()
+        )
+    }
+
+    /// The one rule for what can be paid back, read by a saved transaction (``canBeReimbursed``) and by the Add sheet
+    /// (``TransactionDraft/offersOwesMe``) alike: money going out (`sign` below zero) under the Expense type. A
+    /// transfer's outgoing half, a balance adjustment and a refund (an Expense that brought money in) aren't.
+    nonisolated static func isReimbursable(
+        type: CategoryType?, category: Category?, isBalanceAdjustment: Bool, sign: Int
+    ) -> Bool {
+        type == .expense && category?.isTransferHalf != true && !isBalanceAdjustment && sign < 0
     }
 
     /// The money paid back against this Expense, the earliest day first.
@@ -62,8 +82,8 @@ extension Transaction {
     }
 
     /// Adds its Reimbursements up again into ``reimbursedCents``, after one is added, edited, removed or moved to
-    /// another transaction. Doesn't save.
-    func recountReimbursements() {
+    /// another transaction. Only the Reimbursement rules below change them, so they are the only callers. Doesn't save.
+    fileprivate func recountReimbursements() {
         reimbursedCents = (reimbursements ?? []).reduce(0) { $0 + $1.amountCents }
     }
 
@@ -85,7 +105,7 @@ extension Reimbursement {
     ) throws -> Reimbursement {
         try draft.validate()
         guard expense.canBeReimbursed else { throw ReimbursementRuleError.notAnExpense }
-        let reimbursement = Reimbursement(amount: Money(cents: 0), day: draft.day)
+        let reimbursement = Reimbursement(amountCents: 0, day: draft.day)
         context.insert(reimbursement)
         reimbursement.expense = expense
         reimbursement.expectation = expectation
@@ -95,24 +115,34 @@ extension Reimbursement {
         return reimbursement
     }
 
-    /// Saves an edited draft. Nothing changes when the draft breaks a Reimbursement rule.
+    /// Moves the entry onto `expense`, such as a part of a Split it was assigned to: both Expenses' nets follow.
+    /// Doesn't save.
+    func move(to expense: Transaction) {
+        let previous = self.expense
+        guard previous !== expense else { return }
+        self.expense = expense
+        previous?.reimbursements?.removeAll { $0 === self }
+        previous?.recountReimbursements()
+        expense.recountReimbursements()
+    }
+
     func update(with draft: ReimbursementDraft) throws {
         try draft.validate()
         apply(draft)
         expense?.recountReimbursements()
-        try modelContext?.save()
+        try saveToStore()
     }
 
     /// Removes the entry from its Expense, whose net falls back by its amount. Saves.
     func delete() throws {
-        guard let context = modelContext else { return }
-        removeFromExpense()
+        let context = try storeContext()
+        try removeFromExpense()
         try context.save()
     }
 
     /// ``delete()`` without the save, for a caller that saves once after more changes.
-    func removeFromExpense() {
-        guard let context = modelContext else { return }
+    func removeFromExpense() throws {
+        let context = try storeContext()
         let expense = expense
         expense?.reimbursements?.removeAll { $0 === self }
         expectation?.reimbursements?.removeAll { $0 === self }

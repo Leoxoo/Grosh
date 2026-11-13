@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// Why an Expected reimbursement can't be saved, paid, closed or forgiven.
-nonisolated enum ExpectedReimbursementRuleError: Error, Equatable {
+nonisolated enum ExpectedReimbursementRuleError: RuleRefusal, Equatable {
     /// Only an Expense can have Owes me.
     case notAnExpense
     /// Owes me is for a Person in With; this one (by name) was taken out.
@@ -32,30 +32,18 @@ nonisolated enum ExpectedReimbursementRuleError: Error, Equatable {
 extension ExpectedReimbursementRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .notAnExpense:
-            String(localized: "Only an Expense can have Owes me.")
-        case .personNotInWith(let name):
-            String(localized: "\(name) still owes you for this Expense. Put \(name) back in With, or remove Owes me first.")
-        case .invalidAmount:
-            String(localized: "Enter an amount above zero, or leave it blank if you don't know it yet.")
-        case .amountAboveExpense:
-            String(localized: "People can't owe you more than the Expense cost.")
-        case .hasPayments(let name):
-            String(localized: "\(name) has paid some of this back, so it can't be removed.")
-        case .notOpen:
-            String(localized: "Nothing is expected any more.")
-        case .hasAnAmount:
-            String(localized: "Only an expectation with no amount is closed by hand. One with an amount closes itself once it is paid.")
-        case .notClosed:
-            String(localized: "It isn't closed.")
-        case .notForgiven:
-            String(localized: "It isn't forgiven.")
-        case .walletLockedByPaybacks:
-            String(localized: "Money was paid back into another wallet against this Expense, so it stays in its wallet.")
-        case .splitPart:
-            String(localized: "A part of a Split can't be paid back into another wallet.")
-        case .otherCurrency:
-            String(localized: "That wallet is in another currency than the expense. Choose a wallet in the same currency.")
+        case .notAnExpense: String(localized: Strings.OwesMe.notAnExpense)
+        case .personNotInWith(let name): String(localized: Strings.OwesMe.personNotInWith(name))
+        case .invalidAmount: String(localized: Strings.OwesMe.invalidAmount)
+        case .amountAboveExpense: String(localized: Strings.OwesMe.amountAboveExpense)
+        case .hasPayments(let name): String(localized: Strings.OwesMe.hasPayments(name))
+        case .notOpen: String(localized: Strings.OwesMe.notOpen)
+        case .hasAnAmount: String(localized: Strings.OwesMe.notAnOpenAmount)
+        case .notClosed: String(localized: Strings.OwesMe.notClosed)
+        case .notForgiven: String(localized: Strings.OwesMe.notForgiven)
+        case .walletLockedByPaybacks: String(localized: Strings.OwesMe.walletLockedByPaybacks)
+        case .splitPart: String(localized: Strings.OwesMe.splitPart)
+        case .otherCurrency: String(localized: Strings.OwesMe.otherCurrency)
         }
     }
 }
@@ -86,17 +74,8 @@ nonisolated struct ExpectationPayment: Identifiable {
 }
 
 extension ExpectedReimbursement {
-    /// How many days after its Expense an expectation reminds the user, to begin with.
-    static let reminderDays = 7
-
-    /// The day a new expectation's reminder starts at: a week after its Expense's day, not after today, since the
-    /// Expense may be old.
-    static func defaultReminderDay(expenseOn day: CalendarDay) -> CalendarDay {
-        day.adding(days: reminderDays)
-    }
-
     /// The currency of the Expense's wallet.
-    var currencyCode: String { expense?.amount.currencyCode ?? Money.defaultCurrencyCode }
+    var currencyCode: String { (expense?.wallet).currencyCodeOrDefault }
 
     /// What is expected, or `nil` for an open amount.
     var expected: Money? { amountCents.map { Money(cents: $0, currencyCode: currencyCode) } }
@@ -107,12 +86,6 @@ extension ExpectedReimbursement {
     var reminderDay: CalendarDay? {
         get { reminderDayRaw.map(CalendarDay.init(rawValue:)) }
         set { reminderDayRaw = newValue?.rawValue }
-    }
-
-    /// The day it was forgiven, or `nil` while it isn't.
-    var forgivenDay: CalendarDay? {
-        get { forgivenDayRaw.map(CalendarDay.init(rawValue:)) }
-        set { forgivenDayRaw = newValue?.rawValue }
     }
 
     /// The day it was closed by hand, or `nil` while it isn't.
@@ -179,52 +152,48 @@ extension ExpectedReimbursement {
         return expense.note.isEmpty ? expense.categoryName : expense.note
     }
 
-    /// The Person's name.
     var personName: String { person?.name ?? "" }
+}
+
+extension ExpectedReimbursement: RemindedRecord, ListedWithReminder {
+    /// Every expectation takes a reminder.
+    func checkTakesReminder() {}
+
+    var openReminderDay: CalendarDay? { isOpen ? reminderDay : nil }
 }
 
 // MARK: Changing it
 
 extension ExpectedReimbursement {
-    /// Moves or clears the reminder day, whatever has been paid. Saves.
-    func setReminder(_ day: CalendarDay?) throws {
-        reminderDay = day
-        try modelContext?.save()
-    }
-
     /// Closes an open-amount expectation by hand on `day`: nothing more is expected. Saves.
-    @MainActor
-    func close(on day: CalendarDay = .today) throws {
+    func close(on day: CalendarDay) throws {
         guard isOpen else { throw ExpectedReimbursementRuleError.notOpen }
         guard hasOpenAmount else { throw ExpectedReimbursementRuleError.hasAnAmount }
         closedDay = day
-        try modelContext?.save()
+        try saveToStore()
     }
 
     /// Opens a closed expectation again. Saves.
     func reopen() throws {
         guard closedDayRaw != nil else { throw ExpectedReimbursementRuleError.notClosed }
         closedDay = nil
-        try modelContext?.save()
+        try saveToStore()
     }
 
     /// Forgive: the money won't come back. It is marked Forgiven on `day` with an optional note and counts as settled
     /// (ADR-0004). No transaction is added and nothing in any balance or report changes, since an expectation never
     /// counted in either. Saves.
-    @MainActor
-    func forgive(on day: CalendarDay = .today, note: String = "") throws {
+    func forgive(on day: CalendarDay, note: String = "") throws {
         guard isOpen else { throw ExpectedReimbursementRuleError.notOpen }
-        forgivenDay = day
-        forgivenNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        try modelContext?.save()
+        markForgiven(on: day, note: note)
+        try saveToStore()
     }
 
     /// Takes the Forgiven mark off, so it is open again if anything is still expected. Saves.
     func unforgive() throws {
         guard forgivenDayRaw != nil else { throw ExpectedReimbursementRuleError.notForgiven }
-        forgivenDay = nil
-        forgivenNote = ""
-        try modelContext?.save()
+        clearForgivenMark()
+        try saveToStore()
     }
 }
 
@@ -234,8 +203,8 @@ extension ExpectedReimbursement {
 /// the reminder day.
 nonisolated struct OwesMeDraft {
     let person: Person
-    /// Entered positive, or `nil` while blank: an open amount.
-    var amount: Money?
+    /// The amount as typed on the Keypad, in the Expense's currency: blank for an open amount.
+    var entry: AmountEntry
     /// On by default, a week after the Expense. `nil` switches it off.
     var reminderDay: CalendarDay?
     /// The expectation being edited, or `nil` for a new one.
@@ -246,17 +215,25 @@ nonisolated struct OwesMeDraft {
     /// A new expectation for `person` on an Expense dated `expenseDay`.
     init(person: Person, expenseDay: CalendarDay) {
         self.person = person
-        reminderDay = ExpectedReimbursement.defaultReminderDay(expenseOn: expenseDay)
+        entry = AmountEntry()
+        reminderDay = ReminderDay.default(after: expenseDay)
     }
 
     /// `expectation` as it is, to edit. `nil` for one whose Person is gone.
     init?(editing expectation: ExpectedReimbursement) {
         guard let person = expectation.person else { return nil }
         self.person = person
-        amount = expectation.expected
+        entry = expectation.amountCents.map { AmountEntry(showing: $0) } ?? AmountEntry()
         reminderDay = expectation.reminderDay
         existing = expectation
         hasPayments = expectation.hasPayments
+    }
+
+    /// What the Person is expected to pay back, in cents, or `nil` for an open amount, when nothing is typed. Anything
+    /// typed that isn't an amount above zero comes to zero, which saving refuses
+    /// (``ExpectedReimbursementRuleError/invalidAmount``).
+    var expectedCents: Int? {
+        entry.isEmpty ? nil : max(entry.cents ?? 0, 0)
     }
 }
 
@@ -269,8 +246,8 @@ extension Transaction {
     /// Makes the expectations of this Expense match `entries`: a new one for each entry with no `existing`, the others
     /// changed to the entry, and any not among the entries removed. Whether that is allowed is
     /// ``TransactionDraft/validate()``'s to check. Doesn't save, and moves no balance or report.
-    func setExpectations(_ entries: [OwesMeDraft]) {
-        guard let context = modelContext else { return }
+    func setExpectations(_ entries: [OwesMeDraft]) throws {
+        let context = try storeContext()
         for existing in expectations ?? [] where !entries.contains(where: { $0.existing === existing }) {
             expectations?.removeAll { $0 === existing }
             context.delete(existing)
@@ -285,16 +262,23 @@ extension Transaction {
                 expectation.expense = self
                 expectation.person = entry.person
             }
-            expectation.amountCents = entry.amount?.cents
+            expectation.amountCents = entry.expectedCents
             expectation.reminderDay = entry.reminderDay
         }
     }
 }
 
 nonisolated extension TransactionDraft {
-    /// Whether the Add sheet offers + Owes me: only on an ordinary Expense.
+    /// Whether the Add sheet offers + Owes me: only on what can be paid back once saved
+    /// (``Transaction/isReimbursable(type:category:isBalanceAdjustment:sign:)``).
     var offersOwesMe: Bool {
-        type == .expense && offersCard && !isBalanceAdjustment
+        Transaction.isReimbursable(type: type, category: category, isBalanceAdjustment: isBalanceAdjustment, sign: sign)
+    }
+
+    /// The people in With a + Owes me is offered for: those who don't owe anything yet, on what offers + Owes me at all.
+    var peopleOfferedOwesMe: [Person] {
+        guard offersOwesMe else { return [] }
+        return people.filter { owesEntry(for: $0) == nil }
     }
 
     /// The + Owes me for `person`, or `nil` when there is none.
@@ -332,7 +316,7 @@ nonisolated extension TransactionDraft {
             guard people.contains(where: { $0 === entry.person }) else {
                 throw ExpectedReimbursementRuleError.personNotInWith(entry.person.name)
             }
-            if let cents = entry.amount?.cents {
+            if let cents = entry.expectedCents {
                 guard cents > 0 else { throw ExpectedReimbursementRuleError.invalidAmount }
                 guard cents <= amount.cents else { throw ExpectedReimbursementRuleError.amountAboveExpense }
                 total += cents
@@ -357,7 +341,7 @@ struct ExpectedReimbursements {
     /// row read, so listing them reads no relationship one expectation at a time (docs/agents/architecture.md). The
     /// ones of an Expense in Recently Deleted are left out by ``init(_:)``, which reads the Expense's
     /// ``Transaction/deletedAt``, so a screen showing them follows the Expense going to the bin and coming back.
-    static var all: FetchDescriptor<ExpectedReimbursement> {
+    static var records: FetchDescriptor<ExpectedReimbursement> {
         var descriptor = FetchDescriptor<ExpectedReimbursement>()
         descriptor.relationshipKeyPathsForPrefetching = [\.expense, \.person, \.reimbursements, \.paybacks]
         return descriptor
@@ -378,34 +362,24 @@ struct ExpectedReimbursements {
         self.settled = settled.sorted { $1.isOlder(than: $0) }.map(\.expectation)
     }
 
-    /// Every Expected reimbursement in `context`.
-    init(in context: ModelContext) throws {
-        self.init(try context.fetch(Self.all))
-    }
-
     /// An expectation with what it is sorted by, read once before sorting rather than at every comparison.
     private struct ListPosition {
         let expectation: ExpectedReimbursement
-        let reminderDayRaw: Int?
+        let reminderDay: CalendarDay?
         let expenseDayRaw: Int
         let createdAt: Date
 
         init(_ expectation: ExpectedReimbursement) {
             self.expectation = expectation
-            reminderDayRaw = expectation.reminderDayRaw
+            reminderDay = expectation.reminderDay
             expenseDayRaw = expectation.expense?.dayRaw ?? 0
             createdAt = expectation.createdAt
         }
 
-        /// Whether it comes before `other` among the open ones: a reminder day before none, an earlier reminder day
-        /// before a later one, and otherwise the older Expense first.
+        /// Whether it comes before `other` among the open ones (``ReminderDay/isListed(_:before:otherwise:)``), the
+        /// older Expense first when their reminder days don't decide it.
         func isDue(before other: ListPosition) -> Bool {
-            switch (reminderDayRaw, other.reminderDayRaw) {
-            case let (mine?, theirs?) where mine != theirs: mine < theirs
-            case (.some, nil): true
-            case (nil, .some): false
-            default: isOlder(than: other)
-            }
+            ReminderDay.isListed(reminderDay, before: other.reminderDay) { isOlder(than: other) }
         }
 
         func isOlder(than other: ListPosition) -> Bool {
@@ -415,13 +389,6 @@ struct ExpectedReimbursements {
 
     /// What the open ones come to: the outstanding amounts and how many have no amount.
     var totals: ExpectationTotals { ExpectationTotals(open) }
-
-    /// The open expectations whose reminder day is `today` or earlier, the earliest first: what the Home bell lists. A
-    /// settled one is never due.
-    func due(on today: CalendarDay) -> [ExpectedReimbursement] {
-        open.filter { $0.reminderDay.map { $0 <= today } ?? false }
-            .sorted { $0.reminderDay ?? today < $1.reminderDay ?? today }
-    }
 
     /// The expectations grouped by Person, for Show by people (``DebtsAndLoansByPerson``, which orders the people): each
     /// Person with their open and then their settled expectations, the people in the order they first appear. Read from

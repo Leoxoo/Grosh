@@ -14,7 +14,7 @@ struct CardPicker: View {
     /// The first choice, which picks no Card.
     private let noneTitle: LocalizedStringResource
 
-    @Query(sort: Card.userOrder) private var allCards: [Card]
+    @Query(Card.listed) private var listedCards: [Card]
     @Environment(\.displayScale) private var displayScale
 
     private enum Offered {
@@ -55,21 +55,12 @@ struct CardPicker: View {
     private var choices: [Card] {
         switch offered {
         case .paidFrom(let wallet): Card.pickerChoices(for: wallet, keeping: selection)
-        case .every: allCards.filter { !$0.isPaidFromDeletedWallet }
+        case .every: listedCards
         }
     }
 
     /// A Card's mark in the picker: its image as a small card 16 points tall, or its coloured symbol when it has none.
-    /// The image is a copy shrunk to that size for this screen, drawn at its own size since a picker ignores a frame.
     private func mark(of card: Card) -> some View {
-        let height: CGFloat = 16
-        return CardMark(
-            image: card.shrunkImage(height: height, scale: displayScale),
-            height: height,
-            sizing: .shrunk(scale: displayScale)
-        ) {
-            Image(systemName: Card.symbolName)
-                .foregroundStyle(card.color.color)
-        }
+        CardMark(card: card, height: 16, shrunkForScale: displayScale)
     }
 }

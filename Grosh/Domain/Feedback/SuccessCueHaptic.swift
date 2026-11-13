@@ -1,5 +1,5 @@
 extension SuccessCue {
-    /// An ending's haptic, made from the same notes as its sound (ADR 0006): a tap the moment each note starts, as
+    /// An ending's haptic, made from the same notes as its sound (ADR-0006): a tap the moment each note starts, as
     /// strong as the note is loud and as sharp as it is high. Under a note that rings with sparkle, as Income's last
     /// note does, a soft buzz starts with it and fades out as it rings.
     nonisolated struct Haptic: Equatable, Sendable {
@@ -68,7 +68,6 @@ extension SuccessCue {
 }
 
 extension SuccessCue.NoteList {
-    /// The haptic of `ending`.
     nonisolated func haptic(for ending: SuccessCue.Ending) -> SuccessCue.Haptic {
         SuccessCue.Haptic(notes: notes(for: ending))
     }

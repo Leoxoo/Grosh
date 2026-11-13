@@ -14,15 +14,11 @@ struct PeriodGraphTests {
         store = try MonthGraphFixture()
     }
 
-    /// The graph of `side` for `period` as of today, Oct 12 2026, compared with the Average, for `selection`.
-    private func graph(
-        _ side: SpentOrIncome = .spent, _ period: Period, selection: WalletSelection = .total
-    ) throws -> MonthGraph {
-        let otherIncome = try store.otherIncome()
-        let counted = try store.transactions().compactMap { $0.countedAmount(in: selection, otherIncome: otherIncome) }
-        return MonthGraph(
-            side, of: counted, countingFrom: counted.firstDay, recurring: [], in: period, today: today,
-            comparingWith: .average, selection: selection
+    /// The graph of `side` for `period` as of today, Oct 12 2026, compared with the Average, in the Total, as the
+    /// Income and Spent details draw it.
+    private func graph(_ side: SpentOrIncome = .spent, _ period: Period) throws -> MonthGraph {
+        try #require(
+            store.history().graph(side, in: period, recurring: .none, today: today, comparingWith: .average)
         )
     }
 
@@ -67,18 +63,6 @@ struct PeriodGraphTests {
 
         let quarter = try graph(.spent, .quarter(year: 2026, quarter: 3))
         #expect(quarter.comparisonLine?.last?.total == Money(cents: 116_67))
-    }
-
-    @Test func aGraphCountsOnlyTheWalletItIsGiven() throws {
-        let savings = Wallet(name: "Savings")
-        store.context.insert(savings)
-        try store.record(-25_00, "Café", on: day(2026, 10, 4), in: savings)
-        try store.record(-40_00, "Café", on: day(2026, 10, 3))
-
-        let october = Period.month(CalendarMonth(today))
-        #expect(try graph(.spent, october, selection: .wallet(store.checking)).headline == Money(cents: 40_00))
-        #expect(try graph(.spent, october, selection: .wallet(savings)).headline == Money(cents: 25_00))
-        #expect(try graph(.spent, october).headline == Money(cents: 65_00))
     }
 
     /// Only the current period draws the dotted line; a past one has none.

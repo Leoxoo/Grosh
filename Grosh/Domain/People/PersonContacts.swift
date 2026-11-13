@@ -44,16 +44,6 @@ extension Person {
         }
     }
 
-    /// Renames the Person and keeps ``Transaction/withName`` in step on every transaction they are in, Recently Deleted
-    /// ones included (ADR-0009). Does nothing when the name is the same. Doesn't save.
-    func rename(to newName: String) {
-        guard name != newName else { return }
-        name = newName
-        for transaction in transactions ?? [] {
-            transaction.refreshWithName()
-        }
-    }
-
     /// Takes the contact's name and phone. The name is left alone when another Person has it already, since two people
     /// never share a name (ADR-0009); a name in a contact that is empty is never taken. The phone is left alone when the
     /// contact has none. Doesn't save.

@@ -22,13 +22,14 @@ final class Reimbursement {
     /// expected.
     var expectation: ExpectedReimbursement?
 
-    init(amount: Money, day: CalendarDay, note: String = "") {
-        self.amountCents = amount.cents
+    /// An entry of `amountCents`, in its Expense's currency, paid back on `day`.
+    init(amountCents: Int, day: CalendarDay, note: String = "") {
+        self.amountCents = amountCents
         self.dayRaw = day.rawValue
         self.note = note
     }
 
-    var amount: Money { Money(cents: amountCents, currencyCode: expense?.amount.currencyCode ?? Money.defaultCurrencyCode) }
+    var amount: Money { Money(cents: amountCents, currencyCode: (expense?.wallet).currencyCodeOrDefault) }
 
     var day: CalendarDay {
         get { CalendarDay(rawValue: dayRaw) }

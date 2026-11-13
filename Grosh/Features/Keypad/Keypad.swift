@@ -24,7 +24,7 @@ struct Keypad: View {
     /// The top row is shorter than the digit rows, by this much.
     private static let topRowScale: CGFloat = 0.72
 
-    @AppStorage(SoundsAndHaptics.hapticsKey) private var hapticsOn = SoundsAndHaptics.defaultIsOn
+    @AppStorage(AppSettings.haptics) private var hapticsOn
 
     var body: some View {
         GeometryReader { geometry in
@@ -115,7 +115,7 @@ struct Keypad: View {
     }
 
     private var playsTicks: Bool {
-        SoundsAndHaptics.playsHaptics(on: .current, hapticsOn: hapticsOn)
+        SoundsAndHaptics.plays(on: .current, isOn: hapticsOn)
     }
 }
 
@@ -183,7 +183,7 @@ private extension KeypadKey {
         case .digit(let digit): Text(verbatim: "\(digit)")
         case .decimalSeparator: Text(Strings.Keypad.decimalPoint)
         case .backspace: Text(Strings.Common.delete)
-        case .allClear: Text(Strings.Keypad.clear)
+        case .allClear: Text(Strings.Common.clear)
         case .operation(.add): Text(Strings.Keypad.plus)
         case .operation(.subtract): Text(Strings.Keypad.minus)
         case .operation(.multiply): Text(Strings.Keypad.times)

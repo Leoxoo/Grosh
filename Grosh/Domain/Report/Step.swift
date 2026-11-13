@@ -22,8 +22,8 @@ struct Step: Hashable {
         days.contains(day)
     }
 
-    /// Named the way the screens write a Step: `1–4` for days within one month, `08/2026` for a month, `Q3/2025` for a
-    /// quarter, `2026` for a year, and a single day in numbers. Any other span is written in numbers, as `10/26 – 11/01/2026`.
+    /// Named the way the screens write a Step: `1–4` for days within one month, `08/2026` for a month, `Q3 2025` for a
+    /// quarter (each as the strip writes that period), `2026` for a year, and a single day in numbers. Any other span is written in numbers, as `10/26 – 11/01/2026`.
     func title(locale: Locale = .current) -> String {
         switch unit {
         case .day:
@@ -33,9 +33,9 @@ struct Step: Hashable {
             if first.month == last.month && first.year == last.year { return "\(first.day)–\(last.day)" }
             return first.numericTitle(through: last, locale: locale)
         case .month:
-            return String(format: "%02d/%d", first.month, first.year)
+            return CalendarMonth(first).numericTitle
         case .quarter:
-            return "Q\((first.month - 1) / 3 + 1)/\(first.year)"
+            return Period.quarterTitle(year: first.year, quarter: (first.month - 1) / 3 + 1)
         case .year:
             return String(first.year)
         }
@@ -66,7 +66,7 @@ extension Step {
 
     /// The unit a span of All time or a custom range is split by, by its length: days for up to 31 days, weeks for under 3
     /// months, months for up to 12 months, quarters for up to 3 years, and years beyond that. The 3-month limit is exclusive,
-    /// so a span of exactly 3 months splits into its months, as Q3/2025 does on the Trend.
+    /// so a span of exactly 3 months splits into its months, as Q3 2025 does on the Trend.
     static func unit(for span: DayRange) -> Unit {
         guard let first = span.first, let last = span.last else { return .year }
         if (DayRange(first: first, last: last).dayCount ?? 0) <= 31 { return .day }

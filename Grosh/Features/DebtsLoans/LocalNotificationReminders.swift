@@ -33,7 +33,13 @@ struct LocalNotificationReminders: ReminderScheduler {
             if let category = Reminder.categoryIdentifier {
                 content.categoryIdentifier = category
             }
-            content.userInfo = reminder.userInfo
+            if let textThem = reminder.textThem {
+                do {
+                    content.userInfo = try textThem.userInfo()
+                } catch {
+                    Log.reminders.failed("Writing a reminder's Text them details", error)
+                }
+            }
             let request = UNNotificationRequest(
                 identifier: "\(prefix)\(index)",
                 content: content,
@@ -57,7 +63,7 @@ extension LocalNotificationReminders {
     /// nothing is sent without it. Done once at launch, before any notification can arrive.
     static func registerActions(on center: UNUserNotificationCenter = .current()) {
         let textThem = UNNotificationAction(
-            identifier: textThemAction, title: String(localized: "Text them"), options: [.foreground]
+            identifier: textThemAction, title: String(localized: Strings.People.textThem), options: [.foreground]
         )
         let categories = [ExpectedReimbursementReminder.categoryIdentifier, DebtReminder.categoryIdentifier]
             .compactMap { $0 }

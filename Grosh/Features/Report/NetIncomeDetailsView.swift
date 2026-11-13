@@ -10,30 +10,34 @@ struct NetIncomeDetailsView: View {
     @Binding var timeRange: TimeRange
     @Binding var period: Period
 
-    @Query(Transaction.notDeleted) private var transactions: [Transaction]
     @Environment(\.today) private var today
 
     var body: some View {
-        OtherIncomeReader { otherIncome in
-            content(otherIncome: otherIncome)
+        CountedHistoryReader(selection: walletSelection) { history in
+            content(history)
         }
     }
 
-    /// The details, with Other Income read once for everything it counts.
     @ViewBuilder
-    private func content(otherIncome: Category) -> some View {
-        let counted = transactions.counted(in: walletSelection, during: period, today: today, otherIncome: otherIncome)
-        let rows = stepRows(counted: counted, today: today)
+    private func content(_ history: CountedHistory) -> some View {
+        let counted = history.during(period, today: today)
+        let rows = StepRow.rows(
+            of: counted, currencyCode: history.currencyCode, for: timeRange,
+            over: history.days(of: period, today: today), today: today
+        )
         List {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(Strings.Screens.netIncome)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    AmountText(amount: PeriodTotals(of: counted).netIncome, showsPlusSign: true)
+                    AmountText(
+                        amount: PeriodTotals(of: counted, currencyCode: history.currencyCode).netIncome,
+                        showsPlusSign: true
+                    )
                         .font(.largeTitle.bold())
                         .contentTransition(.numericText())
-                    StepColumns(steps: rows)
+                    StepColumns(steps: rows, currencyCode: history.currencyCode)
                 }
                 .padding(.vertical, 4)
             }
@@ -52,19 +56,13 @@ struct NetIncomeDetailsView: View {
         }
         .roundedSectionsListStyle()
         .reportPeriodControls(
-            walletSelection: $walletSelection, timeRange: $timeRange, period: $period, transactions: transactions,
+            walletSelection: $walletSelection, timeRange: $timeRange, period: $period, history: history,
             showsWalletSelector: false
         )
         .navigationTitle(Strings.Screens.netIncome)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-    }
-
-    /// The Steps of the period as shown, each with its title and totals: what counts in each.
-    private func stepRows(counted: [CountedAmount], today: CalendarDay) -> [StepRow] {
-        let days = transactions.reportDays(of: period, in: walletSelection, today: today)
-        return StepRow.rows(of: counted, for: timeRange, over: days, today: today)
     }
 }
 
@@ -94,6 +92,7 @@ private struct StepTotalsRow: View {
 /// rows below the chart list them with their totals.
 private struct StepColumns: View {
     let steps: [StepRow]
+    let currencyCode: String
 
     var body: some View {
         Chart {
@@ -106,25 +105,6 @@ private struct StepColumns: View {
             RuleMark(y: .value(Strings.Common.zero, 0))
                 .foregroundStyle(.secondary.opacity(0.4))
         }
-        .chartXAxis {
-            // Anchored, as the default label of a bar's category isn't one Charts accepts.
-            AxisMarks { _ in
-                AxisGridLine()
-                AxisTick()
-                AxisValueLabel(anchor: .top)
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading) { value in
-                AxisValueLabel(anchor: .trailing) {
-                    if let cents = value.as(Int.self) {
-                        Text(Money(cents: cents).formatted())
-                            .font(.caption2)
-                    }
-                }
-            }
-        }
-        .frame(height: 260)
-        .accessibilityHidden(true)
+        .stepBarAxes(currencyCode: currencyCode)
     }
 }

@@ -2,14 +2,6 @@ import Foundation
 import SwiftData
 
 extension Transaction {
-    /// What the names in ``withName`` are joined with.
-    static var withSeparator: String { "; " }
-
-    /// The people in With, by name.
-    var orderedPeople: [Person] {
-        (people ?? []).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-    }
-
     /// Puts `chosen` in With, each once, and keeps ``withName`` in step. Every one of them was last used at `date`.
     /// Doesn't save. The one-Person rule of a Loan or Debt is the draft's to check
     /// (``TransactionRuleError/tooManyWith``).
@@ -23,11 +15,6 @@ extension Transaction {
         for person in unique {
             person.markUsed(at: date)
         }
-    }
-
-    /// Makes ``withName`` the names of the people in With again, after a name changed (ADR-0009). Doesn't save.
-    func refreshWithName() {
-        withName = orderedPeople.map(\.name).joined(separator: Self.withSeparator)
     }
 }
 

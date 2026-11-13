@@ -7,13 +7,13 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct AddTransactionTests {
-    private let store: CategoryFixture
+    private let store: TestStore
     private var context: ModelContext { store.context }
-    private var checking: Wallet { store.wallet }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private var checking: Wallet { store.checking }
+    private let today = TestStore.today
 
     init() throws {
-        store = try CategoryFixture()
+        store = try TestStore()
     }
 
     /// A draft of `type` in Checking for `cents`, filed under `categoryName`. A Loan or Debt is with Pasha, since it
@@ -21,7 +21,7 @@ struct AddTransactionTests {
     private func draft(_ type: CategoryType, _ cents: Int, _ categoryName: String) throws -> TransactionDraft {
         var draft = TransactionDraft(type: type, day: today)
         draft.wallet = checking
-        draft.amount = Money(cents: cents)
+        draft.entry = AmountEntry(cents: cents)
         draft.category = try store.category(categoryName, type)
         if type == .debtLoan {
             draft.people = [try Person.add(named: "Pasha", in: context)]
@@ -32,7 +32,7 @@ struct AddTransactionTests {
     @Test func savingAnExpenseTakesTheAmountOutOfTheWallet() throws {
         try Transaction.create(try draft(.expense, 1276, "Café"), in: context)
 
-        #expect(checking.balance(asOf: today) == Money(cents: -1276))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: -1276))
     }
 
     @Test(arguments: [
@@ -43,7 +43,7 @@ struct AddTransactionTests {
     func theCategorySetsTheSign(type: CategoryType, categoryName: String, expectedCents: Int) throws {
         try Transaction.create(try draft(type, 1276, categoryName), in: context)
 
-        #expect(checking.balance(asOf: today) == Money(cents: expectedCents))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: expectedCents))
     }
 
     @Test func theTransactionKeepsWhatWasEntered() throws {
@@ -86,7 +86,7 @@ struct AddTransactionTests {
 
         #expect(!entered.canSave)
         #expect(throws: TransactionRuleError.missingWallet) { try Transaction.create(entered, in: context) }
-        #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 0)
+        #expect(try context.transactionCount() == 0)
     }
 
     @Test(arguments: [0, -500])
@@ -173,13 +173,8 @@ struct AddTransactionTests {
 
     // MARK: Card rule
 
-    @discardableResult
-    private func addCard(_ name: String, paidFrom wallet: Wallet) throws -> Card {
-        try Card.create(CardDraft(name: name, kind: .credit, payingWallet: wallet), in: context)
-    }
-
     @Test func anExpenseNeedsACardWhenItsWalletHasOne() throws {
-        let appleCard = try addCard("Apple Card", paidFrom: checking)
+        let appleCard = try context.addCard("Apple Card", paidFrom: checking)
         var entered = try draft(.expense, 1276, "Café")
 
         #expect(entered.requiresCard)
@@ -193,7 +188,7 @@ struct AddTransactionTests {
 
     @Test func anExpenseNeedsNoCardWhenItsWalletHasNone() throws {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
-        try addCard("Apple Card", paidFrom: savings)
+        try context.addCard("Apple Card", paidFrom: savings)
 
         let entered = try draft(.expense, 1276, "Café")
 
@@ -202,14 +197,14 @@ struct AddTransactionTests {
     }
 
     @Test func anArchivedCardDoesNotMakeTheCardRequired() throws {
-        try addCard("Old Card", paidFrom: checking).archive()
+        try context.addCard("Old Card", paidFrom: checking).archive()
 
         #expect(try draft(.expense, 1276, "Café").canSave)
     }
 
     @Test(arguments: [(CategoryType.income, "Salary"), (.debtLoan, "Loan"), (.debtLoan, "Debt")])
     func theCardIsOptionalOnIncomeAndDebtLoan(type: CategoryType, categoryName: String) throws {
-        try addCard("Apple Card", paidFrom: checking)
+        try context.addCard("Apple Card", paidFrom: checking)
 
         let entered = try draft(type, 1276, categoryName)
 
@@ -219,7 +214,7 @@ struct AddTransactionTests {
 
     @Test(arguments: [(CategoryType.expense, "Outgoing transfer"), (.income, "Incoming transfer")])
     func aTransferHalfIsNeverOfferedACard(type: CategoryType, categoryName: String) throws {
-        let appleCard = try addCard("Apple Card", paidFrom: checking)
+        let appleCard = try context.addCard("Apple Card", paidFrom: checking)
         var entered = try draft(type, 50_000, categoryName)
 
         #expect(!entered.offersCard)
@@ -233,7 +228,7 @@ struct AddTransactionTests {
     @Test func changingTheWalletClearsTheCard() throws {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
         var entered = try draft(.expense, 1276, "Café")
-        entered.card = try addCard("Apple Card", paidFrom: checking)
+        entered.card = try context.addCard("Apple Card", paidFrom: checking)
 
         entered.wallet = savings
 
@@ -299,7 +294,7 @@ struct AddTransactionTests {
         entered.people = [try Person.add(named: "Pasha", in: context)]
         entered.note = "Rent help"
         entered.isExcludedFromReport = false
-        entered.card = try addCard("Navy Federal Debit", paidFrom: checking)
+        entered.card = try context.addCard("Navy Federal Debit", paidFrom: checking)
         return try Transaction.create(entered, in: context)
     }
 
@@ -327,7 +322,7 @@ struct AddTransactionTests {
         #expect(copy != original)
         #expect(copy.amountCents == -10_000)
         #expect(original.day == CalendarDay(year: 2026, month: 5, day: 27))
-        #expect(checking.balance(asOf: today) == Money(cents: -20_000))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: -20_000))
     }
 
     @Test func editingStartsFromTheTransactionAsItIs() throws {
@@ -344,7 +339,7 @@ struct AddTransactionTests {
         let original = try pashaLoan()
         let enteredAt = original.createdAt
         var editing = TransactionDraft(editing: original)
-        editing.amount = Money(cents: 12_000)
+        editing.entry = AmountEntry(cents: 12_000)
         editing.type = .debtLoan
         editing.category = try store.category("Debt", .debtLoan)
         editing.note = "Borrowed instead"
@@ -360,7 +355,7 @@ struct AddTransactionTests {
     @Test func anEditThatBreaksARuleChangesNothing() throws {
         let original = try pashaLoan()
         var editing = TransactionDraft(editing: original)
-        editing.amount = Money(cents: 0)
+        editing.entry = AmountEntry(cents: 0)
 
         #expect(throws: TransactionRuleError.missingAmount) { try original.update(with: editing) }
         #expect(original.amountCents == -10_000)

@@ -5,38 +5,28 @@ import SwiftUI
 struct EstimatedAmountEditor: View {
     let transaction: Transaction
 
-    @Environment(\.dismiss) private var dismiss
-    @State private var entry: AmountEntry
-    @State private var errorMessage: String?
+    @State private var draft: EstimatedAmountDraft
 
     init(transaction: Transaction) {
         self.transaction = transaction
-        _entry = State(initialValue: AmountEntry(cents: abs(transaction.amountCents)))
+        _draft = State(initialValue: EstimatedAmountDraft(confirming: transaction))
     }
 
     var body: some View {
         KeypadSheet(
             title: Text(Strings.Transactions.enterAmount),
-            entry: $entry,
-            canSave: (entry.cents ?? 0) > 0,
-            save: save
+            entry: $draft.entry,
+            canSave: draft.canSave,
+            saving: "Confirming an estimated amount",
+            failureTitle: Strings.Recurring.couldntSaveAmount,
+            log: Log.recurring,
+            save: { try transaction.confirmAmount(draft) }
         ) { fields in
             Section {
-                fields.amountRow(Strings.Common.amount, currencyCode: transaction.amount.currencyCode)
+                fields.amountRow(Strings.Common.amount, currencyCode: draft.currencyCode)
             } footer: {
                 Text(Strings.Recurring.estimatedFromRecent(transaction.categoryName))
             }
-        }
-        .errorAlert(Strings.Recurring.couldntSaveAmount, message: $errorMessage)
-    }
-
-    private func save() {
-        do {
-            try transaction.confirmAmount(cents: entry.cents ?? 0)
-            dismiss()
-        } catch {
-            Log.recurring.failed("Confirming an estimated amount", error)
-            errorMessage = error.localizedDescription
         }
     }
 }

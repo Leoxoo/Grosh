@@ -8,33 +8,18 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct EstimatedAmountTests {
-    private let store: CategoryFixture
+    private let store: TestStore
     private var context: ModelContext { store.context }
     /// The day the schedules are saved on: occurrences dated on or before it aren't made.
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
 
     init() throws {
-        store = try CategoryFixture()
-    }
-
-    /// The instant at `hour` o'clock on `when`, in the UTC calendar the reminders are tested on.
-    private func at(_ when: CalendarDay, hour: Int) -> Date {
-        Calendar.utcGregorian.date(from: DateComponents(year: when.year, month: when.month, day: when.day, hour: hour))
-            ?? .distantPast
-    }
-
-    private func category(_ name: String) -> Grosh.Category {
-        let category = Grosh.Category(name: name, type: .expense, symbolName: "bolt", color: .purple)
-        context.insert(category)
-        return category
+        store = try TestStore()
     }
 
     /// Records a September expense of `cents` under `category`, so there is history for an estimate to average.
     private func record(_ cents: Int, under category: Grosh.Category) throws {
-        let transaction = Transaction(
-            amount: Money(cents: -cents), day: day(2026, 9, 1), wallet: store.wallet, category: category
-        )
-        context.insert(transaction)
+        context.record(-cents, on: day(2026, 9, 1), in: store.checking, under: category)
         try context.save()
     }
 
@@ -42,11 +27,7 @@ struct EstimatedAmountTests {
     private func electricity(
         under category: Grosh.Category, varies: Bool = true, remindAfter: Int = 2
     ) -> RecurringDraft {
-        var draft = RecurringDraft(startDay: day(2026, 10, 12))
-        draft.name = "Electricity"
-        draft.amount = Money(cents: 2_500)
-        draft.wallet = store.wallet
-        draft.category = category
+        var draft = store.recurringDraft("Electricity", 25_00, under: category, starting: day(2026, 10, 12))
         draft.kind = .bill
         draft.amountVaries = varies
         draft.remindAfterDays = remindAfter
@@ -55,23 +36,14 @@ struct EstimatedAmountTests {
 
     /// The October 12 transaction a varying electricity Bill makes, with no history to average.
     private func estimatedElectricity() throws -> Transaction {
-        let utilities = category("Utilities")
+        let utilities = context.addCategory("Utilities")
         let recurring = try RecurringTransaction.create(electricity(under: utilities), today: today, in: context)
         try RecurringTransaction.catchUp(through: day(2026, 10, 12), in: context)
         return try #require(recurring.attachedTransactions.first)
     }
 
-    /// The average the editor shows for `category`, which it sets on the draft as the estimate.
-    private func estimate(for category: Grosh.Category) throws -> Int? {
-        try context.save()
-        return AmountEstimate.cents(
-            among: try context.fetch(FetchDescriptor<Transaction>()), for: category,
-            currencyCode: store.wallet.currencyCode
-        )
-    }
-
     @Test func aVaryingBillMakesAnEstimatedTransactionAtTheAverageOfItsCategory() throws {
-        let utilities = category("Utilities")
+        let utilities = context.addCategory("Utilities")
         try record(1_000, under: utilities)
         try record(3_000, under: utilities)
         let recurring = try RecurringTransaction.create(electricity(under: utilities), today: today, in: context)
@@ -92,15 +64,15 @@ struct EstimatedAmountTests {
     }
 
     @Test func aVaryingBillNeedsNoTypedAmountWhenItsCategoryHasAnEstimate() throws {
-        let water = category("Water")
+        let water = context.addCategory("Water")
         try record(5_000, under: water)
         try record(5_000, under: water)
         var draft = electricity(under: water)
         draft.name = "Water"
-        draft.amount = Money(cents: 0)
-        #expect(!draft.canSave)
+        draft.entry = AmountEntry(cents: 0)
+        draft = store.estimated(draft)
 
-        draft.estimateCents = try estimate(for: water)
+        #expect(draft.estimateCents == 5_000)
         #expect(draft.canSave)
 
         let recurring = try RecurringTransaction.create(draft, today: today, in: context)
@@ -112,35 +84,78 @@ struct EstimatedAmountTests {
     }
 
     @Test func aVaryingBillWithNoEstimateAndNoAmountCannotBeSaved() {
-        var draft = electricity(under: category("Water"))
-        draft.amount = Money(cents: 0)
+        var draft = electricity(under: context.addCategory("Water"))
+        draft.entry = AmountEntry(cents: 0)
+        draft = store.estimated(draft)
         #expect(!draft.canSave)
     }
 
-    @Test func aFixedBillNeedsItsAmountEvenWhenThereIsAnEstimate() {
-        var draft = electricity(under: category("Water"), varies: false)
-        draft.amount = Money(cents: 0)
-        draft.estimateCents = 5_000
+    @Test func aFixedBillNeedsItsAmountEvenWhenItsCategoryHasHistory() throws {
+        let water = context.addCategory("Water")
+        try record(5_000, under: water)
+        var draft = electricity(under: water, varies: false)
+        draft.entry = AmountEntry(cents: 0)
+        draft = store.estimated(draft)
+
+        #expect(draft.estimateCents == nil)
         #expect(!draft.canSave)
+    }
+
+    @Test func theEstimateFollowsTheCategoryAndWhetherTheAmountVaries() throws {
+        let water = context.addCategory("Water")
+        let gas = context.addCategory("Gas")
+        try record(5_000, under: water)
+        try record(1_000, under: gas)
+        var draft = store.estimated(electricity(under: water))
+        #expect(draft.neededEstimate?.category == water)
+        #expect(draft.estimateCents == 5_000)
+
+        draft.category = gas
+        #expect(draft.estimateCents == nil, "an estimate read for Water doesn't stand for Gas")
+        draft = store.estimated(draft)
+        #expect(draft.estimateCents == 1_000)
+
+        draft.amountVaries = false
+        #expect(draft.neededEstimate == nil)
+        #expect(draft.estimateCents == nil)
+
+        draft.amountVaries = true
+        draft.kind = .regular
+        #expect(draft.neededEstimate == nil)
+        #expect(draft.estimateCents == nil)
     }
 
     @Test func aRowShowsTheEstimateOnceThereIsHistoryAndTheTypedAmountUntilThen() throws {
-        let utilities = category("Utilities")
+        let utilities = context.addCategory("Utilities")
         let varying = try RecurringTransaction.create(electricity(under: utilities), today: today, in: context)
         let fixed = try RecurringTransaction.create(
             electricity(under: utilities, varies: false), today: today, in: context
         )
-        #expect(varying.startingAmount(among: []).cents == -2_500)
+        #expect(varying.currentStartingAmount().cents == -2_500)
 
         try record(5_000, under: utilities)
-        let history = try context.fetch(FetchDescriptor<Transaction>())
 
-        #expect(varying.startingAmount(among: history).cents == -5_000)
-        #expect(fixed.startingAmount(among: history).cents == -2_500)
+        #expect(varying.currentStartingAmount().cents == -5_000)
+        #expect(fixed.currentStartingAmount().cents == -2_500)
+        #expect(RecurringFigures([varying, fixed]).startingAmount(of: varying).cents == -5_000)
+    }
+
+    @Test func aScreenReadsTheEstimateOnceUntilTheNextSave() throws {
+        let utilities = context.addCategory("Utilities")
+        let varying = try RecurringTransaction.create(electricity(under: utilities), today: today, in: context)
+        try record(5_000, under: utilities)
+        let schedules = RecurringSchedules([varying])
+
+        #expect(schedules.startingAmount(of: varying).cents == -5_000)
+        try record(7_000, under: utilities)
+
+        // Kept from the first read; a screen makes its schedules again after a save.
+        #expect(schedules.startingAmount(of: varying).cents == -5_000)
+        #expect(RecurringSchedules([varying]).startingAmount(of: varying).cents == -6_000)
     }
 
     @Test func theReminderComesTheChosenNumberOfDaysAfterTheOccurrence() throws {
-        let utilities = category("Utilities")
+        let utilities = context.addCategory("Utilities")
         let recurring = try RecurringTransaction.create(
             electricity(under: utilities, remindAfter: 5), today: today, in: context
         )
@@ -152,7 +167,7 @@ struct EstimatedAmountTests {
     }
 
     @Test func aFixedBillMakesItsTypedAmountWithNoEstimate() throws {
-        let utilities = category("Utilities")
+        let utilities = context.addCategory("Utilities")
         try record(1_000, under: utilities)
         let recurring = try RecurringTransaction.create(
             electricity(under: utilities, varies: false), today: today, in: context
@@ -167,7 +182,7 @@ struct EstimatedAmountTests {
     }
 
     @Test func aSubscriptionIgnoresAmountVaries() throws {
-        let utilities = category("Utilities")
+        let utilities = context.addCategory("Utilities")
         var draft = electricity(under: utilities)
         draft.kind = .subscription
         let recurring = try RecurringTransaction.create(draft, today: today, in: context)
@@ -180,16 +195,36 @@ struct EstimatedAmountTests {
 
     @Test func confirmingTheAmountClearsTheMarkItsReminderAndTheBellItem() throws {
         let made = try estimatedElectricity()
-        #expect(try context.fetch(EstimatedAmounts.transactions).count == 1)
+        #expect(try context.fetch(EstimatedAmounts.records).count == 1)
         #expect(EstimatedAmounts([made]).due(on: day(2026, 10, 14)).count == 1)
 
-        try made.confirmAmount(cents: 2_750)
+        var draft = EstimatedAmountDraft(confirming: made)
+        draft.entry = AmountEntry(cents: 2_750)
+        try made.confirmAmount(draft)
 
         #expect(made.amountCents == -2_750)
         #expect(!made.isEstimated)
         #expect(made.estimateReminderDay == nil)
         #expect(EstimatedAmounts([made]).due(on: day(2026, 10, 20)).isEmpty)
-        #expect(try context.fetch(EstimatedAmounts.transactions).isEmpty)
+        #expect(try context.fetch(EstimatedAmounts.records).isEmpty)
+    }
+
+    @Test func confirmingStartsAtTheEstimateWithoutItsSign() throws {
+        let made = try estimatedElectricity()
+
+        #expect(made.amountCents < 0)
+        #expect(EstimatedAmountDraft(confirming: made).amount.cents == 25_00)
+    }
+
+    @Test func confirmingNothingIsRefusedAndKeepsTheEstimate() throws {
+        let made = try estimatedElectricity()
+        let estimate = made.amountCents
+        var draft = EstimatedAmountDraft(confirming: made)
+        draft.entry = AmountEntry()
+
+        #expect(throws: TransactionRuleError.missingAmount) { try made.confirmAmount(draft) }
+        #expect(made.amountCents == estimate)
+        #expect(made.isEstimated)
     }
 
     @Test func editingTheAmountClearsTheMarkButEditingOnlyTheNoteKeepsIt() throws {
@@ -201,7 +236,7 @@ struct EstimatedAmountTests {
         #expect(made.isEstimated)
 
         var amountEdit = TransactionDraft(editing: made)
-        amountEdit.amount = Money(cents: 4_000)
+        amountEdit.entry = AmountEntry(cents: 4_000)
         try made.update(with: amountEdit)
         #expect(made.amountCents == -4_000)
         #expect(!made.isEstimated)
@@ -234,13 +269,13 @@ struct EstimatedAmountTests {
         let estimates = EstimatedAmounts([made])
         let reminderDay = day(2026, 10, 14)
 
-        let beforeNine = estimates.reminders(at: at(reminderDay, hour: 8), calendar: .utcGregorian, after: [])
+        let beforeNine = estimates.reminders(at: moment(reminderDay, at: 8), calendar: .utcGregorian, after: [])
         #expect(beforeNine.map(\.arrival) == [.onItsDay])
 
-        let afterNine = estimates.reminders(at: at(reminderDay, hour: 14), calendar: .utcGregorian, after: [])
+        let afterNine = estimates.reminders(at: moment(reminderDay, at: 14), calendar: .utcGregorian, after: [])
         #expect(afterNine.map(\.arrival) == [.rightAway])
 
-        let handedOver = estimates.reminders(at: at(reminderDay, hour: 15), calendar: .utcGregorian, after: afterNine)
+        let handedOver = estimates.reminders(at: moment(reminderDay, at: 15), calendar: .utcGregorian, after: afterNine)
         #expect(handedOver.isEmpty)
     }
 
@@ -249,7 +284,7 @@ struct EstimatedAmountTests {
         let scheduler = RecordingReminderScheduler<EstimateReminder>()
 
         await EstimatedAmounts([made]).reschedule(
-            at: at(day(2026, 10, 14), hour: 8), calendar: .utcGregorian, after: nil, using: scheduler
+            at: moment(day(2026, 10, 14), at: 8), calendar: .utcGregorian, after: nil, using: scheduler
         )
 
         #expect(scheduler.calls == [
@@ -268,7 +303,7 @@ struct EstimatedAmountTests {
         let scheduler = RecordingReminderScheduler<EstimateReminder>()
 
         await EstimatedAmounts(none).reschedule(
-            at: at(day(2026, 10, 14), hour: 8), calendar: .utcGregorian, after: nil, using: scheduler
+            at: moment(day(2026, 10, 14), at: 8), calendar: .utcGregorian, after: nil, using: scheduler
         )
 
         #expect(scheduler.calls == [.replacePending([])])

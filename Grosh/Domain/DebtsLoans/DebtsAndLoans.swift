@@ -13,7 +13,7 @@ struct DebtsAndLoans {
     /// Every transaction filed under a Debt/Loan category, outside Recently Deleted: the Loans and Debts and their
     /// payments. A list made from them stays current, since a new payment or a change to a Loan or Debt changes what
     /// this fetches.
-    static var transactions: FetchDescriptor<Transaction> {
+    static var records: FetchDescriptor<Transaction> {
         let debtLoan: String? = CategoryType.debtLoan.rawValue
         return FetchDescriptor(predicate: #Predicate { $0.category?.typeRaw == debtLoan && $0.deletedAt == nil })
     }
@@ -29,19 +29,11 @@ struct DebtsAndLoans {
         settled = loansAndDebts.filter(\.isSettled).sorted { $0.original.isListed(before: $1.original) }
     }
 
-    /// Whether `first` comes before `second` among the open ones: a reminder day before none, an earlier reminder
-    /// day before a later one, and otherwise the older Loan or Debt first.
+    /// Whether `first` comes before `second` among the open ones (``ReminderDay/isListed(_:before:otherwise:)``), the
+    /// older Loan or Debt first when their reminder days don't decide it.
     private static func isDue(before first: LoanOrDebt, _ second: LoanOrDebt) -> Bool {
-        switch (first.original.reminderDay, second.original.reminderDay) {
-        case let (firstDay?, secondDay?) where firstDay != secondDay: firstDay < secondDay
-        case (.some, nil): true
-        case (nil, .some): false
-        default: second.original.isListed(before: first.original)
+        ReminderDay.isListed(first.original.reminderDay, before: second.original.reminderDay) {
+            second.original.isListed(before: first.original)
         }
-    }
-
-    /// Every Loan and Debt in the store.
-    init(in context: ModelContext) throws {
-        self.init(try context.fetch(Self.transactions))
     }
 }

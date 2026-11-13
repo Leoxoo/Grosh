@@ -25,20 +25,24 @@ struct RecurringTransactionEditor: View {
     @Environment(\.today) private var today
 
     var body: some View {
-        RecurringForm(mode: mode, startingDraft: startingDraft)
+        MadeOnce(make: makeStartingDraft) { draft in
+            RecurringForm(mode: mode, startingDraft: draft)
+        }
     }
 
-    private var startingDraft: RecurringDraft {
+    private func makeStartingDraft() -> RecurringDraft {
+        var draft: RecurringDraft
         switch mode {
         case .add:
-            var draft = RecurringDraft(startDay: today)
+            draft = RecurringDraft(startDay: today)
             draft.wallet = TransactionDefaults.suggest(on: today, in: context).wallet
-            return draft
         case .duplicate(let recurring):
-            return RecurringDraft(duplicating: recurring, on: today)
+            draft = RecurringDraft(duplicating: recurring, on: today)
         case .edit(let recurring):
-            return RecurringDraft(editing: recurring)
+            draft = RecurringDraft(editing: recurring)
         }
+        AmountEstimate.give(to: &draft)
+        return draft
     }
 }
 
@@ -51,69 +55,31 @@ private struct RecurringForm: View {
     @Environment(\.today) private var today
 
     @State private var draft: RecurringDraft
-    @State private var entry: AmountEntry
-    /// A Purchase's total price as the keypad shows it. Zero is no total.
-    @State private var totalEntry: AmountEntry
-    @State private var errorMessage: String?
     /// The start-date prompt, offered when the saved schedule has occurrences that have already come due.
     @State private var pastPrompt: PastPrompt?
 
     init(mode: RecurringTransactionEditor.Mode, startingDraft: RecurringDraft) {
         self.mode = mode
         _draft = State(initialValue: startingDraft)
-        _entry = State(initialValue: AmountEntry(cents: startingDraft.amount.cents))
-        _totalEntry = State(initialValue: AmountEntry(cents: startingDraft.total?.cents ?? 0))
-    }
-
-    /// Whether the sheet saves a new Recurring transaction, which Add and Duplicate both do.
-    private var isNew: Bool {
-        if case .edit = mode { false } else { true }
-    }
-
-    /// The Recurring transaction being edited, or `nil` when it is new.
-    private var editing: RecurringTransaction? {
-        if case .edit(let recurring) = mode { recurring } else { nil }
-    }
-
-    private var currencyCode: String { draft.wallet?.currencyCode ?? Money.defaultCurrencyCode }
-
-    /// The estimate a varying Bill starts at: the average of its category's history, or `nil` when there is none.
-    private var estimateCents: Int? {
-        guard draft.estimatesAmount, let category = draft.category else { return nil }
-        return AmountEstimate.cents(for: category, currencyCode: currencyCode)
-    }
-
-    /// The draft with the amounts the keypad comes to. A total of zero is no total.
-    private var draftToSave: RecurringDraft {
-        var result = draft
-        result.amount = Money(cents: entry.cents ?? 0, currencyCode: currencyCode)
-        result.estimateCents = estimateCents
-        if let cents = totalEntry.cents, cents > 0 {
-            result.total = Money(cents: cents, currencyCode: currencyCode)
-        } else {
-            result.total = nil
-        }
-        return result
-    }
-
-    /// The amount is tinted like the transactions it makes: red for an expense, green for income.
-    private var amountTint: Color {
-        draft.category.map { Money(cents: $0.sign).tint } ?? .primary
     }
 
     var body: some View {
         KeypadSheet(
-            title: isNew ? Text(Strings.Recurring.newRecurring) : Text(Strings.Recurring.editRecurring),
-            entry: $entry,
-            secondEntry: $totalEntry,
-            canSave: draftToSave.canSave && totalEntry.cents != nil,
-            save: save,
-            macHeight: (640, 720)
+            title: draft.isNew ? Text(Strings.Recurring.newRecurring) : Text(Strings.Recurring.editRecurring),
+            entry: $draft.entry,
+            secondEntry: $draft.totalEntry,
+            canSave: draft.canSave,
+            size: .tallKeypadForm,
+            saving: "Saving a Recurring transaction",
+            failureTitle: Strings.Recurring.couldntSave,
+            log: Log.recurring,
+            saveThen: save
         ) { fields in
             Section {
                 Picker(Strings.Common.type, selection: $draft.type) {
-                    Text(CategoryType.expense.title).tag(CategoryType.expense)
-                    Text(CategoryType.income.title).tag(CategoryType.income)
+                    ForEach(CategoryType.ordinary, id: \.self) { type in
+                        Text(type.title).tag(type)
+                    }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -129,28 +95,22 @@ private struct RecurringForm: View {
             repeatSection
             endSection
         }
-        .onChange(of: draft.category) { oldCategory, newCategory in
-            // A new Recurring transaction is named after its category, until the user types a name of their own.
-            if draft.name.isEmpty || draft.name == oldCategory?.name {
-                draft.name = newCategory?.name ?? ""
-            }
-            // A new Recurring transaction starts as its category's default Kind, which the user can change.
-            if isNew, let newCategory {
-                draft.kind = newCategory.defaultKind
-            }
-        }
-        .errorAlert(Strings.Recurring.couldntSave, message: $errorMessage)
         .sheet(item: $pastPrompt, onDismiss: { dismiss() }) { prompt in
             PastOccurrencesView(recurring: prompt.recurring, days: prompt.days)
+        }
+        // Read once per change of category, wallet, Kind or "amount varies", rather than each time the draft is checked.
+        .onChange(of: draft.neededEstimate) {
+            AmountEstimate.give(to: &draft)
         }
     }
 
     private func detailsSection(_ fields: KeypadSheetFields) -> some View {
         Section {
             TextField(Strings.Common.name, text: $draft.name)
-            fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: amountTint)
+            // Tinted like the transactions it makes: red for an expense, green for income.
+            fields.amountRow(Strings.Common.amount, currencyCode: draft.currencyCode, tint: MoneyDirection(category: draft.category).tint)
             WalletPicker(title: Strings.Common.wallet, selection: $draft.wallet)
-            CategoryPicker(title: Strings.Common.category, type: draft.type, selection: $draft.category)
+            CategoryPicker(title: Strings.Common.category, type: draft.type, selection: $draft.pickedCategory)
             Picker(Strings.Common.kind, selection: $draft.kind) {
                 ForEach(RecurringKind.allCases, id: \.self) { kind in
                     Text(kind.title).tag(kind)
@@ -184,8 +144,8 @@ private struct RecurringForm: View {
     }
 
     private var estimateText: String {
-        guard let cents = estimateCents else { return String(localized: Strings.Recurring.noneYet) }
-        return Money(cents: cents, currencyCode: currencyCode).formatted()
+        guard let cents = draft.estimateCents else { return String(localized: Strings.Recurring.noneYet) }
+        return Money(cents: cents, currencyCode: draft.currencyCode).formatted()
     }
 
     private var remindAfterText: String {
@@ -195,7 +155,7 @@ private struct RecurringForm: View {
     /// A Purchase's optional total price. Payments attached to it count as paid toward it; the schedule doesn't change.
     private func purchaseSection(_ fields: KeypadSheetFields) -> some View {
         Section {
-            fields.secondAmountRow(Strings.Recurring.totalPrice, currencyCode: currencyCode)
+            fields.secondAmountRow(Strings.Recurring.totalPrice, currencyCode: draft.currencyCode)
         } footer: {
             Text(Strings.Recurring.totalPriceFooter)
         }
@@ -222,7 +182,7 @@ private struct RecurringForm: View {
                 // Each choice is written out in full, as the detail screen reads it.
                 Picker(Strings.Common.on, selection: $draft.monthlyDay) {
                     ForEach(MonthlyDay.offered(startingOn: draft.startDay), id: \.self) { option in
-                        Text(draft.rule.phrase + " " + option.phrase(startingOn: draft.startDay)).tag(option)
+                        Text(draft.rule.phrase(on: option, startingOn: draft.startDay)).tag(option)
                     }
                 }
             }
@@ -255,28 +215,21 @@ private struct RecurringForm: View {
             : String(localized: Strings.Recurring.times(draft.occurrenceCount))
     }
 
-    private func save() {
-        do {
-            // A new schedule, or one whose start day has been moved, offers the occurrences that have already come due.
-            let startChanged = editing.map { $0.schedule.start != draftToSave.startDay } ?? true
-            let saved: RecurringTransaction
-            switch mode {
-            case .add, .duplicate:
-                saved = try RecurringTransaction.create(draftToSave, today: today, in: context)
-            case .edit(let recurring):
-                try recurring.update(with: draftToSave, today: today)
-                saved = recurring
-            }
-            let unentered = saved.unenteredOccurrences(through: today)
-            if startChanged && !unentered.isEmpty {
-                pastPrompt = PastPrompt(recurring: saved, days: unentered)
-            } else {
-                dismiss()
-            }
-        } catch {
-            Log.recurring.failed("Saving a Recurring transaction", error)
-            errorMessage = error.localizedDescription
+    /// Saves, then stays open to offer the occurrences that have already come due, when there are any and the draft
+    /// offers them (``RecurringDraft/offersPastOccurrences``).
+    private func save() throws -> AfterSaving {
+        let saved: RecurringTransaction
+        switch mode {
+        case .add, .duplicate:
+            saved = try RecurringTransaction.create(draft, today: today, in: context)
+        case .edit(let recurring):
+            try recurring.update(with: draft, today: today)
+            saved = recurring
         }
+        let unentered = saved.unenteredOccurrences(through: today)
+        guard draft.offersPastOccurrences, !unentered.isEmpty else { return .close }
+        pastPrompt = PastPrompt(recurring: saved, days: unentered)
+        return .stayOpen
     }
 }
 
@@ -289,5 +242,5 @@ private struct PastPrompt: Identifiable {
 
 #Preview {
     RecurringTransactionEditor(mode: .add)
-        .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+        .modelContainer(try! StoreOpening.open(inMemory: true))
 }

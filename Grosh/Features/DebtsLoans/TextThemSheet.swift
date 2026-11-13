@@ -81,7 +81,7 @@ private struct CopyOrShare: View {
                     Text(text)
                         .textSelection(.enabled)
                 } footer: {
-                    Text("This device can't text \(personName) from here. Copy the message or share it instead.")
+                    Text(Strings.People.cantTextFromHere(personName))
                 }
                 Section {
                     Button {
@@ -89,27 +89,25 @@ private struct CopyOrShare: View {
                         hasCopied = true
                     } label: {
                         if hasCopied {
-                            Label("Copied", systemImage: "checkmark")
+                            Label(Strings.Common.copied, systemImage: "checkmark")
                         } else {
-                            Label("Copy", systemImage: "doc.on.doc")
+                            Label(Strings.Common.copy, systemImage: "doc.on.doc")
                         }
                     }
                     ShareLink(item: text)
                 }
             }
-            .navigationTitle("Text \(personName)")
+            .navigationTitle(Strings.People.textName(personName))
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done", action: onDone)
+                    Button(Strings.Common.done, action: onDone)
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 380, idealWidth: 420, minHeight: 300, idealHeight: 360)
-        #endif
+        .macSheetSize(.message)
     }
 
     private func copy(_ text: String) {

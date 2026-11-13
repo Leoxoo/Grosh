@@ -25,9 +25,10 @@ repo=
 make_repo() {
     local repo=$work/$1
     mkdir -p "$repo/tools" "$repo/Grosh.xcodeproj" "$repo/GroshTests"
-    cp "$here/../../check" "$repo/tools/check"
+    cp "$here/../../check" "$here/../../check_helper.py" "$here/../../message_text.py" "$repo/tools/"
     cp "$here/fakes/check-logs" "$repo/tools/check-logs"
     printf '\t\t\t\tIPHONEOS_DEPLOYMENT_TARGET = 26.4;\n' >"$repo/Grosh.xcodeproj/project.pbxproj"
+    # The files the failing fixtures name only by file name: tools/check finds them to print their repository paths.
     : >"$repo/GroshTests/ReimbursementTests.swift"
     : >"$repo/GroshTests/AmountEntryTests.swift"
     echo "$repo"
@@ -255,7 +256,7 @@ stale_lock() {
 
 boots_a_simulator_that_is_down() {
     repo=$(make_repo boots-a-simulator-that-is-down)
-    run "$repo" FAKE_BOOTED=simctl-none
+    run "$repo" FAKE_DOWN=1
     exits 0
     says "412 passed in Ns (9 skipped)"
     never_says "tools/check-logs skipped"
@@ -268,7 +269,7 @@ boots_a_simulator_that_is_down() {
 
 a_simulator_that_will_not_boot_stops_the_run() {
     repo=$(make_repo a-simulator-that-will-not-boot)
-    run "$repo" FAKE_BOOTED=simctl-none FAKE_BOOT_STATUS=1
+    run "$repo" FAKE_DOWN=1 FAKE_BOOT_STATUS=1
     exits 2
     says "tools/check cannot boot iPhone 17 Pro (iOS 26.4), so nothing ran: fake simctl: the device would not boot"
     never_called "xcodebuild -project"
@@ -276,7 +277,7 @@ a_simulator_that_will_not_boot_stops_the_run() {
 
 goes_down_during_the_run() {
     repo=$(make_repo goes-down-during-the-run)
-    run "$repo" FAKE_BOOTED=simctl-none FAKE_SHUT_DOWN=1
+    run "$repo" FAKE_DOWN=1 FAKE_SHUT_DOWN=1
     exits 0
     says "tools/check-logs skipped: the simulator the tests ran on is not booted, so there is no log to read." \
         "412 passed in Ns (9 skipped)"

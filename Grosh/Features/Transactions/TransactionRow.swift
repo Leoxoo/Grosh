@@ -18,7 +18,6 @@ struct TransactionRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        // At the accessibility text sizes the amounts go under the name, where they have the row's full width.
         let stacks = dynamicTypeSize.isAccessibilitySize
         HStack(alignment: stacks ? .top : .center, spacing: 12) {
             CategoryIcon(category: transaction.category, subscriptionIcon: transaction.recurring?.subscriptionIcon)
@@ -87,10 +86,7 @@ struct TransactionRow: View {
             CardIndicator(card: card)
         }
         if showsWalletIcon, let wallet = transaction.wallet {
-            Image(systemName: wallet.symbolName)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .accessibilityLabel(wallet.name)
+            RowWalletIcon(wallet: wallet)
         }
     }
 }
@@ -101,11 +97,7 @@ struct CardIndicator: View {
     let card: Card
 
     var body: some View {
-        CardMark(image: card.image, height: 15) {
-            Image(systemName: Card.symbolName)
-                .font(.caption)
-                .foregroundStyle(card.color.color)
-        }
+        CardMark(card: card, height: 15, symbolFont: .caption)
         .frame(width: 24, height: 16)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(card.name)
@@ -113,16 +105,23 @@ struct CardIndicator: View {
     }
 }
 
+/// The paying wallet's icon in gray, which a transaction or Scheduled row shows in a list that mixes wallets.
+struct RowWalletIcon: View {
+    let wallet: Wallet
+
+    var body: some View {
+        Image(systemName: wallet.symbolName)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel(wallet.name)
+    }
+}
+
 /// A small capsule marking a transaction whose amount is still an estimate, until the real one is entered.
 struct EstimatedBadge: View {
     var body: some View {
         Text(Strings.Transactions.estimatedShort)
-            .font(.caption2.weight(.medium))
-            .lineLimit(1)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .foregroundStyle(.attention)
-            .background(Color.attention.opacity(0.15), in: Capsule())
+            .capsuleBadge(.attention, on: .attention)
             .accessibilityLabel(Strings.Transactions.estimated)
     }
 }
@@ -132,23 +131,6 @@ struct ForgivenBadge: View {
     var body: some View {
         Label(Strings.Common.forgiven, systemImage: "hand.raised.fill")
             .labelStyle(.titleAndIcon)
-            .font(.caption2.weight(.medium))
-            .lineLimit(1)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .foregroundStyle(.settled)
-            .background(Color.settled.opacity(0.15), in: Capsule())
-    }
-}
-
-extension Transaction {
-    /// The category's name, or "Uncategorized" for a transaction filed under none.
-    var categoryName: String { Category.name(of: category) }
-}
-
-extension Category {
-    /// `category`'s name, or "Uncategorized" for none.
-    static func name(of category: Category?) -> String {
-        category?.name ?? String(localized: Strings.Common.uncategorized)
+            .capsuleBadge(.settled, on: .settled)
     }
 }

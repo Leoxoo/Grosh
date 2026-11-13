@@ -69,7 +69,7 @@ Each xcodebuild boots simulators of its own, so runs from several worktrees at o
 
 ## Scheme and test plan
 
-The shared `Grosh` scheme tests with `Grosh.xctestplan`. Its one configuration, Default, is the plain run, with no extra arguments or environment. Both test targets are on in the plan. `tools/check` narrows each run with `-only-testing`: a plain run passes `-only-testing:GroshTests`, and `--ui` adds `-only-testing:GroshUITests`. So ⌘U in Xcode runs the UI tests as well as the unit tests. Both test targets run on the chosen simulator itself, not on clones of it (GroshTests is not parallelizable either), so `tools/check-logs` can read what they logged.
+The shared `Grosh` scheme tests with `Grosh.xctestplan`. Its one configuration, Default, is the plain run, with no extra arguments or environment. The plan runs every test in English (United States), so a test can expect `$1,234.50` whatever the simulator's own language and region. Both test targets are on in the plan. `tools/check` narrows each run with `-only-testing`: a plain run passes `-only-testing:GroshTests`, and `--ui` adds `-only-testing:GroshUITests`. So ⌘U in Xcode runs the UI tests as well as the unit tests. Both test targets run on the chosen simulator itself, not on clones of it (GroshTests is not parallelizable either), so `tools/check-logs` can read what they logged.
 
 If a run with `--ui` prints `GroshUITests did not run`, check that GroshUITests is still on in `Grosh.xctestplan`. Xcode may skip a target the plan turns off, even when `-only-testing` names it.
 
@@ -77,26 +77,26 @@ If a run with `--ui` prints `GroshUITests did not run`, check that GroshUITests 
 
 `GroshTests/SnapshotTests.swift` draws each transaction row kind (Expense, Income, Transfer, Split, Reimbursement) and Home with its Month graph, in light, dark and the accessibility text size AX3, and compares each with a PNG in `GroshTests/__Snapshots__/SnapshotTests/`. It uses [swift-snapshot-testing](https://github.com/pointfreeco/swift-snapshot-testing), linked to GroshTests only and pinned to 1.19.7 by `Grosh.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`. A new version can draw differently, so updating it means recording the references again. Each screen is drawn as of 12 October 2026, from fixed transactions, on a 402 × 874 screen in English (United States), so the same tree draws the same image on any day.
 
-**References recorded on:** a Mac16,7 (Apple M4 Pro) on macOS 27.2 with Xcode 27.1 (27A9275), on the iPhone 17 Pro simulator with iOS 27.0 (24A434). Record and compare on that setup only. The simulator's language and region must be English (United States) too, since amounts and dates use the device's locale.
-
-CI skips the suite and prints one line saying so, because the references belong to a Mac.
+**References recorded on:** the setup in `GroshTests/__Snapshots__/SnapshotTests/recorded-setup.txt`, the simulated iPhone and iOS, such as `iPhone18,1 simulator / iOS 27.0 (24A434)`. The tests compare only on that setup: another iOS or simulator draws other pixels, so a run on one skips the suite and prints one line naming both setups, the way the benchmarks treat a setup they weren't measured on. CI skips the suite too, with one line, because the references belong to a Mac. Language and region don't vary: `Grosh.xctestplan` runs every test in English (United States), so amounts and dates read the same on any simulator.
 
 ```
 tools/check --only SnapshotTests
 ```
 
-- **Record a reference on purpose.** Delete the PNG to replace, or the whole `__Snapshots__/SnapshotTests` folder for all of them, then run. swift-snapshot-testing writes a missing reference and fails its test once, so run again to compare. Or turn on the library's record mode for one run, with the `record` argument of `assertSnapshot` (the pinned version's README describes it). That overwrites every reference the run draws. Take it out again before committing.
+- **Record the references on a new setup, or all of them again.** Delete the whole `__Snapshots__/SnapshotTests` folder, then run. The run writes this setup into `recorded-setup.txt`, and swift-snapshot-testing writes each missing reference and fails its test once, so run again to compare. Commit the PNGs and `recorded-setup.txt` together.
+- **Record one reference on purpose.** Delete its PNG, on the recorded setup, then run twice as above. Or turn on the library's record mode for one run, with the `record` argument of `assertSnapshot` (the pinned version's README describes it). That overwrites every reference the run draws. Take it out again before committing.
 - **Review the diff.** A changed screen fails its test, and `tools/check` prints the failure. Open the `Grosh.xcresult` it names in Xcode, and compare the reference with the new image in the failed test's attachments. In git, `git status` lists the changed PNGs: open the old and new files side by side, and commit only the changes you meant to make.
 
 ## Testing the tools
 
-These need no Xcode and take about 30 seconds. `tools/check-tools` runs all three and prints only what failed. The Stop hook runs it when an agent's turn changed `tools/` or `.claude/hooks/`, and CI runs it on every pull request that changes `tools/`, `.claude/hooks/` or `.github/` (the Tools check). A pull request that changes only `tools/`, docs, Markdown or agent settings skips the unit and UI tests; a push to main runs everything (`.github/workflows/tests.yml`):
+These need no Xcode and take about 30 seconds. `tools/check-tools` runs all four and prints only what failed. The Stop hook runs it when an agent's turn changed `tools/` or `.claude/hooks/`, and CI runs it on every pull request that changes `tools/`, `.claude/hooks/` or `.github/` (the Tools check). A pull request that changes only `tools/`, docs, Markdown or agent settings skips the unit and UI tests; a push to main runs everything (`.github/workflows/tests.yml`):
 
 ```
-bash tools/check-tools                       # all three
+bash tools/check-tools                       # all four
 tools/tests/check/run.sh                     # tools/check, against stand-ins for xcodebuild, xcrun and tools/check-logs
 tools/tests/run-checks/run.sh                # the Stop hook, .claude/hooks/run-checks.sh
-python3 -B -m unittest discover -s tools     # tools/check-logs
+tools/tests/block-dangerous-git/run.sh       # the git guard, .claude/hooks/block-dangerous-git.sh
+python3 -B -m unittest discover -s tools     # tools/check-logs and tools/check_helper.py
 ```
 
-`tools/tests/run-checks/run.sh` runs the hook on a throwaway repository whose `tools/check` fails while a Swift file holds `BROKEN`, with stand-ins for xcodebuild, curl (LM Studio) and claude (the local model). It covers when the hook runs the unit tests and when the tools' tests (a stand-in `tools/check-tools` that fails while a file under `tools/` or `.claude/hooks/` holds `TOOLBUG`), what it hands back, the three-failure limit, and the local fix: that a failed attempt leaves the worktree, the index and the stash list as they were. A change to the hook comes with a case there.
+`tools/tests/run-checks/run.sh` runs the hook on a throwaway repository whose `tools/check` fails while a Swift file holds `BROKEN`, with stand-ins for xcodebuild, curl (LM Studio) and claude (the local model). It covers when the hook runs the unit tests (only where xcodebuild is installed) and when the tools' tests (a stand-in `tools/check-tools` that fails while a file under `tools/` or `.claude/hooks/` holds `TOOLBUG`), what it hands back, the three-failure limit, and the local fix: that a failed attempt leaves the worktree, the index and the stash list as they were. A change to the hook comes with a case there, and a change to the git guard's patterns with a case in `tools/tests/block-dangerous-git/run.sh`.

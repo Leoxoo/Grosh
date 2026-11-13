@@ -13,8 +13,8 @@ struct WithField: View {
         Button {
             isChoosing = true
         } label: {
-            LabeledContent("With") {
-                Text(people.isEmpty ? String(localized: "None") : people.map(\.name).joined(separator: ", "))
+            LabeledContent(Strings.Common.with) {
+                Text(people.isEmpty ? String(localized: Strings.Common.none) : Transaction.withName(of: people))
                     .foregroundStyle(people.isEmpty ? .secondary : .primary)
                     .multilineTextAlignment(.trailing)
             }
@@ -63,54 +63,54 @@ struct WithMenu: View {
                         Button {
                             add(name)
                         } label: {
-                            Label("Add \(name)", systemImage: "plus.circle")
+                            Label(Strings.People.add(name), systemImage: "plus.circle")
                         }
-                        TextField("Phone (optional)", text: $phone)
+                        TextField(Strings.People.phoneOptional, text: $phone)
                             #if os(iOS)
                             .keyboardType(.phonePad)
                             #endif
                     }
                 }
                 if !chosenElsewhere.isEmpty {
-                    Section("Chosen") {
+                    Section(Strings.People.chosen) {
                         ForEach(chosenElsewhere) { person in
                             row(person)
                         }
                     }
                 }
                 if !listed.people.isEmpty {
-                    Section("Previous") {
+                    Section(Strings.People.previous) {
                         ForEach(listed.people) { person in
                             row(person)
                                 .swipeActions {
-                                    Button("Hide", systemImage: "eye.slash") { hide(person) }
-                                        .tint(.orange)
+                                    Button(Strings.Common.hide, systemImage: "eye.slash") { hide(person) }
+                                        .tint(.archiveAction)
                                 }
                         }
                     }
                 }
                 WithContactsSection(contacts: contacts, typed: query, pick: pick)
             }
-            .searchable(text: $query, prompt: "Search or add a name")
+            .searchable(text: $query, prompt: Strings.People.searchOrAddName)
             .overlay {
                 if previous.isEmpty && chosenElsewhere.isEmpty && contacts.results.isEmpty && query.isEmpty {
                     ContentUnavailableView {
-                        Label("No One Yet", systemImage: "person.2")
+                        Label(Strings.People.noOneYet, systemImage: "person.2")
                     } description: {
-                        Text("Search for a name to add the first person.")
+                        Text(Strings.People.addFirstPerson)
                     }
                 }
             }
-            .navigationTitle("With")
+            .navigationTitle(Strings.Common.with)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button(Strings.Common.done) { dismiss() }
                 }
             }
-            .errorAlert("Couldn't Update People", message: $errorMessage)
+            .errorAlert(Strings.People.couldntUpdate, message: $errorMessage)
             .task { await contacts.open(in: context) }
             .task(id: query) { await contacts.search(query) }
             .onReceive(ContactsInWith.changed) { _ in
@@ -120,9 +120,7 @@ struct WithMenu: View {
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 340, minHeight: 400)
-        #endif
+        .macSheetSize(.people)
     }
 
     private func row(_ person: Person) -> some View {
@@ -148,19 +146,15 @@ struct WithMenu: View {
     }
 
     private func add(_ name: String) {
-        do {
+        Log.store.perform("Adding a Person", errorMessage: &errorMessage) {
             finishAdding(try Person.add(named: name, phone: phone, in: context))
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 
     /// Picking a contact: `phone` is the number the user chose when the contact has several.
     private func pick(_ contact: Contact, phone: String?) {
-        do {
+        Log.store.perform("Adding a Person from Contacts", errorMessage: &errorMessage) {
             finishAdding(try Person.add(contact, phone: phone, in: context))
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 
@@ -175,10 +169,6 @@ struct WithMenu: View {
     }
 
     private func hide(_ person: Person) {
-        do {
-            try person.hide()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        Log.store.perform("Hiding a Person", errorMessage: &errorMessage) { try person.hide() }
     }
 }

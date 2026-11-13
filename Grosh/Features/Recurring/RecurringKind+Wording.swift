@@ -11,7 +11,7 @@ extension RecurringKind {
         }
     }
 
-    /// The kind's heading on the Recurring tab, such as "Bills".
+    /// The kind's heading on Recurring transactions, such as "Bills".
     var sectionTitle: String {
         switch self {
         case .bill: String(localized: Strings.Recurring.bills)

@@ -13,10 +13,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# The Xcode must ship the SDK the app deploys to (iOS 26.4), and the runner image below must carry
-# that Xcode and its simulator runtime. Check both against GitHub's runner image list before relying on them.
+# The same Xcode the app is developed with, so CI compiles what the developer's Mac compiles. It must support the
+# iOS the app deploys to (26.4), and the runner image below must carry it and an iOS simulator runtime. GitHub's
+# xcode-27 image is a preview (images/macos/xcode-27-arm64-Readme.md in actions/runner-images lists what it carries).
 env:
-  XCODE_VERSION: "26.4"
+  XCODE_VERSION: "27.2"
 
 # Benchmarks and snapshot tests are not run on CI: their budgets and reference images belong to
 # the developer's Mac.
@@ -71,7 +72,7 @@ jobs:
           - name: UI tests
             id: ui
             command: tools/check --ui --only GroshUITests
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 45
     steps:
       - name: Check out the repository

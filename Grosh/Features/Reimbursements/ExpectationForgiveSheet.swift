@@ -6,58 +6,49 @@ import SwiftUI
 struct ExpectationForgiveSheet: View {
     let expectation: ExpectedReimbursement
 
+    @Environment(\.today) private var today
     @Environment(\.dismiss) private var dismiss
-    @State private var day: CalendarDay
+    /// The day the user picked, or `nil` while it is still today.
+    @State private var pickedDay: CalendarDay?
     @State private var note = ""
-    @State private var errorMessage: String?
+    private let saver = SheetSaver(Strings.DebtsLoans.couldntForgive)
 
-    /// `today` is the day it starts on, from the presenting screen's environment.
-    init(expectation: ExpectedReimbursement, today: CalendarDay) {
-        self.expectation = expectation
-        _day = State(initialValue: today)
+    private var day: Binding<CalendarDay> {
+        Binding(get: { pickedDay ?? today }, set: { pickedDay = $0 })
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    LabeledContent("From", value: expectation.personName)
-                    LabeledContent("Outstanding") {
-                        Text(expectation.outstanding?.formatted() ?? "?")
+                    LabeledContent(Strings.Common.from, value: expectation.personName)
+                    LabeledContent(Strings.DebtsLoans.outstanding) {
+                        Text(expectation.outstanding.formattedOrUnknown)
                             .monospacedDigit()
                     }
-                    DayStepper(title: "Date", day: $day)
-                    TextField("Note", text: $note, axis: .vertical)
+                    DayStepper(title: Strings.Common.date, day: day)
+                    TextField(Strings.Common.note, text: $note, axis: .vertical)
                 } footer: {
-                    Text("Marks it forgiven without adding any transaction. Nothing in your balances or reports changes, because it never counted in either.")
+                    Text(Strings.OwesMe.forgiveFooter)
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("Forgive")
+            .navigationTitle(Strings.DebtsLoans.forgive)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Forgive", action: forgive)
+                    Button(Strings.DebtsLoans.forgive) {
+                        saver.save("Forgiving Owes me") { try expectation.forgive(on: day.wrappedValue, note: note) }
+                    }
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 420, idealWidth: 460, minHeight: 320, idealHeight: 380)
-        #endif
-        .errorAlert("Couldn't Forgive", message: $errorMessage)
-    }
-
-    private func forgive() {
-        do {
-            try expectation.forgive(on: day, note: note)
-            dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        .macSheetSize(.shorterForm)
+        .failureAlert(saver)
     }
 }

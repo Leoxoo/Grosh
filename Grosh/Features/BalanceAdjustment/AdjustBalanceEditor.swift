@@ -11,40 +11,45 @@ struct AdjustBalanceEditor: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Environment(\.today) private var today
+    /// What the recorded balance adds up.
+    @NotDeletedTransactions private var transactions: [Transaction]
 
     var body: some View {
-        if let draft = startingDraft {
-            AdjustBalanceForm(startingDraft: draft)
-        } else {
-            NavigationStack {
-                ContentUnavailableView(
-                    Strings.BalanceAdjustment.cantAdjust,
-                    systemImage: "exclamationmark.triangle",
-                    description: Text(Strings.BalanceAdjustment.categoriesMissing)
-                )
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(Strings.Common.cancel) { dismiss() }
+        MadeOnce(make: makeStartingDraft) { startingDraft in
+            if let draft = startingDraft {
+                AdjustBalanceForm(startingDraft: draft)
+            } else {
+                NavigationStack {
+                    ContentUnavailableView(
+                        Strings.BalanceAdjustment.cantAdjust,
+                        systemImage: "exclamationmark.triangle",
+                        description: Text(Strings.BalanceAdjustment.categoriesMissing)
+                    )
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(Strings.Common.cancel) { dismiss() }
+                        }
                     }
                 }
             }
         }
     }
 
-    private var startingDraft: BalanceAdjustmentDraft? {
+    private func makeStartingDraft() -> BalanceAdjustmentDraft? {
         Log.store.attempt("Suggesting a balance adjustment") {
-            try TransactionDefaults.suggestBalanceAdjustment(on: today, viewing: viewedWallet, in: context)
+            try TransactionDefaults.suggestBalanceAdjustment(
+                on: today, viewing: viewedWallet, balances: WalletBalances($transactions, asOf: today), in: context
+            )
         }
     }
 }
 
 /// The form behind ``AdjustBalanceEditor``, holding the draft from the moment the sheet opens.
 private struct AdjustBalanceForm: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @NotDeletedTransactions private var transactions: [Transaction]
 
     @State private var draft: BalanceAdjustmentDraft
-    @State private var errorMessage: String?
 
     init(startingDraft: BalanceAdjustmentDraft) {
         _draft = State(initialValue: startingDraft)
@@ -53,15 +58,18 @@ private struct AdjustBalanceForm: View {
     var body: some View {
         KeypadSheet(
             title: Text(Strings.BalanceAdjustment.adjustBalance),
-            entry: $draft.realBalanceEntry,
+            entry: $draft.entry,
             canSave: draft.canSave,
-            save: save,
-            macHeight: (640, 720)
+            size: .tallKeypadForm,
+            saving: "Adjusting a balance",
+            failureTitle: Strings.BalanceAdjustment.couldntAdjust,
+            save: { try Transaction.adjustBalance(draft, in: context) }
         ) { fields in
             balanceSection(fields)
             reasonSection(fields)
         }
-        .errorAlert(Strings.BalanceAdjustment.couldntAdjust, message: $errorMessage)
+        .onChange(of: draft.wallet) { draft.readRecordedBalance(from: $transactions) }
+        .onChange(of: draft.day) { draft.readRecordedBalance(from: $transactions) }
     }
 
     private func balanceSection(_ fields: KeypadSheetFields) -> some View {
@@ -74,11 +82,12 @@ private struct AdjustBalanceForm: View {
                 }
             }
             fields.amountRow(
-                Strings.BalanceAdjustment.realBalance, currencyCode: draft.currencyCode, tint: Money(cents: draft.realBalance?.cents ?? 0).tint
+                Strings.BalanceAdjustment.realBalance, currencyCode: draft.currencyCode,
+                tint: (draft.realBalance?.direction ?? .neither).tint
             )
         } footer: {
             if draft.wallet == nil {
-                Text(Strings.Common.addWalletFirst)
+                Text(TransactionRuleError.missingWallet.localizedDescription)
             } else {
                 Text(Strings.BalanceAdjustment.typeRealBalanceFooter)
             }
@@ -107,19 +116,9 @@ private struct AdjustBalanceForm: View {
             }
         }
     }
-
-    private func save() {
-        do {
-            try Transaction.adjustBalance(draft, in: context)
-            dismiss()
-        } catch {
-            Log.store.failed("Adjusting a balance", error)
-            errorMessage = error.localizedDescription
-        }
-    }
 }
 
 #Preview {
     AdjustBalanceEditor()
-        .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+        .modelContainer(try! StoreOpening.open(inMemory: true))
 }

@@ -7,13 +7,11 @@ struct OwesMeAddButtons: View {
     @Binding var draft: TransactionDraft
 
     var body: some View {
-        if draft.offersOwesMe {
-            ForEach(draft.people.filter { draft.owesEntry(for: $0) == nil }, id: \.persistentModelID) { person in
-                Button {
-                    draft.addOwes(person)
-                } label: {
-                    Label("+ Owes me: \(person.name)", systemImage: "plus.circle")
-                }
+        ForEach(draft.peopleOfferedOwesMe, id: \.persistentModelID) { person in
+            Button {
+                draft.addOwes(person)
+            } label: {
+                Label(Strings.OwesMe.addOwesMe(person.name), systemImage: "plus.circle")
             }
         }
     }
@@ -26,13 +24,11 @@ struct OwesMeAddButtons: View {
 struct OwesMeSections: View {
     @Binding var draft: TransactionDraft
 
-    private var currencyCode: String { draft.wallet?.currencyCode ?? Money.defaultCurrencyCode }
-
     var body: some View {
         ForEach($draft.owes, id: \.person.persistentModelID) { $entry in
-            Section("\(entry.person.name) owes me") {
+            Section(String(localized: Strings.OwesMe.personOwesMe(entry.person.name))) {
                 OwesMeRow(
-                    entry: $entry, currencyCode: currencyCode, expenseDay: draft.day,
+                    entry: $entry, currencyCode: draft.currencyCode, expenseDay: draft.day,
                     remove: entry.hasPayments ? nil : { draft.removeOwes(entry.person) }
                 )
             }
@@ -49,38 +45,17 @@ private struct OwesMeRow: View {
     /// Takes the row away, or `nil` for one with payments.
     let remove: (() -> Void)?
 
-    @State private var amountEntry: AmountEntry
-
-    init(entry: Binding<OwesMeDraft>, currencyCode: String, expenseDay: CalendarDay, remove: (() -> Void)?) {
-        _entry = entry
-        self.currencyCode = currencyCode
-        self.expenseDay = expenseDay
-        self.remove = remove
-        _amountEntry = State(initialValue: AmountEntry(cents: entry.wrappedValue.amount?.cents ?? 0))
-    }
-
     var body: some View {
         AmountRow(
-            field: OwesMeAmountField(person: entry.person.persistentModelID), entry: $amountEntry,
-            currencyCode: currencyCode, placeholder: "?", font: .body
+            field: OwesMeAmountField(person: entry.person.persistentModelID), entry: $entry.entry,
+            currencyCode: currencyCode, placeholder: Strings.OwesMe.unknownAmount, font: .body
         ) {
-            Label("Amount", systemImage: "arrow.uturn.backward.circle")
+            Label(Strings.Common.amount, systemImage: "arrow.uturn.backward.circle")
         }
-        .onChange(of: amountEntry) { entry.amount = Self.amount(typed: amountEntry, currencyCode: currencyCode) }
-        ReminderField(
-            day: $entry.reminderDay, turnsOnAt: ExpectedReimbursement.defaultReminderDay(expenseOn: expenseDay)
-        )
+        ReminderField(day: $entry.reminderDay, countingFrom: expenseDay)
         if let remove {
-            Button("Remove Owes Me", systemImage: "minus.circle", role: .destructive, action: remove)
+            Button(Strings.OwesMe.removeOwesMe, systemImage: "minus.circle", role: .destructive, action: remove)
         }
-    }
-
-    /// What was typed as an amount: nothing is an open amount, and anything that isn't an amount above zero comes to
-    /// zero, which saving refuses (``ExpectedReimbursementRuleError/invalidAmount``).
-    private static func amount(typed entry: AmountEntry, currencyCode: String) -> Money? {
-        guard !entry.isEmpty else { return nil }
-        guard let cents = entry.cents, cents > 0 else { return Money(cents: 0, currencyCode: currencyCode) }
-        return Money(cents: cents, currencyCode: currencyCode)
     }
 }
 

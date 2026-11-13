@@ -4,16 +4,14 @@ import SwiftUI
 /// balance moves under the name, so neither is broken across lines.
 struct WalletRow: View {
     let wallet: Wallet
-    let today: CalendarDay
-    /// Every wallet's balance today, added up at once, when the list has them; otherwise the row adds up the wallet's
-    /// own transactions.
-    var balances: WalletBalances?
+    /// Every wallet's balance today, which the list adds up once for all its rows.
+    let balances: WalletBalances
     var showsTotalStatus = false
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        let balance = balances?.balance(of: wallet) ?? wallet.balance(asOf: today)
+        let balance = balances.balance(of: wallet)
         let stacks = dynamicTypeSize.isAccessibilitySize
         HStack(alignment: stacks ? .top : .center, spacing: 12) {
             SymbolCircle(symbolName: wallet.symbolName, color: wallet.color)

@@ -6,20 +6,16 @@ import SwiftUI
 /// there are none. Use inside a `List`.
 struct RelatedTransactionsSection: View {
     let transaction: Transaction
-    /// Whether the transaction is a part of a Split (``Transaction/isSplitPart``), as the detail worked it out.
-    let isSplitPart: Bool
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
     @State private var isConfirmingUndoSplit = false
     @State private var errorMessage: String?
 
     /// Every transaction sharing the link, this one included, so one linked later shows straight away.
     @Query private var linked: [Transaction]
 
-    init(transaction: Transaction, isSplitPart: Bool) {
+    init(transaction: Transaction) {
         self.transaction = transaction
-        self.isSplitPart = isSplitPart
         _linked = Query(transaction.linkedTransactions)
     }
 
@@ -31,10 +27,11 @@ struct RelatedTransactionsSection: View {
                     NavigationLink {
                         TransactionDetailView(transaction: other)
                     } label: {
-                        RelatedTransactionRow(transaction: other)
+                        // With its day, since it may fall on another.
+                        TransactionRow(transaction: other, showsDay: true)
                     }
                 }
-                if isSplitPart {
+                if transaction.isSplitPart {
                     Button(Strings.Transactions.undoSplit, systemImage: "arrow.uturn.backward") {
                         isConfirmingUndoSplit = true
                     }
@@ -55,28 +52,10 @@ struct RelatedTransactionsSection: View {
     /// Merges the split back, then leaves this transaction's detail if it was one of the parts merged away.
     private func undoSplit() {
         let id = transaction.persistentModelID
-        do {
-            if try transaction.undoSplit(in: context).persistentModelID != id {
+        Log.store.perform("Undoing a split", errorMessage: &errorMessage) {
+            if try transaction.undoSplit().persistentModelID != id {
                 dismiss()
             }
-        } catch {
-            Log.store.failed("Undoing a split", error)
-            errorMessage = error.localizedDescription
-        }
-    }
-}
-
-/// A related transaction with its date, since it may fall on another day.
-private struct RelatedTransactionRow: View {
-    let transaction: Transaction
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            TransactionRow(transaction: transaction)
-            Text(transaction.day.date().formatted(date: .abbreviated, time: .omitted))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.leading, 44)
         }
     }
 }

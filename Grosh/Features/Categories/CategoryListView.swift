@@ -14,6 +14,9 @@ struct CategoryListView: View {
     @State private var errorMessage: String?
     /// Whether the list shows the categories for dragging into a new order.
     @State private var isReordering = false
+    /// Which of the type's categories have transactions, so can't be deleted: counted in the store once for the list
+    /// rather than once per row as it draws, and again when the type changes or categories come or go.
+    @State private var usage = Usage()
 
     private var catalog: CategoryCatalog { CategoryCatalog(context: context) }
 
@@ -38,6 +41,10 @@ struct CategoryListView: View {
             } else {
                 categorySections
             }
+        }
+        .task(id: CategoryCatalog.tree(of: type, from: allCategories).map(\.persistentModelID)) {
+            let tree = CategoryCatalog.tree(of: type, from: allCategories)
+            usage = Usage(counted: Set(tree.map(\.persistentModelID)), inUse: catalog.inUse(tree))
         }
         #if os(iOS)
         .environment(\.editMode, .constant(isReordering ? .active : .inactive))
@@ -73,10 +80,10 @@ struct CategoryListView: View {
             presenting: deleting
         ) { category in
             Button(Strings.Common.delete, role: .destructive) {
-                perform { try catalog.delete(category) }
+                Log.store.perform("Changing a category", errorMessage: &errorMessage) { try catalog.delete(category) }
             }
         } message: { category in
-            Text(CategoryEditor.deleteMessage(for: category))
+            Text(category.deleteMessage)
         }
         .errorAlert(Strings.Categories.couldntChange, message: $errorMessage)
     }
@@ -86,16 +93,17 @@ struct CategoryListView: View {
     private var categorySections: some View {
         Section {
             ForEach(rows) { category in
+                let canDelete = usage.canDelete(category)
                 Button {
                     editorMode = .edit(category)
                 } label: {
                     row(for: category)
                 }
                 .buttonStyle(.plain)
-                .swipeActions { actions(for: category) }
+                .swipeActions { actions(for: category, canDelete: canDelete) }
                 .contextMenu {
                     Button(Strings.Common.edit, systemImage: "pencil") { editorMode = .edit(category) }
-                    actions(for: category)
+                    actions(for: category, canDelete: canDelete)
                 }
             }
         } footer: {
@@ -138,7 +146,7 @@ struct CategoryListView: View {
         Section {
             ForEach(parents) { row(for: $0) }
                 .onMove { source, destination in
-                    perform { try catalog.move(parents, fromOffsets: source, toOffset: destination) }
+                    Log.store.perform("Changing a category", errorMessage: &errorMessage) { try catalog.move(parents, fromOffsets: source, toOffset: destination) }
                 }
         } header: {
             Text(Strings.Screens.categories)
@@ -150,7 +158,7 @@ struct CategoryListView: View {
             Section(parent.name) {
                 ForEach(subcategories) { row(for: $0, indented: false) }
                     .onMove { source, destination in
-                        perform { try catalog.move(subcategories, fromOffsets: source, toOffset: destination) }
+                        Log.store.perform("Changing a category", errorMessage: &errorMessage) { try catalog.move(subcategories, fromOffsets: source, toOffset: destination) }
                     }
             }
         }
@@ -176,9 +184,9 @@ struct CategoryListView: View {
     }
 
     @ViewBuilder
-    private func actions(for category: Category) -> some View {
+    private func actions(for category: Category, canDelete: Bool) -> some View {
         if !category.isLocked {
-            if catalog.canDelete(category) {
+            if canDelete {
                 Button(Strings.Common.delete, systemImage: "trash", role: .destructive) { deleting = category }
             }
             Button(Strings.Common.merge, systemImage: "arrow.triangle.merge") { merging = category }
@@ -187,18 +195,19 @@ struct CategoryListView: View {
                 category.isHidden ? Strings.Common.unhide : Strings.Common.hide,
                 systemImage: category.isHidden ? "eye" : "eye.slash"
             ) {
-                perform { try catalog.setHidden(category, !category.isHidden) }
+                Log.store.perform("Changing a category", errorMessage: &errorMessage) { try catalog.setHidden(category, !category.isHidden) }
             }
             .tint(.hideAction)
         }
     }
 
-    private func perform(_ change: () throws -> Void) {
-        do {
-            try change()
-        } catch {
-            Log.store.failed("Changing a category", error)
-            errorMessage = error.localizedDescription
+    /// The categories counted so far and those of them in use. One not counted yet offers no Delete.
+    private struct Usage {
+        var counted: Set<PersistentIdentifier> = []
+        var inUse: Set<PersistentIdentifier> = []
+
+        func canDelete(_ category: Category) -> Bool {
+            counted.contains(category.persistentModelID) && CategoryCatalog.canDelete(category, inUse: inUse)
         }
     }
 }
@@ -207,5 +216,5 @@ struct CategoryListView: View {
     NavigationStack {
         CategoryListView()
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+    .modelContainer(try! StoreOpening.open(inMemory: true))
 }

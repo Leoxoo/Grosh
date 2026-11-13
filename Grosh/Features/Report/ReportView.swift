@@ -5,7 +5,7 @@ import SwiftUI
 /// ending balances, its Net income and its Category report. It starts on the Total, This month's time range, and the
 /// period Home's strip was showing. Its period never reaches past today.
 struct ReportView: View {
-    @Query(Transaction.notDeleted) private var transactions: [Transaction]
+    @NotDeletedTransactions private var transactions: [Transaction]
     @State private var walletSelection = WalletSelection.total
     /// How long each period of the strip is, chosen with the calendar button.
     @State private var timeRange = TimeRange.month
@@ -21,18 +21,19 @@ struct ReportView: View {
     }
 
     var body: some View {
-        OtherIncomeReader { otherIncome in
-            content(otherIncome: otherIncome)
+        CountedHistoryReader(selection: walletSelection) { history in
+            content(history)
         }
         .onAppear { Signpost.opening("Open Report") }
     }
 
-    /// The Report, with Other Income read once for everything it counts.
     @ViewBuilder
-    private func content(otherIncome: Category) -> some View {
-        let selected = transactions.filter(walletSelection.includes)
-        let counted = transactions.counted(in: walletSelection, during: period, today: today, otherIncome: otherIncome)
-        let summary = PeriodSummary(of: selected, in: period, today: today)
+    private func content(_ history: CountedHistory) -> some View {
+        let counted = history.during(period, today: today)
+        // The same ledger entries of the selection the Transactions tab adds its Opening and Ending balances up from.
+        let summary = PeriodSummary(
+            of: TransactionFilter().transactions(in: walletSelection, from: $transactions), in: period, today: today
+        )
         NavigationStack(path: $path) {
             List {
                 Section {
@@ -45,20 +46,20 @@ struct ReportView: View {
                 }
 
                 Section {
-                    NetIncomeCard(totals: PeriodTotals(of: counted))
+                    NetIncomeCard(totals: PeriodTotals(of: counted, currencyCode: history.currencyCode))
                 }
 
                 Section {
                     CategoryReportCard(
-                        income: CategoryBreakdown(side: .income, of: counted),
-                        spent: CategoryBreakdown(side: .spent, of: counted),
+                        income: CategoryBreakdown(side: .income, of: counted, currencyCode: history.currencyCode),
+                        spent: CategoryBreakdown(side: .spent, of: counted, currencyCode: history.currencyCode),
                         onOpen: { path.append(ReportScreen.details(.side($0))) }
                     )
                 }
             }
             .roundedSectionsListStyle()
             .reportPeriodControls(
-                walletSelection: $walletSelection, timeRange: $timeRange, period: $period, transactions: transactions
+                walletSelection: $walletSelection, timeRange: $timeRange, period: $period, history: history
             )
             .navigationTitle(Strings.Screens.report)
             #if os(iOS)

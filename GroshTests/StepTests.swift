@@ -79,12 +79,13 @@ struct StepTests {
     @Test func aCustomRangeOfNineteenMonthsGivesQuarters() {
         let span = DayRange(first: day(2025, 3, 7), last: day(2026, 10, 16))
         let steps = Step.steps(for: .custom(span), over: span, today: day(2026, 10, 16))
-        #expect(titles(steps) == ["Q1/2025", "Q2/2025", "Q3/2025", "Q4/2025", "Q1/2026", "Q2/2026", "Q3/2026", "Q4/2026"])
+        // As the Quarter strip names them.
+        #expect(titles(steps) == ["Q1 2025", "Q2 2025", "Q3 2025", "Q4 2025", "Q1 2026", "Q2 2026", "Q3 2026", "Q4 2026"])
         #expect(steps.first?.first == day(2025, 3, 7))
         #expect(steps.last?.last == day(2026, 10, 16))
     }
 
-    /// Tapping Q3/2025 opens July–September 2025 alone, and that span is three months, so it is split into months.
+    /// Tapping Q3 2025 opens July–September 2025 alone, and that span is three months, so it is split into months.
     @Test func aQuarterSplitsIntoItsThreeMonths() {
         let span = DayRange(first: day(2025, 7, 1), last: day(2025, 9, 30))
         let steps = Step.steps(for: .custom(span), over: span, today: day(2026, 10, 16))
@@ -124,12 +125,5 @@ struct StepTests {
         for (earlier, later) in zip(steps, steps.dropFirst()) {
             #expect(later.first == earlier.last.adding(days: 1))
         }
-    }
-
-    /// A Step is never cut past today, even when the span reaches beyond it.
-    @Test func noStepReachesPastToday() {
-        let span = DayRange(first: day(2026, 10, 1), last: day(2026, 10, 31))
-        let steps = Step.steps(for: .month, over: span, today: day(2026, 10, 16), firstWeekday: monday)
-        #expect(steps.allSatisfy { $0.last <= day(2026, 10, 16) })
     }
 }

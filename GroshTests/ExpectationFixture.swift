@@ -15,8 +15,7 @@ struct ExpectationFixture {
 
     init() throws {
         store = try MonthGraphFixture()
-        cash = Wallet(name: "Cash")
-        store.context.insert(cash)
+        cash = store.context.addWallet("Cash")
     }
 
     func person(_ name: String) throws -> Person {
@@ -31,13 +30,13 @@ struct ExpectationFixture {
     ) throws -> Transaction {
         var draft = TransactionDraft(type: .expense, day: date ?? day(2026, 10, 3))
         draft.wallet = checking
-        draft.amount = Money(cents: cents)
+        draft.entry = AmountEntry(cents: cents)
         draft.category = try store.category("Restaurants")
         draft.people = owes.map(\.person)
         for owe in owes {
             draft.addOwes(owe.person)
             if let index = draft.owes.firstIndex(where: { $0.person === owe.person }) {
-                draft.owes[index].amount = owe.cents.map { Money(cents: $0) }
+                draft.owes[index].entry = owe.cents.map { AmountEntry(showing: $0) } ?? AmountEntry()
             }
         }
         return try Transaction.create(draft, in: context)
@@ -50,28 +49,24 @@ struct ExpectationFixture {
 
     /// Records a payment of `cents` on `expectation` on `date` (today unless given), into `wallet` (the Expense's own
     /// unless given).
-    @discardableResult
     func pay(
         _ cents: Int, on expectation: ExpectedReimbursement, day date: CalendarDay? = nil, into wallet: Wallet? = nil,
         note: String = ""
-    ) throws -> RecordedPayment {
+    ) throws {
         var draft = ExpectationPaymentDraft(paying: expectation, on: date ?? today)
-        draft.amount = Money(cents: cents)
+        draft.entry = AmountEntry(cents: cents)
         if let wallet { draft.wallet = wallet }
         draft.note = note
-        return try expectation.recordPayment(draft, in: context)
+        try expectation.recordPayment(draft)
     }
 
     /// What the Report counts for `selection` in October.
     func totals(in selection: WalletSelection = .total) throws -> PeriodTotals {
-        try PeriodTotals(
-            of: store.transactions(), in: selection, period: .month(CalendarMonth(today)), today: today,
-            otherIncome: store.otherIncome()
-        )
+        try store.totals(selection)
     }
 
     /// Every Expected reimbursement the way Debts & Loans reads them.
     func owesMe() throws -> ExpectedReimbursements {
-        try ExpectedReimbursements(in: context)
+        ExpectedReimbursements(try context.fetch(ExpectedReimbursements.records))
     }
 }

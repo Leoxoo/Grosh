@@ -57,7 +57,11 @@ struct AccountView: View {
                 }
 
                 Section {
-                    RecurringTransactionsRow()
+                    NavigationLink {
+                        RecurringTransactionsView()
+                    } label: {
+                        Label(Strings.Screens.recurringTransactions, systemImage: "repeat")
+                    }
                 }
             }
             .navigationTitle(Strings.Screens.account)
@@ -68,5 +72,5 @@ struct AccountView: View {
 
 #Preview {
     AccountView()
-        .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+        .modelContainer(try! StoreOpening.open(inMemory: true))
 }

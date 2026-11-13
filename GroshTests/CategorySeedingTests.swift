@@ -55,7 +55,7 @@ struct CategorySeedingTests {
     }
 
     @Test func aSeededStoreHasEveryCategoryTheAppDependsOn() throws {
-        let seeded = try GroshStore.makeSeededContainer(inMemory: true)
+        let seeded = try StoreOpening.open(inMemory: true)
 
         for role in LockedRole.allCases {
             #expect(try seeded.mainContext.lockedCategory(role).lockedRole == role)
@@ -73,7 +73,7 @@ struct CategorySeedingTests {
     @Test func anUpgradedStoreGetsItsIconsAndLockedCategoriesBack() throws {
         try CategorySeeder.seedIfNeeded(in: context)
         for category in try allCategories() {
-            category.symbolName = "questionmark"
+            category.symbolName = Category.placeholderSymbolName
             category.lockedRole = nil
         }
         try context.save()
@@ -82,7 +82,7 @@ struct CategorySeedingTests {
 
         #expect(try allCategories().count == 84)
         #expect(try category(named: "Food & Beverage")?.symbolName == "fork.knife")
-        #expect(try allCategories().allSatisfy { $0.symbolName != "questionmark" })
+        #expect(try allCategories().allSatisfy { $0.symbolName != Category.placeholderSymbolName })
         for role in LockedRole.allCases {
             #expect(try context.lockedCategory(role).lockedRole == role)
         }
@@ -130,7 +130,7 @@ struct CategorySeedingTests {
         try CategorySeeder.seedIfNeeded(in: context)
         for category in try allCategories() {
             category.type = .expense
-            category.symbolName = "questionmark"
+            category.symbolName = Category.placeholderSymbolName
             category.lockedRole = nil
         }
         try context.save()
@@ -141,6 +141,19 @@ struct CategorySeedingTests {
         #expect(try allCategories().filter { $0.type == .income }.count == 15)
         #expect(try allCategories().filter { $0.type == .debtLoan }.count == 4)
         #expect(try context.lockedCategory(.otherIncome).type == .income)
+    }
+
+    /// The upgrade repair is for a store that lost every locked role. One with its locked categories never had the
+    /// broken upgrade, or was repaired already, so a placeholder icon on it is left alone.
+    @Test func aStoreWithItsLockedCategoriesIsNotRepairedAgain() throws {
+        try CategorySeeder.seedIfNeeded(in: context)
+        let products = try #require(try category(named: "Products"))
+        products.symbolName = Category.placeholderSymbolName
+        try context.save()
+
+        try CategorySeeder.restoreMissingDefaults(in: context)
+
+        #expect(products.symbolName == Category.placeholderSymbolName)
     }
 
     /// A store that still has Income categories is left alone, so a type the user changed is kept.
@@ -154,5 +167,4 @@ struct CategorySeedingTests {
 
         #expect(salary.type == .expense)
     }
-
 }

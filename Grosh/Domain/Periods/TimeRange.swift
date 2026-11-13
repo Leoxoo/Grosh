@@ -53,6 +53,12 @@ nonisolated enum TimeRange: Hashable, Sendable {
         return periods + [.future]
     }
 
+    /// The periods a strip of what has happened offers, the Report's and Home's Month graph's:
+    /// ``periods(from:today:firstWeekday:)`` without Future.
+    func pastPeriods(from earliest: CalendarDay?, today: CalendarDay) -> [Period] {
+        periods(from: earliest, today: today).filter { $0 != .future }
+    }
+
     /// The period of this length that holds `day`. A custom range has only its own period, whatever `day` is.
     func period(containing day: CalendarDay, firstWeekday: Int = Calendar.current.firstWeekday) -> Period {
         switch self {
@@ -67,10 +73,17 @@ nonisolated enum TimeRange: Hashable, Sendable {
     }
 }
 
-extension CalendarDay {
-    /// The day of the week, numbered as `Calendar` numbers them: 1 is Sunday, 7 is Saturday.
-    nonisolated var weekday: Int {
-        let calendar = Calendar.utcGregorian
-        return calendar.component(.weekday, from: date(in: calendar))
+extension Period {
+    /// The time range whose periods this period is one of: the range a strip of its length steps through, or `nil` for a
+    /// period that isn't a fixed length.
+    var timeRange: TimeRange? {
+        switch self {
+        case .day: .day
+        case .week: .week
+        case .month: .month
+        case .quarter: .quarter
+        case .year: .year
+        case .all, .custom, .future: nil
+        }
     }
 }

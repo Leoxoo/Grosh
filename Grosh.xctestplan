@@ -9,6 +9,8 @@
     }
   ],
   "defaultOptions" : {
+    "language" : "en",
+    "region" : "US",
     "targetForVariableExpansion" : {
       "containerPath" : "container:Grosh.xcodeproj",
       "identifier" : "D8BF92692F8B41EB0082DDCE",

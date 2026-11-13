@@ -16,11 +16,20 @@ extension ShapeStyle where Self == Color {
     static var moneyOut: Color { Color("AmountRed") }
 }
 
+extension MoneyDirection {
+    /// Green for money coming in, red for money going out; neither stays plain text.
+    var tint: Color {
+        switch self {
+        case .moneyIn: .moneyIn
+        case .moneyOut: .moneyOut
+        case .neither: .primary
+        }
+    }
+}
+
 extension Money {
     /// Green for money coming in, red for money going out; zero stays plain text.
-    var tint: Color {
-        cents > 0 ? .moneyIn : cents < 0 ? .moneyOut : .primary
-    }
+    var tint: Color { direction.tint }
 }
 
 extension SpentOrIncome {
@@ -75,7 +84,7 @@ extension ShapeStyle where Self == Color {
     /// the brand green itself, stands out from them.
     static var keypadOperator: Color { .brand.opacity(0.35) }
 
-    /// The swipe action that archives a wallet or Card.
+    /// The swipe action that archives a wallet or Card, or hides a Person from With's previous people.
     static var archiveAction: Color { .orange }
 
     /// The swipe action that brings an archived wallet or Card back.

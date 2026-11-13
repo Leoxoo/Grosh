@@ -10,6 +10,13 @@ struct TransactionFilterSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var keypad = KeypadTarget()
+    @Query(Wallet.unarchived) private var wallets: [Wallet]
+
+    /// The currency the amount range is shown in: the filtered wallet's, or the Total's
+    /// (``WalletSelection/currencyCode(among:)``). The bounds themselves hold in each transaction's own currency.
+    private var currencyCode: String {
+        (filter.wallet.map(WalletSelection.wallet) ?? .total).currencyCode(among: wallets)
+    }
 
     var body: some View {
         NavigationStack {
@@ -37,8 +44,14 @@ struct TransactionFilterSheet: View {
                 }
 
                 Section {
-                    AmountBoundField(title: Strings.Search.atLeast, field: "minimum", amount: $filter.minimumAmount)
-                    AmountBoundField(title: Strings.Search.atMost, field: "maximum", amount: $filter.maximumAmount)
+                    AmountBoundField(
+                        title: Strings.Search.atLeast, field: "minimum", cents: $filter.minimumCents,
+                        currencyCode: currencyCode
+                    )
+                    AmountBoundField(
+                        title: Strings.Search.atMost, field: "maximum", cents: $filter.maximumCents,
+                        currencyCode: currencyCode
+                    )
                 } header: {
                     Text(Strings.Search.amountRange)
                 } footer: {
@@ -76,10 +89,10 @@ private struct WithFilterPicker: View {
     @Query(Person.everyone) private var everyone: [Person]
 
     var body: some View {
-        Picker("With", selection: $selection) {
-            Text("Anyone").tag(Person?.none)
+        Picker(Strings.Common.with, selection: $selection) {
+            Text(Strings.People.anyone).tag(Person?.none)
             ForEach(everyone) { person in
-                Text(person.isHidden ? "\(person.name) (Hidden)" : person.name)
+                Text(person.isHidden ? String(localized: Strings.People.hiddenName(person.name)) : person.name)
                     .tag(Optional(person))
             }
         }
@@ -102,47 +115,46 @@ private struct OptionalDayRow: View {
     }
 }
 
-/// One end of the amount range, typed on the Keypad. Empty, until a digit is typed and again after C, means any.
+/// One end of the amount range, typed on the Keypad. Empty, until a digit is typed and again after C, means any. The
+/// filter holds only the bound in cents, so what is being typed (a calculation half done) is this field's own, kept in
+/// step with the bound both ways.
 private struct AmountBoundField: View {
     let title: LocalizedStringResource
     let field: String
-    @Binding var amount: Money?
+    @Binding var cents: Int?
+    /// The currency the bound is shown in.
+    let currencyCode: String
 
     @State private var entry: AmountEntry
 
-    init(title: LocalizedStringResource, field: String, amount: Binding<Money?>) {
+    init(title: LocalizedStringResource, field: String, cents: Binding<Int?>, currencyCode: String) {
         self.title = title
+        self.currencyCode = currencyCode
         self.field = field
-        _amount = amount
-        _entry = State(initialValue: Self.entry(for: amount.wrappedValue))
+        _cents = cents
+        _entry = State(initialValue: Self.entry(for: cents.wrappedValue))
     }
 
     var body: some View {
-        AmountRow(title, field: field, entry: $entry, placeholder: Strings.Common.any, font: .body)
+        AmountRow(title, field: field, entry: $entry, currencyCode: currencyCode, placeholder: Strings.Common.any, font: .body)
             .onChange(of: entry) {
-                amount = Self.amount(of: entry)
+                cents = Self.cents(of: entry)
             }
-            .onChange(of: amount) {
+            .onChange(of: cents) {
                 // Clear empties the field.
-                if Self.amount(of: entry) != amount {
-                    entry = Self.entry(for: amount)
+                if Self.cents(of: entry) != cents {
+                    entry = Self.entry(for: cents)
                 }
             }
     }
 
     /// What was typed as a bound: nothing is any amount, and so is a calculation that can't be worked out.
-    private static func amount(of entry: AmountEntry) -> Money? {
-        guard !entry.isEmpty, let cents = entry.cents else { return nil }
-        return Money(cents: cents)
+    private static func cents(of entry: AmountEntry) -> Int? {
+        entry.isEmpty ? nil : entry.cents
     }
 
-    /// `amount` on the Keypad, with a bound of zero shown as 0 rather than as any.
-    private static func entry(for amount: Money?) -> AmountEntry {
-        guard let amount else { return AmountEntry() }
-        var entry = AmountEntry(cents: amount.cents)
-        if amount.cents == 0 {
-            entry.press(.digit(0))
-        }
-        return entry
+    /// `cents` on the Keypad, with a bound of zero shown as 0 rather than as any.
+    private static func entry(for cents: Int?) -> AmountEntry {
+        cents.map { AmountEntry(showing: $0) } ?? AmountEntry()
     }
 }

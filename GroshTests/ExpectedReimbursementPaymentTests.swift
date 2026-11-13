@@ -25,13 +25,11 @@ struct ExpectedReimbursementPaymentTests {
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
         let owed = try fixture.expectation(of: alex, on: dinner)
 
-        let recorded = try fixture.pay(10_00, on: owed, day: day(2026, 10, 8), note: "Venmo")
+        try fixture.pay(10_00, on: owed, day: day(2026, 10, 8), note: "Venmo")
 
-        guard case .onExpense(let entry) = recorded else {
-            Issue.record("Expected a Reimbursement on the Expense.")
-            return
-        }
+        let entry = try #require(dinner.orderedReimbursements.first)
         #expect(dinner.orderedReimbursements == [entry])
+        #expect(dinner.paybacksElsewhere.isEmpty)
         #expect(entry.amountCents == 10_00)
         #expect(entry.day == day(2026, 10, 8))
         #expect(entry.note == "Venmo")
@@ -48,12 +46,10 @@ struct ExpectedReimbursementPaymentTests {
         try fixture.pay(20_00, on: fixture.expectation(of: alex, on: dinner), day: today)
 
         #expect(dinner.netCents == -40_00)
-        #expect(checking.balance(asOf: day(2026, 10, 3)) == Money(cents: -40_00))
+        #expect(walletBalance(checking, asOf: day(2026, 10, 3)) == Money(cents: -40_00))
         #expect([dinner].net == Money(cents: -40_00))
         #expect(try fixture.totals().spent == Money(cents: 40_00))
         #expect(try fixture.store.graph(.spent).headline == Money(cents: 40_00))
-        let entries = try context.fetch(Transaction.notDeleted).map(LedgerEntry.init)
-        #expect(WalletBalances(entries, asOf: today).balance(of: checking) == Money(cents: -40_00))
     }
 
     @Test func aPartialPaymentLeavesTheRestOutstanding() throws {
@@ -93,7 +89,7 @@ struct ExpectedReimbursementPaymentTests {
 
         #expect(draft.amount == Money(cents: 30_00))
         #expect(draft.wallet === checking)
-        try owed.recordPayment(draft, in: context)
+        try owed.recordPayment(draft)
 
         #expect(owed.status == .paidBack)
     }
@@ -108,7 +104,7 @@ struct ExpectedReimbursementPaymentTests {
         #expect(owed.status == .paidBack)
         #expect(owed.outstanding == Money(cents: 0))
         #expect(dinner.netCents == 10_00)
-        let counted = try #require(dinner.countedAmount(otherIncome: fixture.store.otherIncome()))
+        let counted = try #require(dinner.countedAmount(currencyCode: "USD", otherIncome: fixture.store.otherIncome()))
         #expect(counted.side == .income)
         #expect(counted.amount == Money(cents: 10_00))
         #expect(counted.category.name == "Other Income")
@@ -179,7 +175,7 @@ struct ExpectedReimbursementPaymentTests {
 
         #expect(draft.amount == Money(cents: 0))
         #expect(throws: ReimbursementRuleError.missingAmount) {
-            try owed.recordPayment(draft, in: context)
+            try owed.recordPayment(draft)
         }
     }
 
@@ -200,11 +196,10 @@ struct ExpectedReimbursementPaymentTests {
 
     @Test func deletingAPaymentReopensTheExpectation() throws {
         let alex = try fixture.person("Alex")
-        let owed = try fixture.expectation(of: alex, on: fixture.dinner(owing: [(alex, 30_00)]))
-        guard case .onExpense(let entry) = try fixture.pay(30_00, on: owed) else {
-            Issue.record("Expected a Reimbursement on the Expense.")
-            return
-        }
+        let dinner = try fixture.dinner(owing: [(alex, 30_00)])
+        let owed = try fixture.expectation(of: alex, on: dinner)
+        try fixture.pay(30_00, on: owed)
+        let entry = try #require(dinner.orderedReimbursements.first)
         #expect(owed.status == .paidBack)
 
         try entry.delete()

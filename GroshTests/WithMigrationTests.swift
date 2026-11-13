@@ -8,29 +8,25 @@ import Testing
 @MainActor
 @Suite(.namedInTheLog)
 struct WithMigrationTests {
-    private let store: CategoryFixture
+    private let store: TestStore
     private var context: ModelContext { store.context }
     private let day = CalendarDay(year: 2026, month: 10, day: 9)
 
     init() throws {
-        store = try CategoryFixture()
+        store = try TestStore()
     }
 
     /// A transaction as an older version saved it: with a typed With name and no Person, entered `minutesAgo` before
     /// now.
     @discardableResult
     private func legacy(_ name: String, minutesAgo: Double = 0) throws -> Transaction {
-        let transaction = Transaction(amount: Money(cents: -30_00), day: day, wallet: nil, category: nil)
+        let transaction = Transaction.insert(
+            cents: -30_00, on: day, wallet: store.checking, category: nil, in: context
+        )
         transaction.createdAt = Date.now.addingTimeInterval(-minutesAgo * 60)
         transaction.withName = name
-        context.insert(transaction)
-        transaction.wallet = store.wallet
         try context.save()
         return transaction
-    }
-
-    private func everyone() throws -> [Person] {
-        try context.fetch(FetchDescriptor<Person>(sortBy: [SortDescriptor(\.name)]))
     }
 
     @Test func eachDistinctNameBecomesOnePersonIgnoringCase() throws {
@@ -41,7 +37,7 @@ struct WithMigrationTests {
 
         try Person.migrateWithNames(in: context)
 
-        let people = try everyone()
+        let people = try context.everyone()
         #expect(people.map { $0.name.lowercased() } == ["anna", "pasha"])
         let pasha = try #require(people.last)
         #expect(Set(pasha.transactions ?? []) == [first, third, fourth])
@@ -55,8 +51,8 @@ struct WithMigrationTests {
 
         try Person.migrateWithNames(in: context)
 
-        let pasha = try #require(try everyone().first)
-        #expect(try everyone().count == 1)
+        let pasha = try #require(try context.everyone().first)
+        #expect(try context.everyone().count == 1)
         #expect(pasha.name == "PASHA")
         #expect(pasha.lastUsedAt == newest.createdAt)
     }
@@ -95,7 +91,7 @@ struct WithMigrationTests {
 
         #expect(plain.orderedPeople.isEmpty)
         #expect(plain.withName.isEmpty)
-        #expect(try everyone().map(\.name) == ["Anna"])
+        #expect(try context.everyone().map(\.name) == ["Anna"])
     }
 
     @Test func theMigrationIsSaved() throws {
@@ -114,7 +110,7 @@ struct WithMigrationTests {
 
         try Person.migrateWithNames(in: context)
 
-        #expect(try everyone().map(\.name) == ["Anna"])
+        #expect(try context.everyone().map(\.name) == ["Anna"])
         #expect(typedSince.orderedPeople.isEmpty)
     }
 
@@ -123,7 +119,7 @@ struct WithMigrationTests {
 
         try Person.migrateWithNames(in: context)
 
-        #expect(try everyone().isEmpty)
+        #expect(try context.everyone().isEmpty)
     }
 
     @Test func migratedPeopleAreListedInPreviousMostRecentlyUsedFirst() throws {

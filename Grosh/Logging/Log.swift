@@ -15,35 +15,57 @@ nonisolated enum Log {
     static let importing = Logger(subsystem: subsystem, category: "Import")
     /// Recurring transactions making the transactions that came due.
     static let recurring = Logger(subsystem: subsystem, category: "Recurring")
-    /// Scheduling the Loan, Debt and Estimated-amount reminders.
+    /// Scheduling the Loan and Debt, Estimated-amount and Owes me reminders, and their Text them action.
     static let reminders = Logger(subsystem: subsystem, category: "Reminders")
-    /// The Report.
-    static let reports = Logger(subsystem: subsystem, category: "Reports")
+    /// Reading the user's Contacts for With.
+    static let contacts = Logger(subsystem: subsystem, category: "Contacts")
 }
+
+/// An error Grosh declares. Its case names what went wrong and quotes no record, so the log names it as it is.
+nonisolated protocol GroshError: Error {}
+
+/// One of Grosh's rules refusing a change: an invalid draft, a locked category, a bad import file. The person sees it
+/// in an alert and the tests exercise it on purpose, so it is logged as `info`, never as an error.
+nonisolated protocol RuleRefusal: GroshError {}
 
 nonisolated extension Logger {
     /// Logs that `what` didn't happen, because of `cause`.
     ///
-    /// An error Grosh declares is one of its rules refusing a change, such as an invalid draft, a locked or missing
-    /// category or a bad import file. The person sees it in an alert and the tests exercise it, so it is logged as
-    /// `info`, and so is any error from something the person chose, such as a file, when it is `expected`. Any other
-    /// error is the store or the system failing, which should never happen, and is logged as an `error`: `tools/check`
-    /// fails a test run that logs one.
+    /// A ``RuleRefusal`` is logged as `info`, and so is any error from something the person chose, such as a file,
+    /// when it is `expected`. Any other error, such as a model the store no longer holds or a locked category gone
+    /// missing, is the store or the system failing, which should never happen, and is logged as an `error`:
+    /// `tools/check` fails a test run that logs one.
     ///
     /// The log names the kind of error and never its message or user info, which can quote the record that failed.
     func failed(_ what: String, _ cause: Error, expected: Bool = false) {
-        let isGroshError = String(reflecting: type(of: cause)).hasPrefix("Grosh.")
         let kind: String
-        if isGroshError {
+        if cause is GroshError {
             kind = String(describing: cause)
         } else {
             let system = cause as NSError
             kind = "\(system.domain) \(system.code)"
         }
-        if isGroshError || expected {
+        if cause is RuleRefusal || expected {
             self.info("\(what, privacy: .public) was refused: \(kind, privacy: .public)")
         } else {
             self.error("\(what, privacy: .public) failed: \(kind, privacy: .public)")
+        }
+    }
+
+    /// Makes a change the person asked for, such as a save, and says whether it was made. When `change` throws, the
+    /// failure is logged as `what` (see ``failed(_:_:expected:)``) and the error's message goes in `errorMessage`, for
+    /// the screen's `errorAlert` to show.
+    @discardableResult
+    func perform(
+        _ what: String, errorMessage: inout String?, expected: Bool = false, _ change: () throws -> Void
+    ) -> Bool {
+        do {
+            try change()
+            return true
+        } catch {
+            failed(what, error, expected: expected)
+            errorMessage = error.localizedDescription
+            return false
         }
     }
 

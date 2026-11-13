@@ -10,14 +10,17 @@ Design every change for **the 16k store**: about 16,000 transactions over six ye
 
 | Folder | Holds | Rule |
 | --- | --- | --- |
-| `Grosh/Model/` | SwiftData `@Model` classes, `Money`, `CalendarDay`, `GroshStore` (the container), `NotDeletedTransactions`. | Every property optional or defaulted, no `.unique`, every relationship optional with an inverse (ADR-0001). A new model goes into `GroshStore.schema`. |
-| `Grosh/Domain/<Concept>/` | The rules: extensions on the models, value types (drafts, summaries, `LedgerEntry`), and `FetchDescriptor`s named for what they read (`MonthGraphHistory.transactions(for:)`, `RecentlyDeleted.deletedTransactions`). | Plain Swift plus SwiftData: no SwiftUI. Value types stay free of `ModelContext`; whatever a calculation needs from the store is fetched by its caller and passed in. |
-| `Grosh/Features/<Area>/` | SwiftUI screens and rows, one folder per area of the app. | Views read data and call Domain rules. Arithmetic, eligibility and sign handling live in Domain, where tests reach them. |
+| `Grosh/Model/` | SwiftData `@Model` classes, the values their stored fields hold (`CategoryType`, `LinkKind`, `RecurringKind`, `RepeatUnit`…), `Money`, `CalendarDay`, and `GroshStore` (the schema and the container). | Depends on nothing else in the app. Every property optional or defaulted, no `.unique`, every relationship optional with an inverse (ADR-0001). A new model goes into `GroshStore.schema`. |
+| `Grosh/Domain/<Concept>/` | The rules: extensions on the models, value types (drafts, summaries, `LedgerEntry`), and `FetchDescriptor`s named for what they read (`MonthGraphHistory.transactions(for:)`, `RecentlyDeleted.deletedTransactions`). `Domain/Store/StoreOpening` opens the store and brings it up to date (seeding, migrations) before any screen reads it. | Plain Swift plus SwiftData: no SwiftUI, and nothing from `Features/` or `Views/`. Value types stay free of `ModelContext`; whatever a calculation needs from the store is fetched by its caller and passed in. |
+| `Grosh/Features/<Area>/` | SwiftUI screens and rows, one folder per area of the app, and their view state (`TransactionGrouping`). | Views read data and call Domain rules. Arithmetic, eligibility and sign handling live in Domain, where tests reach them. |
+| `Grosh/Strings.swift` | `Strings`, every piece of text the app shows (its English is the String Catalog key). | Domain and Features use it; it depends on nothing. |
+| `Grosh/GroshApp.swift`, `Grosh/RootView.swift` | The app's entry point and its tabs. | The one place that puts the Features' screens together. |
+| `Grosh/Views/` | SwiftUI pieces every area shares: `@NotDeletedTransactions`, `Today`, colors, pickers, the photo cropper. | Like `Features/`, no rules of their own. |
 | `Grosh/Logging/` | `Log`, one `os.Logger` per area, and `Signpost`, the intervals Instruments shows. | A message names what failed and the error, never the data (`docs/agents/logging.md`). |
 | `Grosh/Debug/` | The 16k store generator and the UI test launch hook. | Wrapped in `#if DEBUG`, so the shipped app never carries them. |
-| `GroshTests/` | Swift Testing suites, one per behaviour, each with its own in-memory container (`GroshStore.makeContainer(inMemory: true)`), plus shared fixtures (`*Fixture.swift`). | A Domain rule ships with tests written first. |
+| `GroshTests/` | Swift Testing suites, one per behaviour, each with its own in-memory container (`GroshStore.makeContainer(inMemory: true)`), plus shared fixtures: `TestStore.swift` (the seeded store, its day, and the helpers that make wallets, transactions, Loans, payments and paybacks the way the app does) and the `*Fixture.swift` built on it. | A Domain rule ships with tests written first. |
 
-Startup work runs in `GroshApp` on `scenePhase == .active`: `RecentlyDeleted.purgeExpired` and `RecurringTransaction.catchUp`. Both are on the launch benchmark.
+The app, the UI test store and every preview open the store through `StoreOpening.open` (or `StoreOpening.prepare` on a container opened elsewhere), so each starts from the same seeded, migrated store. Startup work runs in `GroshApp` on `scenePhase == .active`: `RecentlyDeleted.purgeExpired` and `RecurringTransaction.catchUp`. Both are on the launch benchmark.
 
 ## Where a screen gets its transactions
 
@@ -27,7 +30,9 @@ Pick the narrowest source that answers the question:
 2. **A slice of them**: `@Query` with a predicate that narrows in the store: a link (`RelatedTransactionsSection`), a date range (`MonthGraphHistory`), a category, Recently Deleted. Put the `FetchDescriptor` in Domain under a name that says what it reads.
 3. **One answer from the whole store** (the earliest counted day, whether anything matches): a `FetchDescriptor` with a sort and `fetchLimit`, rather than loading everything and reducing in Swift.
 
-`@Query(Transaction.notDeleted)` re-reads all ~16k rows after every save, once per screen showing it. The Report screens still do this; moving them onto `@NotDeletedTransactions` is the known next step.
+`@Query(Transaction.notDeleted)` re-reads all ~16k rows after every save, once per screen showing it, so no screen uses it.
+
+What counts on the Month graph and in the Report comes from one place, `CountedHistory`: each Report screen builds it once per draw from `@NotDeletedTransactions` (`CountedHistoryReader`), and Home's Month graph from the few months `MonthGraphHistory` reads (`MonthGraphHistory.read` does the same for tests and the benchmark). Its strip, first counted day, period totals and lists are the ones every screen shows.
 
 ## What day it is
 
@@ -61,4 +66,5 @@ Each step has a budget in `GroshTests/BenchmarkBudgets.swift`, and a step over i
 
 - **Doc comments** say in the user's words what something is or does, using glossary terms, and cite the ADR that decides it (`(ADR-0004)`). They explain *why* a choice was made when the code can't.
 - **Commit subjects** describe the user-visible change in plain English ("Keep every transaction in memory instead of re-reading the store after each save"), not the code edit.
+- **A rule saves through the store, or refuses.** A rule that changes a model and saves reaches the store with `storeContext()` or `saveToStore()` (`Domain/Store/StoreContext.swift`), never `modelContext?.save()`: a model the store no longer holds throws `StoreError.notInStore` instead of dropping the change without a word.
 - **One home per rule.** A check like "is this an ordinary Expense" or "which part is the original" lives in one Domain property that every caller uses; a second copy in a view, export or report drifts from the first.

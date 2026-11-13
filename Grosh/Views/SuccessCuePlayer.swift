@@ -15,8 +15,7 @@ actor SuccessCuePlayer {
     static let shared = SuccessCuePlayer()
 
     /// Plays `chime`'s `ending`: its sound if `sound`, its haptic if `haptic`, and nothing if neither. It returns at
-    /// once. Whether each plays is the caller's to decide, with ``SoundsAndHaptics/playsSounds(on:soundsOn:)`` and
-    /// ``SoundsAndHaptics/playsHaptics(on:hapticsOn:)``.
+    /// once. Whether each plays is the caller's to decide, with ``SoundsAndHaptics/plays(on:isOn:)``.
     nonisolated func play(_ chime: SuccessCue.Chime, ending: SuccessCue.Ending, sound: Bool, haptic: Bool) {
         guard sound || haptic else { return }
         Task {

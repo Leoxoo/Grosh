@@ -11,7 +11,6 @@ struct RecurringTransactionDetailView: View {
     let recurring: RecurringTransaction
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
     @Environment(\.today) private var today
     @State private var isEditing = false
     @State private var isDuplicating = false
@@ -20,13 +19,15 @@ struct RecurringTransactionDetailView: View {
     @State private var isLinking = false
     @State private var isConfirmingDelete = false
     @State private var errorMessage: String?
-
-    /// Whether the schedule was deleted from this screen. Nothing is read from it then, since a deleted model still on
-    /// screen can't be read.
-    private var isRemoved: Bool { recurring.isDeleted || recurring.modelContext == nil }
+    /// A save can change a varying Bill's estimate, so what its transactions start at is read anew after each one,
+    /// rather than on every draw.
+    @StoreSaves private var saves
+    @State private var startingAmount = DrawingCache<AsSaved, Money>()
 
     var body: some View {
-        if isRemoved {
+        // Once the schedule is deleted from this screen nothing is read from it, since a deleted model still on screen
+        // can't be read.
+        if recurring.isGone {
             ContentUnavailableView(Strings.Recurring.deleted, systemImage: "trash")
         } else {
             details
@@ -42,7 +43,9 @@ struct RecurringTransactionDetailView: View {
                         Text(recurring.name)
                             .font(.title3.weight(.semibold))
                         HStack(spacing: 6) {
-                            AmountText(amount: recurring.startingAmount)
+                            AmountText(amount: startingAmount.value(for: AsSaved([recurring], saves: saves)) {
+                                recurring.currentStartingAmount()
+                            })
                             if recurring.estimatesAmount {
                                 EstimatedBadge()
                             }
@@ -175,30 +178,23 @@ struct RecurringTransactionDetailView: View {
     }
 
     private func addTransactionNow() {
-        do {
-            try recurring.addTransactionNow(today: today, in: context)
-        } catch {
-            Log.recurring.failed("Adding a transaction now", error)
-            errorMessage = error.localizedDescription
+        Log.recurring.perform("Adding a transaction now", errorMessage: &errorMessage) {
+            try recurring.addTransactionNow(today: today)
         }
     }
 
     private func delete() {
-        do {
-            try recurring.delete(today: today, in: context)
+        let succeeded = Log.recurring.perform("Deleting a Recurring transaction", errorMessage: &errorMessage) {
+            try recurring.delete(today: today)
+        }
+        if succeeded {
             dismiss()
-        } catch {
-            Log.recurring.failed("Deleting a Recurring transaction", error)
-            errorMessage = error.localizedDescription
         }
     }
 
     private func unlink(_ transaction: Transaction) {
-        do {
-            try recurring.unlink(transaction, in: context)
-        } catch {
-            Log.recurring.failed("Unlinking a transaction", error)
-            errorMessage = error.localizedDescription
+        Log.recurring.perform("Unlinking a transaction", errorMessage: &errorMessage) {
+            try recurring.unlink(transaction)
         }
     }
 }

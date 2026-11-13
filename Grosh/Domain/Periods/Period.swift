@@ -70,13 +70,13 @@ nonisolated enum Period: Hashable, Sendable {
             let thisMonth = CalendarMonth(today)
             if month == thisMonth { return String(localized: Strings.Periods.thisMonth) }
             if month == thisMonth.adding(months: -1) { return String(localized: Strings.Periods.lastMonth) }
-            return String(format: "%02d/%d", month.month, month.year)
+            return month.numericTitle
         case .quarter(let year, let quarter):
             let thisQuarter = TimeRange.quarter.period(containing: today)
             if self == thisQuarter { return String(localized: Strings.Periods.thisQuarter) }
             let lastQuarter = TimeRange.quarter.period(containing: CalendarMonth(today).adding(months: -3).firstDay)
             if self == lastQuarter { return String(localized: Strings.Periods.lastQuarter) }
-            return "Q\(quarter) \(year)"
+            return Self.quarterTitle(year: year, quarter: quarter)
         case .year(let year):
             if year == today.year { return String(localized: Strings.Periods.thisYear) }
             if year == today.year - 1 { return String(localized: Strings.Periods.lastYear) }
@@ -94,22 +94,18 @@ nonisolated enum Period: Hashable, Sendable {
     }
 }
 
-extension CalendarDay {
-    /// The days from this one through `last` as the strip writes a span: `09/21 – 09/27/2026`, naming the first
-    /// day's year too only when the two differ, as in `12/29/2025 – 01/04/2026`.
-    nonisolated func numericTitle(through last: CalendarDay, locale: Locale) -> String {
-        let start = year == last.year ? numericTitle(locale, withYear: false) : numericTitle(locale)
-        return "\(start) – \(last.numericTitle(locale))"
+extension Period {
+    /// A quarter as the strip and the Trend write it, `Q3 2025`.
+    nonisolated static func quarterTitle(year: Int, quarter: Int) -> String {
+        "Q\(quarter) \(year)"
     }
-}
 
-extension CalendarDay {
-    /// The day as the strip writes it: two-digit day and month in `locale`'s order and with its separators, then the
-    /// year unless `withYear` is false. `10/06/2026` in the US, `06/10/2026` in the UK.
-    nonisolated func numericTitle(_ locale: Locale, withYear: Bool = true) -> String {
-        let calendar = Calendar.utcGregorian
-        let style = Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone)
-            .month(.twoDigits).day(.twoDigits)
-        return date(in: calendar).formatted(withYear ? style.year() : style)
+    /// Stays the period shown while `strip` still offers it; otherwise becomes `current`, the Current period. A strip
+    /// of a wallet with a shorter history, or with the only transaction of its first period gone, may no longer offer
+    /// it.
+    nonisolated mutating func showCurrentPeriod(_ current: Period, unlessOfferedBy strip: [Period]) {
+        if !strip.contains(self) {
+            self = current
+        }
     }
 }

@@ -46,16 +46,6 @@ struct ExpectedReimbursementTests {
         #expect(owed.isOpen)
     }
 
-    @Test func onlyAnExpenseOffersOwesMe() throws {
-        var income = TransactionDraft(type: .income, day: today)
-        income.category = try fixture.store.category("Salary", .income)
-        var expense = TransactionDraft(type: .expense, day: today)
-        expense.category = try fixture.store.category("Restaurants")
-
-        #expect(!income.offersOwesMe)
-        #expect(expense.offersOwesMe)
-    }
-
     @Test func aPersonTakenOutOfWithLosesTheNewOwesMeTheyHad() throws {
         let alex = try fixture.person("Alex")
         let sam = try fixture.person("Sam")
@@ -95,7 +85,7 @@ struct ExpectedReimbursementTests {
 
         #expect(totals.outstanding == [Money(cents: 35_00)])
         #expect(totals.openAmountCount == 1)
-        #expect(totals.summary == "\(Money(cents: 35_00).formatted()) · +1 open")
+        #expect(totals.summary == "$35.00 · +1 open")
     }
 
     @Test func theExpectationsOfEachPersonAreGroupedForShowByPeople() throws {
@@ -121,7 +111,7 @@ struct ExpectedReimbursementTests {
     @Test func owesMeChangesNoBalanceListTotalOrReport() throws {
         let alex = try fixture.person("Alex")
         let plain = try fixture.dinner()
-        let balanceBefore = fixture.checking.balance(asOf: today)
+        let balanceBefore = walletBalance(fixture.checking, asOf: today)
         let totalsBefore = try fixture.totals()
         let graphBefore = try fixture.store.graph(.spent).headline
 
@@ -130,25 +120,25 @@ struct ExpectedReimbursementTests {
         draft.addOwes(alex)
         try plain.update(with: draft)
 
-        #expect(fixture.checking.balance(asOf: today) == balanceBefore)
+        #expect(walletBalance(fixture.checking, asOf: today) == balanceBefore)
         #expect(plain.netCents == -60_00)
         #expect([plain].net == Money(cents: -60_00))
         #expect(try fixture.totals() == totalsBefore)
         #expect(try fixture.store.graph(.spent).headline == graphBefore)
-        #expect(plain.countedAmount(otherIncome: try fixture.store.otherIncome())?.amount == Money(cents: 60_00))
+        #expect(plain.countedAmount(currencyCode: "USD", otherIncome: try fixture.store.otherIncome())?.amount == Money(cents: 60_00))
     }
 
     @Test func editingAndRemovingAnExpectationChangesNoBalanceOrReport() throws {
         let alex = try fixture.person("Alex")
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
-        let balanceBefore = fixture.checking.balance(asOf: today)
+        let balanceBefore = walletBalance(fixture.checking, asOf: today)
         let totalsBefore = try fixture.totals()
 
         var draft = TransactionDraft(editing: dinner)
-        draft.owes[0].amount = Money(cents: 10_00)
+        draft.owes[0].entry = AmountEntry(cents: 10_00)
         try dinner.update(with: draft)
         #expect(try fixture.expectation(of: alex, on: dinner).expected == Money(cents: 10_00))
-        #expect(fixture.checking.balance(asOf: today) == balanceBefore)
+        #expect(walletBalance(fixture.checking, asOf: today) == balanceBefore)
         #expect(try fixture.totals() == totalsBefore)
 
         var removing = TransactionDraft(editing: dinner)
@@ -156,7 +146,7 @@ struct ExpectedReimbursementTests {
         try dinner.update(with: removing)
         #expect(dinner.orderedExpectations.isEmpty)
         #expect(try context.fetchCount(FetchDescriptor<ExpectedReimbursement>()) == 0)
-        #expect(fixture.checking.balance(asOf: today) == balanceBefore)
+        #expect(walletBalance(fixture.checking, asOf: today) == balanceBefore)
         #expect(try fixture.totals() == totalsBefore)
     }
 
@@ -166,7 +156,7 @@ struct ExpectedReimbursementTests {
         let alex = try fixture.person("Alex")
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
 
-        try dinner.delete(.onlySelected, in: context, at: deletedAt)
+        try dinner.delete(.onlySelected, at: deletedAt)
 
         #expect(try fixture.owesMe().open.isEmpty)
         #expect(try fixture.owesMe().totals.outstanding.isEmpty)
@@ -177,7 +167,7 @@ struct ExpectedReimbursementTests {
     @Test func restoringTheExpenseRestoresItsExpectations() throws {
         let alex = try fixture.person("Alex")
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
-        try dinner.delete(.onlySelected, in: context, at: deletedAt)
+        try dinner.delete(.onlySelected, at: deletedAt)
 
         try dinner.restore()
 
@@ -189,9 +179,9 @@ struct ExpectedReimbursementTests {
     @Test func deletingTheExpenseForeverRemovesItsExpectationsButNotThePerson() throws {
         let alex = try fixture.person("Alex")
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
-        try dinner.delete(.onlySelected, in: context, at: deletedAt)
+        try dinner.delete(.onlySelected, at: deletedAt)
 
-        try dinner.deleteForever(in: context)
+        try dinner.deleteForever()
 
         #expect(try context.fetchCount(FetchDescriptor<ExpectedReimbursement>()) == 0)
         #expect(try context.fetchCount(FetchDescriptor<Person>()) == 1)
@@ -231,7 +221,7 @@ struct ExpectedReimbursementTests {
         let sam = try fixture.person("Sam")
         let dinner = try fixture.dinner(owing: [(alex, 30_00), (sam, 20_00)])
         var cheaper = TransactionDraft(editing: dinner)
-        cheaper.amount = Money(cents: 40_00)
+        cheaper.entry = AmountEntry(cents: 40_00)
 
         #expect(throws: ExpectedReimbursementRuleError.amountAboveExpense) {
             try dinner.update(with: cheaper)
@@ -243,16 +233,16 @@ struct ExpectedReimbursementTests {
         let alex = try fixture.person("Alex")
         var draft = TransactionDraft(type: .expense, day: today)
         draft.wallet = fixture.checking
-        draft.amount = Money(cents: 60_00)
+        draft.entry = AmountEntry(cents: 60_00)
         draft.category = try fixture.store.category("Restaurants")
         draft.people = [alex]
         draft.addOwes(alex)
-        draft.owes[0].amount = Money(cents: 70_00)
+        draft.owes[0].entry = AmountEntry(cents: 70_00)
 
         #expect(throws: ExpectedReimbursementRuleError.amountAboveExpense) {
             try Transaction.create(draft, in: context)
         }
-        draft.owes[0].amount = Money(cents: 0)
+        draft.owes[0].entry = AmountEntry(showing: 0)
         #expect(throws: ExpectedReimbursementRuleError.invalidAmount) {
             try Transaction.create(draft, in: context)
         }

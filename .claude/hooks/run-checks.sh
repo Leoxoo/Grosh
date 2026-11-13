@@ -1,27 +1,30 @@
 #!/bin/bash
 #
-# Runs the unit tests when the agent stops after editing Swift, and the tools' own tests when it
-# stops after editing tools/ or the hooks, and hands the agent only the failures.
+# Runs the unit tests when the agent stops after editing the app or its tests, and the tools' own
+# tests when it stops after editing tools/ or the hooks, and hands the agent only the failures.
 # .claude/settings.json registers it twice.
 #
-# run-checks.sh, the Stop hook ("timeout": 300). When a .swift file under Grosh/ or GroshTests/
-# differs from the tree of the last passing run, it runs tools/check, which runs the unit tests.
+# run-checks.sh, the Stop hook. It reads its time limit from the "timeout" that
+# .claude/settings.json gives it. When a file in app_paths below (the Swift under Grosh/,
+# GroshTests/ and GroshUITests/, the string catalogs, the project and the test plan) differs from
+# the tree of the last passing run, it runs tools/check, which builds the app and runs the unit tests.
 # When a file under tools/ or .claude/hooks/ differs from the tree of the tools' last passing run,
 # it runs tools/check-tools, which runs the tools' tests (about 30 seconds, no simulator). Each is
 # run only for its own files. A pass records the tree and adds nothing to the conversation. A
 # failure blocks the stop and hands the agent the failure lines. The third failure in a row lets the agent stop and shows
-# the user what still fails, and the hook then stays quiet until the Swift changes again. A stop
+# the user what still fails, and the hook then stays quiet until those files change again. A stop
 # that follows a message from the user (stop_hook_active is false) starts the count again. When
 # tools/check runs out of time, waiting on another session's run included, the agent stops with a
-# one-line note. Where xcodebuild is not installed (cloud and Linux sessions) the hook does nothing.
+# one-line note. Where xcodebuild is not installed (cloud and Linux sessions) it runs only the
+# tools' tests, which need no Xcode.
 #
 # run-checks.sh prompt, the UserPromptSubmit hook. It hands the agent, once, the note a local fix
 # left. Before any run has passed, it records the tree as it is at the first prompt, so that a turn
-# without Swift changes stays quiet.
+# without changes stays quiet.
 #
 # The local fix. On the first failure in a row of the unit tests, before blocking, a local model served by LM Studio
 # on localhost:1234 gets one headless attempt, capped at 300 seconds including its tools/check rerun
-# and by what is left of the hook's own 300 seconds. It runs only when GROSH_LOCAL_FIX_MODEL holds
+# and by what is left of the hook's own time. It runs only when GROSH_LOCAL_FIX_MODEL holds
 # the id of the model LM Studio serves, set under "env" in .claude/settings.local.json, which is
 # personal and not committed. If LM Studio does not answer within 2 seconds, the hook blocks
 # straight away. The local model may read, edit files under Grosh/ and GroshTests/
@@ -47,28 +50,31 @@
 #   local-fixes.log  one line per local attempt: date, whether it fixed the tests, seconds, failure
 # with the output of the last runs beside them (check.out, local-fix.out, local-fix.err and so on).
 
-hook_timeout=300  # The Stop hook's "timeout" in .claude/settings.json.
 attempt_limit=300 # The local attempt's cap, its tools/check rerun included.
 model_minimum=60  # The local model isn't started with less time than this.
 failure_limit=3
 local_url=http://localhost:1234
 local_model=${GROSH_LOCAL_FIX_MODEL:-}
-swift_paths=('Grosh/*.swift' 'GroshTests/*.swift')
+app_paths=('Grosh/*.swift' 'GroshTests/*.swift' 'GroshUITests/*.swift' '*.xcstrings' '*.pbxproj' '*.xctestplan')
 tool_paths=('tools' '.claude/hooks')
 
 # The local model's own session runs with GROSH_CHECKS_NESTED set, so its hooks leave it alone.
 [ -n "$GROSH_CHECKS_NESTED" ] && exit 0
-command -v xcodebuild >/dev/null 2>&1 || exit 0
 
 mode=${1:-stop}
 case $mode in stop | prompt) ;; *) exit 0 ;; esac
 started=$(date +%s)
-deadline=$((started + hook_timeout - 20))
 input=$(cat)
 
 cwd=$(printf '%s' "$input" | sed -n 's/.*"cwd" *: *"\([^"]*\)".*/\1/p' | head -n 1)
 [ -d "$cwd" ] || cwd=$PWD
 top=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null) && cd "$top" && [ -x tools/check ] || exit 0
+
+# The "timeout" .claude/settings.json gives this hook, or Claude Code's own 60 seconds without one.
+hook_timeout=$(sed -n '/run-checks\.sh"/,/}/s/.*"timeout" *: *\([0-9][0-9]*\).*/\1/p' .claude/settings.json 2>/dev/null |
+  head -n 1)
+[ -n "$hook_timeout" ] || hook_timeout=60
+deadline=$((started + hook_timeout - 20))
 
 git_path() {
   local path
@@ -351,7 +357,7 @@ Its changes could not all be undone. The worktree as it was before is tree $snap
 
 if [ "$mode" = prompt ]; then
   if [ ! -s "$state/baseline-tree" ]; then
-    tree=$(worktree_tree "${swift_paths[@]}" "${tool_paths[@]}") && write_state baseline-tree "$tree" &&
+    tree=$(worktree_tree "${app_paths[@]}" "${tool_paths[@]}") && write_state baseline-tree "$tree" &&
       write_state tools-baseline-tree "$tree"
   fi
   if mv -f "$state/note" "$state/note.sending" 2>/dev/null; then
@@ -362,13 +368,14 @@ if [ "$mode" = prompt ]; then
   exit 0
 fi
 
-current=$(worktree_tree "${swift_paths[@]}" "${tool_paths[@]}") || exit 0
+current=$(worktree_tree "${app_paths[@]}" "${tool_paths[@]}") || exit 0
 baseline=$(read_state baseline-tree)
 tools_baseline=$(read_state tools-baseline-tree)
 [ -n "$tools_baseline" ] || tools_baseline=$baseline
 run_unit=1
 run_tools=1
-[ -n "$baseline" ] && same "$baseline" "$current" "${swift_paths[@]}" && run_unit=0
+[ -n "$baseline" ] && same "$baseline" "$current" "${app_paths[@]}" && run_unit=0
+command -v xcodebuild >/dev/null 2>&1 || run_unit=0
 [ -n "$tools_baseline" ] && same "$tools_baseline" "$current" "${tool_paths[@]}" && run_tools=0
 [ -f tools/check-tools ] || run_tools=0
 if [ "$run_unit" = 0 ] && [ "$run_tools" = 0 ]; then
@@ -376,7 +383,7 @@ if [ "$run_unit" = 0 ] && [ "$run_tools" = 0 ]; then
   exit 0
 fi
 given_up=$(read_state given-up-tree)
-[ -n "$given_up" ] && same "$given_up" "$current" "${swift_paths[@]}" "${tool_paths[@]}" && exit 0
+[ -n "$given_up" ] && same "$given_up" "$current" "${app_paths[@]}" "${tool_paths[@]}" && exit 0
 
 failures=$(read_state failed-stops)
 case $failures in '' | *[!0-9]*) failures=0 ;; esac

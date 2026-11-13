@@ -15,7 +15,7 @@ struct WalletLabel: View {
                     Text(wallet.name)
                 }
             } else {
-                Text("—")
+                Text(Strings.Common.noValue)
             }
         }
     }

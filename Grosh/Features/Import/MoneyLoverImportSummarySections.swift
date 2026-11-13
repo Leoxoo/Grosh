@@ -75,7 +75,8 @@ private extension MoneyLoverImportSummary.UnmatchedRow.Outcome {
                 .init(
                     row: MoneyLoverRow(
                         line: 18, day: CalendarDay(year: 2026, month: 9, day: 2), categoryName: "Incoming transfer",
-                        amount: Money(cents: 120_00), walletName: "Cash", note: "", withName: "", eventName: "",
+                        amount: Money(cents: 120_00, currencyCode: "USD"), walletName: "Cash", note: "", withName: "",
+                        eventName: "",
                         isExcludedFromReport: true
                     ),
                     outcome: .balanceAdjustment

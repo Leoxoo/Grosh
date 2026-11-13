@@ -24,30 +24,19 @@ struct DebtsAndLoansByPersonTests {
     private func record(
         _ role: LockedRole, _ cents: Int, with person: Person, in wallet: Wallet? = nil
     ) throws -> Transaction {
-        var draft = TransactionDraft(type: .debtLoan, day: lentOn)
-        draft.wallet = wallet ?? fixture.checking
-        draft.amount = Money(cents: cents)
-        draft.category = try context.lockedCategory(role)
-        draft.people = [person]
-        return try Transaction.create(draft, in: context)
+        try context.recordLoanOrDebt(role, cents, with: person, on: lentOn, in: wallet ?? fixture.checking)
     }
 
     private func settle(_ original: Transaction) throws {
-        let outstanding = try #require(try LoanOrDebt(original, in: context)).outstanding
-        var draft = try DebtPaymentDraft(settling: original, on: day(2026, 6, 15), in: context)
-        draft.amount = outstanding
-        try DebtPayment.record(draft, in: context)
+        let outstanding = try #require(try LoanOrDebt(original)).outstanding
+        try context.pay(outstanding.cents, on: original, on: day(2026, 6, 15))
     }
 
     private func listing() throws -> DebtsAndLoansByPerson {
-        try DebtsAndLoansByPerson(in: context)
-    }
-
-    private func euroWallet() -> Wallet {
-        let wallet = Wallet(name: "Euro")
-        wallet.currencyCode = "EUR"
-        context.insert(wallet)
-        return wallet
+        DebtsAndLoansByPerson(
+            DebtsAndLoans(try context.fetch(DebtsAndLoans.records)),
+            ExpectedReimbursements(try context.fetch(ExpectedReimbursements.records))
+        )
     }
 
     // MARK: Grouping
@@ -87,7 +76,7 @@ struct DebtsAndLoansByPersonTests {
         let alex = try fixture.person("Alex")
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
 
-        try dinner.delete(.onlySelected, in: context, at: .now)
+        try dinner.delete(.onlySelected, at: .now)
 
         #expect(try listing().entry(for: alex) == nil)
     }
@@ -118,7 +107,7 @@ struct DebtsAndLoansByPersonTests {
 
     @Test func eachCurrencyHasItsOwnAmountAndNeverAddsToAnother() throws {
         let alex = try fixture.person("Alex")
-        let euros = euroWallet()
+        let euros = context.addWallet("Euro", currencyCode: "EUR")
         try record(.loan, 100_00, with: alex)
         try record(.loan, 20_00, with: alex, in: euros)
         try record(.loan, 5_00, with: alex, in: euros)
@@ -134,9 +123,7 @@ struct DebtsAndLoansByPersonTests {
     @Test func figuresCountWhatIsStillOutstandingAfterPayments() throws {
         let alex = try fixture.person("Alex")
         let loan = try record(.loan, 100_00, with: alex)
-        var payment = try DebtPaymentDraft(settling: loan, on: day(2026, 6, 15), in: context)
-        payment.amount = Money(cents: 60_00)
-        try DebtPayment.record(payment, in: context)
+        try context.pay(60_00, on: loan, on: day(2026, 6, 15))
         let dinner = try fixture.dinner(owing: [(alex, 30_00)])
         try fixture.pay(10_00, on: try fixture.expectation(of: alex, on: dinner))
 
@@ -172,7 +159,7 @@ struct DebtsAndLoansByPersonTests {
         #expect(!entry.isSettled)
         #expect(everyone.open.map(\.person) == [alex])
 
-        try fixture.expectation(of: alex, on: dinner).close()
+        try fixture.expectation(of: alex, on: dinner).close(on: fixture.today)
 
         let closed = try #require(try listing().entry(for: alex))
         #expect(closed.openAmountCount == 0)
@@ -212,7 +199,7 @@ struct DebtsAndLoansByPersonTests {
         try settle(debt)
         #expect(try listing().open.map(\.person) == [alex])
 
-        try owed.forgive()
+        try owed.forgive(on: fixture.today)
 
         let everyone = try listing()
         #expect(everyone.open.isEmpty)
@@ -271,10 +258,18 @@ struct DebtsAndLoansByPersonTests {
 
     // MARK: The remembered choice
 
-    @Test func showByLoanOrDebtIsTodaysListAndTheChoiceIsKeptByItsRawValue() {
-        #expect(DebtsLoansGrouping.default == .loanOrDebt)
-        #expect(DebtsLoansGrouping(rawValue: DebtsLoansGrouping.people.rawValue) == .people)
-        #expect(DebtsLoansGrouping(rawValue: DebtsLoansGrouping.loanOrDebt.rawValue) == .loanOrDebt)
+    /// The choice is kept in the user's settings by these names, so renaming a case would forget it.
+    @Test func theGroupingChoiceIsKeptByItsStoredName() {
+        #expect(DebtsLoansGrouping(rawValue: "people") == .people)
+        #expect(DebtsLoansGrouping(rawValue: "loanOrDebt") == .loanOrDebt)
         #expect(DebtsLoansGrouping(rawValue: "something else") == nil)
+    }
+}
+
+@MainActor
+private extension DebtsAndLoansByPerson {
+    /// `person`'s entry, open or settled, or `nil` when they are not listed.
+    func entry(for person: Person) -> PersonDebtsAndLoans? {
+        (open + settled).first { $0.person === person }
     }
 }

@@ -6,18 +6,22 @@ nonisolated struct TransferDraft {
     var from: Wallet?
     /// The wallet the money goes to: it gets the Incoming transfer.
     var to: Wallet?
-    /// Entered positive.
-    var amount = Money(cents: 0)
+    /// The amount as typed, entered positive. It starts empty.
+    var entry = AmountEntry()
     var day: CalendarDay
     var note = ""
 
     init(day: CalendarDay) {
         self.day = day
     }
+
+    /// The amount is in the currency of the wallet it leaves.
+    var currencyCode: String { from.currencyCodeOrDefault }
 }
 
 /// Why a transfer can't be saved yet.
-nonisolated enum TransferRuleError: Error, Equatable {
+nonisolated enum TransferRuleError: RuleRefusal, Equatable {
+    /// A wallet is only missing when there is no second one to pick, so both say to add another.
     case missingSourceWallet
     case missingDestinationWallet
     /// A transfer moves money between two different wallets.
@@ -31,8 +35,7 @@ nonisolated enum TransferRuleError: Error, Equatable {
 extension TransferRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .missingSourceWallet: String(localized: Strings.Transfers.missingSourceWallet)
-        case .missingDestinationWallet: String(localized: Strings.Transfers.missingDestinationWallet)
+        case .missingSourceWallet, .missingDestinationWallet: String(localized: Strings.Transfers.twoWalletsNeeded)
         case .sameWallet: String(localized: Strings.Common.chooseTwoDifferentWallets)
         case .missingAmount: String(localized: Strings.Common.enterAmountAboveZero)
         case .notATransferHalf: String(localized: Strings.Transfers.notATransferHalf)
@@ -41,14 +44,10 @@ extension TransferRuleError: LocalizedError {
 }
 
 nonisolated extension TransferDraft {
-    /// Checks the draft against the transfer rules before anything is saved.
     func validate() throws {
         guard let from else { throw TransferRuleError.missingSourceWallet }
         guard let to else { throw TransferRuleError.missingDestinationWallet }
         guard from != to else { throw TransferRuleError.sameWallet }
         guard amount.cents > 0 else { throw TransferRuleError.missingAmount }
     }
-
-    /// Whether every required field is filled, so Save can be enabled.
-    var canSave: Bool { (try? validate()) != nil }
 }

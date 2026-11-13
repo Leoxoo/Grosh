@@ -19,11 +19,9 @@ struct StepRowsTests {
         try store.record(1_500_00, "Salary", .income, on: day(2026, 10, 5))
         try store.record(-25_00, "Café", on: day(2026, 10, 11))
         let october = DayRange(first: day(2026, 10, 1), last: day(2026, 10, 31))
-        let counted = try store.transactions().counted(
-            in: .total, during: .month(CalendarMonth(today)), today: today, otherIncome: store.otherIncome()
-        )
+        let counted = try store.history().during(.month(CalendarMonth(today)), today: today)
 
-        let rows = StepRow.rows(of: counted, for: .month, over: october, today: today, firstWeekday: 2)
+        let rows = StepRow.rows(of: counted, currencyCode: "USD", for: .month, over: october, today: today, firstWeekday: 2)
 
         // Today is the 12th, so the last week is cut to that day.
         #expect(rows.map(\.title) == ["1–4", "5–11", "10/12/2026"])
@@ -38,15 +36,13 @@ struct StepRowsTests {
         try store.record(-200_00, "Café", on: day(2025, 8, 1))
         try store.record(-300_00, "Café", on: day(2026, 10, 2))
         let span = DayRange(first: day(2025, 3, 7), last: day(2026, 10, 16))
-        let counted = try store.transactions().counted(
-            in: .total, during: .custom(span), today: today, otherIncome: store.otherIncome()
-        )
+        let counted = try store.history().during(.custom(span), today: today)
 
-        let rows = StepRow.rows(of: counted, for: .custom(span), over: span, today: today)
+        let rows = StepRow.rows(of: counted, currencyCode: "USD", for: .custom(span), over: span, today: today)
 
-        #expect(rows.first?.title == "Q1/2025")
+        #expect(rows.first?.title == "Q1 2025")
         #expect(rows.first?.totals.spent == Money(cents: 100_00))
         #expect(rows.map { $0.totals.spent.cents }.reduce(0, +) == 600_00)
-        #expect(rows.map { $0.total(of: .spent).cents }.reduce(0, +) == 600_00)
+        #expect(rows.map { $0.totals.total(of: .spent).cents }.reduce(0, +) == 600_00)
     }
 }

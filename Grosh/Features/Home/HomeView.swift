@@ -4,9 +4,6 @@ import SwiftUI
 /// The Home tab: the Total, the user's wallets, the Month graph with its Spent and Income tabs, and the coming-soon
 /// cards. Its toolbar opens search and the bell of due Loan and Debt reminders.
 struct HomeView: View {
-    /// Remembers across launches whether the Total is hidden.
-    static let isTotalHiddenKey = "home.isTotalHidden"
-
     @Environment(\.today) private var today
 
     var body: some View {
@@ -20,7 +17,7 @@ private struct HomeContent: View {
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     /// What the Total and the wallets' balances add up.
     @NotDeletedTransactions private var transactions: [Transaction]
-    @AppStorage(HomeView.isTotalHiddenKey) private var isTotalHidden = false
+    @AppStorage(AppSettings.isTotalHidden) private var isTotalHidden
     @Environment(\.today) private var today
     /// The month Home's Month graph shows, which the Report opens on.
     @State private var monthPeriod: Period
@@ -44,7 +41,7 @@ private struct HomeContent: View {
                         NavigationLink(Strings.Home.addAWallet) { WalletListView() }
                     }
                     ForEach(wallets) { wallet in
-                        WalletRow(wallet: wallet, today: today, balances: balances)
+                        WalletRow(wallet: wallet, balances: balances)
                     }
                 } header: {
                     HStack {
@@ -56,7 +53,10 @@ private struct HomeContent: View {
                     }
                 }
 
-                HomeMonthGraph(today: today, period: $monthPeriod, isShowingReport: $isShowingReport)
+                HomeMonthGraph(
+                    today: today, period: $monthPeriod, isShowingReport: $isShowingReport,
+                    currencyCode: WalletSelection.total.currencyCode(among: wallets)
+                )
 
                 HomeComingSoonCards()
 
@@ -77,7 +77,8 @@ private struct HomeContent: View {
 
 /// The Total, with an eye button that hides the amount.
 private struct TotalBalanceView: View {
-    let total: Money
+    /// Per currency.
+    let total: [Money]
     @Binding var isHidden: Bool
 
     var body: some View {
@@ -109,5 +110,5 @@ private struct TotalBalanceView: View {
 
 #Preview {
     HomeView()
-        .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+        .modelContainer(try! StoreOpening.open(inMemory: true))
 }

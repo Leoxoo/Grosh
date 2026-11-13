@@ -13,6 +13,16 @@ nonisolated struct EstimateReminder: PendingReminder {
     /// The estimate the transaction holds, without its sign.
     let estimate: Money
     var arrival = ReminderArrival.onItsDay
+
+    /// "Amount to confirm", the notification's title.
+    var title: String {
+        String(localized: Strings.Recurring.amountToConfirm)
+    }
+
+    /// What was estimated, and that the real amount is to be entered.
+    var body: String {
+        String(localized: Strings.Recurring.estimatedAt(name, estimate.formatted()))
+    }
 }
 
 /// Every Estimated transaction, which the Home bell and the reminders track until their real amounts are entered.
@@ -22,45 +32,50 @@ struct EstimatedAmounts: ReminderSource {
 
     /// Every Estimated transaction outside Recently Deleted. A new estimate, or a change to one, changes what this
     /// fetches.
-    static var transactions: FetchDescriptor<Transaction> {
+    static var records: FetchDescriptor<Transaction> {
         FetchDescriptor(predicate: #Predicate { $0.isEstimated && $0.deletedAt == nil })
     }
-
-    static var records: FetchDescriptor<Transaction> { transactions }
 
     init(_ transactions: some Sequence<Transaction>) {
         open = transactions.filter { $0.isEstimated && $0.deletedAt == nil }
     }
 
-    /// The Estimated transactions whose reminder day is `today` or earlier, the earliest first: what the Home bell
-    /// lists.
-    func due(on today: CalendarDay) -> [Transaction] {
-        open.filter { $0.estimateReminderDay.map { $0 <= today } ?? false }
-            .sorted { $0.estimateReminderDay ?? today < $1.estimateReminderDay ?? today }
+    static func reminderDay(of transaction: Transaction) -> CalendarDay? { transaction.estimateReminderDay }
+
+    static func reminder(for transaction: Transaction, on day: CalendarDay) -> EstimateReminder {
+        EstimateReminder(
+            original: transaction.persistentModelID, day: day,
+            name: transaction.recurring?.name ?? transaction.categoryName,
+            estimate: Money(cents: abs(transaction.amountCents), currencyCode: transaction.amount.currencyCode)
+        )
+    }
+}
+
+/// What the amount editor of an Estimated transaction holds: its real amount, entered positive. It starts at the
+/// estimate.
+nonisolated struct EstimatedAmountDraft: AmountDraft, ValidatedDraft {
+    var entry: AmountEntry
+    let currencyCode: String
+
+    init(confirming transaction: Transaction) {
+        entry = AmountEntry(cents: abs(transaction.amountCents))
+        currencyCode = transaction.amount.currencyCode
     }
 
-    /// The notifications that should be pending: one for each Estimated transaction whose reminder day is `today` or
-    /// later, the soonest first. One whose day has passed is listed by the bell instead.
-    func reminders(from today: CalendarDay) -> [EstimateReminder] {
-        open.compactMap { transaction in
-            guard let day = transaction.estimateReminderDay, day >= today else { return nil }
-            return EstimateReminder(
-                original: transaction.persistentModelID, day: day,
-                name: transaction.recurring?.name ?? transaction.categoryName,
-                estimate: Money(cents: abs(transaction.amountCents), currencyCode: transaction.amount.currencyCode)
-            )
-        }
-        .sorted { $0.day < $1.day }
+    /// The real amount must be above zero.
+    func validate() throws {
+        guard amount.cents > 0 else { throw TransactionRuleError.missingAmount }
     }
 }
 
 extension Transaction {
-    /// Confirms the amount of an Estimated transaction at `cents`, entered positive. It keeps its direction. Its
-    /// Estimated mark, its reminder and so its bell item go with it. Saves.
-    func confirmAmount(cents: Int) throws {
-        amountCents = cents * (amountCents < 0 ? -1 : 1)
+    /// Confirms the amount of an Estimated transaction at the draft's, which must be above zero. It keeps its direction.
+    /// Its Estimated mark, its reminder and so its bell item go with it. Saves.
+    func confirmAmount(_ draft: EstimatedAmountDraft) throws {
+        try draft.validate()
+        amountCents = draft.amount.cents * (amountCents < 0 ? -1 : 1)
         clearEstimate()
-        try modelContext?.save()
+        try saveToStore()
     }
 
     /// Clears the Estimated mark and its reminder, once the amount has been confirmed or edited.

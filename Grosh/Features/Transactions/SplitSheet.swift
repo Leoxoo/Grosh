@@ -9,14 +9,13 @@ struct SplitSheet: View {
     let transaction: Transaction
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
 
     @State private var draft: SplitDraft
     /// The part the editor is open on, while it is open.
     @State private var editing: SplitPartRef?
     /// Whether the editor is open on a part about to be added.
     @State private var isAddingPart = false
-    @State private var errorMessage: String?
+    private let saver = SheetSaver(Strings.Transactions.couldntSplit)
 
     init(transaction: Transaction) {
         self.transaction = transaction
@@ -63,25 +62,25 @@ struct SplitSheet: View {
                     Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(Strings.Transactions.split, action: split)
-                        .disabled(!draft.canSplit)
+                    Button(Strings.Transactions.split) {
+                        saver.save("Splitting a transaction") { try transaction.split(draft) }
+                    }
+                        .disabled(!draft.canSave)
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 420, idealWidth: 460, minHeight: 480, idealHeight: 560)
-        #endif
+        .macSheetSize(.list)
         .sheet(item: $editing) { part in
             editor(for: part)
         }
         .sheet(isPresented: $isAddingPart) {
             SplitPartEditor(
-                title: Strings.Transactions.newPart, part: draft.newPart(), type: partType, capacity: draft.original.amount.cents
+                title: Strings.Transactions.newPart, part: draft.newPart(), type: draft.partType, capacity: draft.capacity(of: nil)
             ) {
                 draft.addPart($0)
             }
         }
-        .errorAlert(Strings.Transactions.couldntSplit, message: $errorMessage)
+        .failureAlert(saver)
     }
 
     /// The total the parts come to, and how the wallet's balance moves when it differs from the original amount.
@@ -101,7 +100,7 @@ struct SplitSheet: View {
                 }
             }
         } footer: {
-            if draft.original.amount.cents <= 0 {
+            if draft.leavesNothingOnOriginal {
                 Text(Strings.Transactions.leaveSomeFooter)
             } else if draft.walletChange.cents != 0, let wallet = transaction.wallet {
                 Text(Strings.Transactions.walletBalanceChanges(wallet.name))
@@ -120,14 +119,14 @@ struct SplitSheet: View {
                     Text(Strings.Transactions.chooseAPart).tag(SplitPartRef?.none)
                     Text(Strings.Transactions.thisTransaction).tag(SplitPartRef?.some(.original))
                     ForEach(draft.parts.indices, id: \.self) { part in
-                        Text("\(draft.parts[part].categoryName), \(draft.parts[part].amount.formatted())")
+                        Text(Strings.Transactions.partChoice(Category.name(of: draft.parts[part].category), draft.parts[part].amount.formatted()))
                             .tag(SplitPartRef?.some(.part(part)))
                     }
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(reimbursement.amount.formatted())
                             .monospacedDigit()
-                        Text(reimbursement.day.date().formatted(date: .abbreviated, time: .omitted))
+                        Text(reimbursement.day.shortText)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -140,44 +139,30 @@ struct SplitSheet: View {
         }
     }
 
-    /// The type every part's category is of: the transaction's own.
-    private var partType: CategoryType { transaction.category?.type ?? .expense }
-
     @ViewBuilder
     private func editor(for part: SplitPartRef) -> some View {
         switch part {
         case .original:
-            SplitPartEditor(title: Strings.Transactions.thisTransactionTitle, part: draft.original, type: partType, capacity: nil) {
+            SplitPartEditor(
+                title: Strings.Transactions.thisTransactionTitle, part: draft.original, type: draft.partType,
+                capacity: draft.capacity(of: part)
+            ) {
                 draft.original = $0
             }
         case .part(let index):
             SplitPartEditor(
-                title: Strings.Transactions.editPart, part: draft.parts[index], type: partType,
-                capacity: draft.original.amount.cents + draft.parts[index].amount.cents
+                title: Strings.Transactions.editPart, part: draft.parts[index], type: draft.partType,
+                capacity: draft.capacity(of: part)
             ) {
                 draft.replacePart(at: index, with: $0)
             }
         }
     }
 
-    private func split() {
-        do {
-            try transaction.split(draft, in: context)
-            dismiss()
-        } catch {
-            Log.store.failed("Splitting a transaction", error)
-            errorMessage = error.localizedDescription
-        }
-    }
 }
 
 extension SplitPartRef: Identifiable {
     var id: Self { self }
-}
-
-private extension SplitPart {
-    /// The category's name, or "Uncategorized" before one is chosen, as a transaction's row names it.
-    var categoryName: String { Category.name(of: category) }
 }
 
 /// A part with its category, date, note and amount. The amount is red while it is not above zero.
@@ -188,9 +173,9 @@ private struct SplitPartRow: View {
         HStack(spacing: 12) {
             CategoryIcon(category: part.category)
             VStack(alignment: .leading, spacing: 2) {
-                Text(part.categoryName)
+                Text(Category.name(of: part.category))
                     .lineLimit(1)
-                Text(part.day.date().formatted(date: .abbreviated, time: .omitted))
+                Text(part.day.shortText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if !part.note.isEmpty {
@@ -203,7 +188,7 @@ private struct SplitPartRow: View {
             Spacer(minLength: 8)
             Text(part.amount.formatted())
                 .monospacedDigit()
-                .foregroundStyle(part.amount.cents > 0 ? Money(cents: part.category?.sign ?? 0).tint : .invalid)
+                .foregroundStyle(part.amount.cents > 0 ? MoneyDirection(category: part.category).tint : .invalid)
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
@@ -216,16 +201,13 @@ private struct SplitPartRow: View {
 private struct SplitPartEditor: View {
     let title: LocalizedStringResource
     let type: CategoryType
-    let capacity: Int?
+    let capacity: Money?
     let save: (SplitPart) -> Void
 
-    @Environment(\.dismiss) private var dismiss
-
     @State private var part: SplitPart
-    @State private var entry: AmountEntry
 
     init(
-        title: LocalizedStringResource, part: SplitPart, type: CategoryType, capacity: Int?,
+        title: LocalizedStringResource, part: SplitPart, type: CategoryType, capacity: Money?,
         save: @escaping (SplitPart) -> Void
     ) {
         self.title = title
@@ -233,26 +215,24 @@ private struct SplitPartEditor: View {
         self.capacity = capacity
         self.save = save
         _part = State(initialValue: part)
-        _entry = State(initialValue: AmountEntry(cents: part.amount.cents))
     }
-
-    private var currencyCode: String { part.amount.currencyCode }
-
-    /// What the keypad comes to, in cents.
-    private var cents: Int { entry.cents ?? 0 }
 
     var body: some View {
         KeypadSheet(
-            title: Text(title), entry: $entry, canSave: cents > 0 && part.category != nil, save: commit
+            title: Text(title), entry: $part.entry, canSave: part.canSave,
+            saving: "Keeping a part of a Split", failureTitle: Strings.Transactions.couldntSplit,
+            save: { save(part) }
         ) { fields in
             Section {
-                fields.amountRow(Strings.Common.amount, currencyCode: currencyCode, tint: Money(cents: part.category?.sign ?? 0).tint)
+                fields.amountRow(
+                    Strings.Common.amount, currencyCode: part.currencyCode, tint: MoneyDirection(category: part.category).tint
+                )
                 CategoryPicker(title: Strings.Common.category, type: type, selection: $part.category)
                 DayStepper(title: Strings.Common.date, day: $part.day)
                 fields.noteField($part.note)
             } footer: {
                 if let capacity {
-                    Text(Strings.Transactions.leavesOnOriginal(Money(cents: capacity - cents, currencyCode: currencyCode).formatted()))
+                    Text(Strings.Transactions.leavesOnOriginal(part.leftOver(from: capacity).formatted()))
                 } else {
                     Text(Strings.Transactions.differentAmountChangesTotal)
                 }
@@ -264,12 +244,5 @@ private struct SplitPartEditor: View {
                     .focused(fields.focus, equals: .event)
             }
         }
-    }
-
-    private func commit() {
-        var result = part
-        result.amount = Money(cents: cents, currencyCode: currencyCode)
-        save(result)
-        dismiss()
     }
 }

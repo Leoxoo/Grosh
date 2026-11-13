@@ -9,24 +9,26 @@ struct TransactionSearchView: View {
     @State private var isSearchPresented = true
 
     var body: some View {
-        let results = filter.isOn ? transactions.matching(filter) : []
+        let listing = TransactionListing.search(transactions, filter: filter)
+        let results = listing.transactions
 
         List {
-            if !results.isEmpty {
-                Section {
-                    FilterSummaryView(filter: $filter, transactions: results)
-                }
-            }
-
-            TransactionDaySections(transactions: results) { transaction in
+            TransactionDaySections(transactions: results, listed: listing.listed) { transaction in
                 NavigationLink {
                     TransactionDetailView(transaction: transaction)
                 } label: {
-                    TransactionRow(transaction: transaction, showsWalletIcon: filter.wallet == nil)
+                    TransactionRow(transaction: transaction, showsWalletIcon: listing.mixesWallets, listed: listing.listed)
                 }
             }
         }
         .roundedSectionsListStyle()
+        // A bar rather than an inset, so the results scrolling under it fade as they do under the system bar.
+        .safeAreaBar(edge: .top, spacing: 0) {
+            if !results.isEmpty {
+                FilterSummary(filter: $filter, listing: listing)
+                    .padding(.vertical, 8)
+            }
+        }
         .overlay {
             if !filter.isOn {
                 ContentUnavailableView(
@@ -55,5 +57,5 @@ struct TransactionSearchView: View {
     NavigationStack {
         TransactionSearchView()
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+    .modelContainer(try! StoreOpening.open(inMemory: true))
 }

@@ -14,8 +14,8 @@ struct ForgiveEditor: View {
         LoanOrDebtSheet(
             unavailableTitle: Strings.DebtsLoans.cantForgive,
             unavailableMessage: Strings.DebtsLoans.onlyLoanOrDebtForgiven
-        ) { context in
-            try ForgiveDraft(forgiving: original, on: today, in: context)
+        ) {
+            try ForgiveDraft(forgiving: original, on: today)
         } form: { draft in
             ForgiveForm(startingDraft: draft)
         }
@@ -28,7 +28,7 @@ private struct ForgiveForm: View {
     @Environment(\.modelContext) private var context
 
     @State private var draft: ForgiveDraft
-    @State private var errorMessage: String?
+    private let saver = SheetSaver(Strings.DebtsLoans.couldntForgive)
 
     init(startingDraft: ForgiveDraft) {
         _draft = State(initialValue: startingDraft)
@@ -62,24 +62,14 @@ private struct ForgiveForm: View {
                     Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(Strings.DebtsLoans.forgive, action: forgive)
+                    Button(Strings.DebtsLoans.forgive) {
+                        saver.save("Forgiving a Loan or Debt") { try Forgiveness.record(draft, in: context) }
+                    }
                         .disabled(!draft.canSave)
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 420, idealWidth: 460, minHeight: 360, idealHeight: 420)
-        #endif
-        .errorAlert(Strings.DebtsLoans.couldntForgive, message: $errorMessage)
-    }
-
-    private func forgive() {
-        do {
-            try Forgiveness.record(draft, in: context)
-            dismiss()
-        } catch {
-            Log.store.failed("Forgiving a Loan or Debt", error)
-            errorMessage = error.localizedDescription
-        }
+        .macSheetSize(.shortForm)
+        .failureAlert(saver)
     }
 }

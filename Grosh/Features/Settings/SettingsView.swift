@@ -3,10 +3,10 @@ import SwiftUI
 /// Account → Settings: the app's preferences, one section each. It is shown on every device and Currency is always its
 /// first section, so it is never empty; a section only some devices offer, such as Sounds & Haptics, sits below it.
 struct SettingsView: View {
-    @AppStorage(CurrencyPickerView.currencyCodeKey) private var currencyCode = Money.defaultCurrencyCode
-    @AppStorage(SoundsAndHaptics.soundsKey) private var soundsOn = SoundsAndHaptics.defaultIsOn
-    @AppStorage(SoundsAndHaptics.hapticsKey) private var hapticsOn = SoundsAndHaptics.defaultIsOn
-    @AppStorage(SoundsAndHaptics.chimeKey) private var chime = SuccessCue.Chime.default
+    @AppStorage(AppSettings.currencyCode) private var currencyCode
+    @AppStorage(AppSettings.sounds) private var soundsOn
+    @AppStorage(AppSettings.haptics) private var hapticsOn
+    @AppStorage(AppSettings.chime) private var chime
 
     var body: some View {
         Form {

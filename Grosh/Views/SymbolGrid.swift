@@ -22,7 +22,8 @@ struct SymbolGrid: View {
                         .opacity(symbol == selection ? 1 : 0.5)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(symbol)
+                // The symbol's own description, which the system words in the user's language, rather than its name.
+                .accessibilityLabel(Text(Image(systemName: symbol)))
                 .accessibilityAddTraits(symbol == selection ? .isSelected : [])
             }
         }

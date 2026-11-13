@@ -14,11 +14,8 @@ struct CategoryTransactionsTests {
         store = try MonthGraphFixture()
     }
 
-    private func listed(_ parent: String, _ side: SpentOrIncome = .spent) throws -> CategoryTransactions {
-        try CategoryTransactions(
-            parent: store.category(parent), side: side, of: store.transactions(), in: .total, days: october,
-            otherIncome: store.otherIncome()
-        )
+    private func listed(_ parent: String, _ side: SpentOrIncome = .spent) throws -> ReportTransactions {
+        try ReportTransactions(category: store.category(parent), side: side, on: october, in: store.history())
     }
 
     /// The subcategory's, the parent's own and another subcategory's transactions are all listed under the parent, newest
@@ -35,9 +32,7 @@ struct CategoryTransactionsTests {
 
         let breakdown = CategoryBreakdown(
             side: .spent,
-            of: try store.transactions().counted(
-                in: .total, during: .custom(october), today: today, otherIncome: store.otherIncome()
-            )
+            of: try store.history().during(.custom(october), today: today), currencyCode: "USD"
         )
         let row = try #require(breakdown.categories.first { $0.category.name == "Bills & Utilities" })
         #expect(rows.total == row.total)

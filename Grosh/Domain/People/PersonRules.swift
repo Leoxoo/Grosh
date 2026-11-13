@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// Why a Person can't be added.
-nonisolated enum PersonRuleError: Error, Equatable {
+nonisolated enum PersonRuleError: RuleRefusal, Equatable {
     /// A Person needs a name.
     case missingName
 }
@@ -10,7 +10,7 @@ nonisolated enum PersonRuleError: Error, Equatable {
 extension PersonRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .missingName: String(localized: "Enter a name.")
+        case .missingName: String(localized: Strings.People.missingName)
         }
     }
 }
@@ -66,7 +66,7 @@ extension Person {
     /// again brings them back (``add(named:phone:in:)``). Saves.
     func hide() throws {
         isHidden = true
-        try modelContext?.save()
+        try saveToStore()
     }
 
     /// Everyone who isn't hidden, the one used most lately first and equal dates by name: what the With menu's Previous

@@ -9,9 +9,9 @@ import SwiftUI
 /// (Debts), apart and never netted, the ones with something outstanding first and then Settled. A row opens the Person's
 /// Loans, Debts and Owes me, and has a Text button while something is outstanding (ADR-0009, ADR-0010).
 struct DebtsLoansView: View {
-    @Query(DebtsAndLoans.transactions) private var transactions: [Transaction]
-    @Query(ExpectedReimbursements.all) private var expectations: [ExpectedReimbursement]
-    @AppStorage(DebtsLoansGrouping.storageKey) private var grouping = DebtsLoansGrouping.default
+    @Query(DebtsAndLoans.records) private var transactions: [Transaction]
+    @Query(ExpectedReimbursements.records) private var expectations: [ExpectedReimbursement]
+    @AppStorage(AppSettings.debtsLoansGrouping) private var grouping
     /// The message being texted, while Text them is open.
     @State private var texting: TextReminder?
 
@@ -24,7 +24,7 @@ struct DebtsLoansView: View {
             ?? (list.open.isEmpty && list.settled.isEmpty && owesMe.open.isEmpty && owesMe.settled.isEmpty)
         List {
             Section {
-                Picker(Strings.DebtsLoans.show, selection: $grouping) {
+                Picker(Strings.Common.show, selection: $grouping) {
                     Text(Strings.DebtsLoans.showByPeople).tag(DebtsLoansGrouping.people)
                     Text(Strings.DebtsLoans.showByLoanOrDebt).tag(DebtsLoansGrouping.loanOrDebt)
                 }
@@ -54,14 +54,14 @@ struct DebtsLoansView: View {
     @ViewBuilder
     private func byPeople(_ people: DebtsAndLoansByPerson) -> some View {
         if !people.open.isEmpty {
-            Section("Open") {
+            Section(Strings.DebtsLoans.open) {
                 ForEach(people.open) { entry in
                     PersonDebtsLink(entry: entry) { texting = $0 }
                 }
             }
         }
         if !people.settled.isEmpty {
-            Section("Settled") {
+            Section(Strings.Common.settled) {
                 ForEach(people.settled) { entry in
                     PersonDebtsLink(entry: entry) { texting = $0 }
                 }
@@ -69,11 +69,11 @@ struct DebtsLoansView: View {
         }
     }
 
-    /// Show by Loan/Debt: the list as it was before people.
+    /// Show by Loan/Debt: the open Loans and Debts, the open Owes me, then the settled ones of each.
     @ViewBuilder
     private func byLoanOrDebt(_ list: DebtsAndLoans, _ owesMe: ExpectedReimbursements) -> some View {
         if !list.open.isEmpty {
-            Section("Open") {
+            Section(Strings.DebtsLoans.open) {
                 ForEach(list.open) { loanOrDebt in
                     LoanOrDebtLink(loanOrDebt: loanOrDebt)
                 }
@@ -86,7 +86,7 @@ struct DebtsLoansView: View {
                 }
             } header: {
                 HStack {
-                    Text("Owes Me")
+                    Text(Strings.OwesMe.owesMe)
                     Spacer()
                     Text(owesMe.totals.summary)
                         .monospacedDigit()
@@ -94,14 +94,14 @@ struct DebtsLoansView: View {
             }
         }
         if !list.settled.isEmpty {
-            Section("Settled") {
+            Section(Strings.Common.settled) {
                 ForEach(list.settled) { loanOrDebt in
                     LoanOrDebtLink(loanOrDebt: loanOrDebt)
                 }
             }
         }
         if !owesMe.settled.isEmpty {
-            Section("Owes Me · Settled") {
+            Section(Strings.OwesMe.settledSection) {
                 ForEach(owesMe.settled) { expectation in
                     ExpectedReimbursementLink(expectation: expectation)
                 }
@@ -150,15 +150,13 @@ struct LoanOrDebtRow: View {
         HStack(spacing: 12) {
             CategoryIcon(category: original.category)
             VStack(alignment: .leading, spacing: 2) {
-                Text(original.withName.isEmpty ? original.categoryName : original.withName)
+                Text(loanOrDebt.title)
                     .lineLimit(1)
-                Text(loanOrDebt.kind.summary(lentOrBorrowedOn: original.day.date().formatted(date: .abbreviated, time: .omitted)))
+                Text(loanOrDebt.kind.summary(lentOrBorrowedOn: original.day.shortText))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                if !loanOrDebt.isSettled, let due = original.reminderDay {
-                    Text("\(Image(systemName: "bell")) \(Text(Strings.DebtsLoans.due(due.date().formatted(date: .abbreviated, time: .omitted))))")
-                        .font(.caption)
-                        .foregroundStyle(due <= today ? .urgent : .secondary)
+                if let due = loanOrDebt.openReminderDay {
+                    ReminderDueText(day: due, isDue: loanOrDebt.isReminderDue(on: today))
                 }
             }
             Spacer(minLength: 8)
@@ -197,5 +195,5 @@ extension LoanOrDebt: Identifiable {
     NavigationStack {
         DebtsLoansView()
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+    .modelContainer(try! StoreOpening.open(inMemory: true))
 }

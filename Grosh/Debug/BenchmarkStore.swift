@@ -11,11 +11,9 @@ import UniformTypeIdentifiers
 /// carries it.
 enum BenchmarkStore {
     static func open(at url: URL) throws -> ModelContainer {
-        let configuration = ModelConfiguration(schema: GroshStore.schema, url: url, cloudKitDatabase: .none)
-        return try ModelContainer(for: GroshStore.schema, configurations: configuration)
+        try GroshStore.makeContainer(at: url)
     }
 
-    /// Makes the store at `url` unless it is there already, made today.
     static func prepare(at url: URL, years: Int) throws {
         let stamp = url.appendingPathExtension("made")
         let today = String(CalendarDay.today.rawValue)
@@ -71,10 +69,10 @@ enum BenchmarkStore {
         while day <= lastDay {
             for _ in 0..<random.next(in: 4...10) {
                 let wallet = wallets[random.next(in: 0...9) < 7 ? 0 : random.next(in: 1...3)]
-                let transaction = Transaction(
-                    amount: Money(cents: -random.next(in: 150...15_000)), day: day, wallet: wallet,
+                let transaction = Transaction.insert(
+                    cents: -random.next(in: 150...15_000), on: day, wallet: wallet,
                     category: expenses[random.next(in: 0...(expenses.count - 1))],
-                    note: notes[random.next(in: 0...(notes.count - 1))]
+                    note: notes[random.next(in: 0...(notes.count - 1))], in: context
                 )
                 switch random.next(in: 0...9) {
                 case 0...2: transaction.card = photoCard
@@ -82,29 +80,30 @@ enum BenchmarkStore {
                 default: break
                 }
                 transaction.isExcludedFromReport = random.next(in: 0...49) == 0
-                context.insert(transaction)
                 count += 1
             }
             if day.day == 1 || day.day == 15 {
-                context.insert(Transaction(
-                    amount: Money(cents: random.next(in: 250_000...400_000)), day: day, wallet: wallets[0],
-                    category: incomes[0]
-                ))
-                let link = UUID()
-                let out = Transaction(amount: Money(cents: -50_000), day: day, wallet: wallets[0], category: role(.outgoingTransfer))
-                let into = Transaction(amount: Money(cents: 50_000), day: day, wallet: wallets[1], category: role(.incomingTransfer))
-                out.linkID = link
-                into.linkID = link
-                context.insert(out)
-                context.insert(into)
+                Transaction.insert(
+                    cents: random.next(in: 250_000...400_000), on: day, wallet: wallets[0],
+                    category: incomes[0], in: context
+                )
+                let out = Transaction.insert(
+                    cents: -50_000, on: day, wallet: wallets[0], category: role(.outgoingTransfer), in: context
+                )
+                let into = Transaction.insert(
+                    cents: 50_000, on: day, wallet: wallets[1], category: role(.incomingTransfer), in: context
+                )
+                Transaction.link([out, into], as: .transfer)
                 count += 3
             }
             if day.day == 10, random.next(in: 0...2) == 0 {
-                let loan = Transaction(amount: Money(cents: -random.next(in: 2_000...50_000)), day: day, wallet: wallets[2], category: role(.loan))
+                let loan = Transaction.insert(
+                    cents: -random.next(in: 2_000...50_000), on: day, wallet: wallets[2], category: role(.loan),
+                    in: context
+                )
                 loan.isExcludedFromReport = true
-                loan.linkID = UUID()
+                Transaction.link([loan], as: .loanOrDebt)
                 loan.reminderDay = day.adding(days: 30)
-                context.insert(loan)
                 loan.setPeople([people[random.next(in: 0...2)]])
                 count += 1
             }

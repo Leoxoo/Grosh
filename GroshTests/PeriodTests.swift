@@ -4,11 +4,7 @@ import Testing
 /// Which days each period of the Transactions tab covers, and the strip of periods it steps through.
 @Suite(.namedInTheLog)
 struct PeriodTests {
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
-
-    private func day(_ year: Int, _ month: Int, _ day: Int) -> CalendarDay {
-        CalendarDay(year: year, month: month, day: day)
-    }
+    private let today = TestStore.today
 
     @Test func aPastMonthRunsFromItsFirstDayToItsLastDay() {
         let august = Period.month(CalendarMonth(year: 2026, month: 8))

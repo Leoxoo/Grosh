@@ -2,23 +2,19 @@ import SwiftData
 import SwiftUI
 
 /// Deletes a transaction after asking how: a plain confirmation for a transaction on its own, or whether to
-/// delete its related transactions too. Every delete goes through ``Transaction/delete(_:in:)``.
+/// delete its related transactions too. Every delete goes through ``Swift/Collection/delete(_:at:)``.
 struct TransactionDeleteButton: View {
     let transaction: Transaction
     /// Called once the transaction is gone, so the screen showing it can close.
     var didDelete: () -> Void = {}
 
-    @Environment(\.modelContext) private var context
     @State private var prompt: TransactionDeletePrompt?
     @State private var errorMessage: String?
 
     var body: some View {
         Button(Strings.Transactions.deleteTransaction, systemImage: "trash", role: .destructive) {
-            do {
-                prompt = try TransactionDeletePrompt(for: [transaction], in: context)
-            } catch {
-                Log.store.failed("Reading what deleting a transaction takes", error)
-                errorMessage = error.localizedDescription
+            Log.store.perform("Reading what deleting a transaction takes", errorMessage: &errorMessage) {
+                prompt = try TransactionDeletePrompt(for: [transaction])
             }
         }
         .foregroundStyle(.destructive)
@@ -27,43 +23,9 @@ struct TransactionDeleteButton: View {
     }
 }
 
-/// What the user is asked before deleting one or more transactions: a plain confirmation when no link would break,
-/// otherwise whether to delete the related transactions left out too.
-struct TransactionDeletePrompt {
-    let transactions: [Transaction]
-    /// How many transactions are linked to ``transactions`` without being among them.
-    let relatedCount: Int
-    /// The answers offered, the default first.
-    let scopes: [TransactionDeleteScope]
-
-    init(for transactions: [Transaction], in context: ModelContext) throws {
-        self.transactions = transactions
-        relatedCount = try transactions.related(in: context).count
-        scopes = try transactions.deleteScopes(in: context)
-    }
-
-    var title: String {
-        if relatedCount > 0 { return String(localized: Strings.Transactions.deleteRelatedToo) }
-        return transactions.count == 1
-            ? String(localized: Strings.Transactions.deleteThisTransaction)
-            : String(localized: Strings.Transactions.deleteCountQuestion(transactions.count))
-    }
-
-    var message: String? {
-        guard relatedCount > 0 else { return nil }
-        return transactions.count == 1
-            ? String(localized: Strings.Transactions.hasRelated(relatedCount))
-            : String(localized: Strings.Transactions.selectedHaveRelated(relatedCount))
-    }
-
-    func buttonTitle(for scope: TransactionDeleteScope) -> String {
-        scope.buttonTitle(selectedCount: transactions.count, relatedCount: relatedCount)
-    }
-}
-
 extension View {
     /// Asks how to delete the transactions of `prompt` while it is set, then deletes them through
-    /// ``Swift/Collection/delete(_:in:)`` and calls `didDelete`.
+    /// ``Swift/Collection/delete(_:at:)`` and calls `didDelete`.
     func transactionDeleteDialog(
         _ prompt: Binding<TransactionDeletePrompt?>,
         didDelete: @escaping () -> Void
@@ -76,7 +38,6 @@ private struct TransactionDeleteDialog: ViewModifier {
     @Binding var prompt: TransactionDeletePrompt?
     let didDelete: () -> Void
 
-    @Environment(\.modelContext) private var context
     @State private var errorMessage: String?
 
     func body(content: Content) -> some View {
@@ -102,31 +63,11 @@ private struct TransactionDeleteDialog: ViewModifier {
     }
 
     private func delete(_ transactions: [Transaction], _ scope: TransactionDeleteScope) {
-        do {
-            try transactions.delete(scope, in: context)
-            didDelete()
-        } catch {
-            Log.store.failed("Deleting a transaction", error)
-            errorMessage = error.localizedDescription
+        let succeeded = Log.store.perform("Deleting a transaction", errorMessage: &errorMessage) {
+            try transactions.delete(scope)
         }
-    }
-}
-
-extension TransactionDeleteScope {
-    /// The button that picks this answer when deleting `selectedCount` transactions that have `relatedCount`
-    /// related transactions left out of them.
-    func buttonTitle(selectedCount: Int = 1, relatedCount: Int) -> String {
-        switch self {
-        case .onlySelected where selectedCount == 1:
-            relatedCount > 0 ? String(localized: Strings.Common.onlyThisOne) : String(localized: Strings.Transactions.deleteTransaction)
-        case .onlySelected:
-            relatedCount > 0
-                ? String(localized: Strings.Transactions.onlyThese(selectedCount))
-                : String(localized: Strings.Transactions.deleteCount(selectedCount))
-        case .withRelated:
-            selectedCount + relatedCount == 2
-                ? String(localized: Strings.Transactions.deleteBoth)
-                : String(localized: Strings.Transactions.deleteAll(selectedCount + relatedCount))
+        if succeeded {
+            didDelete()
         }
     }
 }

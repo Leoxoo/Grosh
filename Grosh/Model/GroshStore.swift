@@ -17,23 +17,17 @@ enum GroshStore {
                 for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
             )
         }
-        let configuration = ModelConfiguration(
-            schema: schema,
-            isStoredInMemoryOnly: inMemory,
-            cloudKitDatabase: .none
+        return try makeContainer(
+            ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory, cloudKitDatabase: .none)
         )
-        return try ModelContainer(for: schema, configurations: configuration)
     }
 
-    /// The store as the app opens it: ``makeContainer(inMemory:)`` with the default categories seeded into an empty
-    /// one (``CategorySeeder``), and the With names typed before there were people turned into people
-    /// (``Person/migrateWithNames(in:)``), so no screen ever sees a With without its Person. Previews open theirs in
-    /// memory, so they start where a fresh install does, with the locked categories the app depends on.
-    static func makeSeededContainer(inMemory: Bool = false) throws -> ModelContainer {
-        let container = try makeContainer(inMemory: inMemory)
-        try CategorySeeder.seedIfNeeded(in: container.mainContext)
-        try CategorySeeder.restoreMissingDefaults(in: container.mainContext)
-        try Person.migrateWithNames(in: container.mainContext)
-        return container
+    /// A container for the store file at `url` instead of the app's own, such as the 16k store the benchmarks use.
+    static func makeContainer(at url: URL) throws -> ModelContainer {
+        try makeContainer(ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none))
+    }
+
+    private static func makeContainer(_ configuration: ModelConfiguration) throws -> ModelContainer {
+        try ModelContainer(for: schema, configurations: configuration)
     }
 }

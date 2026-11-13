@@ -15,10 +15,13 @@ struct SideDetailsView: View {
     /// Whether the Breakdown or the Trend is shown, chosen with the segmented control.
     @State private var shows = Shows.breakdown
     /// Whether the comparison card compares with Last year, which Home's Month graph shares.
-    @AppStorage(HomeMonthGraph.comparesWithLastYearKey) private var comparesWithLastYear = false
+    @AppStorage(AppSettings.comparesWithLastYear) private var comparesWithLastYear
 
-    @Query(Transaction.notDeleted) private var transactions: [Transaction]
     @Query private var recurringTransactions: [RecurringTransaction]
+    /// A save can change a varying Bill's estimate, so the schedules' starting amounts are read anew after each one,
+    /// rather than on every draw.
+    @StoreSaves private var saves
+    @State private var schedules = DrawingCache<AsSaved, RecurringSchedules>()
     @Environment(\.today) private var today
 
     /// The two segments of the screen below its total.
@@ -27,19 +30,22 @@ struct SideDetailsView: View {
         case trend
     }
 
+    /// The schedules whose occurrences the comparison card adds, with what each starts at, as of the last save.
+    private var recurringSchedules: RecurringSchedules {
+        schedules.value(for: AsSaved(recurringTransactions, saves: saves)) { RecurringSchedules(recurringTransactions) }
+    }
+
     var body: some View {
-        OtherIncomeReader { otherIncome in
-            content(otherIncome: otherIncome)
+        CountedHistoryReader(selection: walletSelection) { history in
+            content(history)
         }
     }
 
-    /// The details, with Other Income read once for everything it counts.
     @ViewBuilder
-    private func content(otherIncome: Category) -> some View {
-        let days = transactions.reportDays(of: period, in: walletSelection, today: today)
-        let counted = transactions.counted(in: walletSelection, during: period, today: today, otherIncome: otherIncome)
-        let totals = PeriodTotals(of: counted)
-        let total = side == .income ? totals.income : totals.spent
+    private func content(_ history: CountedHistory) -> some View {
+        let days = history.days(of: period, today: today)
+        let counted = history.during(period, today: today)
+        let total = PeriodTotals(of: counted, currencyCode: history.currencyCode).total(of: side)
         List {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
@@ -51,7 +57,7 @@ struct SideDetailsView: View {
                         .monospacedDigit()
                         .foregroundStyle(side.color)
                         .contentTransition(.numericText())
-                    if timeRange != .day, let average = DailyAverage.of(total, over: days) {
+                    if let average = DailyAverage.of(total, over: days) {
                         LabeledContent(Strings.Report.dailyAverage) {
                             Text(average.formatted()).monospacedDigit()
                         }
@@ -60,18 +66,13 @@ struct SideDetailsView: View {
                 .padding(.vertical, 4)
             }
 
-            if timeRange.hasComparisonCard {
-                let countedEver = transactions.compactMap {
-                    $0.countedAmount(in: walletSelection, otherIncome: otherIncome)
-                }
-                PeriodComparisonCard(
-                    graph: MonthGraph(
-                        side, of: countedEver, countingFrom: countedEver.firstDay, recurring: recurringTransactions,
-                        in: period, today: today, comparingWith: comparesWithLastYear ? .lastYear : .average,
-                        selection: walletSelection
-                    ),
-                    comparesWithLastYear: $comparesWithLastYear
-                )
+            // Only a week, month, quarter or year has a graph. The period decides, not the time range: for a moment
+            // after the time range changes, the period is still one of the old range.
+            if let graph = history.graph(
+                side, in: period, recurring: recurringSchedules, today: today,
+                comparingWith: MonthGraphComparison(comparesWithLastYear: comparesWithLastYear)
+            ) {
+                PeriodComparisonCard(graph: graph, comparesWithLastYear: $comparesWithLastYear)
             }
 
             Section {
@@ -85,14 +86,14 @@ struct SideDetailsView: View {
 
             switch shows {
             case .breakdown:
-                breakdown(counted: counted, days: days)
+                breakdown(counted: counted, currencyCode: history.currencyCode, days: days)
             case .trend:
-                trend(counted: counted, days: days, today: today)
+                trend(counted: counted, currencyCode: history.currencyCode, days: days, today: today)
             }
         }
         .roundedSectionsListStyle()
         .reportPeriodControls(
-            walletSelection: $walletSelection, timeRange: $timeRange, period: $period, transactions: transactions,
+            walletSelection: $walletSelection, timeRange: $timeRange, period: $period, history: history,
             showsWalletSelector: false
         )
         .navigationTitle(side.title)
@@ -102,11 +103,10 @@ struct SideDetailsView: View {
     }
 
     @ViewBuilder
-    private func breakdown(counted: [CountedAmount], days: DayRange) -> some View {
-        let breakdown = CategoryBreakdown(side: side, of: counted)
+    private func breakdown(counted: [CountedAmount], currencyCode: String, days: DayRange) -> some View {
+        let breakdown = CategoryBreakdown(side: side, of: counted, currencyCode: currencyCode)
         Section {
-            // The details show every parent category, not only the five largest the Report's donut does.
-            CategoryDonut(breakdown: breakdown, ownSliceLimit: Int.max, minimumShare: 0.02)
+            CategoryDonut(breakdown: breakdown, donut: .details)
                 .frame(maxWidth: 300)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
@@ -126,10 +126,12 @@ struct SideDetailsView: View {
     }
 
     @ViewBuilder
-    private func trend(counted: [CountedAmount], days: DayRange, today: CalendarDay) -> some View {
-        let rows = StepRow.rows(of: counted, for: timeRange, over: days, today: today)
+    private func trend(
+        counted: [CountedAmount], currencyCode: String, days: DayRange, today: CalendarDay
+    ) -> some View {
+        let rows = StepRow.rows(of: counted, currencyCode: currencyCode, for: timeRange, over: days, today: today)
         Section {
-            SideTrendChart(side: side, rows: rows)
+            SideTrendChart(side: side, rows: rows, currencyCode: currencyCode)
                 .padding(.vertical, 8)
         }
 
@@ -141,7 +143,7 @@ struct SideDetailsView: View {
                     )
                 ) {
                     LabeledContent(row.title) {
-                        Text(row.total(of: side).formatted())
+                        Text(row.totals.total(of: side).formatted())
                             .monospacedDigit()
                     }
                 }
@@ -178,35 +180,19 @@ private struct CategoryBreakdownRow: View {
 private struct SideTrendChart: View {
     let side: SpentOrIncome
     let rows: [StepRow]
+    let currencyCode: String
 
     var body: some View {
         Chart {
             ForEach(rows) { row in
-                BarMark(x: .value(Strings.Common.step, row.title), y: .value(Strings.Common.total, row.total(of: side).cents))
-                    .foregroundStyle(side.color)
+                BarMark(
+                    x: .value(Strings.Common.step, row.title), y: .value(Strings.Common.total, row.totals.total(of: side).cents)
+                )
+                .foregroundStyle(side.color)
             }
             RuleMark(y: .value(Strings.Common.zero, 0))
                 .foregroundStyle(.secondary.opacity(0.4))
         }
-        .chartXAxis {
-            // Anchored, as the default label of a bar's category isn't one Charts accepts.
-            AxisMarks { _ in
-                AxisGridLine()
-                AxisTick()
-                AxisValueLabel(anchor: .top)
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading) { value in
-                AxisValueLabel(anchor: .trailing) {
-                    if let cents = value.as(Int.self) {
-                        Text(Money(cents: cents).formatted())
-                            .font(.caption2)
-                    }
-                }
-            }
-        }
-        .frame(height: 260)
-        .accessibilityHidden(true)
+        .stepBarAxes(currencyCode: currencyCode)
     }
 }
