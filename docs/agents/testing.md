@@ -89,13 +89,14 @@ tools/check --only SnapshotTests
 
 ## Testing the tools
 
-These need no Xcode and take about 30 seconds. `tools/check-tools` runs all three and prints only what failed. The Stop hook runs it when an agent's turn changed `tools/` or `.claude/hooks/`, and CI runs it on every pull request that changes `tools/`, `.claude/hooks/` or `.github/` (the Tools check). A pull request that changes only `tools/`, docs, Markdown or agent settings skips the unit and UI tests; a push to main runs everything (`.github/workflows/tests.yml`):
+These need no Xcode and take about 30 seconds. `tools/check-tools` runs all four and prints only what failed. The Stop hook runs it when an agent's turn changed `tools/` or `.claude/hooks/`, and CI runs it on every pull request that changes `tools/`, `.claude/hooks/` or `.github/` (the Tools check). A pull request that changes only `tools/`, docs, Markdown or agent settings skips the unit and UI tests; a push to main runs everything (`.github/workflows/tests.yml`):
 
 ```
-bash tools/check-tools                       # all three
+bash tools/check-tools                       # all four
 tools/tests/check/run.sh                     # tools/check, against stand-ins for xcodebuild, xcrun and tools/check-logs
 tools/tests/run-checks/run.sh                # the Stop hook, .claude/hooks/run-checks.sh
+tools/tests/block-dangerous-git/run.sh       # the git guard, .claude/hooks/block-dangerous-git.sh
 python3 -B -m unittest discover -s tools     # tools/check-logs and tools/check_helper.py
 ```
 
-`tools/tests/run-checks/run.sh` runs the hook on a throwaway repository whose `tools/check` fails while a Swift file holds `BROKEN`, with stand-ins for xcodebuild, curl (LM Studio) and claude (the local model). It covers when the hook runs the unit tests and when the tools' tests (a stand-in `tools/check-tools` that fails while a file under `tools/` or `.claude/hooks/` holds `TOOLBUG`), what it hands back, the three-failure limit, and the local fix: that a failed attempt leaves the worktree, the index and the stash list as they were. A change to the hook comes with a case there.
+`tools/tests/run-checks/run.sh` runs the hook on a throwaway repository whose `tools/check` fails while a Swift file holds `BROKEN`, with stand-ins for xcodebuild, curl (LM Studio) and claude (the local model). It covers when the hook runs the unit tests (only where xcodebuild is installed) and when the tools' tests (a stand-in `tools/check-tools` that fails while a file under `tools/` or `.claude/hooks/` holds `TOOLBUG`), what it hands back, the three-failure limit, and the local fix: that a failed attempt leaves the worktree, the index and the stash list as they were. A change to the hook comes with a case there, and a change to the git guard's patterns with a case in `tools/tests/block-dangerous-git/run.sh`.

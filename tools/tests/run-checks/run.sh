@@ -22,18 +22,21 @@ said=
 status=
 repo=
 
-# A repository with one Swift file in Grosh/ and one in GroshTests/, a tools/check that records its calls and fails
+# A repository with one Swift file in Grosh/ and one in GroshTests/, the project's .claude/settings.json, a tools/check that records its calls and fails
 # while any Swift file holds BROKEN, and a tools/check-tools that records its calls and fails while a file under tools/
-# or .claude/hooks/ holds TOOLBUG. FAKE_CHECK_EXIT makes tools/check exit with that status instead.
+# or .claude/hooks/ holds TOOLBUG. FAKE_CHECK_EXIT makes tools/check exit with that status instead, and FAKE_CHECK_SLEEP
+# makes it wait that many seconds first.
 make_repo() {
     repo=$work/$1
     mkdir -p "$repo/Grosh" "$repo/GroshTests" "$repo/tools"
     printf 'let app = 1\n' >"$repo/Grosh/App.swift"
     printf 'let test = 1\n' >"$repo/GroshTests/AppTests.swift"
     printf 'Grosh\n' >"$repo/README.md"
+    mkdir -p "$repo/.claude" && cp "$here/../../../.claude/settings.json" "$repo/.claude/settings.json"
     cat >"$repo/tools/check" <<'EOF'
 #!/usr/bin/env bash
 printf 'check\n' >>"$FAKE_CALLS"
+[ -n "${FAKE_CHECK_SLEEP:-}" ] && sleep "$FAKE_CHECK_SLEEP"
 if [ -n "${FAKE_CHECK_EXIT:-}" ]; then
     exit "$FAKE_CHECK_EXIT"
 fi
@@ -134,14 +137,57 @@ test_case() {
 break_the_tests() { printf 'let broken = 1 // BROKEN\n' >>"$repo/Grosh/App.swift"; }
 break_the_tools() { mkdir -p "$repo/.claude/hooks" && printf '# TOOLBUG\n' >"$repo/.claude/hooks/new.sh"; }
 
+# A folder of links to every command on PATH, the fakes first, except xcodebuild: PATH as it is where Xcode isn't
+# installed.
+path_without_xcodebuild() {
+    local bin=$work/no-xcodebuild dir tool
+    if [ ! -d "$bin" ]; then
+        mkdir -p "$bin"
+        for dir in "$here/fakes" ${PATH//:/ }; do
+            for tool in "$dir"/*; do
+                [ -x "$tool" ] && [ ! -d "$tool" ] || continue
+                [ "${tool##*/}" = xcodebuild ] && continue
+                [ -e "$bin/${tool##*/}" ] || ln -s "$tool" "$bin/${tool##*/}"
+            done
+        done
+    fi
+    printf '%s\n' "$bin"
+}
+
 without_xcode() {
     make_repo without-xcode
+    prompt
     break_the_tests
-    mkdir -p "$work/empty-bin"
-    said=$(printf '{"cwd":"%s"}' "$repo" | env PATH="$work/empty-bin" /bin/bash "$hook" stop)
-    status=$?
-    silent
+    break_the_tools
+    stop GROSH_LOCAL_FIX=0 PATH="$(path_without_xcodebuild)"
+    says "The tools' tests fail."
+    never_says "The unit tests"
     checks 0
+    checks_tools 1
+}
+
+timeout_from_settings() {
+    make_repo timeout-from-settings
+    mkdir -p "$repo/.claude"
+    printf '{ "hooks": { "Stop": [ { "hooks": [ { "type": "command",\n  "command": "x/.claude/hooks/run-checks.sh",\n  "timeout": 23\n} ] } ] } }\n' \
+        >"$repo/.claude/settings.json"
+    prompt
+    break_the_tests
+    stop GROSH_LOCAL_FIX=0 FAKE_CHECK_SLEEP=10
+    says "tools/check did not finish within"
+    never_says '"decision":"block"'
+}
+
+ui_tests_and_strings_count_as_changes() {
+    make_repo ui-tests-and-strings
+    prompt
+    mkdir -p "$repo/GroshUITests"
+    printf 'let ui = 1\n' >"$repo/GroshUITests/UITests.swift"
+    stop
+    checks 1
+    printf '{}\n' >"$repo/Grosh/Localizable.xcstrings"
+    stop
+    checks 2
 }
 
 quiet_without_swift_changes() {
@@ -409,7 +455,9 @@ nested_session_is_left_alone() {
     checks 0
 }
 
-test_case "without xcodebuild it does nothing" without_xcode
+test_case "without xcodebuild it runs only the tools' tests" without_xcode
+test_case "it takes its time limit from the timeout in .claude/settings.json" timeout_from_settings
+test_case "UI tests and string catalogs count as changes" ui_tests_and_strings_count_as_changes
 test_case "without Swift changes it runs nothing and says nothing" quiet_without_swift_changes
 test_case "a passing run says nothing and is not run again for the same Swift" passing
 test_case "a failing run blocks the stop with tools/check's failure lines" failing

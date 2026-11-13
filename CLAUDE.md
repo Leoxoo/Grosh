@@ -4,7 +4,7 @@ Every user has **the 16k store** (~16,000 transactions). Before writing or revie
 
 ## Tests and checks
 
-The Stop hook (`.claude/hooks/run-checks.sh`) runs the unit tests after an agent edits Swift, and the tools' own tests (`tools/check-tools`) after it edits `tools/` or `.claude/hooks/`, so a failure comes back to the agent without a manual run. Run them with `tools/check`, or `tools/check --ui` for the UI tests. See `docs/agents/testing.md`, `docs/agents/benchmarks.md`, `docs/agents/log-check.md`, `docs/agents/ui-smoke.md` and `docs/agents/local-fixes.md`.
+The Stop hook (`.claude/hooks/run-checks.sh`) runs the unit tests after an agent edits the app or its tests (Swift, string catalogs, the project), and the tools' own tests (`tools/check-tools`) after it edits `tools/` or `.claude/hooks/`, so a failure comes back to the agent without a manual run. Run them with `tools/check`, or `tools/check --ui` for the UI tests. See `docs/agents/testing.md`, `docs/agents/benchmarks.md`, `docs/agents/log-check.md`, `docs/agents/ui-smoke.md` and `docs/agents/local-fixes.md`.
 
 ## Agent skills
 

@@ -29,6 +29,7 @@ suite() {
 
 suite "tools/check (tools/tests/check/run.sh)" tools/tests/check/run.sh
 suite "the Stop hook (tools/tests/run-checks/run.sh)" tools/tests/run-checks/run.sh
+suite "the git guard (tools/tests/block-dangerous-git/run.sh)" tools/tests/block-dangerous-git/run.sh
 suite "tools/check-logs and tools/check_helper.py (python3 -m unittest)" python3 -B -m unittest discover -s tools
 
 if [ "$failed" -eq 0 ]; then

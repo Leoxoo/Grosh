@@ -10,7 +10,7 @@ The local step runs only when `GROSH_LOCAL_FIX_MODEL` holds the id of the model 
 
 To turn the local step off, set `GROSH_LOCAL_FIX` to `0`. In `.claude/settings.json`, that is `"env": { "GROSH_LOCAL_FIX": "0" }` at the top level, next to `"hooks"`.
 
-The Stop hook has 300 seconds in all, so the local attempt gets only what is left after the first `tools/check` run. With runs of 1 to 3 minutes it is often skipped, and the log shows when. A hook timeout of 600 seconds would give it its full five minutes.
+The Stop hook has the 300 seconds its `timeout` in `.claude/settings.json` gives it, so the local attempt gets only what is left after the first `tools/check` run. With runs of 1 to 3 minutes it is often skipped, and the log shows when. Raising that timeout to 600 seconds, which the hook reads, would give it its full five minutes.
 
 A failed attempt undoes every change made in the worktree since the snapshot, including the developer's own edits, so don't edit the worktree while the hook runs.
 
