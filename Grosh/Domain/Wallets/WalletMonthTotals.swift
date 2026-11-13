@@ -9,7 +9,8 @@ import SwiftData
 /// A change to what a balance counts marks its wallet-months dirty (``Transaction/changeCounted(_:)``). Right after
 /// each save of a context ``recountAfterEachSave(of:)`` was given, those months are counted again from their
 /// transactions and their marks cleared, in a second save. A month still dirty when the totals are next read, as after
-/// the app stopped between the two saves, is counted then (``read(through:in:)``).
+/// the app stopped between the two saves, is counted then, in memory, without saving (``read(through:in:)``), and
+/// saved by the next save.
 enum WalletMonthTotals {
     /// The format the totals are counted in (``WalletMonthTotalFormat``). Raise it when what a total holds changes:
     /// the next launch rebuilds them all.
@@ -70,23 +71,66 @@ enum WalletMonthTotals {
     /// Counts every dirty wallet-month of `context` again from its transactions and clears its mark. Saves when there
     /// was one; does nothing otherwise.
     static func countDirtyMonths(in context: ModelContext) throws {
-        let marks = try context.fetch(FetchDescriptor<DirtyWalletMonth>()).filter { !$0.isDeleted }
-        guard !marks.isEmpty else { return }
-        for mark in marks {
-            if let month = WalletMonth(mark.wallet, mark.month), !month.wallet.isDeleted {
-                let transactions = try context.fetch(counted(in: month))
-                save(transactions.reduce(0) { $0 + $1.netCents }, as: month, in: context)
-            }
-            context.delete(mark)
-        }
+        guard try countDirty(in: context) else { return }
         try context.save()
     }
 
-    /// The transactions the saved total of `month` adds up: those of its wallet dated in it outside Recently Deleted.
-    private static func counted(in month: WalletMonth) -> FetchDescriptor<Transaction> {
-        let id = month.wallet.persistentModelID
-        let first = month.month.firstDay.rawValue
-        let last = month.month.lastDay.rawValue
+    /// Counts every dirty wallet-month of `context` again into its saved total and clears its mark, and says whether
+    /// there was one. Doesn't save.
+    private static func countDirty(in context: ModelContext) throws -> Bool {
+        let marks = try context.fetch(FetchDescriptor<DirtyWalletMonth>()).filter { !$0.isDeleted }
+        guard !marks.isEmpty else { return false }
+        for (month, netCents) in try count(dirtyMonths(of: marks), in: context) {
+            save(netCents, as: month, in: context)
+        }
+        for mark in marks {
+            context.delete(mark)
+        }
+        return true
+    }
+
+    /// The wallet-months `marks` mark, leaving out a wallet removed for good in the context: its totals go with it.
+    private static func dirtyMonths(of marks: [DirtyWalletMonth]) -> Set<WalletMonth> {
+        Set(marks.compactMap { WalletMonth($0.wallet, $0.month) }.filter { !$0.wallet.isDeleted })
+    }
+
+    /// The net of each of `months`, counted from its transactions outside Recently Deleted in `context`, its unsaved
+    /// changes included. One fetch per wallet for each stretch of its months less than a year apart: a wallet moved to
+    /// Recently Deleted, which marks every month it held, is one read rather than one a month, and a date moved across
+    /// years two small ones rather than every month between.
+    private static func count(_ months: Set<WalletMonth>, in context: ModelContext) throws -> [WalletMonth: Int] {
+        var net = Dictionary(uniqueKeysWithValues: months.map { ($0, 0) })
+        for walletMonths in Dictionary(grouping: months, by: { ObjectIdentifier($0.wallet) }).values {
+            guard let wallet = walletMonths.first?.wallet else { continue }
+            for stretch in stretches(of: walletMonths.map(\.month)) {
+                for transaction in try context.fetch(counted(in: wallet, during: stretch)) where !transaction.isDeleted {
+                    net[WalletMonth(wallet: wallet, month: CalendarMonth(transaction.day))]? += transaction.netCents
+                }
+            }
+        }
+        return net
+    }
+
+    /// `months` in order, cut wherever the next is a year or more after the one before.
+    private static func stretches(of months: [CalendarMonth]) -> [ClosedRange<CalendarMonth>] {
+        var stretches: [ClosedRange<CalendarMonth>] = []
+        for month in months.sorted() {
+            if let last = stretches.last, month < last.upperBound.adding(months: 12) {
+                stretches[stretches.count - 1] = last.lowerBound...month
+            } else {
+                stretches.append(month...month)
+            }
+        }
+        return stretches
+    }
+
+    /// The transactions of `wallet` dated in `months` outside Recently Deleted: what their saved totals add up.
+    private static func counted(
+        in wallet: Wallet, during months: ClosedRange<CalendarMonth>
+    ) -> FetchDescriptor<Transaction> {
+        let id = wallet.persistentModelID
+        let first = months.lowerBound.firstDay.rawValue
+        let last = months.upperBound.lastDay.rawValue
         return FetchDescriptor(predicate: #Predicate {
             $0.wallet?.persistentModelID == id && $0.dayRaw >= first && $0.dayRaw <= last && $0.deletedAt == nil
         })
@@ -221,12 +265,23 @@ enum WalletMonthTotals {
 
     // MARK: Reading
 
-    /// Every wallet's saved totals up to and including `month`, after counting any month still dirty (which saves).
-    /// What a balance adds up: a wallet's balance today is the sum of its totals through this month, less this month's
-    /// transactions dated after today (ADR-0013).
-    static func read(through month: CalendarMonth, in context: ModelContext) throws -> [WalletMonthTotal] {
-        try countDirtyMonths(in: context)
+    /// The net of every wallet-month up to and including `month`: its saved total or, for a month still dirty (as
+    /// after a save nothing counted), its transactions counted now. What a balance adds up: a wallet's balance today is
+    /// the sum of its months through this one, less this month's transactions dated after today (ADR-0013).
+    ///
+    /// Only reads, never saves: a screen reads it while it draws (``SavedWalletBalances``), when a save would tell every
+    /// observer of the store's saves to draw again. A dirty month keeps its mark for the next save to count.
+    static func read(through month: CalendarMonth, in context: ModelContext) throws -> [WalletMonth: Int] {
         let last = month.rawValue
-        return try context.fetch(FetchDescriptor<WalletMonthTotal>(predicate: #Predicate { $0.monthRaw <= last }))
+        var net: [WalletMonth: Int] = [:]
+        for total in try context.fetch(FetchDescriptor<WalletMonthTotal>(predicate: #Predicate { $0.monthRaw <= last })) {
+            if let walletMonth = WalletMonth(total.wallet, total.month) { net[walletMonth, default: 0] += total.netCents }
+        }
+        let marks = try context.fetch(FetchDescriptor<DirtyWalletMonth>()).filter { !$0.isDeleted }
+        let dirty = dirtyMonths(of: marks).filter { $0.month <= month }
+        if !dirty.isEmpty {
+            net.merge(try count(dirty, in: context)) { $1 }
+        }
+        return net
     }
 }

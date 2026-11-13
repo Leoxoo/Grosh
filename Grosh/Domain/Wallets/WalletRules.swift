@@ -75,14 +75,16 @@ nonisolated struct WalletBalances {
         self.centsByWallet = centsByWallet
     }
 
-    /// The balances on a day from the saved month totals (ADR-0013): each wallet's `monthTotals` through the day's month
-    /// added up, less what its `datedLaterThisMonth` (``datedLaterThisMonth(than:)``) add, as they don't count yet.
+    /// The balances on a day from the saved month totals (ADR-0013): each wallet's `monthNets` through the day's month
+    /// (``WalletMonthTotals/read(through:in:)``) added up, less what its `datedLaterThisMonth`
+    /// (``datedLaterThisMonth(than:)``) add, as they don't count yet.
     @MainActor
-    init(monthTotals: some Sequence<WalletMonthTotal>, datedLaterThisMonth: some Sequence<some DatedAmount>) {
+    init(
+        monthNets: [WalletMonthTotals.WalletMonth: Int], datedLaterThisMonth: some Sequence<some DatedAmount>
+    ) {
         var centsByWallet: [ObjectIdentifier: Int] = [:]
-        for total in monthTotals {
-            guard let wallet = total.wallet else { continue }
-            centsByWallet[ObjectIdentifier(wallet), default: 0] += total.netCents
+        for (month, netCents) in monthNets {
+            centsByWallet[ObjectIdentifier(month.wallet), default: 0] += netCents
         }
         for transaction in datedLaterThisMonth {
             guard let wallet = transaction.wallet else { continue }
@@ -102,12 +104,12 @@ nonisolated struct WalletBalances {
     }
 
     /// Every wallet's balance on `today`, from the saved month totals through its month, any month still dirty counted
-    /// first (``WalletMonthTotals/read(through:in:)``), less this month's transactions dated after it. Two small reads,
-    /// never every transaction.
+    /// in memory (``WalletMonthTotals/read(through:in:)``), less this month's transactions dated after it. A few small
+    /// reads, never every transaction, and never a save.
     @MainActor
     static func read(asOf today: CalendarDay, in context: ModelContext) throws -> WalletBalances {
         WalletBalances(
-            monthTotals: try WalletMonthTotals.read(through: CalendarMonth(today), in: context),
+            monthNets: try WalletMonthTotals.read(through: CalendarMonth(today), in: context),
             datedLaterThisMonth: try context.fetch(datedLaterThisMonth(than: today))
         )
     }

@@ -78,6 +78,20 @@ struct WalletMonthTotalTests {
         #expect(try totals(in: context) == ["Checking 2026-10: -4200"])
     }
 
+    @Test func monthsYearsApartInOneWalletAreEachCountedAndNoneBetween() throws {
+        let dinner = try Transaction.create(draft(30_00, on: day(2020, 3, 14)), in: context)
+        try Transaction.create(draft(5_00, on: day(2023, 6, 1)), in: context)
+        try Transaction.create(draft(2_00, on: day(2026, 9, 30)), in: context)
+
+        var edit = TransactionDraft(editing: dinner)
+        edit.day = day(2026, 10, 2)
+        try dinner.update(with: edit)
+
+        #expect(try totals(in: context) == [
+            "Checking 2023-06: -500", "Checking 2026-09: -200", "Checking 2026-10: -3000",
+        ])
+    }
+
     @Test func aMonthChangedAgainAfterItWasCountedIsCountedAgain() throws {
         let dinner = try Transaction.create(draft(30_00, on: day(2026, 10, 5)), in: context)
 
@@ -210,7 +224,8 @@ struct WalletMonthTotalTests {
 
     // MARK: Read
 
-    @Test func aMonthStillDirtyWhenTheTotalsAreReadIsCountedThen() throws {
+    /// A screen reads the totals while it draws, when nothing may save.
+    @Test func aMonthStillDirtyWhenTheTotalsAreReadIsCountedThenWithoutSaving() throws {
         // Saved where nothing counts the totals after a save, as when the app stopped between a save and its count.
         let container = try TestStore.makeContainer(countingEachSave: false)
         let other = container.mainContext
@@ -218,11 +233,26 @@ struct WalletMonthTotalTests {
         other.record(-12_00, on: day(2026, 10, 3), in: cash)
         other.record(-8_00, on: day(2026, 9, 3), in: cash)
         try other.save()
+        let saves = SaveCount(other)
 
         let read = try WalletMonthTotals.read(through: CalendarMonth(year: 2026, month: 10), in: other)
 
-        #expect(Set(read.map(describe)) == ["Cash 2026-09: -800", "Cash 2026-10: -1200"])
-        #expect(try other.fetchCount(FetchDescriptor<DirtyWalletMonth>()) == 0)
+        #expect(describe(read) == ["Cash 2026-09: -800", "Cash 2026-10: -1200"])
+        #expect(saves.count == 0)
+        #expect(!other.hasChanges)
+    }
+
+    @Test func aMonthLeftDirtyIsCountedByTheNextSave() throws {
+        // Saved by a context whose saves nothing counts, as a save off the main thread is.
+        let elsewhere = ModelContext(store.container)
+        let cash = elsewhere.addWallet("Cash")
+        elsewhere.record(-12_00, on: day(2026, 10, 3), in: cash)
+        try elsewhere.save()
+
+        try Transaction.create(draft(30_00, on: day(2026, 9, 5)), in: context)
+
+        #expect(try totals(in: context) == ["Cash 2026-10: -1200", "Checking 2026-09: -3000"])
+        #expect(try context.fetchCount(FetchDescriptor<DirtyWalletMonth>()) == 0)
     }
 
     @Test func readingStopsAtTheMonthAskedFor() throws {
@@ -232,7 +262,7 @@ struct WalletMonthTotalTests {
 
         let read = try WalletMonthTotals.read(through: CalendarMonth(year: 2026, month: 10), in: context)
 
-        #expect(Set(read.map(describe)) == ["Checking 2026-09: -3000", "Checking 2026-10: -1000"])
+        #expect(describe(read) == ["Checking 2026-09: -3000", "Checking 2026-10: -1000"])
     }
 }
 
@@ -245,7 +275,7 @@ func totals(in context: ModelContext) throws -> Set<String> {
 
 /// How many times a context has saved since this began counting.
 @MainActor
-private final class SaveCount {
+final class SaveCount {
     private(set) var count = 0
     nonisolated(unsafe) private var observer: (any NSObjectProtocol)?
 
@@ -264,7 +294,16 @@ private final class SaveCount {
 
 @MainActor
 private func describe(_ total: WalletMonthTotal) -> String {
-    String(
-        format: "%@ %04d-%02d: %d", total.wallet?.name ?? "-", total.month.year, total.month.month, total.netCents
-    )
+    describe(total.wallet, total.month, total.netCents)
+}
+
+/// The nets ``WalletMonthTotals/read(through:in:)`` gave, as ``totals(in:)`` writes them.
+@MainActor
+private func describe(_ read: [WalletMonthTotals.WalletMonth: Int]) -> Set<String> {
+    Set(read.map { describe($0.key.wallet, $0.key.month, $0.value) })
+}
+
+@MainActor
+private func describe(_ wallet: Wallet?, _ month: CalendarMonth, _ netCents: Int) -> String {
+    String(format: "%@ %04d-%02d: %d", wallet?.name ?? "-", month.year, month.month, netCents)
 }

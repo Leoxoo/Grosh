@@ -70,7 +70,7 @@ struct SavedBalanceTests {
         #expect(balances.balance(of: checking) == Money(cents: 50_00))
     }
 
-    @Test func aMonthStillDirtyWhenTheBalancesAreReadIsCountedFirst() throws {
+    @Test func aMonthStillDirtyWhenTheBalancesAreReadIsCountedWithoutSaving() throws {
         // Saved where nothing counts the totals after a save, as when the app stopped between a save and its count.
         let container = try TestStore.makeContainer(countingEachSave: false)
         let other = container.mainContext
@@ -81,10 +81,13 @@ struct SavedBalanceTests {
         other.record(-12_00, on: day(2026, 10, 3), in: cash)
         other.record(-3_00, on: day(2026, 10, 25), in: cash)
         try other.save()
+        let saves = SaveCount(other)
 
         let balances = try WalletBalances.read(asOf: today, in: other)
 
         #expect(balances.balance(of: cash) == Money(cents: 28_00))
+        // A screen reads its balances while it draws, when nothing may save.
+        #expect(saves.count == 0)
     }
 
     // MARK: On screen
