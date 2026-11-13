@@ -128,6 +128,24 @@ struct WalletMonthTotalTests {
         ])
     }
 
+    /// So the first screen to read a balance never saves while it draws.
+    @Test func openingAStoreWithAMonthStillDirtyCountsIt() throws {
+        // Saved where nothing counts the totals after a save, as when the app stopped between a save and its count.
+        let container = try GroshStore.makeContainer(inMemory: true)
+        let other = container.mainContext
+        try CategorySeeder.seedIfNeeded(in: other)
+        let cash = other.addWallet("Cash")
+        try WalletMonthTotals.rebuild(in: other)
+        try other.save()
+        other.record(-12_00, on: day(2026, 10, 3), in: cash)
+        try other.save()
+
+        try StoreOpening.prepare(other)
+
+        #expect(try totals(in: other) == ["Cash 2026-10: -1200"])
+        #expect(try other.fetchCount(FetchDescriptor<DirtyWalletMonth>()) == 0)
+    }
+
     // MARK: Wallets and imports
 
     @Test func removingAWalletForGoodRemovesItsTotals() throws {

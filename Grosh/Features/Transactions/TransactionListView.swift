@@ -25,6 +25,8 @@ private struct TransactionListContent: View {
     @Binding var selectedTransaction: Transaction?
 
     @NotDeletedTransactions private var transactions: [Transaction]
+    /// The Wallet selector's balances, from the saved month totals.
+    @SavedWalletBalances private var balances
     @Query private var recurringTransactions: [RecurringTransaction]
     /// A save can change a varying Bill's estimate, so Future's Scheduled rows read the schedules' starting amounts
     /// anew after each one, rather than on every draw.
@@ -69,11 +71,9 @@ private struct TransactionListContent: View {
         )
         let shown = listing.transactions
         let periods = strip(for: listing.selected)
-        // Both places the Wallet selector shows, under the title and in the bar once the header has risen, read the
-        // balances added up here once.
-        let walletSelector = WalletSelector(
-            selection: $walletSelection, balances: WalletBalances($transactions, asOf: today), fillsWidth: false
-        )
+        // Both places the Wallet selector shows, under the title and in the bar once the header has risen, show the
+        // balances read here once.
+        let walletSelector = WalletSelector(selection: $walletSelection, balances: balances, fillsWidth: false)
         // Future's Scheduled rows are listed by day, and only while nothing is searched, filtered or being selected.
         let scheduled: [ScheduledOccurrence] = period == .future && grouping == .day && !filter.isOn && !isSelecting
             ? schedules.value(for: AsSaved(recurringTransactions, saves: saves)) {

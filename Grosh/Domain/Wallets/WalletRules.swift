@@ -54,10 +54,13 @@ extension Wallet {
     var countsInTotal: Bool { !isArchived && includeInTotal && deletedAt == nil }
 }
 
-/// The balance of every wallet on one day, added up in one pass over every transaction outside Recently Deleted, as
-/// ``NotDeletedTransactions`` keeps them: every balance the app shows, a wallet's, the Total's or what Adjust Balance
+/// The balance of every wallet on one day: every balance the app shows, a wallet's, the Total's or what Adjust Balance
 /// calls the recorded balance, is read from it. A wallet's balance is the sum of its transactions dated that day or
 /// earlier: those dated after belong to Future and don't count yet, and those in Recently Deleted never do.
+///
+/// Home, the Wallets list and the Wallet selector read it from the saved month totals (``read(asOf:in:)``, ADR-0013);
+/// the other screens add it up in one pass over the transactions outside Recently Deleted that they already hold, as
+/// ``NotDeletedTransactions`` keeps them.
 nonisolated struct WalletBalances {
     private let centsByWallet: [ObjectIdentifier: Int]
 
@@ -70,6 +73,43 @@ nonisolated struct WalletBalances {
             centsByWallet[ObjectIdentifier(wallet), default: 0] += transaction.netCents
         }
         self.centsByWallet = centsByWallet
+    }
+
+    /// The balances on a day from the saved month totals (ADR-0013): each wallet's `monthTotals` through the day's month
+    /// added up, less what its `datedLaterThisMonth` (``datedLaterThisMonth(than:)``) add, as they don't count yet.
+    @MainActor
+    init(monthTotals: some Sequence<WalletMonthTotal>, datedLaterThisMonth: some Sequence<some DatedAmount>) {
+        var centsByWallet: [ObjectIdentifier: Int] = [:]
+        for total in monthTotals {
+            guard let wallet = total.wallet else { continue }
+            centsByWallet[ObjectIdentifier(wallet), default: 0] += total.netCents
+        }
+        for transaction in datedLaterThisMonth {
+            guard let wallet = transaction.wallet else { continue }
+            centsByWallet[ObjectIdentifier(wallet), default: 0] -= transaction.netCents
+        }
+        self.centsByWallet = centsByWallet
+    }
+
+    /// The transactions of `today`'s month dated after it, outside Recently Deleted: counted in the month's saved total,
+    /// they don't count in a balance yet. Usually a handful.
+    static func datedLaterThisMonth(than today: CalendarDay) -> FetchDescriptor<Transaction> {
+        let after = today.rawValue
+        let last = CalendarMonth(today).lastDay.rawValue
+        return FetchDescriptor(predicate: #Predicate {
+            $0.dayRaw > after && $0.dayRaw <= last && $0.deletedAt == nil
+        })
+    }
+
+    /// Every wallet's balance on `today`, from the saved month totals through its month, any month still dirty counted
+    /// first (``WalletMonthTotals/read(through:in:)``), less this month's transactions dated after it. Two small reads,
+    /// never every transaction.
+    @MainActor
+    static func read(asOf today: CalendarDay, in context: ModelContext) throws -> WalletBalances {
+        WalletBalances(
+            monthTotals: try WalletMonthTotals.read(through: CalendarMonth(today), in: context),
+            datedLaterThisMonth: try context.fetch(datedLaterThisMonth(than: today))
+        )
     }
 
     /// The wallet's balance, in its own currency.
