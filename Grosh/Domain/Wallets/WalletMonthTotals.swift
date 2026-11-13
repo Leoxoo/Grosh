@@ -6,22 +6,23 @@ import SwiftData
 /// month, the net of that month's transactions outside Recently Deleted. Every month is saved the same way, the
 /// current one and those ahead included; only reading a balance knows which day it is.
 ///
-/// A change to what a balance counts marks its wallet-months dirty (``Transaction/changeCounted(_:)``). Right after
-/// each save of a context ``recountAfterEachSave(of:)`` was given, those months are counted again from their
-/// transactions and their marks cleared, in a second save. A month still dirty when the totals are next read, as after
-/// the app stopped between the two saves, is counted then, in memory, without saving (``read(through:in:)``), and
-/// saved by the next save.
+/// A change to what a balance counts marks its wallet-months dirty (``Transaction/changeCounted(_:)``). As each save
+/// of a context ``countInEachSave(of:)`` was given begins, those months are counted again from their transactions and
+/// their marks cleared, so the totals go into the same save as the change. A month still dirty when the totals are
+/// read, as after a save nothing counted, is counted then, in memory, without saving (``read(through:in:)``), and saved
+/// by the next save.
 enum WalletMonthTotals {
     /// The format the totals are counted in (``WalletMonthTotalFormat``). Raise it when what a total holds changes:
     /// the next launch rebuilds them all.
     static let formatVersion = 1
 
-    // MARK: Counting after each save
+    // MARK: Counting in each save
 
-    /// Counts the dirty months of `context` again right after each of its saves, before the save returns: no
-    /// background work. The store does this for its main context when it opens (``StoreOpening/prepare(_:)``).
-    /// Asking again for the same context changes nothing.
-    static func recountAfterEachSave(of context: ModelContext) {
+    /// Counts the dirty months of `context` again as each of its saves begins, so the totals they change go into that
+    /// same save: no background work, and no second save that every other observer of the store's saves
+    /// (``StoreSaves``, ``NotDeletedTransactions``) would see inside the first. The store does this for its main
+    /// context when it opens (``StoreOpening/prepare(_:)``). Asking again for the same context changes nothing.
+    static func countInEachSave(of context: ModelContext) {
         _ = saves
         counting = counting.filter { $0.value.context != nil }
         counting[ObjectIdentifier(context)] = WeakContext(context: context)
@@ -32,39 +33,31 @@ enum WalletMonthTotals {
         weak var context: ModelContext?
     }
 
-    /// The contexts whose saves are followed by a count, by identity.
+    /// The contexts whose saves count their dirty months, by identity.
     private static var counting: [ObjectIdentifier: WeakContext] = [:]
-    /// The contexts being counted now: the count's own save is not followed by another.
-    private static var recounting: Set<ObjectIdentifier> = []
 
-    /// One observer for every context's saves, made the first time a context is counted. A save off the main thread
-    /// isn't followed by a count; its months are counted when the totals are next read.
+    /// One observer for every context's saves, made the first time a context is counted. `willSave` is posted before
+    /// the context hands its changes to the store, so what the count changes is saved with them. A save off the main
+    /// thread counts nothing; its months are counted in memory when the totals are read, and saved by the next save.
     private static let saves: any NSObjectProtocol = NotificationCenter.default.addObserver(
-        forName: ModelContext.didSave, object: nil, queue: nil
+        forName: ModelContext.willSave, object: nil, queue: nil
     ) { notification in
         guard Thread.isMainThread else { return }
-        let saved = SavedContext(notification)
+        let saving = SavingContext(notification)
         MainActor.assumeIsolated {
-            if let context = saved.context { countAfterSave(of: context) }
+            guard let context = saving.context, counting[ObjectIdentifier(context)]?.context === context else { return }
+            Log.store.attempt("Counting the saved month totals again") {
+                _ = try countDirty(in: context)
+            }
         }
     }
 
     /// The context a save notification came from, handed to the main actor it was posted on.
-    nonisolated private struct SavedContext: @unchecked Sendable {
+    nonisolated private struct SavingContext: @unchecked Sendable {
         weak var context: ModelContext?
 
         init(_ notification: Notification) {
             context = notification.object as? ModelContext
-        }
-    }
-
-    private static func countAfterSave(of context: ModelContext) {
-        let id = ObjectIdentifier(context)
-        guard counting[id]?.context === context, !recounting.contains(id) else { return }
-        recounting.insert(id)
-        defer { recounting.remove(id) }
-        Log.store.attempt("Counting the saved month totals again") {
-            try countDirtyMonths(in: context)
         }
     }
 

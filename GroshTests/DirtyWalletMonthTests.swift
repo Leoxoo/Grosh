@@ -6,28 +6,36 @@ import Testing
 /// Every change to what a wallet's balance counts of a transaction (its wallet, day, amount, Reimbursed total and
 /// Recently Deleted mark) marks the wallet-months it touches as dirty, so their saved totals are counted again
 /// (ADR-0013).
+///
+/// The suite's store counts nothing in its saves, so the marks a change makes stay in it to be read; ``settle()`` counts
+/// them as the app's saves do.
 @MainActor
 @Suite(.namedInTheLog)
 struct DirtyWalletMonthTests {
     private let store: TestStore
-    private let marks: SavedMarks
     private var context: ModelContext { store.context }
     private var checking: Wallet { store.checking }
 
     init() throws {
-        store = try TestStore()
-        marks = SavedMarks(store.context)
+        store = try TestStore(countingEachSave: false)
     }
 
-    /// The wallet-months the saves since the last ``settle()`` marked dirty, as "<wallet> <yyyy>-<mm>".
+    /// The wallet-months marked dirty since the last ``settle()``, as "<wallet> <yyyy>-<mm>".
     private func dirty() throws -> Set<String> {
-        Set(marks.saved)
+        Set(try marks().map { mark in
+            String(format: "%@ %04d-%02d", mark.wallet?.name ?? "-", mark.month.year, mark.month.month)
+        })
     }
 
-    /// Saves, then forgets the marks saved so far, so a test sees only what its own change marks.
+    private func marks() throws -> [DirtyWalletMonth] {
+        try context.fetch(FetchDescriptor<DirtyWalletMonth>())
+    }
+
+    /// Saves, then counts the months marked so far and clears their marks, so a test sees only what its own change
+    /// marks.
     private func settle() throws {
         try context.save()
-        marks.saved = []
+        try WalletMonthTotals.countDirtyMonths(in: context)
     }
 
     private func draft(_ cents: Int, on day: CalendarDay, in wallet: Wallet? = nil) throws -> TransactionDraft {
@@ -102,7 +110,8 @@ struct DirtyWalletMonthTests {
         lunch.changeCounted { $0.amountCents = -13_00 }
         try context.save()
 
-        #expect(marks.saved == ["Checking 2026-10"])
+        #expect(try marks().count == 1)
+        #expect(try dirty() == ["Checking 2026-10"])
     }
 
     @Test func editingAStartingBalanceMarksTheMonthsItLeftAndMovedTo() throws {
@@ -210,34 +219,5 @@ struct DirtyWalletMonthTests {
         try RecentlyDeleted.empty(in: context)
 
         #expect(try dirty().isEmpty)
-    }
-}
-
-/// The marks each save of a context carries, read as it is about to save: the count right after the save clears them
-/// (``WalletMonthTotals``).
-@MainActor
-private final class SavedMarks {
-    /// Each mark saved since this was last cleared, as "<wallet> <yyyy>-<mm>", once per save that carried it.
-    var saved: [String] = []
-    private weak var context: ModelContext?
-    nonisolated(unsafe) private var observer: (any NSObjectProtocol)?
-
-    init(_ context: ModelContext) {
-        self.context = context
-        observer = NotificationCenter.default.addObserver(
-            forName: ModelContext.willSave, object: context, queue: nil
-        ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, let context = self.context else { return }
-                let marks = context.insertedModelsArray.compactMap { $0 as? DirtyWalletMonth }
-                self.saved += marks.map { mark in
-                    String(format: "%@ %04d-%02d", mark.wallet?.name ?? "-", mark.month.year, mark.month.month)
-                }
-            }
-        }
-    }
-
-    deinit {
-        if let observer { NotificationCenter.default.removeObserver(observer) }
     }
 }

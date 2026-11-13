@@ -4,7 +4,7 @@ import Testing
 @testable import Grosh
 
 /// The saved month totals: for each wallet and calendar month, the net of that month's transactions outside Recently
-/// Deleted, counted again right after each save that changed one, rebuilt when their format changes or an import
+/// Deleted, counted again in each save that changed one, rebuilt when their format changes or an import
 /// replaces everything, and gone with their wallet (ADR-0013).
 @MainActor
 @Suite(.namedInTheLog)
@@ -25,7 +25,7 @@ struct WalletMonthTotalTests {
         return draft
     }
 
-    // MARK: Counted after each save
+    // MARK: Counted in each save
 
     @Test func savingATransactionCountsItsMonth() throws {
         try Transaction.create(draft(30_00, on: day(2026, 10, 5)), in: context)
@@ -102,6 +102,36 @@ struct WalletMonthTotalTests {
         }
 
         #expect(try totals(in: context) == ["Checking 2026-10: -3200"])
+    }
+
+    /// So every other observer of the store's saves (``StoreSaves``, ``NotDeletedTransactions``) sees each save once,
+    /// never one saved inside another.
+    @Test func aChangeAndTheTotalsItMovesGoIntoOneSave() throws {
+        let saves = SaveCount(context)
+
+        try Transaction.create(draft(30_00, on: day(2026, 10, 5)), in: context)
+
+        #expect(saves.count == 1)
+        #expect(!context.hasChanges)
+        #expect(try totals(in: context) == ["Checking 2026-10: -3000"])
+    }
+
+    @Test func theTotalsASaveCountedAreInTheStoreWhenItOpensAgain() throws {
+        let url = URL.temporaryDirectory
+            .appending(path: "GroshTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+            .appending(path: "Grosh.store")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        do {
+            let first = try GroshStore.makeContainer(at: url)
+            try StoreOpening.prepare(first.mainContext)
+            first.mainContext.record(-12_00, on: day(2026, 10, 3), in: first.mainContext.addWallet("Cash"))
+            try first.mainContext.save()
+        }
+
+        let reopened = TestStore.checked(try GroshStore.makeContainer(at: url))
+
+        #expect(try totals(in: reopened.mainContext) == ["Cash 2026-10: -1200"])
+        #expect(try reopened.mainContext.fetchCount(FetchDescriptor<DirtyWalletMonth>()) == 0)
     }
 
     // MARK: Rebuilt

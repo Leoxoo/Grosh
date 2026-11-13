@@ -3,9 +3,9 @@ import SwiftData
 import Testing
 @testable import Grosh
 
-/// An in-memory store seeded with the default category tree and one wallet, Checking, seen on ``today``. Each save is
-/// followed by counting the saved month totals it made dirty, as the app's store does, and once the test ends its totals
-/// are checked against a full count of its transactions (``SavedTotalsCheck``, ADR-0013).
+/// An in-memory store seeded with the default category tree and one wallet, Checking, seen on ``today``. Each save
+/// counts the saved month totals it made dirty, as the app's store does, and once the test ends its totals are checked
+/// against a full count of its transactions (``SavedTotalsCheck``, ADR-0013).
 @MainActor
 struct TestStore {
     /// The day most suites are seen on. The Month graph suites have a day of their own, ``MonthGraphFixture/today``.
@@ -16,8 +16,10 @@ struct TestStore {
     var context: ModelContext { container.mainContext }
     var catalog: CategoryCatalog { CategoryCatalog(context: context) }
 
-    init() throws {
-        container = try Self.makeContainer()
+    /// `countingEachSave: false` makes a store whose saves count nothing (``checked(_:countingEachSave:)``), for the
+    /// suite that reads the dirty marks themselves.
+    init(countingEachSave: Bool = true) throws {
+        container = try Self.makeContainer(countingEachSave: countingEachSave)
         try CategorySeeder.seedIfNeeded(in: container.mainContext)
         checking = container.mainContext.addWallet("Checking")
     }
@@ -151,7 +153,7 @@ extension TestStore {
     /// dirty months wait to be counted, and the check leaves them out.
     @discardableResult
     static func checked(_ container: ModelContainer, countingEachSave: Bool = true) -> ModelContainer {
-        if countingEachSave { WalletMonthTotals.recountAfterEachSave(of: container.mainContext) }
+        if countingEachSave { WalletMonthTotals.countInEachSave(of: container.mainContext) }
         SavedTotalsCheck.stores?.add(container)
         return container
     }

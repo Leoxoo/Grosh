@@ -16,12 +16,12 @@ enum StoreOpening {
     /// one and any missing ones restored (``CategorySeeder``), the With names typed before there were people turned into
     /// people (``Person/migrateWithNames(in:)``, ADR-0009), so no screen ever sees a With without its Person, and every
     /// link given its kind (``Transaction/migrateLinkKinds(in:)``, ADR-0012), and the saved month totals rebuilt when
-    /// their format is missing or old (``WalletMonthTotals/rebuildIfOutdated(in:)``, ADR-0013), or else any month left dirty
-    /// counted, as after the app stopped between a save and its count, so the first screen to read a balance never saves
-    /// while it draws. Each step does nothing on a store already up to date. From here on, each save of `context` is followed by counting the months it marked
-    /// dirty (``WalletMonthTotals/recountAfterEachSave(of:)``).
+    /// their format is missing or old (``WalletMonthTotals/rebuildIfOutdated(in:)``, ADR-0013), or else any month left
+    /// dirty by a save nothing counted counted and saved, so the screens' reads needn't count it each time. Each step does
+    /// nothing on a store already up to date. From here on, each save of `context` counts the months it marked dirty
+    /// into that same save (``WalletMonthTotals/countInEachSave(of:)``).
     static func prepare(_ context: ModelContext) throws {
-        WalletMonthTotals.recountAfterEachSave(of: context)
+        WalletMonthTotals.countInEachSave(of: context)
         try CategorySeeder.seedIfNeeded(in: context)
         try CategorySeeder.restoreMissingDefaults(in: context)
         try Person.migrateWithNames(in: context)

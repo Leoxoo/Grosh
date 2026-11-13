@@ -10,11 +10,11 @@ import UniformTypeIdentifiers
 /// test opens the app on it (``UITestStore``). It is compiled into Debug builds only, so the app as shipped never
 /// carries it.
 enum BenchmarkStore {
-    /// The store at `url`, its saves followed by counting the saved month totals they made dirty, as the app's are
-    /// (ADR-0013), so a benchmark's save pays for that count too.
+    /// The store at `url`, each save counting the saved month totals it made dirty, as the app's does (ADR-0013), so a
+    /// benchmark's save pays for that count too.
     static func open(at url: URL) throws -> ModelContainer {
         let container = try GroshStore.makeContainer(at: url)
-        WalletMonthTotals.recountAfterEachSave(of: container.mainContext)
+        WalletMonthTotals.countInEachSave(of: container.mainContext)
         return container
     }
 
