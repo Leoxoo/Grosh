@@ -181,15 +181,19 @@ struct WalletMonthTotalTests {
     @Test func aTotalThatDiffersFromItsTransactionsIsFound() throws {
         try Transaction.create(draft(30_00, on: day(2026, 10, 5)), in: context)
         try Transaction.create(draft(8_00, on: day(2026, 9, 5)), in: context)
-        let october = try #require(try context.fetch(FetchDescriptor<WalletMonthTotal>()).first { $0.monthRaw == 2026_10 })
+        let october = try #require(
+            try context.fetch(FetchDescriptor<WalletMonthTotal>()).first { $0.month == CalendarMonth(year: 2026, month: 10) }
+        )
         october.netCents = -1
         try context.save()
 
         let found = try WalletMonthTotals.mismatches(in: context).map { mismatch in
-            "\(mismatch.wallet.name) \(mismatch.monthRaw): saved \(mismatch.savedCents), counted \(mismatch.countedCents)"
+            let month = mismatch.walletMonth
+            return "\(month.wallet.name) \(month.month.numericTitle): saved \(mismatch.savedCents), "
+                + "counted \(mismatch.countedCents)"
         }
 
-        #expect(found == ["Checking 202610: saved -1, counted -3000"])
+        #expect(found == ["Checking 10/2026: saved -1, counted -3000"])
         // Right again, for the check every test's store ends with.
         try WalletMonthTotals.rebuild(in: context)
         try context.save()
@@ -261,7 +265,6 @@ private final class SaveCount {
 @MainActor
 private func describe(_ total: WalletMonthTotal) -> String {
     String(
-        format: "%@ %04d-%02d: %d", total.wallet?.name ?? "-", total.monthRaw / 100, total.monthRaw % 100,
-        total.netCents
+        format: "%@ %04d-%02d: %d", total.wallet?.name ?? "-", total.month.year, total.month.month, total.netCents
     )
 }

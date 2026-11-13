@@ -168,6 +168,9 @@ extension Transaction {
     /// is counted in after, so their saved totals are counted again. A date moved from March to May marks both months,
     /// a move to another wallet both wallets. A change that leaves them as they were marks nothing. The marks are
     /// inserted in the transaction's context, so they go into the same save as the change. Doesn't save.
+    ///
+    /// A rule, yet it lives here in `Model/` rather than in `Domain/`: the five fields it changes are `private(set)`, so
+    /// that the compiler refuses a write anywhere else, and Swift lets only code in this file set them (ADR-0013).
     func changeCounted(_ change: (inout Counted) -> Void) {
         let before = counted
         var after = before
@@ -186,13 +189,11 @@ extension Transaction {
     /// wallet, or in Recently Deleted, counts in none.
     private func markCountedMonthDirty() {
         guard deletedAt == nil, let wallet, let context = modelContext else { return }
-        let monthRaw = dayRaw / 100
+        let month = CalendarMonth(day)
         // A wallet's dirty months are few, those changed since they were last counted, so looking among them is cheap.
         // One deleted once it was counted, but not yet saved, no longer marks it.
-        guard !(wallet.dirtyMonths ?? []).contains(where: { !$0.isDeleted && $0.monthRaw == monthRaw }) else { return }
-        let mark = DirtyWalletMonth(monthRaw: monthRaw)
-        context.insert(mark)
-        mark.wallet = wallet
+        guard !(wallet.dirtyMonths ?? []).contains(where: { !$0.isDeleted && $0.month == month }) else { return }
+        DirtyWalletMonth.insert(month, of: wallet, in: context)
     }
 }
 

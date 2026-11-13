@@ -23,15 +23,16 @@ enum WalletMonthTotals {
     static func recountAfterEachSave(of context: ModelContext) {
         _ = saves
         counting = counting.filter { $0.value.context != nil }
-        counting[ObjectIdentifier(context)] = Counted(context: context)
+        counting[ObjectIdentifier(context)] = WeakContext(context: context)
     }
 
-    private struct Counted {
+    /// A context held without keeping it alive.
+    private struct WeakContext {
         weak var context: ModelContext?
     }
 
     /// The contexts whose saves are followed by a count, by identity.
-    private static var counting: [ObjectIdentifier: Counted] = [:]
+    private static var counting: [ObjectIdentifier: WeakContext] = [:]
     /// The contexts being counted now: the count's own save is not followed by another.
     private static var recounting: Set<ObjectIdentifier> = []
 
@@ -72,35 +73,31 @@ enum WalletMonthTotals {
         let marks = try context.fetch(FetchDescriptor<DirtyWalletMonth>()).filter { !$0.isDeleted }
         guard !marks.isEmpty else { return }
         for mark in marks {
-            if let wallet = mark.wallet, !wallet.isDeleted {
-                let transactions = try context.fetch(counted(in: wallet, monthRaw: mark.monthRaw))
-                save(transactions.reduce(0) { $0 + $1.netCents }, as: mark.monthRaw, of: wallet, in: context)
+            if let month = WalletMonth(mark.wallet, mark.month), !month.wallet.isDeleted {
+                let transactions = try context.fetch(counted(in: month))
+                save(transactions.reduce(0) { $0 + $1.netCents }, as: month, in: context)
             }
             context.delete(mark)
         }
         try context.save()
     }
 
-    /// The transactions `wallet`'s total for the month `monthRaw` (`yyyymm`) adds up: those dated in it outside
-    /// Recently Deleted.
-    private static func counted(in wallet: Wallet, monthRaw: Int) -> FetchDescriptor<Transaction> {
-        let id = wallet.persistentModelID
-        let first = monthRaw * 100
-        let last = monthRaw * 100 + 99
+    /// The transactions the saved total of `month` adds up: those of its wallet dated in it outside Recently Deleted.
+    private static func counted(in month: WalletMonth) -> FetchDescriptor<Transaction> {
+        let id = month.wallet.persistentModelID
+        let first = month.month.firstDay.rawValue
+        let last = month.month.lastDay.rawValue
         return FetchDescriptor(predicate: #Predicate {
             $0.wallet?.persistentModelID == id && $0.dayRaw >= first && $0.dayRaw <= last && $0.deletedAt == nil
         })
     }
 
-    /// Makes `netCents` the saved total of `wallet` for the month `monthRaw`. A month that nets to nothing and had no
-    /// total yet gets none.
-    private static func save(_ netCents: Int, as monthRaw: Int, of wallet: Wallet, in context: ModelContext) {
-        if let total = (wallet.monthTotals ?? []).first(where: { !$0.isDeleted && $0.monthRaw == monthRaw }) {
+    /// Makes `netCents` the saved total of `month`. A month that nets to nothing and had no total yet gets none.
+    private static func save(_ netCents: Int, as month: WalletMonth, in context: ModelContext) {
+        if let total = (month.wallet.monthTotals ?? []).first(where: { !$0.isDeleted && $0.month == month.month }) {
             if total.netCents != netCents { total.netCents = netCents }
         } else if netCents != 0 {
-            let total = WalletMonthTotal(monthRaw: monthRaw, netCents: netCents)
-            context.insert(total)
-            total.wallet = wallet
+            WalletMonthTotal.insert(netCents, for: month.month, of: month.wallet, in: context)
         }
     }
 
@@ -127,9 +124,7 @@ enum WalletMonthTotals {
             context.delete(mark)
         }
         for (month, netCents) in try fullCount(in: context) where netCents != 0 {
-            let total = WalletMonthTotal(monthRaw: month.monthRaw, netCents: netCents)
-            context.insert(total)
-            total.wallet = month.wallet
+            WalletMonthTotal.insert(netCents, for: month.month, of: month.wallet, in: context)
         }
         let formats = try context.fetch(FetchDescriptor<WalletMonthTotalFormat>())
         for extra in formats.dropFirst() {
@@ -145,15 +140,26 @@ enum WalletMonthTotals {
     /// One wallet-month, keyed by the wallet's identity.
     struct WalletMonth: Hashable {
         let wallet: Wallet
-        let monthRaw: Int
+        let month: CalendarMonth
+
+        init(wallet: Wallet, month: CalendarMonth) {
+            self.wallet = wallet
+            self.month = month
+        }
+
+        /// `month` of `wallet`, or `nil` for what is in no wallet.
+        init?(_ wallet: Wallet?, _ month: CalendarMonth) {
+            guard let wallet else { return nil }
+            self.init(wallet: wallet, month: month)
+        }
 
         static func == (lhs: WalletMonth, rhs: WalletMonth) -> Bool {
-            lhs.wallet === rhs.wallet && lhs.monthRaw == rhs.monthRaw
+            lhs.wallet === rhs.wallet && lhs.month == rhs.month
         }
 
         func hash(into hasher: inout Hasher) {
             hasher.combine(ObjectIdentifier(wallet))
-            hasher.combine(monthRaw)
+            hasher.combine(month)
         }
     }
 
@@ -163,7 +169,7 @@ enum WalletMonthTotals {
         var net: [WalletMonth: Int] = [:]
         for transaction in try context.fetch(Transaction.notDeleted) where !transaction.isDeleted {
             guard let wallet = transaction.wallet, !wallet.isDeleted else { continue }
-            net[WalletMonth(wallet: wallet, monthRaw: transaction.dayRaw / 100), default: 0] += transaction.netCents
+            net[WalletMonth(wallet: wallet, month: CalendarMonth(transaction.day)), default: 0] += transaction.netCents
         }
         return net
     }
@@ -172,8 +178,7 @@ enum WalletMonthTotals {
 
     /// A wallet-month whose saved total isn't what its transactions add up to.
     struct Mismatch {
-        let wallet: Wallet
-        let monthRaw: Int
+        let walletMonth: WalletMonth
         let savedCents: Int
         let countedCents: Int
     }
@@ -186,21 +191,21 @@ enum WalletMonthTotals {
         var saved: [WalletMonth: Int] = [:]
         for total in try context.fetch(FetchDescriptor<WalletMonthTotal>()) where !total.isDeleted {
             guard let wallet = total.wallet, !wallet.isDeleted else { continue }
-            saved[WalletMonth(wallet: wallet, monthRaw: total.monthRaw), default: 0] += total.netCents
+            saved[WalletMonth(wallet: wallet, month: total.month), default: 0] += total.netCents
         }
         var dirty: Set<WalletMonth> = []
         for mark in try context.fetch(FetchDescriptor<DirtyWalletMonth>()) where !mark.isDeleted {
-            if let wallet = mark.wallet { dirty.insert(WalletMonth(wallet: wallet, monthRaw: mark.monthRaw)) }
+            if let month = WalletMonth(mark.wallet, mark.month) { dirty.insert(month) }
         }
         return Set(counted.keys).union(saved.keys).subtracting(dirty).compactMap { month in
             let savedCents = saved[month] ?? 0
             let countedCents = counted[month] ?? 0
             guard savedCents != countedCents else { return nil }
-            return Mismatch(
-                wallet: month.wallet, monthRaw: month.monthRaw, savedCents: savedCents, countedCents: countedCents
-            )
+            return Mismatch(walletMonth: month, savedCents: savedCents, countedCents: countedCents)
         }
-        .sorted { ($0.wallet.name, $0.monthRaw) < ($1.wallet.name, $1.monthRaw) }
+        .sorted {
+            ($0.walletMonth.wallet.name, $0.walletMonth.month) < ($1.walletMonth.wallet.name, $1.walletMonth.month)
+        }
     }
 
     /// Logs an error when a saved total differs from its transactions (``mismatches(in:)``): a change that marked no
@@ -221,7 +226,7 @@ enum WalletMonthTotals {
     /// transactions dated after today (ADR-0013).
     static func read(through month: CalendarMonth, in context: ModelContext) throws -> [WalletMonthTotal] {
         try countDirtyMonths(in: context)
-        let last = month.year * 100 + month.month
+        let last = month.rawValue
         return try context.fetch(FetchDescriptor<WalletMonthTotal>(predicate: #Predicate { $0.monthRaw <= last }))
     }
 }

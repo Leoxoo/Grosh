@@ -1,21 +1,6 @@
 import Foundation
 
-/// A month of a year, such as 08/2026.
-nonisolated struct CalendarMonth: Hashable, Sendable {
-    let year: Int
-    /// 1–12.
-    let month: Int
-
-    init(year: Int, month: Int) {
-        self.year = year
-        self.month = month
-    }
-
-    /// The month `day` falls in.
-    init(_ day: CalendarDay) {
-        self.init(year: day.year, month: day.month)
-    }
-
+nonisolated extension CalendarMonth {
     /// The month `months` months after this one (before it when negative), across year ends.
     func adding(months: Int) -> CalendarMonth {
         let index = year * 12 + (month - 1) + months
@@ -35,12 +20,6 @@ nonisolated struct CalendarMonth: Hashable, Sendable {
     var dayCount: Int {
         let calendar = Calendar.utcGregorian
         return calendar.range(of: .day, in: .month, for: firstDay.date(in: calendar))?.count ?? 28
-    }
-}
-
-nonisolated extension CalendarMonth: Comparable {
-    static func < (lhs: CalendarMonth, rhs: CalendarMonth) -> Bool {
-        (lhs.year, lhs.month) < (rhs.year, rhs.month)
     }
 }
 

@@ -34,7 +34,8 @@ final class CheckedStores {
                 for mismatch in try WalletMonthTotals.mismatches(in: container.mainContext) {
                     Issue.record(
                         """
-                        The saved total of \(mismatch.wallet.name) for \(mismatch.monthRaw) is \(mismatch.savedCents), \
+                        The saved total of \(mismatch.walletMonth.wallet.name) for \
+                        \(mismatch.walletMonth.month.numericTitle) is \(mismatch.savedCents), \
                         but its transactions add up to \(mismatch.countedCents): a change marked no month dirty
                         """
                     )

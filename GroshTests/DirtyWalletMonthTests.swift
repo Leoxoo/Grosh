@@ -231,7 +231,7 @@ private final class SavedMarks {
                 guard let self, let context = self.context else { return }
                 let marks = context.insertedModelsArray.compactMap { $0 as? DirtyWalletMonth }
                 self.saved += marks.map { mark in
-                    String(format: "%@ %04d-%02d", mark.wallet?.name ?? "-", mark.monthRaw / 100, mark.monthRaw % 100)
+                    String(format: "%@ %04d-%02d", mark.wallet?.name ?? "-", mark.month.year, mark.month.month)
                 }
             }
         }
