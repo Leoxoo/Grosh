@@ -69,9 +69,7 @@ struct Keypad: View {
                 }
             }
         }
-        .sensoryFeedback(trigger: target.refusals) { [playsTicks] _, _ in
-            playsTicks ? KeypadTick.error.feedback : nil
-        }
+        .refusalTick(refusals: target.refusals, plays: playsTicks)
     }
 
     private func key(_ key: KeypadKey) -> some View {
@@ -217,6 +215,58 @@ private extension KeypadTick {
         }
     }
 }
+
+private extension View {
+    /// Gives an error tick each time `refusals` goes up, while `plays`.
+    @ViewBuilder
+    func refusalTick(refusals: Int, plays: Bool) -> some View {
+        #if os(iOS)
+        background(RefusalTick(refusals: refusals, plays: plays))
+        #else
+        sensoryFeedback(trigger: refusals) { _, _ in plays ? KeypadTick.error.feedback : nil }
+        #endif
+    }
+}
+
+#if os(iOS)
+/// The error tick on iPhone and iPad, played by a UIKit generator attached to a view in the Keypad. SwiftUI's
+/// `sensoryFeedback` on the Keypad stopped playing it once the Add Transaction form had shown more details: its closure
+/// still asked for the tick, but no generator played it, even after the details were closed again.
+private struct RefusalTick: UIViewRepresentable {
+    let refusals: Int
+    let plays: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(refusals: refusals)
+    }
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.isUserInteractionEnabled = false
+        view.isAccessibilityElement = false
+        context.coordinator.generator = UINotificationFeedbackGenerator(view: view)
+        return view
+    }
+
+    func updateUIView(_ view: UIView, context: Context) {
+        let coordinator = context.coordinator
+        if refusals > coordinator.refusals, plays {
+            coordinator.generator?.notificationOccurred(.error)
+        }
+        coordinator.refusals = refusals
+    }
+
+    final class Coordinator {
+        /// The count last seen, so only a new refusal ticks.
+        var refusals: Int
+        var generator: UINotificationFeedbackGenerator?
+
+        init(refusals: Int) {
+            self.refusals = refusals
+        }
+    }
+}
+#endif
 
 /// What holding a key that repeats does.
 private enum KeyHold {
