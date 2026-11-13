@@ -16,7 +16,7 @@ struct NotDeletedTransactionsTests {
     private let checking: Wallet
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
+        container = try TestStore.makeContainer()
         checking = container.mainContext.addWallet("Checking")
     }
 
@@ -34,7 +34,7 @@ struct NotDeletedTransactionsTests {
 
     @Test func theyStartAsEveryTransactionOutsideRecentlyDeleted() throws {
         record("coffee")
-        record("rent").deletedAt = .now
+        record("rent").changeCounted { $0.deletedAt = .now }
         try context.save()
 
         #expect(try notes().shared == ["coffee"])
@@ -114,7 +114,7 @@ struct NotDeletedTransactionsTests {
         let listChanged = OSAllocatedUnfairLock(initialState: false)
         withObservationTracking { _ = store.transactions } onChange: { listChanged.withLock { $0 = true } }
 
-        coffee.amountCents = -7_50
+        coffee.changeCounted { $0.amountCents = -7_50 }
         try context.save()
 
         #expect(!listChanged.withLock { $0 })
@@ -132,14 +132,14 @@ struct NotDeletedTransactionsTests {
         // onChange is a Sendable closure, so the flag it sets is behind a lock.
         let ledgerChanged = OSAllocatedUnfairLock(initialState: false)
         withObservationTracking { _ = store.entries } onChange: { ledgerChanged.withLock { $0 = true } }
-        coffee.amountCents = -7_50
+        coffee.changeCounted { $0.amountCents = -7_50 }
         #expect(store.entries.map(\.netCents) == [-5_00])
         try context.save()
         #expect(ledgerChanged.withLock { $0 })
         #expect(store.entries.map(\.netCents) == [-7_50])
 
-        coffee.wallet = savings
-        coffee.day = today.adding(days: -3)
+        coffee.changeCounted { $0.wallet = savings }
+        coffee.changeCounted { $0.day = today.adding(days: -3) }
         try context.save()
         let balances = WalletBalances(store.entries, asOf: today)
         #expect(balances.balance(of: savings) == Money(cents: -7_50))
@@ -166,7 +166,7 @@ struct NotDeletedTransactionsTests {
     @Test func eachContextHasItsOwn() throws {
         record("coffee")
         try context.save()
-        let other = try GroshStore.makeContainer(inMemory: true)
+        let other = try TestStore.makeContainer()
 
         #expect(NotDeletedTransactions.Store.of(context) === shared)
         #expect(NotDeletedTransactions.Store.of(other.mainContext).transactions.isEmpty)

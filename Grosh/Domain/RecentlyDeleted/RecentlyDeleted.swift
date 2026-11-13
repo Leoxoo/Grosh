@@ -184,7 +184,7 @@ extension Wallet {
         }
         deletedAt = now
         for transaction in (transactions ?? []).notDeleted {
-            transaction.deletedAt = now
+            transaction.changeCounted { $0.deletedAt = now }
             transaction.deletedWithWallet = true
         }
         for schedule in schedules {
@@ -213,7 +213,7 @@ extension Wallet {
     func restore(today: CalendarDay) throws {
         guard isInRecentlyDeleted else { throw RecentlyDeletedError.notDeleted }
         for transaction in transactionsDeletedWithIt {
-            transaction.deletedAt = nil
+            transaction.changeCounted { $0.deletedAt = nil }
             transaction.deletedWithWallet = false
         }
         for schedule in recurringDeletedWithIt {
@@ -292,7 +292,7 @@ extension Transaction {
     /// (``takeBackMovedInReimbursements()``). Saves.
     func restore() throws {
         if let restoreBlocker { throw restoreBlocker }
-        deletedAt = nil
+        changeCounted { $0.deletedAt = nil }
         try takeBackMovedInReimbursements()
         try saveToStore()
     }

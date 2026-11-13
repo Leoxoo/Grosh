@@ -13,7 +13,7 @@ struct MoneyLoverImportTests {
     private let today = CalendarDay(year: 2026, month: 10, day: 10)
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
+        container = try TestStore.makeContainer()
         try CategorySeeder.seedIfNeeded(in: container.mainContext)
     }
 

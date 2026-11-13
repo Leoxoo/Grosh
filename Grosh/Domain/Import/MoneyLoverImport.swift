@@ -25,9 +25,9 @@ enum MoneyLoverImport {
     /// file's own row rather than a $0 one. A With of several names, as the export joins them with `; `, becomes
     /// several people. Nothing is left unmatched.
     ///
-    /// Saves once, at the end: the old data is deleted by the same save that adds the new. Throws without changing
-    /// anything when it can't finish, saving included, and ``MoneyLoverImportError/noTransactions`` for no rows.
-    /// Once saved, the old data can't be brought back.
+    /// Saves once, at the end: the old data is deleted by the same save that adds the new and rebuilds every saved month
+    /// total (ADR-0013). Throws without changing anything when it can't finish, saving included, and
+    /// ``MoneyLoverImportError/noTransactions`` for no rows. Once saved, the old data can't be brought back.
     @discardableResult
     static func replaceAllData(
         with export: MoneyLoverExport, cards: MoneyLoverCardMapping, in context: ModelContext, now: Date = .now
@@ -38,6 +38,8 @@ enum MoneyLoverImport {
             return try Signpost.interval("Import CSV") {
                 try removeAllData(in: context)
                 let summary = try importer.run()
+                // Everything is replaced, so every saved month total is counted again, in the same save (ADR-0013).
+                try WalletMonthTotals.rebuild(in: context)
                 try context.save()
                 return summary
             }

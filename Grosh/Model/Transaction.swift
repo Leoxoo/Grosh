@@ -4,10 +4,11 @@ import SwiftData
 /// One dated movement of money into or out of one wallet, filed under one category.
 @Model
 final class Transaction {
-    /// Signed effect on the wallet in cents: positive adds money, negative takes it away.
-    var amountCents: Int = 0
-    /// The ``CalendarDay`` as `yyyymmdd`.
-    var dayRaw: Int = 0
+    /// Signed effect on the wallet in cents: positive adds money, negative takes it away. Changed through
+    /// ``changeCounted(_:)`` (ADR-0013).
+    private(set) var amountCents: Int = 0
+    /// The ``CalendarDay`` as `yyyymmdd`. Changed through ``changeCounted(_:)`` (ADR-0013).
+    private(set) var dayRaw: Int = 0
     var note: String = ""
     /// The names of the transaction's ``people`` ("With"), joined with `; ` and ordered by name. A copy kept beside
     /// them, so a list, a search or an export reads the With without reading the ``people`` relationship one
@@ -41,13 +42,14 @@ final class Transaction {
     var forgivenDayRaw: Int?
     var forgivenNote: String = ""
     /// When the transaction was moved to Recently Deleted, or `nil` while it isn't there. A transaction in Recently
-    /// Deleted counts in no balance, list, search or report.
-    var deletedAt: Date?
+    /// Deleted counts in no balance, list, search or report. Changed through ``changeCounted(_:)`` (ADR-0013).
+    private(set) var deletedAt: Date?
     /// Set on a transaction that went to Recently Deleted with its wallet, as part of that one item: it is restored
     /// with the wallet, never on its own.
     var deletedWithWallet: Bool = false
 
-    var wallet: Wallet?
+    /// Changed through ``changeCounted(_:)`` (ADR-0013).
+    private(set) var wallet: Wallet?
     var category: Category?
     var card: Card?
     /// The Recurring transaction that made this one, or that the user attached it to. `nil` for an ordinary one.
@@ -60,8 +62,9 @@ final class Transaction {
     var people: [Person]? = []
     /// On an Expense, what its Reimbursements add up to in cents: zero when it has none. Kept beside them, so a balance
     /// reads a transaction's net (``netCents``) without reading its Reimbursements one transaction at a time.
-    /// The Reimbursement rules recount it whenever one is added, edited, removed or moved, so no caller has to.
-    var reimbursedCents: Int = 0
+    /// The Reimbursement rules recount it whenever one is added, edited, removed or moved, so no caller has to. Changed
+    /// through ``changeCounted(_:)`` (ADR-0013).
+    private(set) var reimbursedCents: Int = 0
     /// On an Expense, the money paid back against it. They go with it: to Recently Deleted and back, and for good.
     @Relationship(deleteRule: .cascade, inverse: \Reimbursement.expense)
     var reimbursements: [Reimbursement]? = []
@@ -98,7 +101,8 @@ final class Transaction {
 
     /// Makes a transaction of `cents` (in `wallet`'s currency, signed as it moves the wallet) on `day` in `context`, in
     /// `wallet`, filed under `category` and paid with `card`. It is inserted before its relationships are set:
-    /// SwiftData relates two models only once both are in the same context. Doesn't save.
+    /// SwiftData relates two models only once both are in the same context. Its wallet-month is marked dirty
+    /// (``changeCounted(_:)``). Doesn't save.
     @discardableResult
     static func insert(
         cents: Int,
@@ -111,7 +115,7 @@ final class Transaction {
     ) -> Transaction {
         let transaction = Transaction(amountCents: cents, day: day, note: note)
         context.insert(transaction)
-        transaction.wallet = wallet
+        transaction.changeCounted { $0.wallet = wallet }
         transaction.category = category
         transaction.card = card
         return transaction
@@ -119,10 +123,7 @@ final class Transaction {
 
     var amount: Money { Money(cents: amountCents, currencyCode: wallet.currencyCodeOrDefault) }
 
-    var day: CalendarDay {
-        get { CalendarDay(rawValue: dayRaw) }
-        set { dayRaw = newValue.rawValue }
-    }
+    var day: CalendarDay { CalendarDay(rawValue: dayRaw) }
 
     var isInRecentlyDeleted: Bool { deletedAt != nil }
 
@@ -136,6 +137,63 @@ final class Transaction {
     var estimateReminderDay: CalendarDay? {
         get { estimateReminderDayRaw.map(CalendarDay.init(rawValue:)) }
         set { estimateReminderDayRaw = newValue?.rawValue }
+    }
+}
+
+extension Transaction {
+    /// What a wallet's balance counts of a transaction: its wallet, day, amount, Reimbursed total and Recently Deleted
+    /// mark. They change only together, through ``Transaction/changeCounted(_:)`` (ADR-0013).
+    struct Counted {
+        var wallet: Wallet?
+        var day: CalendarDay
+        var amountCents: Int
+        var reimbursedCents: Int
+        var deletedAt: Date?
+
+        fileprivate func isSame(as other: Counted) -> Bool {
+            wallet === other.wallet && day == other.day && amountCents == other.amountCents
+                && reimbursedCents == other.reimbursedCents && deletedAt == other.deletedAt
+        }
+    }
+
+    /// What a wallet's balance counts of the transaction now.
+    var counted: Counted {
+        Counted(
+            wallet: wallet, day: day, amountCents: amountCents, reimbursedCents: reimbursedCents, deletedAt: deletedAt
+        )
+    }
+
+    /// The one way a transaction's wallet, day, amount, Reimbursed total or Recently Deleted mark changes (ADR-0013):
+    /// `change` edits them, and the wallet-month the transaction was counted in before is marked dirty, and the one it
+    /// is counted in after, so their saved totals are counted again. A date moved from March to May marks both months,
+    /// a move to another wallet both wallets. A change that leaves them as they were marks nothing. The marks are
+    /// inserted in the transaction's context, so they go into the same save as the change. Doesn't save.
+    ///
+    /// A rule, yet it lives here in `Model/` rather than in `Domain/`: the five fields it changes are `private(set)`, so
+    /// that the compiler refuses a write anywhere else, and Swift lets only code in this file set them (ADR-0013).
+    func changeCounted(_ change: (inout Counted) -> Void) {
+        let before = counted
+        var after = before
+        change(&after)
+        guard !after.isSame(as: before) else { return }
+        markCountedMonthDirty()
+        if wallet !== after.wallet { wallet = after.wallet }
+        if dayRaw != after.day.rawValue { dayRaw = after.day.rawValue }
+        if amountCents != after.amountCents { amountCents = after.amountCents }
+        if reimbursedCents != after.reimbursedCents { reimbursedCents = after.reimbursedCents }
+        if deletedAt != after.deletedAt { deletedAt = after.deletedAt }
+        markCountedMonthDirty()
+    }
+
+    /// Marks the wallet-month the transaction counts in as dirty, unless it is marked already. A transaction in no
+    /// wallet, or in Recently Deleted, counts in none.
+    private func markCountedMonthDirty() {
+        guard deletedAt == nil, let wallet, let context = modelContext else { return }
+        let month = CalendarMonth(day)
+        // A wallet's dirty months are few, those changed since they were last counted, so looking among them is cheap.
+        // One deleted once it was counted, but not yet saved, no longer marks it.
+        guard !(wallet.dirtyMonths ?? []).contains(where: { !$0.isDeleted && $0.month == month }) else { return }
+        DirtyWalletMonth.insert(month, of: wallet, in: context)
     }
 }
 

@@ -15,12 +15,18 @@ enum StoreOpening {
     /// Brings a store just opened up to date before any screen reads it: the default categories seeded into an empty
     /// one and any missing ones restored (``CategorySeeder``), the With names typed before there were people turned into
     /// people (``Person/migrateWithNames(in:)``, ADR-0009), so no screen ever sees a With without its Person, and every
-    /// link given its kind (``Transaction/migrateLinkKinds(in:)``, ADR-0012). Each step does nothing on a store already
-    /// up to date.
+    /// link given its kind (``Transaction/migrateLinkKinds(in:)``, ADR-0012), and the saved month totals rebuilt when
+    /// their format is missing or old (``WalletMonthTotals/rebuildIfOutdated(in:)``, ADR-0013), or else any month left
+    /// dirty by a save nothing counted counted and saved, so the screens' reads needn't count it each time. Each step does
+    /// nothing on a store already up to date. From here on, each save of `context` counts the months it marked dirty
+    /// into that same save (``WalletMonthTotals/countInEachSave(of:)``).
     static func prepare(_ context: ModelContext) throws {
+        WalletMonthTotals.countInEachSave(of: context)
         try CategorySeeder.seedIfNeeded(in: context)
         try CategorySeeder.restoreMissingDefaults(in: context)
         try Person.migrateWithNames(in: context)
         try Transaction.migrateLinkKinds(in: context)
+        try WalletMonthTotals.rebuildIfOutdated(in: context)
+        try WalletMonthTotals.countDirtyMonths(in: context)
     }
 }

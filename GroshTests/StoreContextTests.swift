@@ -12,7 +12,7 @@ struct StoreContextTests {
     private let today = TestStore.today
 
     init() throws {
-        container = try StoreOpening.open(inMemory: true)
+        container = TestStore.checked(try StoreOpening.open(inMemory: true))
     }
 
     @Test func aWalletRemovedForGoodCantBeArchived() throws {

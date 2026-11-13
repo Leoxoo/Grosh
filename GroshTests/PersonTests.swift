@@ -146,8 +146,8 @@ struct PersonTests {
         let anna = try Person.add(named: "Anna", in: context)
         let dinner = try store.eat(with: [anna])
 
-        context.delete(dinner)
-        try context.save()
+        try dinner.delete(.onlySelected)
+        try RecentlyDeleted.empty(in: context)
 
         #expect(try context.everyone().map(\.name) == ["Anna"])
     }

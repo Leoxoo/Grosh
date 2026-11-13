@@ -12,7 +12,7 @@ struct CardManagementTests {
     private let checking: Wallet
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
+        container = try TestStore.makeContainer()
         try CategorySeeder.seedIfNeeded(in: container.mainContext)
         checking = try Wallet.create(name: "Checking", startingBalance: Money(cents: 0), on: today, in: container.mainContext)
     }

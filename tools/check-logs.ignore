@@ -118,5 +118,9 @@
   {
     "pattern": "^\\[ProcessScene\\] \\[UISceneHosting-[^\\]]+:UIHostedScene-com\\.apple\\.InputUI-[0-9A-F-]+\\] No scene exists for this identity \\(didUpdateClientSettingsWithDiff\\)$",
     "reason": "The system's keyboard host (InputUI) logs this when the app's own input view, the Keypad on iPhone, takes the keyboard's place while the host's scene for the system keyboard is gone. The Keypad still comes up and types."
+  },
+  {
+    "pattern": "<compose failure \\[shared UUID\\]>",
+    "reason": "log show prints this in place of a message whose text lives in the simulator runtime's shared system libraries when it cannot read them, as on GitHub's xcode-27 image with iOS 27.2. Only system libraries' messages are kept there; Grosh's own messages are in its app binary and still read in full."
   }
 ]

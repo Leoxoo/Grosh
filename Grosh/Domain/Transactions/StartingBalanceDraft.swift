@@ -29,8 +29,10 @@ extension Transaction {
     func update(with draft: StartingBalanceDraft) throws {
         guard editFlow == .startingBalance else { throw TransactionRuleError.notAStartingBalance }
         try draft.validate()
-        amountCents = draft.amount.cents
-        day = draft.day
+        changeCounted {
+            $0.amountCents = draft.amount.cents
+            $0.day = draft.day
+        }
         note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
         try saveToStore()
     }

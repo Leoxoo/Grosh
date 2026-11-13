@@ -581,9 +581,9 @@ struct DebtLoanTests {
     @Test func debtsAndLoansListsOpenOnesOldestFirstAndSettledOnesNewestFirst() throws {
         let pasha = try lend(100_00, to: "Pasha")
         let anna = try borrow(50_00, from: "Anna")
-        anna.day = lentOn.adding(days: -10)
+        anna.changeCounted { $0.day = lentOn.adding(days: -10) }
         let ivan = try lend(20_00, to: "Ivan")
-        ivan.day = lentOn.adding(days: 1)
+        ivan.changeCounted { $0.day = lentOn.adding(days: 1) }
         try pay(20_00, on: ivan)
         let olga = try borrow(30_00, from: "Olga")
         try pay(30_00, on: olga)

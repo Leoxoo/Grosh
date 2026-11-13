@@ -12,7 +12,7 @@ struct CardImageShrinkingTests {
     private let container: ModelContainer
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
+        container = try TestStore.makeContainer()
     }
 
     /// A Card with an image saved as the Card editor saves one: a photo cropped to a credit card, 960 by 605 pixels.

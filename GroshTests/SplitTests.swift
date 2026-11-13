@@ -542,7 +542,7 @@ struct SplitTests {
         draft.addPart(part)
         draft.original.entry = AmountEntry(cents: 16_80)
         let created = try #require(try coffee.split(draft).first)
-        created.amountCents = -9_00
+        created.changeCounted { $0.amountCents = -9_00 }
 
         try coffee.undoSplit()
 

@@ -11,7 +11,7 @@ struct WalletSelectionTests {
     private let today = TestStore.today
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
+        container = try TestStore.makeContainer()
     }
 
     @discardableResult

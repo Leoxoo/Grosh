@@ -10,8 +10,12 @@ import UniformTypeIdentifiers
 /// test opens the app on it (``UITestStore``). It is compiled into Debug builds only, so the app as shipped never
 /// carries it.
 enum BenchmarkStore {
+    /// The store at `url`, each save counting the saved month totals it made dirty, as the app's does (ADR-0013), so a
+    /// benchmark's save pays for that count too.
     static func open(at url: URL) throws -> ModelContainer {
-        try GroshStore.makeContainer(at: url)
+        let container = try GroshStore.makeContainer(at: url)
+        WalletMonthTotals.countInEachSave(of: container.mainContext)
+        return container
     }
 
     static func prepare(at url: URL, years: Int) throws {
@@ -113,7 +117,9 @@ enum BenchmarkStore {
 
         // Some waiting in Recently Deleted, not yet due to be removed.
         let recent = try context.fetch(Transaction.recent(limit: 150, asOf: today))
-        for transaction in recent.suffix(100) { transaction.deletedAt = .now.addingTimeInterval(-5 * 86_400) }
+        for transaction in recent.suffix(100) {
+            transaction.changeCounted { $0.deletedAt = .now.addingTimeInterval(-5 * 86_400) }
+        }
 
         // Recurring transactions, dealt with through today so opening the app has nothing to make.
         for index in 0..<12 {
@@ -132,6 +138,8 @@ enum BenchmarkStore {
             schedule.handledThrough = today
             context.insert(schedule)
         }
+        // The saved month totals as a launch after the update builds them, so opening the store doesn't (ADR-0013).
+        try WalletMonthTotals.rebuild(in: context)
         try context.save()
         print("BENCH store holds \(try context.fetchCount(FetchDescriptor<Transaction>())) transactions")
     }
