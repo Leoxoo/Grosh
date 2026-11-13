@@ -16,7 +16,7 @@ struct NotDeletedTransactionsTests {
     private let checking: Wallet
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
+        container = try TestStore.makeContainer()
         checking = container.mainContext.addWallet("Checking")
     }
 
@@ -166,7 +166,7 @@ struct NotDeletedTransactionsTests {
     @Test func eachContextHasItsOwn() throws {
         record("coffee")
         try context.save()
-        let other = try GroshStore.makeContainer(inMemory: true)
+        let other = try TestStore.makeContainer()
 
         #expect(NotDeletedTransactions.Store.of(context) === shared)
         #expect(NotDeletedTransactions.Store.of(other.mainContext).transactions.isEmpty)

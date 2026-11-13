@@ -17,9 +17,7 @@ struct TestStore {
     var catalog: CategoryCatalog { CategoryCatalog(context: context) }
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
-        WalletMonthTotals.recountAfterEachSave(of: container.mainContext)
-        SavedTotalsCheck.stores?.add(container)
+        container = try Self.makeContainer()
         try CategorySeeder.seedIfNeeded(in: container.mainContext)
         checking = container.mainContext.addWallet("Checking")
     }
@@ -135,6 +133,27 @@ struct TestStore {
         draft.category = try category("Restaurants")
         draft.people = people
         return try Transaction.create(draft, in: context)
+    }
+}
+
+// MARK: - Making a store
+
+extension TestStore {
+    /// An empty in-memory store, the one every suite starts from (``checked(_:countingEachSave:)``).
+    static func makeContainer(countingEachSave: Bool = true) throws -> ModelContainer {
+        checked(try GroshStore.makeContainer(inMemory: true), countingEachSave: countingEachSave)
+    }
+
+    /// `container`, each save of its main context counting the saved month totals it made dirty, as the app's store
+    /// does, and its totals checked against a full count of its transactions once the test ends (``SavedTotalsCheck``,
+    /// ADR-0013). Every store a test makes goes through here, so no change that marks no month passes unseen.
+    /// `countingEachSave: false` saves it where nothing counts them, as another context or an older app does: its
+    /// dirty months wait to be counted, and the check leaves them out.
+    @discardableResult
+    static func checked(_ container: ModelContainer, countingEachSave: Bool = true) -> ModelContainer {
+        if countingEachSave { WalletMonthTotals.recountAfterEachSave(of: container.mainContext) }
+        SavedTotalsCheck.stores?.add(container)
+        return container
     }
 }
 

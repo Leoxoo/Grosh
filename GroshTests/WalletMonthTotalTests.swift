@@ -94,7 +94,7 @@ struct WalletMonthTotalTests {
 
     @Test func openingAStoreSavedBeforeThereWereTotalsBuildsThem() throws {
         // Saved as the app did before it kept totals: none, no marks and no format version.
-        let container = try GroshStore.makeContainer(inMemory: true)
+        let container = try TestStore.makeContainer(countingEachSave: false)
         let other = container.mainContext
         let cash = other.addWallet("Cash")
         other.record(-12_00, on: day(2026, 10, 3), in: cash)
@@ -131,7 +131,7 @@ struct WalletMonthTotalTests {
     /// So the first screen to read a balance never saves while it draws.
     @Test func openingAStoreWithAMonthStillDirtyCountsIt() throws {
         // Saved where nothing counts the totals after a save, as when the app stopped between a save and its count.
-        let container = try GroshStore.makeContainer(inMemory: true)
+        let container = try TestStore.makeContainer(countingEachSave: false)
         let other = container.mainContext
         try CategorySeeder.seedIfNeeded(in: other)
         let cash = other.addWallet("Cash")
@@ -196,7 +196,7 @@ struct WalletMonthTotalTests {
     }
 
     @Test func aMonthWaitingToBeCountedIsNoMismatch() throws {
-        let container = try GroshStore.makeContainer(inMemory: true)
+        let container = try TestStore.makeContainer(countingEachSave: false)
         let other = container.mainContext
         other.record(-12_00, on: day(2026, 10, 3), in: other.addWallet("Cash"))
         try other.save()
@@ -208,7 +208,7 @@ struct WalletMonthTotalTests {
 
     @Test func aMonthStillDirtyWhenTheTotalsAreReadIsCountedThen() throws {
         // Saved where nothing counts the totals after a save, as when the app stopped between a save and its count.
-        let container = try GroshStore.makeContainer(inMemory: true)
+        let container = try TestStore.makeContainer(countingEachSave: false)
         let other = container.mainContext
         let cash = other.addWallet("Cash")
         other.record(-12_00, on: day(2026, 10, 3), in: cash)

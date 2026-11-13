@@ -17,7 +17,7 @@ struct RecentlyDeletedTests {
     private let links = TestLinks()
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
+        container = try TestStore.makeContainer()
         checking = container.mainContext.addWallet("Checking")
         savings = container.mainContext.addWallet("Savings")
     }

@@ -14,7 +14,7 @@ struct TimeRangeBalanceTests {
     private let checking: Wallet
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
+        container = try TestStore.makeContainer()
         checking = container.mainContext.addWallet("Checking")
         record(1_000_00, on: day(2026, 7, 1))
         record(-100_00, on: day(2026, 9, 30))

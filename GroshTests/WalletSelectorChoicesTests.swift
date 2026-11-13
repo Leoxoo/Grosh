@@ -13,7 +13,7 @@ struct WalletSelectorChoicesTests {
     private let today = TestStore.today
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
+        container = try TestStore.makeContainer()
     }
 
     private func record(_ cents: Int, in wallet: Wallet, on day: CalendarDay? = nil) {

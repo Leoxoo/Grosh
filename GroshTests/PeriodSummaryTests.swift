@@ -13,7 +13,7 @@ struct PeriodSummaryTests {
     private let checking: Wallet
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
+        container = try TestStore.makeContainer()
         checking = container.mainContext.addWallet("Checking")
     }
 

@@ -72,7 +72,7 @@ struct SavedBalanceTests {
 
     @Test func aMonthStillDirtyWhenTheBalancesAreReadIsCountedFirst() throws {
         // Saved where nothing counts the totals after a save, as when the app stopped between a save and its count.
-        let container = try GroshStore.makeContainer(inMemory: true)
+        let container = try TestStore.makeContainer(countingEachSave: false)
         let other = container.mainContext
         let cash = other.addWallet("Cash")
         other.record(40_00, on: day(2026, 9, 3), in: cash)

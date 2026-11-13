@@ -11,7 +11,7 @@ struct WalletBalanceTests {
     private let today = TestStore.today
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
+        container = try TestStore.makeContainer()
     }
 
     private func record(_ cents: Int, on day: CalendarDay, in wallet: Wallet) {
