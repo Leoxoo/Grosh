@@ -266,6 +266,7 @@ struct DebtsAndLoansByPersonTests {
     }
 }
 
+@MainActor
 private extension DebtsAndLoansByPerson {
     /// `person`'s entry, open or settled, or `nil` when they are not listed.
     func entry(for person: Person) -> PersonDebtsAndLoans? {

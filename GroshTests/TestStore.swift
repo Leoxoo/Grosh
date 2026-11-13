@@ -297,6 +297,7 @@ func walletTotal(_ wallets: [Wallet], asOf today: CalendarDay) -> [Money] {
     WalletBalances(of: wallets, asOf: today).total(of: wallets)
 }
 
+@MainActor
 extension Card {
     /// What the Card's statement screen shows for `period` on `today`, fetched through the same
     /// ``CardStatement/Reads`` the screen's queries use.
@@ -344,6 +345,7 @@ func moneyLoverExport(_ rows: [String]) -> String {
 
 // MARK: - Shorthands for production calls
 
+@MainActor
 extension Wallet {
     /// Adds a wallet named `name` with its Starting balance, as ``create(_:startingBalance:on:in:)`` does.
     @MainActor
@@ -366,6 +368,7 @@ extension Wallet {
     }
 }
 
+@MainActor
 extension TransactionListing {
     /// The Transactions tab's list of `selection` on `days` from `all`, with their ledger entries read from them.
     init(
