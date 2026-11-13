@@ -175,8 +175,8 @@ nonisolated struct RecurringDraft {
     }
 
     /// The estimate the draft needs now, or `nil` when its amount doesn't vary or it has no category yet. The draft
-    /// reads nothing from the store: whoever holds it reads the estimate from ``AmountEstimate`` and gives it with
-    /// ``setEstimate(_:for:)`` whenever this changes.
+    /// reads nothing from the store: whoever holds it has ``AmountEstimate/give(to:)`` read the estimate and give
+    /// it whenever this changes.
     var neededEstimate: EstimateRequest? {
         guard estimatesAmount, let category else { return nil }
         return EstimateRequest(category: category, currencyCode: currencyCode)
@@ -345,8 +345,7 @@ extension RecurringTransaction {
         Money(cents: (estimateCents ?? amountCents) * (category?.sign ?? -1), currencyCode: currencyCode)
     }
 
-    /// What its transactions start at now, a varying Bill's estimate read from the store. A screen showing many
-    /// schedules reads them once through ``RecurringFigures``.
+    /// What its transactions start at now, a varying Bill's estimate read from the store. X    /// schedules reads them once through ``RecurringSchedules``.
     func currentStartingAmount() -> Money {
         startingAmount(estimateCents: currentEstimateCents())
     }

@@ -64,7 +64,9 @@ private struct CategoryForm: View {
     @State private var draft: CategoryDraft
     @State private var isMerging = false
     @State private var isConfirmingDelete = false
-    @State private var parentOptions = ParentOptions()
+    /// The parent categories offered for the type shown, read from the store when the type changes rather than on every
+    /// draw, which is every keystroke in Name.
+    @State private var keptParentOptions = DrawingCache<CategoryType, [Category]>()
     private var saver = SheetSaver(Strings.Categories.couldntSave)
 
     init(mode: CategoryEditor.Mode, startingDraft: CategoryDraft, inUse: Set<PersistentIdentifier>) {
@@ -87,19 +89,11 @@ private struct CategoryForm: View {
         return !editing.isLocked && !inUse.contains(editing.persistentModelID)
     }
 
-    /// The parent categories offered for each type, read from the store the first time the type is shown rather than
-    /// on every draw, which is every keystroke in Name. Filling it in doesn't redraw anything, so it is safe while
-    /// drawing.
-    private final class ParentOptions {
-        private var byType: [CategoryType: [Category]] = [:]
-
-        func of(_ type: CategoryType, for editing: Category?, in catalog: CategoryCatalog) -> [Category] {
-            if let options = byType[type] { return options }
-            let options = Log.store.attempt("Reading the parent categories to choose from") {
+    private func parentOptions(of type: CategoryType) -> [Category] {
+        keptParentOptions.value(for: type) {
+            Log.store.attempt("Reading the parent categories to choose from") {
                 try catalog.parentOptions(of: type, for: editing)
             } ?? []
-            byType[type] = options
-            return options
         }
     }
 
@@ -109,7 +103,7 @@ private struct CategoryForm: View {
             Form {
                 detailsSection(
                     canChangeType: canChangeType,
-                    parentOptions: parentOptions.of(draft.type, for: editing, in: catalog),
+                    parentOptions: parentOptions(of: draft.type),
                     check: check
                 )
                 if !isLocked {
@@ -164,8 +158,9 @@ private struct CategoryForm: View {
             }
             if !isLocked {
                 Picker(Strings.Common.type, selection: $draft.type) {
-                    Text(CategoryType.expense.title).tag(CategoryType.expense)
-                    Text(CategoryType.income.title).tag(CategoryType.income)
+                    ForEach(CategoryType.ordinary, id: \.self) { type in
+                        Text(type.title).tag(type)
+                    }
                 }
                 .disabled(!canChangeType)
 

@@ -41,17 +41,8 @@ struct RecurringTransactionEditor: View {
         case .edit(let recurring):
             draft = RecurringDraft(editing: recurring)
         }
-        draft.readNeededEstimate()
+        AmountEstimate.give(to: &draft)
         return draft
-    }
-}
-
-extension RecurringDraft {
-    /// Reads the estimate the draft needs now from the store, if it needs one, and gives it to the draft.
-    fileprivate mutating func readNeededEstimate() {
-        if let request = neededEstimate {
-            setEstimate(AmountEstimate.cents(for: request), for: request)
-        }
     }
 }
 
@@ -86,8 +77,9 @@ private struct RecurringForm: View {
         ) { fields in
             Section {
                 Picker(Strings.Common.type, selection: $draft.type) {
-                    Text(CategoryType.expense.title).tag(CategoryType.expense)
-                    Text(CategoryType.income.title).tag(CategoryType.income)
+                    ForEach(CategoryType.ordinary, id: \.self) { type in
+                        Text(type.title).tag(type)
+                    }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -108,7 +100,7 @@ private struct RecurringForm: View {
         }
         // Read once per change of category, wallet, Kind or "amount varies", rather than each time the draft is checked.
         .onChange(of: draft.neededEstimate) {
-            draft.readNeededEstimate()
+            AmountEstimate.give(to: &draft)
         }
     }
 

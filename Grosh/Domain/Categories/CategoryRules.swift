@@ -20,10 +20,14 @@ extension Transaction {
 
 nonisolated extension CategoryType {
     /// The types the user sees, in order: the segments of Account → Categories and of the Add sheet.
-    static let segments: [CategoryType] = [.expense, .income, .debtLoan]
+    static let segments: [CategoryType] = ordinary + [.debtLoan]
+
+    /// Expense and Income, in order: the types of the user's own categories, and all that a Recurring transaction, a
+    /// category's editor, a balance adjustment or a part of a Split offers.
+    static let ordinary: [CategoryType] = [.expense, .income]
 
     /// Expense and Income categories are the user's own; Debt/Loan and system categories are fixed.
-    var isUserManaged: Bool { self == .expense || self == .income }
+    var isUserManaged: Bool { Self.ordinary.contains(self) }
 }
 
 extension LockedRole {

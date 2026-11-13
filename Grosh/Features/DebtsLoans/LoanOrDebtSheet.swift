@@ -1,4 +1,3 @@
-import SwiftData
 import SwiftUI
 
 /// A sheet that records something against a Loan or Debt, such as Record Payment or Forgive the Rest: `form` with a
@@ -8,15 +7,14 @@ struct LoanOrDebtSheet<Draft, Form: View>: View {
     let unavailableTitle: LocalizedStringResource
     let unavailableMessage: LocalizedStringResource
     /// Throws when the transaction isn't a Loan or Debt.
-    let makeDraft: (ModelContext) throws -> Draft
+    let makeDraft: () throws -> Draft
     @ViewBuilder let form: (Draft) -> Form
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
 
     var body: some View {
         MadeOnce {
-            Log.store.attempt("Making the draft for a Loan or Debt") { try makeDraft(context) }
+            Log.store.attempt("Making the draft for a Loan or Debt") { try makeDraft() }
         } content: { draft in
             content(draft)
         }

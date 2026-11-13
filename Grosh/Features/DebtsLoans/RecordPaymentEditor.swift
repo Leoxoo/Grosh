@@ -13,8 +13,8 @@ struct RecordPaymentEditor: View {
         LoanOrDebtSheet(
             unavailableTitle: Strings.DebtsLoans.cantRecordPayment,
             unavailableMessage: Strings.DebtsLoans.onlyLoanOrDebtPaidBack
-        ) { context in
-            try DebtPaymentDraft(settling: original, on: today, in: context)
+        ) {
+            try DebtPaymentDraft(settling: original, on: today)
         } form: { draft in
             RecordPaymentForm(startingDraft: draft)
         }

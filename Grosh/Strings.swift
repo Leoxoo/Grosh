@@ -10,6 +10,8 @@ nonisolated enum Strings {
     /// Words and messages that many screens share.
     enum Common {
         static let notInStore: LocalizedStringResource = "It's no longer in Grosh."
+        /// Stands in for a value there is none of, such as the wallet of a transfer's deleted half.
+        static let noValue: LocalizedStringResource = "—"
         static let cancel: LocalizedStringResource = "Cancel"
         static let done: LocalizedStringResource = "Done"
         static let save: LocalizedStringResource = "Save"

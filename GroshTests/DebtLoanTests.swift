@@ -97,7 +97,7 @@ struct DebtLoanTests {
         let loan = try lend(100_00)
         try pay(60_00, on: loan)
 
-        let draft = try DebtPaymentDraft(settling: loan, on: paidOn, in: context)
+        let draft = try DebtPaymentDraft(settling: loan, on: paidOn)
 
         #expect(draft.amount == Money(cents: 40_00))
         #expect(draft.day == paidOn)
@@ -111,7 +111,7 @@ struct DebtLoanTests {
         try pay(60_00, on: loan)
         #expect(try outstanding(loan) == Money(cents: 40_00))
 
-        var draft = try DebtPaymentDraft(settling: loan, on: paidOn.adding(days: 7), in: context)
+        var draft = try DebtPaymentDraft(settling: loan, on: paidOn.adding(days: 7))
         draft.entry = AmountEntry(cents: 70_00)
         draft.overpaymentCategory = try store.category("Collect Interest", .income)
         #expect(draft.overpaid == Money(cents: 30_00))
@@ -134,7 +134,7 @@ struct DebtLoanTests {
     @Test func anOverpaidDebtIsAnExpenseForTheRest() throws {
         let debt = try borrow(100_00)
 
-        var draft = try DebtPaymentDraft(settling: debt, on: paidOn, in: context)
+        var draft = try DebtPaymentDraft(settling: debt, on: paidOn)
         draft.entry = AmountEntry(cents: 120_00)
         draft.overpaymentCategory = try store.category("Gifts & Donations")
         let recorded = try DebtPayment.record(draft, in: context)
@@ -155,7 +155,7 @@ struct DebtLoanTests {
             role, 100_00, with: context.person("Pasha"), on: lentOn, in: checking
         )
 
-        let draft = try DebtPaymentDraft(settling: original, on: paidOn, in: context)
+        let draft = try DebtPaymentDraft(settling: original, on: paidOn)
 
         #expect(draft.overpaymentCategory == (try context.lockedCategory(expected)))
         #expect(draft.overpaymentType == (role == .loan ? .income : .expense))
@@ -164,7 +164,7 @@ struct DebtLoanTests {
     @Test func nothingIsOverpaidUpToWhatIsOutstanding() throws {
         let loan = try lend(100_00)
 
-        var draft = try DebtPaymentDraft(settling: loan, on: paidOn, in: context)
+        var draft = try DebtPaymentDraft(settling: loan, on: paidOn)
         draft.entry = AmountEntry(cents: 100_00)
 
         #expect(draft.overpaid == Money(cents: 0))
@@ -175,7 +175,7 @@ struct DebtLoanTests {
 
     @Test func aPaymentOfNothingIsRefused() throws {
         let loan = try lend(100_00)
-        var draft = try DebtPaymentDraft(settling: loan, on: paidOn, in: context)
+        var draft = try DebtPaymentDraft(settling: loan, on: paidOn)
         draft.entry = AmountEntry(cents: 0)
 
         #expect(!draft.canSave)
@@ -185,7 +185,7 @@ struct DebtLoanTests {
 
     @Test func aSettledLoanTakesNoMorePayments() throws {
         let loan = try lend(100_00)
-        let draft = try DebtPaymentDraft(settling: loan, on: paidOn, in: context)
+        let draft = try DebtPaymentDraft(settling: loan, on: paidOn)
         try DebtPayment.record(draft, in: context)
 
         #expect(throws: DebtLoanRuleError.alreadySettled) { try pay(10_00, on: loan) }
@@ -195,7 +195,7 @@ struct DebtLoanTests {
 
     @Test func anOverpaymentNeedsACategoryOfTheMatchingType() throws {
         let loan = try lend(100_00)
-        var draft = try DebtPaymentDraft(settling: loan, on: paidOn, in: context)
+        var draft = try DebtPaymentDraft(settling: loan, on: paidOn)
         draft.entry = AmountEntry(cents: 120_00)
 
         draft.overpaymentCategory = try store.category("Café")
@@ -216,7 +216,7 @@ struct DebtLoanTests {
         let countBefore = try context.transactionCount()
         let forgivenOn = paidOn.adding(days: 3)
 
-        var draft = try ForgiveDraft(forgiving: loan, on: forgivenOn, in: context)
+        var draft = try ForgiveDraft(forgiving: loan, on: forgivenOn)
         draft.category = try store.category("Friends & Lover")
         draft.note = "  Birthday  "
         #expect(draft.forgiven == Money(cents: 20_00))
@@ -239,7 +239,7 @@ struct DebtLoanTests {
         let debt = try borrow(250_00)
         try pay(200_00, on: debt)
 
-        var draft = try ForgiveDraft(forgiving: debt, on: paidOn, in: context)
+        var draft = try ForgiveDraft(forgiving: debt, on: paidOn)
         draft.category = try store.category("Gifts", .income)
         try Forgiveness.record(draft, in: context)
 
@@ -253,11 +253,11 @@ struct DebtLoanTests {
 
     @Test func theForgivenAmountCountsInReportsAsExpenseForALoanAndIncomeForADebt() throws {
         let loan = try lend(100_00)
-        var forgiveLoan = try ForgiveDraft(forgiving: loan, on: paidOn, in: context)
+        var forgiveLoan = try ForgiveDraft(forgiving: loan, on: paidOn)
         forgiveLoan.category = try context.lockedCategory(.otherExpense)
         let forgivenLoan = try Forgiveness.record(forgiveLoan, in: context)
         let debt = try borrow(40_00)
-        var forgiveDebt = try ForgiveDraft(forgiving: debt, on: paidOn, in: context)
+        var forgiveDebt = try ForgiveDraft(forgiving: debt, on: paidOn)
         forgiveDebt.category = try context.lockedCategory(.otherIncome)
         let forgivenDebt = try Forgiveness.record(forgiveDebt, in: context)
 
@@ -270,7 +270,7 @@ struct DebtLoanTests {
     @Test func unforgivingMakesWhatWasForgivenOutstandingAgain() throws {
         let loan = try lend(50_00)
         try pay(30_00, on: loan)
-        var draft = try ForgiveDraft(forgiving: loan, on: paidOn, in: context)
+        var draft = try ForgiveDraft(forgiving: loan, on: paidOn)
         draft.category = try context.lockedCategory(.otherExpense)
         try Forgiveness.record(draft, in: context)
 
@@ -288,7 +288,7 @@ struct DebtLoanTests {
     @Test func deletingAPaymentOnAForgivenLoanMakesThatPartOutstandingAgain() throws {
         let loan = try lend(100_00)
         let collection = try pay(60_00, on: loan).payment
-        var draft = try ForgiveDraft(forgiving: loan, on: paidOn, in: context)
+        var draft = try ForgiveDraft(forgiving: loan, on: paidOn)
         draft.category = try context.lockedCategory(.otherExpense)
         try Forgiveness.record(draft, in: context)
 
@@ -297,7 +297,7 @@ struct DebtLoanTests {
         #expect(try outstanding(loan) == Money(cents: 60_00))
         #expect(loan.forgiveness?.amount == Money(cents: 40_00))
 
-        var again = try ForgiveDraft(forgiving: loan, on: paidOn.adding(days: 1), in: context)
+        var again = try ForgiveDraft(forgiving: loan, on: paidOn.adding(days: 1))
         again.category = try context.lockedCategory(.otherExpense)
         try Forgiveness.record(again, in: context)
         #expect(try isSettled(loan))
@@ -312,7 +312,7 @@ struct DebtLoanTests {
             role, 100_00, with: context.person("Pasha"), on: lentOn, in: checking
         )
 
-        let draft = try ForgiveDraft(forgiving: original, on: paidOn, in: context)
+        let draft = try ForgiveDraft(forgiving: original, on: paidOn)
 
         #expect(draft.category == (try context.lockedCategory(expected)))
         #expect(draft.forgivenType == (role == .loan ? .expense : .income))
@@ -320,7 +320,7 @@ struct DebtLoanTests {
 
     @Test func forgivingNeedsAnOpenLoanAndACategoryOfTheMatchingType() throws {
         let loan = try lend(100_00)
-        var draft = try ForgiveDraft(forgiving: loan, on: paidOn, in: context)
+        var draft = try ForgiveDraft(forgiving: loan, on: paidOn)
 
         draft.category = try store.category("Salary", .income)
         #expect(!draft.canSave)
@@ -338,7 +338,7 @@ struct DebtLoanTests {
 
     @Test func aForgivenLoanTakesNoMorePaymentsUntilUnforgiven() throws {
         let loan = try lend(100_00)
-        var forgive = try ForgiveDraft(forgiving: loan, on: paidOn, in: context)
+        var forgive = try ForgiveDraft(forgiving: loan, on: paidOn)
         forgive.category = try context.lockedCategory(.otherExpense)
         try Forgiveness.record(forgive, in: context)
 
@@ -347,7 +347,7 @@ struct DebtLoanTests {
 
     @Test func aForgivenLoanKeepsItsAmountWalletAndCategoryUntilUnforgiven() throws {
         let loan = try lend(100_00)
-        var forgive = try ForgiveDraft(forgiving: loan, on: paidOn, in: context)
+        var forgive = try ForgiveDraft(forgiving: loan, on: paidOn)
         forgive.category = try context.lockedCategory(.otherExpense)
         try Forgiveness.record(forgive, in: context)
         let editing = TransactionDraft(editing: loan)
@@ -370,7 +370,7 @@ struct DebtLoanTests {
     @Test func aCategoryAForgivenAmountCountsUnderCantBeDeletedAndMovesWhenMerged() throws {
         let loan = try lend(100_00)
         let friends = try store.category("Friends & Lover")
-        var forgive = try ForgiveDraft(forgiving: loan, on: paidOn, in: context)
+        var forgive = try ForgiveDraft(forgiving: loan, on: paidOn)
         forgive.category = friends
         try Forgiveness.record(forgive, in: context)
 
@@ -419,7 +419,7 @@ struct DebtLoanTests {
     @Test func whatOverpayingADebtWritesOffNeedsNoCard() throws {
         try context.addCard(paidFrom: checking)
         let debt = try borrow(100_00)
-        var payment = try DebtPaymentDraft(settling: debt, on: paidOn, in: context)
+        var payment = try DebtPaymentDraft(settling: debt, on: paidOn)
         payment.entry = AmountEntry(cents: 120_00)
         let overpaid = try #require(try DebtPayment.record(payment, in: context).overpayment)
         let coffee = store.spend(4_50, on: try store.category("Café"))
@@ -445,7 +445,7 @@ struct DebtLoanTests {
         let enteredAt = loan.createdAt
 
         try pay(30_00, on: loan)
-        var forgive = try ForgiveDraft(forgiving: loan, on: paidOn, in: context)
+        var forgive = try ForgiveDraft(forgiving: loan, on: paidOn)
         forgive.category = try store.category("Friends & Lover")
         try Forgiveness.record(forgive, in: context)
         let debt = try borrow(50_00)
@@ -601,7 +601,7 @@ struct DebtLoanTests {
         let coffee = store.spend(4_50, on: try store.category("Café"))
 
         #expect(throws: DebtLoanRuleError.notALoanOrDebt) {
-            try DebtPaymentDraft(settling: coffee, on: paidOn, in: context)
+            try DebtPaymentDraft(settling: coffee, on: paidOn)
         }
     }
 }

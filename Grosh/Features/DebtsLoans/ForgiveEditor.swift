@@ -14,8 +14,8 @@ struct ForgiveEditor: View {
         LoanOrDebtSheet(
             unavailableTitle: Strings.DebtsLoans.cantForgive,
             unavailableMessage: Strings.DebtsLoans.onlyLoanOrDebtForgiven
-        ) { context in
-            try ForgiveDraft(forgiving: original, on: today, in: context)
+        ) {
+            try ForgiveDraft(forgiving: original, on: today)
         } form: { draft in
             ForgiveForm(startingDraft: draft)
         }

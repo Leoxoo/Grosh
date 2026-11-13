@@ -245,7 +245,7 @@ nonisolated extension TransactionDraft {
     /// category of the type its difference matches, never a Loan or Debt. A part of a Split is never a Loan or Debt
     /// either.
     var types: [CategoryType] {
-        isBalanceAdjustment || isSplitPart ? [.expense, .income] : CategoryType.segments
+        isBalanceAdjustment || isSplitPart ? CategoryType.ordinary : CategoryType.segments
     }
 
     /// Whether the transaction can name a Card at all: every transaction but the two halves of a transfer.

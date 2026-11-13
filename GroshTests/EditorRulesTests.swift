@@ -199,7 +199,7 @@ struct EditorRulesTests {
             role, 50_00, with: fixture.person("Alex"), on: day(2026, 10, 3), in: fixture.checking
         )
 
-        var payment = try DebtPaymentDraft(settling: original, on: day(2026, 10, 9), in: context)
+        var payment = try DebtPaymentDraft(settling: original, on: day(2026, 10, 9))
         payment.entry = AmountEntry(cents: 70_00)
         #expect(payment.signedOverpaid.cents == overpaid)
     }

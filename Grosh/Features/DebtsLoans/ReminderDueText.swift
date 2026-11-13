@@ -7,8 +7,13 @@ struct ReminderDueText: View {
     let isDue: Bool
 
     var body: some View {
-        Text("\(Image(systemName: "bell")) \(Text(Strings.DebtsLoans.due(day.shortText)))")
-            .font(.caption)
-            .foregroundStyle(isDue ? .urgent : .secondary)
+        // The bell sits beside the sentence rather than inside it, so the only text is the whole "Due …" sentence.
+        HStack(spacing: 3) {
+            Image(systemName: "bell")
+            Text(Strings.DebtsLoans.due(day.shortText))
+        }
+        .font(.caption)
+        .foregroundStyle(isDue ? .urgent : .secondary)
+        .accessibilityElement(children: .combine)
     }
 }

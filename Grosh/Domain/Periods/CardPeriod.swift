@@ -96,46 +96,6 @@ extension Card {
     func period(containing day: CalendarDay) -> CardPeriod {
         CardPeriod(containing: day, statementDay: kind == .credit ? statementDay : nil)
     }
-
-    /// The Card's transactions outside Recently Deleted dated from `first` through `last`: what a statement reads for
-    /// its period and lead-in days (``CardStatement/days(for:)``), found by the store rather than by walking every
-    /// transaction the Card paid for, which run into thousands for a main Card.
-    func paidTransactions(from first: CalendarDay, through last: CalendarDay) -> FetchDescriptor<Transaction> {
-        let id = persistentModelID
-        let firstRaw = first.rawValue
-        let lastRaw = last.rawValue
-        return FetchDescriptor(predicate: #Predicate { transaction in
-            transaction.card?.persistentModelID == id && transaction.deletedAt == nil
-                && transaction.dayRaw >= firstRaw && transaction.dayRaw <= lastRaw
-        })
-    }
-
-    /// The Card's earliest transaction outside Recently Deleted, by day: where its statements' ‹ stops.
-    var earliestTransaction: FetchDescriptor<Transaction> { endTransaction(order: .forward) }
-
-    /// The Card's latest transaction outside Recently Deleted, by day: where its statements' › stops.
-    var latestTransaction: FetchDescriptor<Transaction> { endTransaction(order: .reverse) }
-
-    private func endTransaction(order: SortOrder) -> FetchDescriptor<Transaction> {
-        let id = persistentModelID
-        var descriptor = FetchDescriptor<Transaction>(
-            predicate: #Predicate { $0.card?.persistentModelID == id && $0.deletedAt == nil },
-            sortBy: [SortDescriptor(\.dayRaw, order: order)]
-        )
-        descriptor.fetchLimit = 1
-        return descriptor
-    }
-
-    /// What the Card's statement screen shows for `period` on `today`, read from the store as the screen reads it.
-    func statement(for period: CardPeriod, today: CalendarDay) throws -> CardStatement {
-        let context = try storeContext()
-        let days = CardStatement.days(for: period)
-        return CardStatement(
-            of: self, for: period, read: try context.fetch(paidTransactions(from: days.first, through: days.last)),
-            earliest: try context.fetch(earliestTransaction).first?.day,
-            latest: try context.fetch(latestTransaction).first?.day, today: today
-        )
-    }
 }
 
 /// What a Card's statement screen shows for one period: the periods ‹ › step through, the transactions paid with the
@@ -152,21 +112,16 @@ nonisolated struct CardStatement {
     /// in this one's total unless the user adds one for the moment. None for a calendar month.
     let leadIns: [Transaction]
 
-    /// The days a statement of `period` reads the Card's transactions on: its lead-in days, if it has any, and its own.
-    static func days(for period: CardPeriod) -> (first: CalendarDay, last: CalendarDay) {
-        (period.leadInDays?.first ?? period.firstDay, period.lastDay)
-    }
-
-    /// The statement of `card` for `period` on `today`, from `read`, the Card's transactions on ``days(for:)``, and the
-    /// days of its `earliest` and `latest` transactions.
+    /// The statement of `card` for `period` on `today`, from what its ``Reads`` found in the store: `paid`, `earliest`
+    /// and `latest`.
     init(
-        of card: Card, for period: CardPeriod, read: [Transaction], earliest: CalendarDay?, latest: CalendarDay?,
+        of card: Card, for period: CardPeriod, paid: [Transaction], earliest: [Transaction], latest: [Transaction],
         today: CalendarDay
     ) {
         let leadInDays = period.leadInDays
         var transactions: [Transaction] = []
         var leadIns: [Transaction] = []
-        for transaction in read {
+        for transaction in paid {
             let day = transaction.day
             if period.contains(day) {
                 transactions.append(transaction)
@@ -174,10 +129,44 @@ nonisolated struct CardStatement {
                 leadIns.append(transaction)
             }
         }
-        let first = min(earliest ?? today, today)
-        let last = max(latest ?? today, today)
+        let first = min(earliest.first?.day ?? today, today)
+        let last = max(latest.first?.day ?? today, today)
         periods = card.period(containing: first)...card.period(containing: last)
         self.transactions = transactions
         self.leadIns = leadIns
+    }
+}
+
+extension CardStatement {
+    /// What the statement screen reads from the store for one period, found by the store rather than by walking every
+    /// transaction the Card paid for, which run into thousands for a main Card.
+    struct Reads {
+        /// The Card's transactions outside Recently Deleted on the period's days and its lead-in days, if it has any.
+        let paid: FetchDescriptor<Transaction>
+        /// The Card's earliest transaction outside Recently Deleted, by day: where its statements' ‹ stops.
+        let earliest: FetchDescriptor<Transaction>
+        /// The Card's latest transaction outside Recently Deleted, by day: where its statements' › stops.
+        let latest: FetchDescriptor<Transaction>
+
+        init(card: Card, for period: CardPeriod) {
+            let id = card.persistentModelID
+            let firstRaw = (period.leadInDays?.first ?? period.firstDay).rawValue
+            let lastRaw = period.lastDay.rawValue
+            paid = FetchDescriptor(predicate: #Predicate { transaction in
+                transaction.card?.persistentModelID == id && transaction.deletedAt == nil
+                    && transaction.dayRaw >= firstRaw && transaction.dayRaw <= lastRaw
+            })
+            earliest = Self.end(of: id, order: .forward)
+            latest = Self.end(of: id, order: .reverse)
+        }
+
+        private static func end(of card: PersistentIdentifier, order: SortOrder) -> FetchDescriptor<Transaction> {
+            var descriptor = FetchDescriptor<Transaction>(
+                predicate: #Predicate { $0.card?.persistentModelID == card && $0.deletedAt == nil },
+                sortBy: [SortDescriptor(\.dayRaw, order: order)]
+            )
+            descriptor.fetchLimit = 1
+            return descriptor
+        }
     }
 }

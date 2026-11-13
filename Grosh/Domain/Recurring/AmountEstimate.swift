@@ -23,9 +23,12 @@ nonisolated enum AmountEstimate {
         } ?? nil
     }
 
-    /// The estimate `request` asks for: what a Recurring transaction's draft needs (``RecurringDraft/neededEstimate``).
-    static func cents(for request: RecurringDraft.EstimateRequest) -> Int? {
-        cents(for: request.category, currencyCode: request.currencyCode)
+    /// Reads the estimate `draft` needs now (``RecurringDraft/neededEstimate``) from the store, if it needs one, and
+    /// gives it to the draft: what the Recurring editor does when it opens and whenever what the estimate is for changes.
+    @MainActor
+    static func give(to draft: inout RecurringDraft) {
+        guard let request = draft.neededEstimate else { return }
+        draft.setEstimate(cents(for: request.category, currencyCode: request.currencyCode), for: request)
     }
 
     /// The ``sampleSize`` newest usable transactions filed under `category` and under each of its subcategories in

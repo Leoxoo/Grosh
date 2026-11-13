@@ -63,7 +63,7 @@ private struct CardPeriodList: View {
     /// The lead-in transactions the user added to the statement total for now.
     @Binding var addedLeadIns: Set<Transaction>
 
-    @Query private var read: [Transaction]
+    @Query private var paid: [Transaction]
     @Query private var earliest: [Transaction]
     @Query private var latest: [Transaction]
 
@@ -76,15 +76,15 @@ private struct CardPeriodList: View {
         self.today = today
         _periodsBack = periodsBack
         _addedLeadIns = addedLeadIns
-        let days = CardStatement.days(for: period)
-        _read = Query(card.paidTransactions(from: days.first, through: days.last))
-        _earliest = Query(card.earliestTransaction)
-        _latest = Query(card.latestTransaction)
+        let reads = CardStatement.Reads(card: card, for: period)
+        _paid = Query(reads.paid)
+        _earliest = Query(reads.earliest)
+        _latest = Query(reads.latest)
     }
 
     var body: some View {
         let statement = CardStatement(
-            of: card, for: period, read: read, earliest: earliest.first?.day, latest: latest.first?.day, today: today
+            of: card, for: period, paid: paid, earliest: earliest, latest: latest, today: today
         )
         let shown = statement.transactions
         let leadIns = statement.leadIns

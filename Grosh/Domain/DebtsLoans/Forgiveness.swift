@@ -13,11 +13,11 @@ struct ForgiveDraft {
     var category: Category?
 
     /// Forgiving the rest of `original`, a Loan or Debt, on `day`. Throws when `original` is neither.
-    init(forgiving original: Transaction, on day: CalendarDay, in context: ModelContext) throws {
+    init(forgiving original: Transaction, on day: CalendarDay) throws {
         guard let loanOrDebt = try LoanOrDebt(original) else { throw DebtLoanRuleError.notALoanOrDebt }
         self.loanOrDebt = loanOrDebt
         self.day = day
-        self.category = try context.otherCategory(loanOrDebt.kind.forgivenType)
+        self.category = try original.storeContext().otherCategory(loanOrDebt.kind.forgivenType)
     }
 
     /// Expense for a forgiven Loan (the user gives the money up), Income for a forgiven Debt.

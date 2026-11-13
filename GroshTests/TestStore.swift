@@ -118,9 +118,7 @@ struct TestStore {
     /// `draft` with the estimate it needs now, read from the store and given to it as the Recurring editor gives it.
     func estimated(_ draft: RecurringDraft) -> RecurringDraft {
         var draft = draft
-        if let request = draft.neededEstimate {
-            draft.setEstimate(AmountEstimate.cents(for: request), for: request)
-        }
+        AmountEstimate.give(to: &draft)
         return draft
     }
 
@@ -238,14 +236,14 @@ extension ModelContext {
     /// A payment of `cents` on `loanOrDebt` on `day`, as Debts & Loans records it.
     @discardableResult
     func pay(_ cents: Int, on loanOrDebt: Transaction, on day: CalendarDay) throws -> DebtPayment {
-        var draft = try DebtPaymentDraft(settling: loanOrDebt, on: day, in: self)
+        var draft = try DebtPaymentDraft(settling: loanOrDebt, on: day)
         draft.entry = AmountEntry(cents: cents)
         return try DebtPayment.record(draft, in: self)
     }
 
     /// Forgives what is outstanding on `loanOrDebt` on `day`, under Other Expense for a Loan or Other Income for a Debt.
     func forgive(_ loanOrDebt: Transaction, on day: CalendarDay) throws {
-        try Forgiveness.record(ForgiveDraft(forgiving: loanOrDebt, on: day, in: self), in: self)
+        try Forgiveness.record(ForgiveDraft(forgiving: loanOrDebt, on: day), in: self)
     }
 
     /// `cents` paid back on `expense` on `day`.
@@ -297,6 +295,20 @@ func balanceChange(of transaction: Transaction) throws -> (recorded: Money, actu
 @MainActor
 func walletTotal(_ wallets: [Wallet], asOf today: CalendarDay) -> [Money] {
     WalletBalances(of: wallets, asOf: today).total(of: wallets)
+}
+
+extension Card {
+    /// What the Card's statement screen shows for `period` on `today`, fetched through the same
+    /// ``CardStatement/Reads`` the screen's queries use.
+    @MainActor
+    func statement(for period: CardPeriod, today: CalendarDay) throws -> CardStatement {
+        let context = try storeContext()
+        let reads = CardStatement.Reads(card: self, for: period)
+        return CardStatement(
+            of: self, for: period, paid: try context.fetch(reads.paid), earliest: try context.fetch(reads.earliest),
+            latest: try context.fetch(reads.latest), today: today
+        )
+    }
 }
 
 extension WalletBalances {

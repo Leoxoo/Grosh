@@ -15,12 +15,12 @@ struct DebtPaymentDraft {
     var overpaymentCategory: Category?
 
     /// A payment against `original`, a Loan or Debt, dated `day`. Throws when `original` is neither.
-    init(settling original: Transaction, on day: CalendarDay, in context: ModelContext) throws {
+    init(settling original: Transaction, on day: CalendarDay) throws {
         guard let loanOrDebt = try LoanOrDebt(original) else { throw DebtLoanRuleError.notALoanOrDebt }
         self.loanOrDebt = loanOrDebt
         entry = AmountEntry(cents: loanOrDebt.outstanding.cents)
         self.day = day
-        self.overpaymentCategory = try context.otherCategory(loanOrDebt.kind.overpaymentType)
+        self.overpaymentCategory = try original.storeContext().otherCategory(loanOrDebt.kind.overpaymentType)
     }
 
     /// The amount is in the Loan or Debt's currency.

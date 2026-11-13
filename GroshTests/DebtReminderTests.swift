@@ -85,7 +85,7 @@ struct DebtReminderTests {
     @Test func settlingALoanWithdrawsItsNotification() throws {
         let loan = try record(.loan, 100_00, with: "Pasha", remindOn: today.adding(days: 5))
 
-        var forgive = try ForgiveDraft(forgiving: loan, on: today, in: context)
+        var forgive = try ForgiveDraft(forgiving: loan, on: today)
         forgive.category = try context.lockedCategory(.otherExpense)
         try Forgiveness.record(forgive, in: context)
 
