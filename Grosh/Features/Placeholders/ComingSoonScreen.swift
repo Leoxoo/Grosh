@@ -6,7 +6,7 @@ struct ComingSoonScreen: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label("Coming Soon", systemImage: placeholder.systemImage)
+            Label(Strings.Common.comingSoon, systemImage: placeholder.systemImage)
         } description: {
             Text(placeholder.message)
         }

@@ -3,10 +3,11 @@ import Testing
 @testable import Grosh
 
 @MainActor
+@Suite(.namedInTheLog)
 struct WalletManagementTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
 
     init() throws {
         container = try GroshStore.makeContainer(inMemory: true)
@@ -35,18 +36,27 @@ struct WalletManagementTests {
         #expect(starting.category?.name == "Starting balance")
         #expect(starting.category?.lockedRole == .startingBalance)
         #expect(starting.isExcludedFromReport)
-        #expect(savings.balance(asOf: today) == Money(cents: 1_250_00))
+        #expect(walletBalance(savings, asOf: today) == Money(cents: 1_250_00))
+    }
+
+    @Test func aNewWalletStartsInTheCurrencyItsDraftHasAndEditingKeepsIt() throws {
+        var draft = WalletDraft(currencyCode: "EUR")
+        draft.name = "Travel"
+        let travel = try Wallet.create(draft, startingBalance: Money(cents: 0), on: today, in: context)
+
+        #expect(travel.currencyCode == "EUR")
+        #expect(WalletDraft(travel).currencyCode == "EUR")
     }
 
     @Test func aWalletNeedsAName() throws {
-        var draft = WalletDraft()
+        var draft = WalletDraft(currencyCode: Money.defaultCurrencyCode)
         draft.name = "  "
 
         #expect(throws: WalletRuleError.missingName) {
             try Wallet.create(draft, startingBalance: Money(cents: 100_00), on: today, in: context)
         }
         #expect(try context.fetchCount(FetchDescriptor<Wallet>()) == 0)
-        #expect(try context.fetchCount(FetchDescriptor<Transaction>()) == 0)
+        #expect(try context.transactionCount() == 0)
     }
 
     @Test func editingAWalletSavesItsFieldsAndKeepsItsTransactions() throws {
@@ -63,7 +73,7 @@ struct WalletManagementTests {
         #expect(cash.symbolName == "banknote.fill")
         #expect(cash.color == .orange)
         #expect(!cash.includeInTotal)
-        #expect(cash.balance(asOf: today) == Money(cents: 40_00))
+        #expect(walletBalance(cash, asOf: today) == Money(cents: 40_00))
 
         draft.name = ""
         #expect(throws: WalletRuleError.missingName) { try cash.update(with: draft) }
@@ -76,7 +86,7 @@ struct WalletManagementTests {
         var edit = StartingBalanceDraft(editing: starting)
         #expect(edit.amount == Money(cents: -250_00))
 
-        edit.amount = Money(cents: -300_00)
+        edit.entry = AmountEntry(cents: -300_00, kind: .balance)
         edit.day = CalendarDay(year: 2026, month: 9, day: 1)
         edit.note = " Balance on the September statement "
         try starting.update(with: edit)
@@ -86,21 +96,18 @@ struct WalletManagementTests {
         #expect(starting.note == "Balance on the September statement")
         #expect(starting.category?.lockedRole == .startingBalance)
         #expect(starting.isExcludedFromReport)
-        #expect(creditLine.balance(asOf: today) == Money(cents: -300_00))
+        #expect(walletBalance(creditLine, asOf: today) == Money(cents: -300_00))
 
-        edit.amount = Money(cents: 1_000_00)
+        edit.entry = AmountEntry(cents: 1_000_00)
         try starting.update(with: edit)
-        #expect(creditLine.balance(asOf: today) == Money(cents: 1_000_00))
+        #expect(walletBalance(creditLine, asOf: today) == Money(cents: 1_000_00))
     }
 
     @Test func onlyAStartingBalanceTakesAStartingBalanceEdit() throws {
         let checking = try addWallet("Checking")
-        let salary = Transaction(amount: Money(cents: 2_000_00), day: today, wallet: nil, category: nil)
-        context.insert(salary)
-        salary.wallet = checking
-        salary.category = try context.lockedCategory(.otherIncome)
+        let salary = context.record(2_000_00, on: today, in: checking, under: try context.lockedCategory(.otherIncome))
         var edit = StartingBalanceDraft(editing: salary)
-        edit.amount = Money(cents: -5_00)
+        edit.entry = AmountEntry(cents: -5_00, kind: .balance)
 
         #expect(throws: TransactionRuleError.notAStartingBalance) { try salary.update(with: edit) }
         #expect(salary.amount == Money(cents: 2_000_00))
@@ -145,12 +152,12 @@ struct WalletManagementTests {
         let checking = try addWallet("Checking", startingBalance: 100_00)
         let oldBank = try addWallet("Old bank", startingBalance: 300_00)
 
-        try oldBank.archive()
+        try oldBank.archive(today: today)
 
         #expect(try unarchivedNames() == ["Checking"])
-        #expect(Wallet.total(of: try context.fetch(FetchDescriptor<Wallet>()), asOf: today) == Money(cents: 100_00))
+        #expect(walletTotal(try context.fetch(FetchDescriptor<Wallet>()), asOf: today) == [Money(cents: 100_00)])
         #expect(oldBank.transactions?.count == 1)
-        #expect(oldBank.balance(asOf: today) == Money(cents: 300_00))
+        #expect(walletBalance(oldBank, asOf: today) == Money(cents: 300_00))
         #expect(checking.isArchived == false)
     }
 
@@ -158,11 +165,11 @@ struct WalletManagementTests {
         try addWallet("Checking")
         let oldBank = try addWallet("Old bank", startingBalance: 300_00)
         try addWallet("Cash")
-        try oldBank.archive()
+        try oldBank.archive(today: today)
 
-        try oldBank.unarchive()
+        try oldBank.unarchive(today: today)
 
         #expect(try unarchivedNames() == ["Checking", "Old bank", "Cash"])
-        #expect(Wallet.total(of: try context.fetch(Wallet.unarchived), asOf: today) == Money(cents: 300_00))
+        #expect(walletTotal(try context.fetch(Wallet.unarchived), asOf: today) == [Money(cents: 300_00)])
     }
 }

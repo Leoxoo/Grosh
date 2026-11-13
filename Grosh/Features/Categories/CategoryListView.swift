@@ -14,6 +14,9 @@ struct CategoryListView: View {
     @State private var errorMessage: String?
     /// Whether the list shows the categories for dragging into a new order.
     @State private var isReordering = false
+    /// Which of the type's categories have transactions, so can't be deleted: counted in the store once for the list
+    /// rather than once per row as it draws, and again when the type changes or categories come or go.
+    @State private var usage = Usage()
 
     private var catalog: CategoryCatalog { CategoryCatalog(context: context) }
 
@@ -24,7 +27,7 @@ struct CategoryListView: View {
     var body: some View {
         List {
             Section {
-                Picker("Type", selection: $type) {
+                Picker(Strings.Common.type, selection: $type) {
                     ForEach(CategoryType.segments, id: \.self) { segment in
                         Text(segment.title).tag(segment)
                     }
@@ -39,18 +42,22 @@ struct CategoryListView: View {
                 categorySections
             }
         }
+        .task(id: CategoryCatalog.tree(of: type, from: allCategories).map(\.persistentModelID)) {
+            let tree = CategoryCatalog.tree(of: type, from: allCategories)
+            usage = Usage(counted: Set(tree.map(\.persistentModelID)), inUse: catalog.inUse(tree))
+        }
         #if os(iOS)
         .environment(\.editMode, .constant(isReordering ? .active : .inactive))
         #endif
-        .navigationTitle("Categories")
+        .navigationTitle(Strings.Screens.categories)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 if type.isUserManaged {
-                    Button(isReordering ? "Done" : "Edit") {
+                    Button(isReordering ? Strings.Common.done : Strings.Common.edit) {
                         withAnimation { isReordering.toggle() }
                     }
                 }
-                Button("Add Category", systemImage: "plus") { editorMode = .add(type) }
+                Button(Strings.Categories.addCategory, systemImage: "plus") { editorMode = .add(type) }
                     .disabled(!type.isUserManaged || isReordering)
             }
         }
@@ -67,18 +74,18 @@ struct CategoryListView: View {
             CategoryMergeView(source: source)
         }
         .confirmationDialog(
-            "Delete “\(deleting?.name ?? "")”?",
+            Strings.Common.deleteNamed(deleting?.name ?? ""),
             isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
             titleVisibility: .visible,
             presenting: deleting
         ) { category in
-            Button("Delete", role: .destructive) {
-                perform { try catalog.delete(category) }
+            Button(Strings.Common.delete, role: .destructive) {
+                Log.store.perform("Changing a category", errorMessage: &errorMessage) { try catalog.delete(category) }
             }
         } message: { category in
-            Text(CategoryEditor.deleteMessage(for: category))
+            Text(category.deleteMessage)
         }
-        .errorAlert("Couldn't Change Category", message: $errorMessage)
+        .errorAlert(Strings.Categories.couldntChange, message: $errorMessage)
     }
 
     /// The type's tree to tap and swipe, the switch for hidden categories, and the app's own categories.
@@ -86,28 +93,29 @@ struct CategoryListView: View {
     private var categorySections: some View {
         Section {
             ForEach(rows) { category in
+                let canDelete = usage.canDelete(category)
                 Button {
                     editorMode = .edit(category)
                 } label: {
                     row(for: category)
                 }
                 .buttonStyle(.plain)
-                .swipeActions { actions(for: category) }
+                .swipeActions { actions(for: category, canDelete: canDelete) }
                 .contextMenu {
-                    Button("Edit", systemImage: "pencil") { editorMode = .edit(category) }
-                    actions(for: category)
+                    Button(Strings.Common.edit, systemImage: "pencil") { editorMode = .edit(category) }
+                    actions(for: category, canDelete: canDelete)
                 }
             }
         } footer: {
             if type == .debtLoan {
-                Text("Debt/Loan categories are fixed. You can change their icons.")
+                Text(Strings.Categories.debtLoanFooter)
             }
         }
 
         Section {
-            Toggle("Show hidden categories", isOn: $showsHidden)
+            Toggle(Strings.Categories.showHidden, isOn: $showsHidden)
         } footer: {
-            Text("Hidden categories leave the picker but stay on their transactions.")
+            Text(Strings.Categories.hiddenFooter)
         }
 
         Section {
@@ -119,13 +127,13 @@ struct CategoryListView: View {
                 }
                 .buttonStyle(.plain)
                 .contextMenu {
-                    Button("Edit", systemImage: "pencil") { editorMode = .edit(category) }
+                    Button(Strings.Common.edit, systemImage: "pencil") { editorMode = .edit(category) }
                 }
             }
         } header: {
-            Text("The app's own categories")
+            Text(Strings.Categories.appsOwn)
         } footer: {
-            Text("The app files transactions under these itself, such as a new wallet's Starting balance. You can change their icons.")
+            Text(Strings.Categories.appsOwnFooter)
         }
     }
 
@@ -138,19 +146,19 @@ struct CategoryListView: View {
         Section {
             ForEach(parents) { row(for: $0) }
                 .onMove { source, destination in
-                    perform { try catalog.move(parents, fromOffsets: source, toOffset: destination) }
+                    Log.store.perform("Changing a category", errorMessage: &errorMessage) { try catalog.move(parents, fromOffsets: source, toOffset: destination) }
                 }
         } header: {
-            Text("Categories")
+            Text(Strings.Screens.categories)
         } footer: {
-            Text("Drag to reorder. A category's subcategories move with it. When you pick a category, the ones used most in the last month still come first.")
+            Text(Strings.Categories.reorderFooter)
         }
         ForEach(parents.filter { !($0.children ?? []).isEmpty }) { parent in
             let subcategories = CategoryCatalog.subcategories(of: parent)
             Section(parent.name) {
                 ForEach(subcategories) { row(for: $0, indented: false) }
                     .onMove { source, destination in
-                        perform { try catalog.move(subcategories, fromOffsets: source, toOffset: destination) }
+                        Log.store.perform("Changing a category", errorMessage: &errorMessage) { try catalog.move(subcategories, fromOffsets: source, toOffset: destination) }
                     }
             }
         }
@@ -163,12 +171,12 @@ struct CategoryListView: View {
             if category.isHidden {
                 Image(systemName: "eye.slash")
                     .foregroundStyle(.secondary)
-                    .accessibilityLabel("Hidden")
+                    .accessibilityLabel(Strings.Common.hidden)
             }
             if category.isLocked {
                 Image(systemName: "lock.fill")
                     .foregroundStyle(.secondary)
-                    .accessibilityLabel("Locked")
+                    .accessibilityLabel(Strings.Categories.locked)
             }
         }
         .opacity(category.isHiddenInTree ? 0.5 : 1)
@@ -176,28 +184,30 @@ struct CategoryListView: View {
     }
 
     @ViewBuilder
-    private func actions(for category: Category) -> some View {
+    private func actions(for category: Category, canDelete: Bool) -> some View {
         if !category.isLocked {
-            if catalog.canDelete(category) {
-                Button("Delete", systemImage: "trash", role: .destructive) { deleting = category }
+            if canDelete {
+                Button(Strings.Common.delete, systemImage: "trash", role: .destructive) { deleting = category }
             }
-            Button("Merge", systemImage: "arrow.triangle.merge") { merging = category }
-                .tint(.indigo)
+            Button(Strings.Common.merge, systemImage: "arrow.triangle.merge") { merging = category }
+                .tint(.mergeAction)
             Button(
-                category.isHidden ? "Unhide" : "Hide",
+                category.isHidden ? Strings.Common.unhide : Strings.Common.hide,
                 systemImage: category.isHidden ? "eye" : "eye.slash"
             ) {
-                perform { try catalog.setHidden(category, !category.isHidden) }
+                Log.store.perform("Changing a category", errorMessage: &errorMessage) { try catalog.setHidden(category, !category.isHidden) }
             }
-            .tint(.gray)
+            .tint(.hideAction)
         }
     }
 
-    private func perform(_ change: () throws -> Void) {
-        do {
-            try change()
-        } catch {
-            errorMessage = error.localizedDescription
+    /// The categories counted so far and those of them in use. One not counted yet offers no Delete.
+    private struct Usage {
+        var counted: Set<PersistentIdentifier> = []
+        var inUse: Set<PersistentIdentifier> = []
+
+        func canDelete(_ category: Category) -> Bool {
+            counted.contains(category.persistentModelID) && CategoryCatalog.canDelete(category, inUse: inUse)
         }
     }
 }
@@ -206,5 +216,5 @@ struct CategoryListView: View {
     NavigationStack {
         CategoryListView()
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+    .modelContainer(try! StoreOpening.open(inMemory: true))
 }

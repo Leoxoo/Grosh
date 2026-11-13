@@ -10,6 +10,7 @@ import SwiftUI
 struct CardTransactionsView: View {
     let card: Card
 
+    @Environment(\.today) private var today
     /// How many periods before the current one is showing: 0 for the current period, negative for a later one holding
     /// a transaction dated after today.
     @State private var periodsBack = 0
@@ -17,22 +18,28 @@ struct CardTransactionsView: View {
     /// The lead-in transactions the user added to the statement total for now. Cleared on stepping to another period.
     @State private var addedLeadIns = Set<Transaction>()
 
-    /// Whether the Card was merged into another or deleted, from its editor, while this screen was open.
-    private var isRemoved: Bool { card.isDeleted || card.modelContext == nil }
-
     var body: some View {
+        // The Card can be merged into another or deleted, from its editor, while this screen is open.
         Group {
-            if isRemoved {
+            if card.isGone {
                 ContentUnavailableView(
-                    "Card Removed",
+                    Strings.Cards.cardRemoved,
                     systemImage: Card.symbolName,
-                    description: Text("It was merged into another Card or deleted.")
+                    description: Text(Strings.Cards.cardRemovedDescription)
                 )
             } else {
-                periodList
+                let period = card.period(containing: today).adding(-periodsBack)
+                CardPeriodList(
+                    card: card, period: period, today: today, periodsBack: $periodsBack, addedLeadIns: $addedLeadIns
+                )
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button(Strings.Common.edit) { isEditing = true }
+                    }
+                }
             }
         }
-        .navigationTitle(isRemoved ? "" : card.displayName)
+        .navigationTitle(card.isGone ? "" : card.displayName)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -43,56 +50,88 @@ struct CardTransactionsView: View {
             addedLeadIns = []
         }
     }
+}
 
-    /// The period being shown, its count and total, then its transactions by day and its lead-in transactions.
-    private var periodList: some View {
-        let today = CalendarDay.today
-        let period = card.period(containing: today).adding(-periodsBack)
-        let shown = card.transactions(in: period)
-        let leadIns = card.leadInTransactions(in: period)
-        let added = leadIns.filter(addedLeadIns.contains)
+/// The period being shown, its count and total, then its transactions by day and its lead-in transactions. The Card's
+/// transactions on the period's days, and its first and last, are read by the store for the period shown, rather than by
+/// walking every transaction the Card paid for on each draw.
+private struct CardPeriodList: View {
+    let card: Card
+    let period: CardPeriod
+    let today: CalendarDay
+    @Binding var periodsBack: Int
+    /// The lead-in transactions the user added to the statement total for now.
+    @Binding var addedLeadIns: Set<Transaction>
 
-        return List {
+    @Query private var paid: [Transaction]
+    @Query private var earliest: [Transaction]
+    @Query private var latest: [Transaction]
+
+    init(
+        card: Card, period: CardPeriod, today: CalendarDay, periodsBack: Binding<Int>,
+        addedLeadIns: Binding<Set<Transaction>>
+    ) {
+        self.card = card
+        self.period = period
+        self.today = today
+        _periodsBack = periodsBack
+        _addedLeadIns = addedLeadIns
+        let reads = CardStatement.Reads(card: card, for: period)
+        _paid = Query(reads.paid)
+        _earliest = Query(reads.earliest)
+        _latest = Query(reads.latest)
+    }
+
+    var body: some View {
+        let statement = CardStatement(
+            of: card, for: period, paid: paid, earliest: earliest, latest: latest, today: today
+        )
+        let shown = statement.transactions
+        let leadIns = statement.leadIns
+        let added = leadIns.filter { addedLeadIns.contains($0) }
+
+        List {
             Section {
                 CardPeriodStepper(
-                    period: period, periods: card.periods(today: today), today: today, periodsBack: $periodsBack
+                    period: period, periods: statement.periods, today: today, periodsBack: $periodsBack
                 )
-                LabeledContent("Transactions") {
+                LabeledContent(Strings.Common.transactions) {
                     Text(shown.count.formatted())
                         .monospacedDigit()
                 }
                 LabeledContent {
-                    AmountText(amount: (shown + added).net, showsPlusSign: true, showsColor: false)
+                    AmountText(amount: (shown + added).charged, showsPlusSign: true, showsColor: false)
                         .fontWeight(.semibold)
                 } label: {
-                    Text(period.isStatement ? "Statement total" : "Total")
+                    Text(period.isStatement ? Strings.Cards.statementTotal : Strings.Common.total)
                     if !added.isEmpty {
-                        Text("Includes \(added.count) from the previous statement")
+                        Text(Strings.Cards.includesFromPreviousStatement(added.count))
                     }
                 }
             } footer: {
                 if period.isStatement {
-                    Text("A statement period runs from the day after one statement date through the next.")
+                    Text(Strings.Cards.statementPeriodFooter)
                 } else if card.kind == .credit {
-                    Text("Add the day this card's statement closes to see its transactions by statement period.")
+                    Text(Strings.Cards.addStatementDayFooter)
                 }
             }
 
             if shown.isEmpty {
                 Section {
                     ContentUnavailableView(
-                        "No Transactions",
+                        Strings.Common.noTransactions,
                         systemImage: Card.symbolName,
-                        description: Text("Nothing was paid with this Card in this period.")
+                        description: Text(Strings.Cards.nothingPaidInPeriod)
                     )
                 }
             }
 
-            TransactionDaySections(transactions: shown) { transaction in
+            // A statement shows what the Card was charged, Reimbursements not counted, so it reconciles with the Card.
+            TransactionDaySections(transactions: shown, listed: .charged) { transaction in
                 NavigationLink {
                     TransactionDetailView(transaction: transaction)
                 } label: {
-                    TransactionRow(transaction: transaction)
+                    TransactionRow(transaction: transaction, listed: .charged)
                 }
             }
 
@@ -108,15 +147,10 @@ struct CardTransactionsView: View {
                         }
                     }
                 } header: {
-                    Text("Previous statement")
+                    Text(Strings.Cards.previousStatementSection)
                 } footer: {
-                    Text("From the \(CardPeriod.leadInDayCount) days before this statement, as entries aren't always dated as on the statement. They're not in its total; tap + to add one for now.")
+                    Text(Strings.Cards.previousStatementFooter(CardPeriod.leadInDayCount))
                 }
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Edit") { isEditing = true }
             }
         }
     }
@@ -137,12 +171,12 @@ private struct LeadInTransactionRow: View {
                     .frame(minWidth: 28, minHeight: 28)
             }
             .buttonStyle(.borderless)
-            .accessibilityLabel(isAdded ? "Remove from Statement Total" : "Add to Statement Total")
+            .accessibilityLabel(isAdded ? Strings.Cards.removeFromStatementTotal : Strings.Cards.addToStatementTotal)
 
             NavigationLink {
                 TransactionDetailView(transaction: transaction)
             } label: {
-                TransactionRow(transaction: transaction, showsDay: true)
+                TransactionRow(transaction: transaction, showsDay: true, listed: .charged)
                     .opacity(0.55)
             }
         }
@@ -167,7 +201,7 @@ private struct CardPeriodStepper: View {
                 Image(systemName: "chevron.left")
                     .frame(minWidth: 28, minHeight: 28)
             }
-            .accessibilityLabel(period.isStatement ? "Previous Statement" : "Previous Month")
+            .accessibilityLabel(period.isStatement ? Strings.Cards.previousStatement : Strings.Cards.previousMonth)
             .disabled(period <= periods.lowerBound)
 
             Spacer()
@@ -176,7 +210,7 @@ private struct CardPeriodStepper: View {
                     .font(.headline)
                     .monospacedDigit()
                 if period.isStatement {
-                    Text(period.contains(today) ? "Current statement" : "Statement period")
+                    Text(period.contains(today) ? Strings.Cards.currentStatement : Strings.Cards.statementPeriod)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -190,7 +224,7 @@ private struct CardPeriodStepper: View {
                 Image(systemName: "chevron.right")
                     .frame(minWidth: 28, minHeight: 28)
             }
-            .accessibilityLabel(period.isStatement ? "Next Statement" : "Next Month")
+            .accessibilityLabel(period.isStatement ? Strings.Cards.nextStatement : Strings.Cards.nextMonth)
             .disabled(period >= periods.upperBound)
         }
         .buttonStyle(.borderless)

@@ -9,14 +9,14 @@ struct RecentTransactionsSection: View {
 
     @Query private var transactions: [Transaction]
 
-    init(today: CalendarDay = .today) {
+    init(today: CalendarDay) {
         _transactions = Query(Transaction.recent(limit: Self.limit, asOf: today))
     }
 
     var body: some View {
-        Section("Recent transactions") {
+        Section(Strings.Home.recentTransactions) {
             if transactions.isEmpty {
-                Text("Transactions you add show up here.")
+                Text(Strings.Home.recentTransactionsEmpty)
                     .foregroundStyle(.secondary)
             }
             ForEach(transactions.inListOrder()) { transaction in

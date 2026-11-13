@@ -14,26 +14,9 @@ nonisolated enum SoundsAndHaptics {
         device == .iPhone
     }
 
-    /// Each switch is on until the user turns it off.
-    static let defaultIsOn = true
-
-    /// Where the Sounds switch is remembered.
-    static let soundsKey = "soundsAndHaptics.sounds"
-
-    /// Where the Haptics switch is remembered.
-    static let hapticsKey = "soundsAndHaptics.haptics"
-
-    /// Where the Success cue's chime is remembered, as its ``SuccessCue/Chime`` raw value. It is
-    /// ``SuccessCue/Chime/default`` until the user picks another.
-    static let chimeKey = "soundsAndHaptics.chime"
-
-    /// Whether sounds play on `device` while the Sounds switch is `soundsOn`, whatever the Haptics switch says.
-    static func playsSounds(on device: Device, soundsOn: Bool) -> Bool {
-        isOffered(on: device) && soundsOn
-    }
-
-    /// Whether haptics play on `device` while the Haptics switch is `hapticsOn`, whatever the Sounds switch says.
-    static func playsHaptics(on device: Device, hapticsOn: Bool) -> Bool {
-        isOffered(on: device) && hapticsOn
+    /// Whether sounds, or haptics, play on `device` while their switch in Settings is `isOn`, whatever the other
+    /// switch says. The switches are kept in ``AppSettings``.
+    static func plays(on device: Device, isOn: Bool) -> Bool {
+        isOffered(on: device) && isOn
     }
 }

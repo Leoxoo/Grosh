@@ -33,15 +33,30 @@ struct CategoryEditor: View {
         "star.fill", "questionmark.circle.fill", "ellipsis.circle.fill", "flag.fill",
     ]
 
-    /// What deleting `category` takes with it, for the confirmation.
-    static func deleteMessage(for category: Category) -> String {
-        let subcategories = category.children?.count ?? 0
-        return subcategories == 0
-            ? "This can't be undone."
-            : "Its \(subcategories) subcategories are deleted too. This can't be undone."
-    }
-
     let mode: Mode
+
+    @Environment(\.modelContext) private var context
+
+    var body: some View {
+        MadeOnce {
+            switch mode {
+            case .add(let type):
+                (draft: CategoryDraft.new(type), inUse: Set<PersistentIdentifier>())
+            case .edit(let category):
+                (draft: CategoryDraft(category), inUse: CategoryCatalog(context: context).inUse([category]))
+            }
+        } content: { start in
+            CategoryForm(mode: mode, startingDraft: start.draft, inUse: start.inUse)
+        }
+    }
+}
+
+/// The form behind ``CategoryEditor``, holding the draft from the moment the sheet opens.
+private struct CategoryForm: View {
+    let mode: CategoryEditor.Mode
+    /// Whether the category being edited (or a subcategory) has transactions, counted in the store once when the sheet
+    /// opens rather than each time it draws.
+    let inUse: Set<PersistentIdentifier>
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
@@ -49,16 +64,15 @@ struct CategoryEditor: View {
     @State private var draft: CategoryDraft
     @State private var isMerging = false
     @State private var isConfirmingDelete = false
-    @State private var errorMessage: String?
+    /// The parent categories offered for the type shown, read from the store when the type changes rather than on every
+    /// draw, which is every keystroke in Name.
+    @State private var keptParentOptions = DrawingCache<CategoryType, [Category]>()
+    private let saver = SheetSaver(Strings.Categories.couldntSave)
 
-    init(mode: Mode) {
+    init(mode: CategoryEditor.Mode, startingDraft: CategoryDraft, inUse: Set<PersistentIdentifier>) {
         self.mode = mode
-        switch mode {
-        case .add(let type):
-            _draft = State(initialValue: CategoryDraft(type: type, symbolName: "tag.fill", color: .blue))
-        case .edit(let category):
-            _draft = State(initialValue: CategoryDraft(category))
-        }
+        self.inUse = inUse
+        _draft = State(initialValue: startingDraft)
     }
 
     private var catalog: CategoryCatalog { CategoryCatalog(context: context) }
@@ -72,19 +86,26 @@ struct CategoryEditor: View {
     /// A category's type is fixed once it (or a subcategory) has transactions.
     private var canChangeType: Bool {
         guard let editing else { return true }
-        return !editing.isLocked && !catalog.hasTransactions(editing)
+        return !editing.isLocked && !inUse.contains(editing.persistentModelID)
     }
 
-    private var parentOptions: [Category] {
-        (try? catalog.parentOptions(of: draft.type, for: editing)) ?? []
+    private func parentOptions(of type: CategoryType) -> [Category] {
+        keptParentOptions.value(for: type) {
+            Log.store.attempt("Reading the parent categories to choose from") {
+                try catalog.parentOptions(of: type, for: editing)
+            } ?? []
+        }
     }
-
-    private var canSave: Bool { !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
+        let check = draft.check
         NavigationStack {
             Form {
-                detailsSection
+                detailsSection(
+                    canChangeType: canChangeType,
+                    parentOptions: parentOptions(of: draft.type),
+                    check: check
+                )
                 if !isLocked {
                     kindSection
                 }
@@ -95,14 +116,14 @@ struct CategoryEditor: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle(editing == nil ? "Add Category" : "Edit Category")
+            .navigationTitle(editing == nil ? Strings.Categories.addCategory : Strings.Categories.editCategory)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(editing == nil ? "Add" : "Save", action: save)
-                        .disabled(!canSave)
+                    Button(editing == nil ? Strings.Common.add : Strings.Common.save, action: save)
+                        .disabled(!check.passes)
                 }
             }
             .sheet(isPresented: $isMerging) {
@@ -111,42 +132,40 @@ struct CategoryEditor: View {
                 }
             }
             .confirmationDialog(
-                "Delete “\(editing?.name ?? "")”?",
+                Strings.Common.deleteNamed(editing?.name ?? ""),
                 isPresented: $isConfirmingDelete,
                 titleVisibility: .visible
             ) {
-                Button("Delete", role: .destructive) {
-                    perform {
+                Button(Strings.Common.delete, role: .destructive) {
+                    saver.save("Changing a category") {
                         if let editing { try catalog.delete(editing) }
                     }
                 }
             } message: {
-                if let editing { Text(Self.deleteMessage(for: editing)) }
+                if let editing { Text(editing.deleteMessage) }
             }
-            .errorAlert("Couldn't Save Category", message: $errorMessage)
+            .failureAlert(saver)
         }
     }
 
-    private var detailsSection: some View {
+    /// The name, type and parent.
+    private func detailsSection(canChangeType: Bool, parentOptions: [Category], check: RuleCheck) -> some View {
         Section {
             HStack(spacing: 12) {
                 SymbolCircle(symbolName: draft.symbolName, color: draft.color, size: 40)
-                TextField("Name", text: $draft.name)
+                TextField(Strings.Common.name, text: $draft.name)
                     .disabled(isLocked)
             }
             if !isLocked {
-                Picker("Type", selection: $draft.type) {
-                    Text(CategoryType.expense.title).tag(CategoryType.expense)
-                    Text(CategoryType.income.title).tag(CategoryType.income)
+                Picker(Strings.Common.type, selection: $draft.type) {
+                    ForEach(CategoryType.ordinary, id: \.self) { type in
+                        Text(type.title).tag(type)
+                    }
                 }
                 .disabled(!canChangeType)
-                .onChange(of: draft.type) {
-                    // A parent of the old type can't hold a category of the new one.
-                    draft.parent = nil
-                }
 
-                Picker("Parent", selection: $draft.parent) {
-                    Text("None").tag(Category?.none)
+                Picker(Strings.Categories.parent, selection: $draft.parent) {
+                    Text(Strings.Common.none).tag(Category?.none)
                     ForEach(parentOptions) { parent in
                         Text(parent.name).tag(Category?.some(parent))
                     }
@@ -156,26 +175,29 @@ struct CategoryEditor: View {
         } footer: {
             if isLocked {
                 Text(CategoryRuleError.locked.localizedDescription)
+            } else if let problem = check.shownProblem {
+                Text(problem.localizedDescription)
+                    .foregroundStyle(.invalid)
             } else if !canChangeType {
-                Text("This category has transactions, so its type can't change.")
+                Text(Strings.Categories.typeLockedFooter)
             } else if !(editing?.children ?? []).isEmpty {
-                Text("A category with subcategories stays at the top level.")
+                Text(Strings.Categories.topLevelFooter)
             }
         }
     }
 
     private var kindSection: some View {
         Section {
-            Picker("Kind", selection: kindChoice) {
+            Picker(Strings.Common.kind, selection: kindChoice) {
                 if let parent = draft.parent {
-                    Text("Same as \(parent.name) (\(parent.defaultKind.title))").tag(RecurringKind?.none)
+                    Text(Strings.Categories.sameAsParent(parent.name, parent.defaultKind.title)).tag(RecurringKind?.none)
                 }
                 ForEach(RecurringKind.allCases, id: \.self) { kind in
                     Text(kind.title).tag(Optional(kind))
                 }
             }
         } footer: {
-            Text("New Recurring transactions in this category start as this Kind. Existing ones keep theirs.")
+            Text(Strings.Categories.kindFooter)
         }
     }
 
@@ -189,58 +211,48 @@ struct CategoryEditor: View {
     }
 
     private var iconSection: some View {
-        Section("Icon") {
-            SymbolGrid(symbols: Self.symbolChoices, selection: $draft.symbolName, color: draft.color)
+        Section(Strings.Common.icon) {
+            SymbolGrid(symbols: CategoryEditor.symbolChoices, selection: $draft.symbolName, color: draft.color)
         }
     }
 
     private var colorSection: some View {
-        Section("Color") {
+        Section(Strings.Common.color) {
             PaletteColorGrid(selection: $draft.color)
         }
     }
 
     private func manageSection(for category: Category) -> some View {
-        let canDelete = catalog.canDelete(category)
+        let canDelete = CategoryCatalog.canDelete(category, inUse: inUse)
         return Section {
             Button(
-                category.isHidden ? "Unhide Category" : "Hide Category",
+                category.isHidden ? Strings.Categories.unhideCategory : Strings.Categories.hideCategory,
                 systemImage: category.isHidden ? "eye" : "eye.slash"
             ) {
-                perform { try catalog.setHidden(category, !category.isHidden) }
+                saver.save("Changing a category") { try catalog.setHidden(category, !category.isHidden) }
             }
-            Button("Merge into Another Category…", systemImage: "arrow.triangle.merge") {
+            Button(Strings.Categories.mergeIntoAnother, systemImage: "arrow.triangle.merge") {
                 isMerging = true
             }
             if canDelete {
-                Button("Delete Category", systemImage: "trash", role: .destructive) {
+                Button(Strings.Categories.deleteCategory, systemImage: "trash", role: .destructive) {
                     isConfirmingDelete = true
                 }
             }
         } footer: {
             Text(canDelete
-                ? "Hidden categories leave the picker but stay on their transactions."
-                : "This category has transactions, so it can't be deleted. Merge it into another category instead.")
+                ? Strings.Categories.hiddenFooter
+                : Strings.Categories.cantDeleteFooter)
         }
     }
 
     private func save() {
-        perform {
+        saver.save("Changing a category") {
             if let editing {
                 try catalog.update(editing, to: draft)
             } else {
                 try catalog.add(draft)
             }
-        }
-    }
-
-    /// Runs a change and closes the sheet, or shows why the change was refused.
-    private func perform(_ change: () throws -> Void) {
-        do {
-            try change()
-            dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 }

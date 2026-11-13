@@ -13,13 +13,13 @@ struct MonthGraphLegend: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 16) {
                 // Already localized: shown as they are.
-                entry("\(graph.lineName)", color: graph.side.color)
+                entry(Text(verbatim: graph.lineName), color: graph.side.color)
                 if graph.comparisonLine != nil {
-                    entry("\(graph.comparison.name)", color: MonthGraphChart.comparisonColor)
+                    entry(Text(verbatim: graph.comparison.name), color: .comparison)
                 }
                 Spacer(minLength: 0)
                 if graph.offersLastYear {
-                    Toggle("vs last year", isOn: $comparesWithLastYear)
+                    Toggle(Strings.Home.vsLastYear, isOn: comparesWithoutAnimation)
                         .toggleStyle(.switch)
                         .controlSize(.mini)
                         .fixedSize()
@@ -27,15 +27,28 @@ struct MonthGraphLegend: View {
                         .disabled(!graph.isLastYearAvailable)
                 }
             }
-            if let expected = graph.expectedByMonthEnd {
-                entry("Scheduled · Expected by \(graph.endName) \(expected.formatted())", color: graph.side.color, dotted: true)
+            if let expected = graph.expectedByPeriodEnd {
+                entry(Text(Strings.Home.scheduledExpectedBy(graph.endName, expected.formatted())), color: graph.side.color, dotted: true)
             }
         }
         .font(.caption)
         .foregroundStyle(.secondary)
     }
 
-    private func entry(_ name: LocalizedStringKey, color: Color, dotted: Bool = false) -> some View {
+    /// The switch's setting, changed with every animation off. Home, the Report's comparison card and the Spent and
+    /// Income details all redraw from it, some on screens not showing; an animation carried into those while the user
+    /// leaves for another tab drew "Transformers don't support animations across multiple screens".
+    private var comparesWithoutAnimation: Binding<Bool> {
+        Binding {
+            comparesWithLastYear
+        } set: { isOn in
+            var transaction = SwiftUI.Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { comparesWithLastYear = isOn }
+        }
+    }
+
+    private func entry(_ name: Text, color: Color, dotted: Bool = false) -> some View {
         HStack(spacing: 6) {
             if dotted {
                 Path { path in
@@ -49,7 +62,7 @@ struct MonthGraphLegend: View {
                     .fill(color)
                     .frame(width: 12, height: 3)
             }
-            Text(name)
+            name
         }
     }
 }

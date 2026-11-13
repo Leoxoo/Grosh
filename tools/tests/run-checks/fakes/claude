@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Stands in for the local model's headless Claude Code in tools/tests/run-checks/run.sh. Records the call in $FAKE_CALLS
+# and changes the worktree as $FAKE_CLAUDE says:
+#   fix      takes BROKEN out of Grosh/App.swift, so the fake tools/check passes
+#   mess     edits Grosh/App.swift and the untracked Grosh/Draft.swift, deletes GroshTests/AppTests.swift and creates
+#            Grosh/New/Deep/Made.swift, and leaves BROKEN in place, so the tests still fail
+#   nothing  changes nothing
+# Then it replies with three lines, as the hook asks.
+
+printf 'claude GROSH_CHECKS_NESTED=%s %s\n' "${GROSH_CHECKS_NESTED:-}" "$*" >>"$FAKE_CALLS"
+case ${FAKE_CLAUDE:-nothing} in
+    fix)
+        sed -i.bak 's/BROKEN//' Grosh/App.swift && rm -f Grosh/App.swift.bak
+        ;;
+    mess)
+        printf 'let attempt = 1 // BROKEN\n' >>Grosh/App.swift
+        printf 'changed by the model\n' >Grosh/Draft.swift
+        rm -f GroshTests/AppTests.swift
+        mkdir -p Grosh/New/Deep
+        printf 'struct Made {}\n' >Grosh/New/Deep/Made.swift
+        ;;
+esac
+printf 'Line one of the summary.\nLine two.\nLine three.\n'

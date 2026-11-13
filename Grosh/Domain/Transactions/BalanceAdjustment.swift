@@ -2,23 +2,35 @@ import Foundation
 import SwiftData
 
 /// What the Adjust Balance sheet holds: the wallet's real balance on a day. Saving records the difference from
-/// what the wallet's transactions add up to as one balance adjustment.
-struct BalanceAdjustmentDraft {
-    /// Changing it starts the real balance again from this wallet's recorded one: what was typed belonged to the
-    /// other wallet.
+/// what the wallet's transactions add up to (its recorded balance) as one balance adjustment.
+nonisolated struct BalanceAdjustmentDraft {
+    /// Changing it starts the real balance again from this wallet's recorded one, read with
+    /// ``readRecordedBalance(from:)``: what was typed belonged to the other wallet.
     var wallet: Wallet? {
         didSet {
             if wallet != oldValue {
                 typedEntry = nil
+                recordedBalance = nil
             }
         }
     }
     /// The day the real balance is true on, and the date of the adjustment. Changing it keeps a real balance
-    /// already typed; until one is, the real balance follows the recorded balance on the new day.
-    var day: CalendarDay
+    /// already typed; until one is, the real balance follows the recorded balance on the new day, read with
+    /// ``readRecordedBalance(from:)``.
+    var day: CalendarDay {
+        didSet {
+            if day != oldValue {
+                recordedBalance = nil
+            }
+        }
+    }
     var note = ""
     /// Off by default: an adjustment counts in reports like any other transaction.
     var isExcludedFromReport = false
+    /// What the wallet's transactions add up to on `day` (``WalletBalances``), or `nil` without a wallet. The sheet
+    /// gives it, and reads it again when the wallet or the day changes, so the draft never adds the wallet up itself;
+    /// until it is read again there is nothing to adjust, so a difference is never taken from another wallet or day.
+    private(set) var recordedBalance: Money?
 
     /// The reason for money found and for money missing, unless the user picks another.
     private let defaultReasons: [CategoryType: Category]
@@ -27,34 +39,38 @@ struct BalanceAdjustmentDraft {
     /// The real balance as typed on the keypad, or `nil` until the user types one.
     private var typedEntry: AmountEntry?
 
-    /// Starts from the wallet's recorded balance on `day`, so there is nothing to adjust until the real balance
-    /// is typed.
-    init(wallet: Wallet?, day: CalendarDay, in context: ModelContext) throws {
+    /// Starts from the wallet's `recordedBalance` on `day`, so there is nothing to adjust until the real balance is
+    /// typed. `defaultReasons` are ``defaultReasons(in:)``.
+    init(
+        wallet: Wallet?, day: CalendarDay, recordedBalance: Money?, defaultReasons: [CategoryType: Category]
+    ) {
         self.wallet = wallet
         self.day = day
-        defaultReasons = try [CategoryType.income, .expense].reduce(into: [:]) { reasons, type in
-            reasons[type] = try Self.defaultReason(for: type, in: context)
-        }
+        self.recordedBalance = recordedBalance
+        self.defaultReasons = defaultReasons
     }
 
-    var currencyCode: String { wallet?.currencyCode ?? Money.defaultCurrencyCode }
+    /// Reads the recorded balance of the wallet on `day` again from `transactions`, every transaction outside
+    /// Recently Deleted: after the wallet or the day changes.
+    mutating func readRecordedBalance(from transactions: some Sequence<some DatedAmount>) {
+        recordedBalance = wallet.map { WalletBalances(transactions, asOf: day).balance(of: $0) }
+    }
+
+    var currencyCode: String { wallet.currencyCodeOrDefault }
 
     /// The real balance on the keypad: what the user typed, or until they type, the recorded balance on `day`,
     /// which the first digit replaces.
-    var realBalanceEntry: AmountEntry {
-        get { typedEntry ?? AmountEntry(cents: recordedBalance?.cents ?? 0) }
+    var entry: AmountEntry {
+        get { typedEntry ?? AmountEntry(cents: recordedBalance?.cents ?? 0, kind: .balance) }
         set { typedEntry = newValue }
     }
 
     /// What the wallet really holds on `day`, or `nil` while the keypad can't work it out (dividing by zero).
     /// Setting it types it; setting `nil` starts again from the recorded balance.
     var realBalance: Money? {
-        get { realBalanceEntry.cents.map { Money(cents: $0, currencyCode: currencyCode) } }
-        set { typedEntry = newValue.map { AmountEntry(cents: $0.cents) } }
+        get { entry.cents.map { Money(cents: $0, currencyCode: currencyCode) } }
+        set { typedEntry = newValue.map { AmountEntry(cents: $0.cents, kind: .balance) } }
     }
-
-    /// What the wallet's transactions add up to on `day`.
-    var recordedBalance: Money? { wallet?.balance(asOf: day) }
 
     /// How far the real balance is from the recorded one: what the adjustment adds (above zero) or takes away.
     var difference: Money? {
@@ -73,10 +89,12 @@ struct BalanceAdjustmentDraft {
         differenceCents > 0 ? .income : differenceCents < 0 ? .expense : nil
     }
 
-    /// The reason a balance adjustment of `type` is filed under unless another is picked: Other Income for money
+    /// The reason a balance adjustment is filed under unless another is picked, by type: Other Income for money
     /// found, Other Expense for money missing.
-    static func defaultReason(for type: CategoryType, in context: ModelContext) throws -> Category {
-        try context.otherCategory(type)
+    static func defaultReasons(in context: ModelContext) throws -> [CategoryType: Category] {
+        try [CategoryType.income, .expense].reduce(into: [:]) { reasons, type in
+            reasons[type] = try context.otherCategory(type)
+        }
     }
 
     /// The reason the adjustment is filed under: any category of ``reasonType``, the default reason unless the user
@@ -96,23 +114,10 @@ struct BalanceAdjustmentDraft {
         guard realBalance != nil else { throw BalanceAdjustmentRuleError.missingRealBalance }
         guard reasonType != nil else { throw BalanceAdjustmentRuleError.nothingToAdjust }
     }
-
-    /// Whether Save can be enabled.
-    var canSave: Bool { (try? validate()) != nil }
-}
-
-extension TransactionDefaults {
-    /// The starting values of Adjust Balance, dated `today`: in the ``wallet(viewing:in:)`` (the wallet the
-    /// screen shows, or else the last-used one), with its real balance at the recorded one.
-    static func suggestBalanceAdjustment(
-        on today: CalendarDay, viewing viewed: Wallet? = nil, in context: ModelContext
-    ) throws -> BalanceAdjustmentDraft {
-        try BalanceAdjustmentDraft(wallet: wallet(viewing: viewed, in: context), day: today, in: context)
-    }
 }
 
 /// Why a balance adjustment can't be recorded.
-nonisolated enum BalanceAdjustmentRuleError: Error, Equatable {
+nonisolated enum BalanceAdjustmentRuleError: RuleRefusal, Equatable {
     /// The keypad can't work out the real balance typed, such as when dividing by zero.
     case missingRealBalance
     /// The real balance is what the wallet's transactions already add up to.
@@ -125,11 +130,11 @@ extension BalanceAdjustmentRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingRealBalance:
-            String(localized: "Enter what the wallet really holds.")
+            String(localized: Strings.BalanceAdjustment.enterRealBalance)
         case .nothingToAdjust:
-            String(localized: "The wallet already has this balance.")
+            String(localized: Strings.BalanceAdjustment.alreadyThisBalance)
         case .reasonDoesNotMatchDifference:
-            String(localized: "Choose an Income category when the balance goes up, or an Expense category when it goes down.")
+            String(localized: Strings.BalanceAdjustment.reasonCategoryType)
         }
     }
 }
@@ -149,31 +154,28 @@ extension Transaction {
         )
     }
 
-    /// Records a known `difference` as a balance adjustment in `wallet` on `day`: money found (above zero) or
-    /// missing (below zero). Its `reason` is an Income category for money found and an Expense category for money
-    /// missing; without one it is Other Income or Other Expense. It counts in reports unless excluded, and never
-    /// needs a Card. Saves.
-    @discardableResult
-    static func recordBalanceAdjustment(
+    /// Records `difference` as a balance adjustment in `wallet` on `day`: money found (above zero) or missing (below
+    /// zero). Its `reason` is an Income category for money found and an Expense category for money missing; without
+    /// one it is Other Income or Other Expense. It never needs a Card. Saves.
+    private static func recordBalanceAdjustment(
         _ difference: Money,
         in wallet: Wallet,
         on day: CalendarDay,
-        reason: Category? = nil,
-        note: String = "",
-        isExcludedFromReport: Bool = false,
+        reason: Category?,
+        note: String,
+        isExcludedFromReport: Bool,
         in context: ModelContext
     ) throws -> Transaction {
         guard let type = BalanceAdjustmentDraft.reasonType(for: difference.cents) else {
             throw BalanceAdjustmentRuleError.nothingToAdjust
         }
-        let category = try reason ?? BalanceAdjustmentDraft.defaultReason(for: type, in: context)
+        let category = try reason ?? context.otherCategory(type)
         guard category.type == type else { throw BalanceAdjustmentRuleError.reasonDoesNotMatchDifference }
 
-        let adjustment = Transaction(amount: difference, day: day, wallet: nil, category: nil)
-        context.insert(adjustment)
-        adjustment.wallet = wallet
-        adjustment.category = category
-        adjustment.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let adjustment = Transaction.insert(
+            cents: difference.cents, on: day, wallet: wallet, category: category,
+            note: note.trimmingCharacters(in: .whitespacesAndNewlines), in: context
+        )
         adjustment.isExcludedFromReport = isExcludedFromReport
         adjustment.isBalanceAdjustment = true
         try context.save()
@@ -182,12 +184,16 @@ extension Transaction {
 
     /// For a balance adjustment, its wallet's balance just before it (what was recorded) and just after (the
     /// actual balance), taking the wallet's transactions in list order: what is entered later the same day
-    /// comes after it. `nil` for any other transaction.
-    var balanceChange: (recorded: Money, actual: Money)? {
+    /// comes after it. `nil` for any other transaction. Added up from `ledger`, the ledger entries of every
+    /// transaction outside Recently Deleted; only the few entered on the adjustment's own day are read for their order.
+    func balanceChange(in ledger: some Sequence<LedgerEntry>) -> (recorded: Money, actual: Money)? {
         guard isBalanceAdjustment, let wallet else { return nil }
-        let recordedCents = (wallet.transactions ?? []).notDeleted
-            .filter { $0 != self && isListed(before: $0) }
-            .reduce(0) { $0 + $1.amountCents }
+        let day = dayRaw
+        let recordedCents = ledger.reduce(0) { cents, entry in
+            guard entry.wallet === wallet, entry.dayRaw <= day, entry.transaction != self else { return cents }
+            let isEarlier = entry.dayRaw < day || isListed(before: entry.transaction)
+            return isEarlier ? cents + entry.netCents : cents
+        }
         return (
             recorded: Money(cents: recordedCents, currencyCode: wallet.currencyCode),
             actual: Money(cents: recordedCents + amountCents, currencyCode: wallet.currencyCode)

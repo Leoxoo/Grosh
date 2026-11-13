@@ -1,0 +1,22 @@
+{
+  "devices" : {
+    "com.apple.CoreSimulator.SimRuntime.iOS-26-0" : [
+      {
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro",
+        "isAvailable" : true,
+        "name" : "iPhone 17 Pro",
+        "state" : "Shutdown",
+        "udid" : "OLD-PRO-UDID"
+      }
+    ],
+    "com.apple.CoreSimulator.SimRuntime.iOS-26-4" : [
+      {
+        "deviceTypeIdentifier" : "com.apple.CoreSimulator.SimDeviceType.iPad-Air-11-inch-M3",
+        "isAvailable" : true,
+        "name" : "iPad Air 11-inch (M3)",
+        "state" : "Shutdown",
+        "udid" : "IPAD-UDID"
+      }
+    ]
+  }
+}

@@ -5,6 +5,8 @@ import SwiftUI
 /// In a narrow column the name gives way first, so the badge, amount and date keep their full width.
 struct ScheduledRow: View {
     let occurrence: ScheduledOccurrence
+    /// Shows the wallet's icon in gray, as ``TransactionRow`` does, for lists that mix wallets.
+    var showsWalletIcon = true
 
     /// The due day, such as "Mon, Oct 12". The year is left off because the day header above the row shows it.
     private var dayText: String {
@@ -23,11 +25,8 @@ struct ScheduledRow: View {
                         EstimatedBadge()
                             .fixedSize()
                     }
-                    if let wallet = occurrence.recurring.wallet {
-                        Image(systemName: wallet.symbolName)
-                            .font(.caption)
-                            .foregroundStyle(wallet.color.color)
-                            .accessibilityLabel(wallet.name)
+                    if showsWalletIcon, let wallet = occurrence.recurring.wallet {
+                        RowWalletIcon(wallet: wallet)
                     }
                 }
             }
@@ -48,14 +47,9 @@ struct ScheduledRow: View {
 /// A small capsule saying a row is a Scheduled occurrence, not a transaction yet. It never truncates its label.
 struct ScheduledBadge: View {
     var body: some View {
-        Label("Scheduled", systemImage: "calendar.badge.clock")
+        Label(Strings.Transactions.scheduled, systemImage: "calendar.badge.clock")
             .labelStyle(.titleAndIcon)
-            .font(.caption2.weight(.medium))
-            .lineLimit(1)
             .fixedSize()
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .foregroundStyle(.secondary)
-            .background(Color.secondary.opacity(0.15), in: Capsule())
+            .capsuleBadge(.secondary, on: .secondary)
     }
 }

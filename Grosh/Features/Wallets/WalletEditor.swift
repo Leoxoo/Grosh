@@ -4,7 +4,7 @@ import SwiftUI
 /// Adds a wallet (asking for the money it holds now, its Starting balance) or edits one.
 struct WalletEditor: View {
     static let symbolChoices = [
-        "wallet.bifold.fill", "creditcard.fill", "banknote.fill", "building.columns.fill",
+        Wallet.defaultSymbolName, "creditcard.fill", "banknote.fill", "building.columns.fill",
         "dollarsign.circle.fill", "bitcoinsign.circle.fill", "chart.line.uptrend.xyaxis", "chart.pie.fill",
         "briefcase.fill", "house.fill", "car.fill", "cart.fill",
         "bag.fill", "gift.fill", "airplane", "graduationcap.fill",
@@ -14,99 +14,122 @@ struct WalletEditor: View {
 
     let mode: EditorMode<Wallet>
 
+    @Environment(\.today) private var today
+    @AppStorage(AppSettings.currencyCode) private var currencyCode
+
+    var body: some View {
+        MadeOnce {
+            (draft: mode.editing.map { WalletDraft($0) } ?? WalletDraft(currencyCode: currencyCode), startingDay: today)
+        } content: { start in
+            WalletForm(mode: mode, startingDraft: start.draft, startingDay: start.startingDay)
+        }
+    }
+}
+
+/// The form behind ``WalletEditor``, holding the draft from the moment the sheet opens.
+private struct WalletForm: View {
+    let mode: EditorMode<Wallet>
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.today) private var today
 
     @State private var draft: WalletDraft
-    @State private var startingAmountText = ""
-    @State private var startingDay = CalendarDay.today
-    @State private var errorMessage: String?
+    @State private var keypad = KeypadTarget()
+    @FocusState private var isNameFocused: Bool
+    @State private var startingDay: CalendarDay
+    private let saver = SheetSaver(Strings.Wallets.couldntSave)
     @State private var isAdjustingBalance = false
     /// The wallet waiting for the user to confirm deleting it.
     @State private var deleting: Wallet?
 
-    init(mode: EditorMode<Wallet>) {
+    init(mode: EditorMode<Wallet>, startingDraft: WalletDraft, startingDay: CalendarDay) {
         self.mode = mode
-        _draft = State(initialValue: mode.editing.map(WalletDraft.init) ?? WalletDraft())
+        _draft = State(initialValue: startingDraft)
+        _startingDay = State(initialValue: startingDay)
     }
-
-    /// The Starting balance typed so far; an empty field means $0.
-    private var startingBalance: Money? {
-        startingAmountText.trimmingCharacters(in: .whitespaces).isEmpty
-            ? Money(cents: 0)
-            : Money(typedAmount: startingAmountText)
-    }
-
-    private var canSave: Bool { (try? draft.validate()) != nil && (!mode.isAdding || startingBalance != nil) }
 
     var body: some View {
+        let check = draft.check
         NavigationStack {
             Form {
                 Section {
                     HStack(spacing: 12) {
                         SymbolCircle(symbolName: draft.symbolName, color: draft.color, size: 40)
-                        TextField("Name", text: $draft.name)
+                        TextField(Strings.Common.name, text: $draft.name)
+                            .focused($isNameFocused)
                     }
-                    Toggle("Include in Total", isOn: $draft.includeInTotal)
+                    Toggle(Strings.Wallets.includeInTotal, isOn: $draft.includeInTotal)
                 } footer: {
-                    Text("The Total on Home adds up the wallets that are included.")
+                    if let problem = check.shownProblem {
+                        Text(problem.localizedDescription)
+                            .foregroundStyle(.invalid)
+                    } else {
+                        Text(Strings.Wallets.includeFooter)
+                    }
                 }
 
                 if mode.isAdding {
                     startingBalanceSection
                 }
 
-                Section("Icon") {
-                    SymbolGrid(symbols: Self.symbolChoices, selection: $draft.symbolName, color: draft.color)
+                Section(Strings.Common.icon) {
+                    SymbolGrid(symbols: WalletEditor.symbolChoices, selection: $draft.symbolName, color: draft.color)
                 }
 
-                Section("Color") {
+                Section(Strings.Common.color) {
                     PaletteColorGrid(selection: $draft.color)
                 }
 
                 if let wallet = mode.editing, !wallet.isArchived {
                     Section {
-                        Button("Adjust Balance", systemImage: "plusminus") { isAdjustingBalance = true }
+                        Button(Strings.BalanceAdjustment.adjustBalance, systemImage: "plusminus") { isAdjustingBalance = true }
                     } footer: {
-                        Text("Type what the wallet really holds; the difference is recorded as one transaction.")
+                        Text(Strings.Wallets.adjustBalanceFooter)
                     }
                 }
 
                 if let wallet = mode.editing {
                     Section {
                         if wallet.isArchived {
-                            Button("Unarchive Wallet", systemImage: "tray.and.arrow.up") {
-                                perform { try wallet.unarchive() }
+                            Button(Strings.Wallets.unarchiveWallet, systemImage: "tray.and.arrow.up") {
+                                saver.save("Changing a wallet") { try wallet.unarchive(today: today) }
                             }
                         } else {
-                            Button("Archive Wallet", systemImage: "archivebox") {
-                                perform { try wallet.archive() }
+                            Button(Strings.Wallets.archiveWallet, systemImage: "archivebox") {
+                                saver.save("Changing a wallet") { try wallet.archive(today: today) }
                             }
                         }
                     } footer: {
-                        Text("An archived wallet leaves the Total and the pickers but keeps its transactions. Its Recurring transactions pause until it is unarchived.")
+                        Text(Strings.Wallets.archivedFooter)
                     }
 
                     Section {
-                        Button("Delete Wallet", systemImage: "trash", role: .destructive) { deleting = wallet }
-                            .foregroundStyle(.red)
+                        Button(Strings.Wallets.deleteWallet, systemImage: "trash", role: .destructive) { deleting = wallet }
+                            .foregroundStyle(.destructive)
                     } footer: {
-                        Text("Deleting moves the wallet, its transactions and its Recurring transactions to Recently Deleted for \(RecentlyDeleted.keptDays) days.")
+                        Text(Strings.Wallets.deletingFooter(RecentlyDeleted.keptDays))
                     }
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle(mode.isAdding ? "Add Wallet" : "Edit Wallet")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(mode.isAdding ? "Add" : "Save", action: save)
-                        .disabled(!canSave)
+            .keypad(keypad)
+            .onChange(of: isNameFocused) {
+                if isNameFocused {
+                    keypad.hide()
                 }
             }
-            .errorAlert("Couldn't Save Wallet", message: $errorMessage)
+            .navigationTitle(mode.isAdding ? Strings.Wallets.addWallet : Strings.Wallets.editWallet)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(Strings.Common.cancel) { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(mode.isAdding ? Strings.Common.add : Strings.Common.save, action: save)
+                        .disabled(!check.passes)
+                }
+            }
+            .failureAlert(saver)
             .walletDeleteDialog($deleting) { dismiss() }
             .sheet(isPresented: $isAdjustingBalance) {
                 AdjustBalanceEditor(viewedWallet: mode.editing)
@@ -116,41 +139,27 @@ struct WalletEditor: View {
 
     private var startingBalanceSection: some View {
         Section {
-            TextField("Current balance", text: $startingAmountText, prompt: Text(Money(cents: 0).formatted()))
-                #if os(iOS)
-                .keyboardType(.numbersAndPunctuation)
-                #endif
-            DayStepper(title: "Date", day: $startingDay)
+            AmountRow(
+                Strings.Wallets.currentBalance, field: "currentBalance", entry: $draft.startingBalanceEntry,
+                currencyCode: draft.currencyCode,
+                tint: (draft.startingBalance?.direction ?? .neither).tint, font: .body
+            )
+            DayStepper(title: Strings.Common.date, day: $startingDay)
         } header: {
-            Text("Starting balance")
+            Text(Strings.Wallets.startingBalance)
         } footer: {
-            if startingBalance == nil {
-                Text("Enter an amount such as 1,250.00.")
-                    .foregroundStyle(.red)
-            } else {
-                Text("The money this wallet holds now. It becomes the wallet's first transaction and is excluded from report.")
-            }
+            Text(Strings.Wallets.startingBalanceFooter)
         }
     }
 
     private func save() {
-        perform {
+        saver.save("Changing a wallet") {
             switch mode {
             case .add:
-                try Wallet.create(draft, startingBalance: startingBalance ?? Money(cents: 0), on: startingDay, in: context)
+                try Wallet.create(draft, startingOn: startingDay, in: context)
             case .edit(let wallet):
                 try wallet.update(with: draft)
             }
-        }
-    }
-
-    /// Runs a change and closes the sheet, or shows why the change was refused.
-    private func perform(_ change: () throws -> Void) {
-        do {
-            try change()
-            dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 }

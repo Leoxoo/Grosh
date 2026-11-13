@@ -6,7 +6,7 @@ import SwiftData
 /// The original transaction is never changed by a payment; what is still owed is worked out from the payments linked
 /// to it. This is the one place Outstanding is worked out: Debts & Loans, the detail, the Home bell and the reminders
 /// all read it from here.
-struct LoanOrDebt {
+struct LoanOrDebt: Equatable {
     /// The Loan or Debt transaction itself.
     let original: Transaction
     /// Which way the money went.
@@ -22,15 +22,21 @@ struct LoanOrDebt {
         self.kind = kind
         let link = original.linkID
         payments = link == nil ? [] : transactions
-            .filter { $0.linkID == link && $0.category?.lockedRole == kind.paymentRole }
+            .filter { $0.linkID == link && $0.isPayment(of: kind) }
             .inListOrder()
     }
 
-    /// `original` with its payments, or `nil` when it isn't a Loan or a Debt.
-    init?(_ original: Transaction, in context: ModelContext) throws {
+    /// `original` with its payments, read from the store, or `nil` when it isn't a Loan or a Debt.
+    init?(_ original: Transaction) throws {
         guard original.isLoanOrDebt else { return nil }
-        self.init(original, among: try original.related(in: context))
+        self.init(original, among: try original.related())
     }
+
+    /// The Person it is with: a Loan or Debt is with exactly one (ADR-0009, ``TransactionRuleError/tooManyWith``).
+    var person: Person? { original.people?.first }
+
+    /// What its row is titled: who it is with, or its category's name when nobody is named.
+    var title: String { original.withName.isEmpty ? original.categoryName : original.withName }
 
     /// What the original lent or borrowed, above zero.
     var owed: Money { Money(cents: abs(original.amountCents), currencyCode: original.amount.currencyCode) }
@@ -58,14 +64,13 @@ struct LoanOrDebt {
     /// as it stands now (a payment may have been recorded since the sheet opened), lets `check` refuse, has `record`
     /// add the payment or the Forgiven mark to it, then saves.
     func settle<Recorded>(
-        in context: ModelContext,
         check: (_ current: LoanOrDebt) throws -> Void,
         record: (_ current: LoanOrDebt) throws -> Recorded
     ) throws -> Recorded {
-        guard let current = try LoanOrDebt(original, in: context) else { throw DebtLoanRuleError.notALoanOrDebt }
+        guard let current = try LoanOrDebt(original) else { throw DebtLoanRuleError.notALoanOrDebt }
         try check(current)
         let recorded = try record(current)
-        try context.save()
+        try original.saveToStore()
         return recorded
     }
 
@@ -74,17 +79,15 @@ struct LoanOrDebt {
     /// Doesn't save.
     func addLinked(
         _ cents: Int, filedUnder category: Category, on day: CalendarDay, note: String,
-        isExcludedFromReport: Bool, in context: ModelContext
+        isExcludedFromReport: Bool
     ) throws -> Transaction {
-        let link = original.paymentLink()
-        let transaction = Transaction(amount: Money(cents: cents), day: day, wallet: nil, category: nil)
-        context.insert(transaction)
-        transaction.wallet = original.wallet
-        transaction.category = category
-        transaction.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        transaction.withName = original.withName
+        let transaction = Transaction.insert(
+            cents: cents, on: day, wallet: original.wallet, category: category,
+            note: note.trimmingCharacters(in: .whitespacesAndNewlines), in: try original.storeContext()
+        )
+        transaction.setPeople(original.orderedPeople)
         transaction.isExcludedFromReport = isExcludedFromReport
-        transaction.linkID = link
+        transaction.join(original, as: .loanOrDebt)
         return transaction
     }
 }
@@ -111,13 +114,25 @@ nonisolated enum LoanOrDebtKind: Hashable, Sendable {
         }
     }
 
-    /// How a payment moves the wallet: a Debt Collection brings money in (`1`), a Repayment takes it out (`-1`).
-    var paymentSign: Int {
+    /// The kind whose payments are filed under `role`: Loan for Debt Collection, Debt for Repayment, `nil` for any
+    /// other role.
+    init?(paymentRole role: LockedRole?) {
+        guard let kind = [LoanOrDebtKind.loan, .debt].first(where: { $0.paymentRole == role }) else { return nil }
+        self = kind
+    }
+
+    /// How the Loan or Debt itself moves the wallet: a Loan (you lent) takes money out (`-1`), a Debt (you borrowed)
+    /// brings it in (`1`).
+    var sign: Int {
         switch self {
-        case .loan: 1
-        case .debt: -1
+        case .loan: -1
+        case .debt: 1
         }
     }
+
+    /// How a payment moves the wallet, back the other way: a Debt Collection brings money in (`1`), a Repayment takes
+    /// it out (`-1`).
+    var paymentSign: Int { -sign }
 
     /// Income for money collected beyond a Loan, Expense for money repaid beyond a Debt.
     var overpaymentType: CategoryType {
@@ -146,30 +161,42 @@ extension Transaction {
     /// Whether this is a Loan or a Debt, which payments settle.
     var isLoanOrDebt: Bool { loanOrDebtKind != nil }
 
-    /// Loan or Debt, or `nil` for any other transaction.
     var loanOrDebtKind: LoanOrDebtKind? { LoanOrDebtKind(category?.lockedRole) }
 
     /// Whether this is the ordinary expense or income a Loan or Debt adds beside a payment (``LoanOrDebt/addLinked``):
-    /// what was paid above it, or a forgiven amount recorded before forgiving became a mark (ADR-0004). It shares the
-    /// Loan's or Debt's link, as no other expense or income does (a transfer half is filed under a transfer category).
-    var isDebtWriteOff: Bool {
-        guard linkID != nil, let category, !category.isTransferHalf else { return false }
-        return category.type == .expense || category.type == .income
+    /// what was paid above it, or a forgiven amount recorded before forgiving became a mark (ADR-0004). It is on the
+    /// Loan's or Debt's link (ADR-0012).
+    var isDebtWriteOff: Bool { linkKind == .loanOrDebt && category?.type.isUserManaged == true }
+
+    /// Whether this is a payment of a Loan or Debt of `kind`: a Debt Collection of a Loan, or a Repayment of a Debt.
+    func isPayment(of kind: LoanOrDebtKind) -> Bool { category?.lockedRole == kind.paymentRole }
+
+    /// The kind of Loan or Debt this pays: Loan for a Debt Collection, Debt for a Repayment, `nil` for anything else.
+    var paidLoanOrDebtKind: LoanOrDebtKind? { LoanOrDebtKind(paymentRole: category?.lockedRole) }
+
+    /// Whether this is a Debt Collection or Repayment on the link of a Loan or Debt that is forgiven. Restoring such a
+    /// payment from Recently Deleted would count it a second time, since the forgiven amount already settles what it
+    /// paid (ADR-0004). Reads the transactions on its link.
+    func paysForgivenLoanOrDebt() throws -> Bool {
+        guard let kind = paidLoanOrDebtKind, linkKind == .loanOrDebt else { return false }
+        return try storeContext().fetch(linkedTransactions).contains { $0.isForgiven && $0.loanOrDebtKind == kind }
+    }
+
+    /// Its payments, those in Recently Deleted too: restoring one brings it back against this Loan or Debt, so until
+    /// then it still holds the wallet, category and lowest amount in place (``TransactionDraft/isLockedByPayments``).
+    /// Empty for anything but a Loan or Debt with a link.
+    func paymentsWithRecentlyDeleted() throws -> [Transaction] {
+        guard let kind = loanOrDebtKind, linkID != nil else { return [] }
+        return try storeContext().fetch(linkedTransactionsWithRecentlyDeleted).filter { $0.isPayment(of: kind) }
     }
 
     /// Links `payment`, a Debt Collection (for a Loan) or Repayment (for a Debt) recorded without one, such as by an
     /// import, so it counts against this Loan or Debt and they show as each other's Related transactions. Only the
-    /// links change. Saves.
+    /// links change. Doesn't save: an import links many and saves once.
     func linkPayment(_ payment: Transaction) throws {
-        try linkPaymentWithoutSaving(payment)
-        try modelContext?.save()
-    }
-
-    /// ``linkPayment(_:)`` without the save, for a caller that saves once after linking many, such as an import.
-    func linkPaymentWithoutSaving(_ payment: Transaction) throws {
         guard let kind = loanOrDebtKind else { throw DebtLoanRuleError.notALoanOrDebt }
-        guard payment.category?.lockedRole == kind.paymentRole else { throw DebtLoanRuleError.paymentDoesNotMatch }
-        payment.linkID = paymentLink()
+        guard payment.isPayment(of: kind) else { throw DebtLoanRuleError.paymentDoesNotMatch }
+        payment.join(self, as: .loanOrDebt)
     }
 
     /// Whether `payment` pays this Loan or Debt back in one go: a Debt Collection for a Loan or a Repayment for a
@@ -177,15 +204,7 @@ extension Transaction {
     /// without their links, finds the Loan or Debt to link one to.
     func isPaidBackInFull(by payment: Transaction) -> Bool {
         guard let kind = loanOrDebtKind else { return false }
-        return payment.category?.lockedRole == kind.paymentRole && payment.wallet == wallet
+        return payment.isPayment(of: kind) && payment.wallet == wallet
             && payment.amountCents == -amountCents && payment.dayRaw >= dayRaw
-    }
-
-    /// The link this Loan or Debt shares with its payments, made the first time one is recorded.
-    fileprivate func paymentLink() -> UUID {
-        if let linkID { return linkID }
-        let link = UUID()
-        linkID = link
-        return link
     }
 }

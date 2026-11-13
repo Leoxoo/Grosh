@@ -12,18 +12,20 @@ nonisolated enum TransactionEditFlow: Hashable, Sendable {
 
 extension Transaction {
     /// How the detail edits this transaction, or `nil` when the flow that recorded it owns it: a Debt Collection
-    /// or Repayment from Record payment, and every other linked transaction. A Loan or Debt stays with the Add
-    /// sheet once it has payments (which share its link), with its wallet and category locked
-    /// (``TransactionDraft/isLockedByPayments``). A Starting balance and a transfer half have their own editors,
-    /// since the Add sheet would re-sign their amount by type and never offers their category.
+    /// or Repayment from Record payment, what a Loan or Debt writes off beside one, and a payback into another wallet
+    /// (ADR-0010). The link's kind says which (ADR-0012).
+    /// A Loan or Debt stays with the Add sheet once it has payments (which share its link), with its wallet and category
+    /// locked (``TransactionDraft/isLockedByPayments``), and so does an Expense paid back into another wallet. A part of
+    /// a Split (``isSplitPart``) is edited there too, on its own. A Starting balance and a transfer half have their own
+    /// editors, since the Add sheet would re-sign their amount by type and never offers their category.
     var editFlow: TransactionEditFlow? {
-        if category?.isTransferHalf == true { return .transferHalf }
-        if isLoanOrDebt { return .addSheet }
-        guard linkID == nil else { return nil }
         switch category?.lockedRole {
-        case .startingBalance: return .startingBalance
-        case .outgoingTransfer, .incomingTransfer, .debtCollection, .repayment: return nil
-        case .otherIncome, .otherExpense, .loan, .debt, nil: return .addSheet
+        case .outgoingTransfer, .incomingTransfer: return .transferHalf
+        case .loan, .debt: return .addSheet
+        case .debtCollection, .repayment, .reimbursement: return nil
+        case .startingBalance, .otherIncome, .otherExpense, nil:
+            if linkKind == .transfer || linkKind == .loanOrDebt { return nil }
+            return category?.lockedRole == .startingBalance ? .startingBalance : .addSheet
         }
     }
 

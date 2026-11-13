@@ -4,16 +4,11 @@ import SwiftUI
 /// Account → Cards: every Card in the order it was added. Tap to see its transactions by statement period or month,
 /// swipe to archive.
 struct CardListView: View {
-    @Query(filter: #Predicate<Card> { !$0.isArchived }, sort: Card.userOrder) private var unarchivedCards: [Card]
-    @Query(filter: #Predicate<Card> { $0.isArchived }, sort: Card.userOrder) private var allArchivedCards: [Card]
+    @Query(Card.unarchived) private var cards: [Card]
+    @Query(Card.archived) private var archivedCards: [Card]
     @State private var editorMode: EditorMode<Card>?
     @State private var mergeSource: Card?
     @State private var errorMessage: String?
-
-    /// The unarchived Cards, leaving out those whose paying wallet is in Recently Deleted.
-    private var cards: [Card] { unarchivedCards.filter { !$0.isPaidFromDeletedWallet } }
-    /// The archived Cards, leaving out those whose paying wallet is in Recently Deleted.
-    private var archivedCards: [Card] { allArchivedCards.filter { !$0.isPaidFromDeletedWallet } }
 
     var body: some View {
         List {
@@ -21,13 +16,13 @@ struct CardListView: View {
                 ForEach(cards) { card in
                     row(card)
                         .swipeActions {
-                            Button("Archive", systemImage: "archivebox") { perform { try card.archive() } }
-                                .tint(.orange)
+                            Button(Strings.Common.archive, systemImage: "archivebox") { Log.store.perform("Changing a card", errorMessage: &errorMessage) { try card.archive() } }
+                                .tint(.archiveAction)
                         }
                 }
             } footer: {
                 if !cards.isEmpty {
-                    Text("A Card is only a label for what an expense was paid with. It never changes any balance.")
+                    Text(Strings.Cards.onlyALabelListFooter)
                 }
             }
 
@@ -37,32 +32,32 @@ struct CardListView: View {
                         row(card)
                             .foregroundStyle(.secondary)
                             .swipeActions {
-                                Button("Unarchive", systemImage: "tray.and.arrow.up") { perform { try card.unarchive() } }
-                                    .tint(.green)
+                                Button(Strings.Common.unarchive, systemImage: "tray.and.arrow.up") { Log.store.perform("Changing a card", errorMessage: &errorMessage) { try card.unarchive() } }
+                                    .tint(.unarchiveAction)
                             }
                     }
                 } header: {
-                    Text("Archived")
+                    Text(Strings.Common.archived)
                 } footer: {
-                    Text("Archived Cards leave the pickers but stay on their transactions.")
+                    Text(Strings.Cards.archivedSectionFooter)
                 }
             }
         }
         .overlay {
             if cards.isEmpty && archivedCards.isEmpty {
                 ContentUnavailableView {
-                    Label("No Cards", systemImage: "creditcard")
+                    Label(Strings.Cards.noCards, systemImage: "creditcard")
                 } description: {
-                    Text("Add the cards you pay with to see which one each expense went on.")
+                    Text(Strings.Cards.noCardsDescription)
                 } actions: {
-                    Button("Add Card") { editorMode = .add }
+                    Button(Strings.Cards.addCard) { editorMode = .add }
                 }
             }
         }
-        .navigationTitle("Cards")
+        .navigationTitle(Strings.Screens.cards)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Add Card", systemImage: "plus") { editorMode = .add }
+                Button(Strings.Cards.addCard, systemImage: "plus") { editorMode = .add }
             }
         }
         .sheet(item: $editorMode) { mode in
@@ -71,7 +66,7 @@ struct CardListView: View {
         .sheet(item: $mergeSource) { card in
             CardMergeView(source: card)
         }
-        .errorAlert("Couldn't Change Card", message: $errorMessage)
+        .errorAlert(Strings.Cards.couldntChange, message: $errorMessage)
     }
 
     private func row(_ card: Card) -> some View {
@@ -81,22 +76,13 @@ struct CardListView: View {
             CardRow(card: card)
         }
         .contextMenu {
-            Button("Edit", systemImage: "pencil") { editorMode = .edit(card) }
+            Button(Strings.Common.edit, systemImage: "pencil") { editorMode = .edit(card) }
             if card.isArchived {
-                Button("Unarchive", systemImage: "tray.and.arrow.up") { perform { try card.unarchive() } }
+                Button(Strings.Common.unarchive, systemImage: "tray.and.arrow.up") { Log.store.perform("Changing a card", errorMessage: &errorMessage) { try card.unarchive() } }
             } else {
-                Button("Archive", systemImage: "archivebox") { perform { try card.archive() } }
+                Button(Strings.Common.archive, systemImage: "archivebox") { Log.store.perform("Changing a card", errorMessage: &errorMessage) { try card.archive() } }
             }
-            Button("Merge into Another Card…", systemImage: "arrow.triangle.merge") { mergeSource = card }
-        }
-    }
-
-    /// Runs a change, or shows why it was refused.
-    private func perform(_ change: () throws -> Void) {
-        do {
-            try change()
-        } catch {
-            errorMessage = error.localizedDescription
+            Button(Strings.Cards.mergeIntoAnother, systemImage: "arrow.triangle.merge") { mergeSource = card }
         }
     }
 }
@@ -105,5 +91,5 @@ struct CardListView: View {
     NavigationStack {
         CardListView()
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+    .modelContainer(try! StoreOpening.open(inMemory: true))
 }

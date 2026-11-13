@@ -3,7 +3,7 @@ import SwiftData
 
 /// What the Add Transaction sheet holds before it is saved. The amount is entered positive; the category
 /// sets the sign.
-struct TransactionDraft {
+nonisolated struct TransactionDraft {
     /// Expense, Income or Debt/Loan. Switching it drops a category of the old type. Switching onto or off
     /// Debt/Loan also swaps the Exclude from report switch: to the value the user left there before, or else
     /// to the new type's default. Switching between Expense and Income leaves it alone.
@@ -31,14 +31,43 @@ struct TransactionDraft {
             }
         }
     }
-    /// Entered positive; the category decides whether it adds to or takes from the wallet.
-    var amount = Money(cents: 0)
-    var category: Category?
+    /// The amount is in the wallet's currency.
+    var currencyCode: String { wallet.currencyCodeOrDefault }
+    /// The amount as typed, entered positive; the category decides whether it adds to or takes from the wallet.
+    var entry = AmountEntry()
+    /// Changing it to a Loan or a Debt keeps only the first of the people in With, since those are with one Person.
+    var category: Category? {
+        didSet {
+            if requiresWith, people.count > 1 {
+                people = [people[0]]
+            }
+        }
+    }
     var card: Card?
     var note = ""
-    var day: CalendarDay
-    /// The person the transaction involved.
-    var withName = ""
+    /// Moving it moves the reminder of every + Owes me that still sits a week after it.
+    var day: CalendarDay {
+        didSet {
+            guard day != oldValue else { return }
+            let before = ReminderDay.default(after: oldValue)
+            let after = ReminderDay.default(after: day)
+            for index in owes.indices where owes[index].reminderDay == before {
+                owes[index].reminderDay = after
+            }
+        }
+    }
+    /// The people in With, in the order they were chosen (ADR-0009). A Loan or Debt takes exactly one; anything else
+    /// takes any number. Taking someone out drops the new + Owes me they had; one already saved stays, and saving is
+    /// refused until it is removed or they are back (``validateExpectations()``).
+    var people: [Person] = [] {
+        didSet {
+            owes.removeAll { entry in
+                entry.existing == nil && !people.contains(where: { $0 === entry.person })
+            }
+        }
+    }
+    /// The + Owes me of an Expense, one for each Person who is yet to pay part of it back (ADR-0010).
+    var owes: [OwesMeDraft] = []
     var isExcludedFromReport = false
     /// The day a Loan or Debt reminds the user of it, or `nil` for no reminder. Only kept on the Debt/Loan tab.
     var reminderDay: CalendarDay?
@@ -47,10 +76,16 @@ struct TransactionDraft {
     /// Set when editing a balance adjustment, which never needs a Card and is never a Loan or Debt. Saving keeps
     /// the transaction one.
     private(set) var isBalanceAdjustment = false
+    /// Set when editing a part of a Split, which stays an Expense or Income, since the parts add up as one amount.
+    private(set) var isSplitPart = false
     /// Set when editing a transaction the Card rule doesn't apply to (``requiresCard``).
     private(set) var cardRuleExemption: CardRuleExemption?
     /// Set when editing a Loan or Debt that has payments or was forgiven: what they hold in place.
     private(set) var paymentLock: PaymentLock?
+    /// Set when editing an Expense: the expectations it had, so removing one that has payments can be refused.
+    private(set) var originalExpectations: [ExpectedReimbursement] = []
+    /// Set when editing an Expense that was paid back into another wallet: the wallet it has to stay in.
+    private(set) var walletKeptByPaybacks: Wallet?
 
     /// What the payments on a Loan or Debt, or its Forgiven mark, hold in place while it is edited: the wallet and
     /// category (so the type) they were recorded against, and an amount no lower than what has been paid. Payments in
@@ -70,23 +105,40 @@ struct TransactionDraft {
         self.day = day
     }
 
-    /// The transaction as it is, to edit.
-    init(editing transaction: Transaction) {
+    @MainActor init(editing transaction: Transaction) {
         self.init(copying: transaction, day: transaction.day)
         eventName = transaction.eventName
         isBalanceAdjustment = transaction.isBalanceAdjustment
+        isSplitPart = transaction.isSplitPart
         cardRuleExemption = transaction.cardRuleExemption
         reminderDay = transaction.reminderDay
-        let deletedPayments = transaction.paymentsInRecentlyDeleted
-        if let context = transaction.modelContext, let loanOrDebt = try? LoanOrDebt(transaction, in: context),
-           !loanOrDebt.payments.isEmpty || transaction.isForgiven || !deletedPayments.isEmpty {
-            let deletedCents = deletedPayments.reduce(0) { $0 + abs($1.amountCents) }
-            paymentLock = PaymentLock(
-                wallet: transaction.wallet, category: transaction.category,
-                paid: Money(cents: loanOrDebt.paid.cents + deletedCents, currencyCode: loanOrDebt.paid.currencyCode),
-                forgivenOwed: transaction.isForgiven ? loanOrDebt.owed : nil
+        originalExpectations = transaction.orderedExpectations
+        owes = originalExpectations.compactMap(OwesMeDraft.init(editing:))
+        walletKeptByPaybacks = transaction.hasPaybacksElsewhere ? transaction.wallet : nil
+        paymentLock = Self.paymentLock(editing: transaction)
+    }
+
+    /// What holds a Loan or Debt in place while it is edited, or `nil` when nothing does. When its payments can't be
+    /// read, it is held as if paid in full: a lock lifted by a failed read would let it change under its payments.
+    @MainActor private static func paymentLock(editing transaction: Transaction) -> PaymentLock? {
+        guard transaction.isLoanOrDebt, transaction.modelContext != nil else { return nil }
+        let owed = Money(cents: abs(transaction.amountCents), currencyCode: transaction.amount.currencyCode)
+        let forgivenOwed = transaction.isForgiven ? owed : nil
+        let payments: [Transaction]
+        do {
+            payments = try transaction.paymentsWithRecentlyDeleted()
+        } catch {
+            Log.store.failed("Reading the payments of a Loan or Debt", error)
+            return PaymentLock(
+                wallet: transaction.wallet, category: transaction.category, paid: owed, forgivenOwed: forgivenOwed
             )
         }
+        guard !payments.isEmpty || transaction.isForgiven else { return nil }
+        return PaymentLock(
+            wallet: transaction.wallet, category: transaction.category,
+            paid: Money(cents: payments.reduce(0) { $0 + abs($1.amountCents) }, currencyCode: owed.currencyCode),
+            forgivenOwed: forgivenOwed
+        )
     }
 
     /// A new transaction like `transaction`, dated `today` ("Duplicate"). A Loan's or Debt's reminder belonged to
@@ -100,7 +152,7 @@ struct TransactionDraft {
     init(paymentFor recurring: RecurringTransaction, on today: CalendarDay) {
         self.init(type: recurring.category?.type ?? .expense, day: today)
         wallet = recurring.wallet
-        amount = Money(cents: abs(recurring.amountCents), currencyCode: recurring.currencyCode)
+        entry = AmountEntry(cents: abs(recurring.amountCents))
         category = recurring.category
         card = recurring.card
         note = recurring.note
@@ -109,17 +161,17 @@ struct TransactionDraft {
     private init(copying transaction: Transaction, day: CalendarDay) {
         self.init(type: transaction.category?.type ?? .expense, day: day)
         wallet = transaction.wallet
-        amount = Money(cents: abs(transaction.amountCents), currencyCode: transaction.amount.currencyCode)
+        entry = AmountEntry(cents: abs(transaction.amountCents))
         category = transaction.category
         card = transaction.card
         note = transaction.note
-        withName = transaction.withName
+        people = transaction.orderedPeople
         isExcludedFromReport = transaction.isExcludedFromReport
     }
 }
 
 /// Why a transaction can't be saved yet.
-nonisolated enum TransactionRuleError: Error, Equatable {
+nonisolated enum TransactionRuleError: RuleRefusal, Equatable {
     case missingWallet
     /// The amount must be above zero; the category sets the sign.
     case missingAmount
@@ -128,6 +180,8 @@ nonisolated enum TransactionRuleError: Error, Equatable {
     case missingCard
     /// A Loan or Debt must say who it is with.
     case missingWith
+    /// A Loan or Debt is with one Person, not several (ADR-0009).
+    case tooManyWith
     /// Only a wallet's Starting balance is edited as one.
     case notAStartingBalance
 }
@@ -135,18 +189,18 @@ nonisolated enum TransactionRuleError: Error, Equatable {
 extension TransactionRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .missingWallet: String(localized: "Choose a wallet.")
-        case .missingAmount: String(localized: "Enter an amount above zero.")
-        case .missingCategory: String(localized: "Choose a category.")
-        case .missingCard: String(localized: "Choose the Card this expense was paid with.")
-        case .missingWith: String(localized: "Enter who you lent to or borrowed from in With.")
-        case .notAStartingBalance: String(localized: "Only a wallet's Starting balance can be edited here.")
+        case .missingWallet: String(localized: Strings.Common.addWalletFirst)
+        case .missingAmount: String(localized: Strings.Common.enterAmountAboveZero)
+        case .missingCategory: String(localized: Strings.Common.chooseACategory)
+        case .missingCard: String(localized: Strings.Transactions.missingCard)
+        case .missingWith: String(localized: Strings.Transactions.missingWith)
+        case .tooManyWith: String(localized: Strings.Transactions.tooManyWith)
+        case .notAStartingBalance: String(localized: Strings.Transactions.notAStartingBalance)
         }
     }
 }
 
-extension TransactionDraft {
-    /// Checks the draft against the transaction rules before anything is saved.
+nonisolated extension TransactionDraft {
     func validate() throws {
         guard wallet != nil else { throw TransactionRuleError.missingWallet }
         guard amount.cents > 0 else { throw TransactionRuleError.missingAmount }
@@ -165,6 +219,8 @@ extension TransactionDraft {
         }
         guard card != nil || !requiresCard else { throw TransactionRuleError.missingCard }
         guard !isMissingWith else { throw TransactionRuleError.missingWith }
+        guard !(requiresWith && people.count > 1) else { throw TransactionRuleError.tooManyWith }
+        try validateExpectations()
     }
 
     /// Whether this is a Loan or Debt with payments or forgiven, whose wallet, type and category can't change.
@@ -175,20 +231,21 @@ extension TransactionDraft {
         type == .debtLoan
     }
 
-    /// Whether the transaction must say who it is with: a Loan or a Debt.
+    /// Whether the transaction must say who it is with, and with exactly one Person: a Loan or a Debt.
     var requiresWith: Bool {
         category?.isLoanOrDebt == true
     }
 
     /// Whether a Loan or Debt still says nobody in With.
     var isMissingWith: Bool {
-        requiresWith && withName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        requiresWith && people.isEmpty
     }
 
     /// The types the sheet offers, in order. A balance adjustment is only ever Expense or Income: its reason is a
-    /// category of the type its difference matches, never a Loan or Debt.
+    /// category of the type its difference matches, never a Loan or Debt. A part of a Split is never a Loan or Debt
+    /// either.
     var types: [CategoryType] {
-        isBalanceAdjustment ? [.expense, .income] : CategoryType.segments
+        isBalanceAdjustment || isSplitPart ? CategoryType.ordinary : CategoryType.segments
     }
 
     /// Whether the transaction can name a Card at all: every transaction but the two halves of a transfer.
@@ -223,14 +280,11 @@ extension Transaction {
     }
 }
 
-extension TransactionDraft {
+nonisolated extension TransactionDraft {
 
     /// Whether the amount adds to the wallet (`1`) or takes from it (`-1`): the category's ``Category/sign``, or
     /// before one is chosen, the type's. `0` while a Debt/Loan has neither Loan nor Debt picked.
     var sign: Int {
-        category?.sign ?? (type == .expense ? -1 : type == .income ? 1 : 0)
+        category?.sign ?? type.sign ?? 0
     }
-
-    /// Whether every required field is filled, so Save can be enabled.
-    var canSave: Bool { (try? validate()) != nil }
 }

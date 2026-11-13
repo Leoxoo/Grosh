@@ -22,10 +22,31 @@ struct PaletteColorGrid: View {
                         }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(choice.rawValue.capitalized)
+                .accessibilityLabel(Text(choice.name))
                 .accessibilityAddTraits(choice == selection ? .isSelected : [])
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+extension PaletteColor {
+    /// The color's name, as VoiceOver reads it.
+    var name: LocalizedStringResource {
+        switch self {
+        case .red: Strings.Palette.red
+        case .orange: Strings.Palette.orange
+        case .yellow: Strings.Palette.yellow
+        case .green: Strings.Palette.green
+        case .mint: Strings.Palette.mint
+        case .teal: Strings.Palette.teal
+        case .cyan: Strings.Palette.cyan
+        case .blue: Strings.Palette.blue
+        case .indigo: Strings.Palette.indigo
+        case .purple: Strings.Palette.purple
+        case .pink: Strings.Palette.pink
+        case .brown: Strings.Palette.brown
+        case .gray: Strings.Palette.gray
+        }
     }
 }

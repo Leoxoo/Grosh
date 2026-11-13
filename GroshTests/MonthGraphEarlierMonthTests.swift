@@ -5,6 +5,7 @@ import Testing
 /// The month strip above Home's Spent and Income cards, and an earlier month picked in it: complete, compared with the
 /// three complete months before it, and selected on its last day to start with.
 @MainActor
+@Suite(.namedInTheLog)
 struct MonthGraphEarlierMonthTests {
     private let store: MonthGraphFixture
     private var context: ModelContext { store.context }
@@ -30,7 +31,7 @@ struct MonthGraphEarlierMonthTests {
     @Test func theStripRunsFromTheMonthOfTheFirstTransactionThatCountsThroughThisMonth() throws {
         try Wallet.create(name: "Cash", startingBalance: Money(cents: 300_00), on: day(2026, 5, 1), in: context)
         let deleted = try store.record(-15_00, "Café", on: day(2026, 6, 4))
-        try [deleted].delete(.onlySelected, in: context)
+        try [deleted].delete(.onlySelected)
         let excluded = try store.record(-40_00, "Café", on: day(2026, 7, 3))
         excluded.isExcludedFromReport = true
         try store.record(1_500_00, "Salary", .income, on: day(2026, 8, 20))
@@ -43,6 +44,55 @@ struct MonthGraphEarlierMonthTests {
         #expect(strip.map { $0.title(today: today) } == ["08/2026", "Last month", "This month"])
     }
 
+    /// August's Expense, paid back in full, counts nothing, so the strip starts in September, the first month anything
+    /// counts, rather than holding this month alone.
+    @Test func anExpensePaidBackInFullDoesntStartTheStrip() throws {
+        let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 8, 3))
+        try Reimbursement.add(ReimbursementDraft(amount: Money(cents: 60_00), day: day(2026, 8, 5)), to: dinner, in: context)
+        try store.record(-25_00, "Café", on: day(2026, 9, 5))
+
+        #expect(try store.strip() == [.month(month(2026, 9)), .month(month(2026, 10))])
+    }
+
+    /// August's Expense is paid back in full into Cash, another wallet of the Total: in the Total it counts nothing, and
+    /// nor does the payback, so the strip starts in September.
+    @Test func anExpensePaidBackInFullIntoAnotherWalletDoesntStartTheStrip() throws {
+        let cash = context.addWallet("Cash")
+        let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 8, 3))
+        try context.payBack(60_00, on: day(2026, 8, 5), to: dinner, into: cash)
+        try store.record(-25_00, "Café", on: day(2026, 9, 5))
+
+        #expect(try store.strip() == [.month(month(2026, 9)), .month(month(2026, 10))])
+    }
+
+    /// The earliest transaction is a payback into Cash, which the Total leaves out since its Expense counts it; the
+    /// Expense, which still counts what wasn't paid back, starts the strip in August.
+    @Test func aPaybackTheTotalLeavesOutDoesntHideTheMonthsAfterIt() throws {
+        let cash = context.addWallet("Cash")
+        let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 8, 10))
+        try context.payBack(20_00, on: day(2026, 7, 28), to: dinner, into: cash)
+
+        #expect(try store.strip() == [.month(month(2026, 8)), .month(month(2026, 9)), .month(month(2026, 10))])
+    }
+
+    /// The Total is labelled in dollars, Checking's currency, so the older euro wallet's transactions count on neither
+    /// card: the strip starts in September, with Checking's first, as the Report's does. There are more of them than the
+    /// earliest transactions Home reads, so they would hide September's if the store read them too.
+    @Test func theStripStartsWithTheFirstTransactionInTheTotalsCurrency() throws {
+        let euros = try Wallet.create(
+            name: "Euros", startingBalance: Money(cents: 300_00, currencyCode: "EUR"), on: day(2026, 1, 1), in: context
+        )
+        for number in 1...MonthGraphHistory.earliestCandidateCount + 2 {
+            try store.record(-5_00, "Café", on: day(2026, 1, number), in: euros)
+        }
+        try store.record(-25_00, "Café", on: day(2026, 9, 5))
+
+        let strip = try store.strip()
+
+        #expect(strip == [.month(month(2026, 9)), .month(month(2026, 10))])
+        #expect(try strip == store.history().strip(.month, today: today))
+    }
+
     /// July's only transaction that counts is deleted, so the strip drops July: a card left on July shows this month,
     /// and one on September stays there.
     @Test func aMonthTheStripNoLongerOffersGivesWayToThisMonth() throws {
@@ -51,7 +101,7 @@ struct MonthGraphEarlierMonthTests {
         var july = Period.month(month(2026, 7))
         var september = Period.month(month(2026, 9))
 
-        try [coffee].delete(.onlySelected, in: context)
+        try [coffee].delete(.onlySelected)
         let strip = try store.strip()
         july.showCurrentPeriod(.month(month(2026, 10)), unlessOfferedBy: strip)
         september.showCurrentPeriod(.month(month(2026, 10)), unlessOfferedBy: strip)

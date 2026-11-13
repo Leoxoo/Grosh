@@ -1,0 +1,41 @@
+{
+  "devicesAndConfigurations" : [
+    {
+      "device" : {
+        "architecture" : "arm64",
+        "deviceId" : "PRO-UDID",
+        "deviceName" : "iPhone 17 Pro",
+        "modelName" : "iPhone 17 Pro",
+        "osVersion" : "26.4",
+        "platform" : "iOS Simulator"
+      },
+      "expectedFailures" : 0,
+      "failedTests" : 0,
+      "passedTests" : 412,
+      "skippedTests" : 9,
+      "testPlanConfiguration" : {
+        "configurationId" : "1",
+        "configurationName" : "Default"
+      }
+    }
+  ],
+  "environmentDescription" : "Grosh · Built with macOS 26.4",
+  "expectedFailures" : 0,
+  "failedTests" : 0,
+  "finishTime" : 1792731698.204,
+  "passedTests" : 412,
+  "result" : "Passed",
+  "skippedTests" : 9,
+  "startTime" : 1792731651.033,
+  "statistics" : [
+
+  ],
+  "testFailures" : [
+
+  ],
+  "title" : "Test - Grosh",
+  "topInsights" : [
+
+  ],
+  "totalTestCount" : 421
+}

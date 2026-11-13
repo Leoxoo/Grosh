@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// The Home bell itself: a plain bell while nothing is due, with a badge once a Loan or Debt reminder is.
+/// The Home bell itself: a plain bell while nothing is due, with a badge once a reminder is: a Loan's, a Debt's, an
+/// Owes me's, or an estimated amount's.
 struct DueRemindersButton: View {
-    /// How many open Loans and Debts have reached their reminder day.
+    /// How many open Loans, Debts and Owes me have reached their reminder day, and estimated amounts their due day.
     let dueCount: Int
     let action: () -> Void
 
@@ -10,6 +11,6 @@ struct DueRemindersButton: View {
         Button(action: action) {
             Image(systemName: dueCount == 0 ? "bell" : "bell.badge")
         }
-        .accessibilityLabel(dueCount == 0 ? Text("Reminders") : Text("\(dueCount) Due Reminders"))
+        .accessibilityLabel(dueCount == 0 ? Text(Strings.Screens.reminders) : Text(Strings.DebtsLoans.dueReminders(dueCount)))
     }
 }

@@ -6,6 +6,8 @@ import UniformTypeIdentifiers
 /// replaces every wallet, Card and transaction with it, keeping the categories. Then shows what was imported.
 struct ImportFromMoneyLoverView: View {
     @Environment(\.modelContext) private var context
+    /// The currency of a row that names none, and so of its wallet.
+    @AppStorage(AppSettings.currencyCode) private var currencyCode
     @State private var isPickingFile = false
     /// The export read from the picked file, waiting for the user to confirm.
     @State private var picked: PickedExport?
@@ -19,15 +21,15 @@ struct ImportFromMoneyLoverView: View {
                 MoneyLoverImportSummarySections(summary: summary)
             } else {
                 Section {
-                    Button("Choose CSV File…", systemImage: "doc.badge.plus") {
+                    Button(Strings.ImportExport.chooseCSVFile, systemImage: "doc.badge.plus") {
                         isPickingFile = true
                     }
                 } footer: {
-                    Text("Replaces every wallet, Card and transaction with those in a MoneyLover CSV export, or restores a Grosh CSV export. Your categories are kept.")
+                    Text(Strings.ImportExport.importFooter)
                 }
             }
         }
-        .navigationTitle("Import from MoneyLover")
+        .navigationTitle(Strings.Screens.importFromMoneyLover)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -35,42 +37,42 @@ struct ImportFromMoneyLoverView: View {
             read(result)
         }
         .confirmationDialog(
-            "Replace all data?",
+            Strings.ImportExport.replaceAllDataQuestion,
             isPresented: Binding(get: { picked != nil }, set: { if !$0 { picked = nil } }),
             titleVisibility: .visible,
             presenting: picked
         ) { export in
-            Button("Replace All Data", role: .destructive) {
+            Button(Strings.ImportExport.replaceAllData, role: .destructive) {
                 replaceAllData(with: export)
             }
-            Button("Cancel", role: .cancel) {}
+            Button(Strings.Common.cancel, role: .cancel) {}
         } message: { export in
-            Text("Every wallet, Card and transaction will be deleted and replaced with the \(export.rows.count) transactions in \(export.fileName). Categories are kept. This can't be undone.")
+            Text(Strings.ImportExport.replaceConfirmation(export.export.rows.count, export.fileName))
         }
         .disabled(isImporting)
         .overlay {
             if isImporting {
-                ProgressView("Importing…")
+                ProgressView(Strings.ImportExport.importing)
                     .padding()
                     .background(.regularMaterial, in: .rect(cornerRadius: 12))
                     .transition(.opacity)
             }
         }
-        .errorAlert("Couldn't Import", message: $errorMessage)
+        .errorAlert(Strings.ImportExport.couldntImport, message: $errorMessage)
     }
 
     /// Reads the picked file and checks it is a MoneyLover export before asking to replace anything.
     private func read(_ result: Result<URL, Error>) {
-        do {
+        Log.importing.perform("Reading the picked file", errorMessage: &errorMessage, expected: true) {
             let url = try result.get()
             let isAccessing = url.startAccessingSecurityScopedResource()
             defer {
                 if isAccessing { url.stopAccessingSecurityScopedResource() }
             }
             let text = try String(contentsOf: url, encoding: .utf8)
-            picked = PickedExport(fileName: url.lastPathComponent, rows: try MoneyLoverCSV.rows(in: text))
-        } catch {
-            errorMessage = error.localizedDescription
+            picked = PickedExport(
+                fileName: url.lastPathComponent, export: try MoneyLoverCSV.read(text, currencyCode: currencyCode)
+            )
         }
     }
 
@@ -81,10 +83,10 @@ struct ImportFromMoneyLoverView: View {
         withAnimation {
             isImporting = true
         } completion: {
-            do {
-                summary = try MoneyLoverImport.replaceAllData(with: export.rows, in: context)
-            } catch {
-                errorMessage = error.localizedDescription
+            Log.importing.perform("Importing from MoneyLover", errorMessage: &errorMessage) {
+                summary = try MoneyLoverImport.replaceAllData(
+                    with: export.export, cards: .ownersCards, in: context
+                )
             }
             isImporting = false
         }
@@ -94,12 +96,12 @@ struct ImportFromMoneyLoverView: View {
 /// A MoneyLover export read from a file the user picked.
 private struct PickedExport {
     let fileName: String
-    let rows: [MoneyLoverRow]
+    let export: MoneyLoverExport
 }
 
 #Preview {
     NavigationStack {
         ImportFromMoneyLoverView()
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+    .modelContainer(try! StoreOpening.open(inMemory: true))
 }

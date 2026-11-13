@@ -8,12 +8,14 @@ struct ForgiveEditor: View {
     /// The Loan or Debt being forgiven.
     let original: Transaction
 
+    @Environment(\.today) private var today
+
     var body: some View {
         LoanOrDebtSheet(
-            unavailableTitle: "Can't Forgive",
-            unavailableMessage: "Only a Loan or a Debt can be forgiven."
-        ) { context in
-            try ForgiveDraft(forgiving: original, on: .today, in: context)
+            unavailableTitle: Strings.DebtsLoans.cantForgive,
+            unavailableMessage: Strings.DebtsLoans.onlyLoanOrDebtForgiven
+        ) {
+            try ForgiveDraft(forgiving: original, on: today)
         } form: { draft in
             ForgiveForm(startingDraft: draft)
         }
@@ -26,7 +28,7 @@ private struct ForgiveForm: View {
     @Environment(\.modelContext) private var context
 
     @State private var draft: ForgiveDraft
-    @State private var errorMessage: String?
+    private let saver = SheetSaver(Strings.DebtsLoans.couldntForgive)
 
     init(startingDraft: ForgiveDraft) {
         _draft = State(initialValue: startingDraft)
@@ -39,44 +41,35 @@ private struct ForgiveForm: View {
             Form {
                 Section {
                     LoanOrDebtWithRow(loanOrDebt: loanOrDebt)
-                    LabeledContent("Forgiven") {
+                    LabeledContent(Strings.Common.forgiven) {
                         Text(draft.forgiven.formatted())
                             .monospacedDigit()
                     }
-                    DayStepper(title: "Date", day: $draft.day)
-                    CategoryPicker(title: "Category", type: draft.forgivenType, selection: $draft.category)
-                    TextField("Note", text: $draft.note, axis: .vertical)
+                    DayStepper(title: Strings.Common.date, day: $draft.day)
+                    CategoryPicker(title: Strings.Common.category, type: draft.forgivenType, selection: $draft.category)
+                    TextField(Strings.Common.note, text: $draft.note, axis: .vertical)
                 } footer: {
                     Text(loanOrDebt.kind.forgiveFooter)
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("Forgive the Rest")
+            .navigationTitle(Strings.DebtsLoans.forgiveTheRest)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Forgive", action: forgive)
+                    Button(Strings.DebtsLoans.forgive) {
+                        saver.save("Forgiving a Loan or Debt") { try Forgiveness.record(draft, in: context) }
+                    }
                         .disabled(!draft.canSave)
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 420, idealWidth: 460, minHeight: 360, idealHeight: 420)
-        #endif
-        .errorAlert("Couldn't Forgive", message: $errorMessage)
-    }
-
-    private func forgive() {
-        do {
-            try Forgiveness.record(draft, in: context)
-            dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        .macSheetSize(.shortForm)
+        .failureAlert(saver)
     }
 }

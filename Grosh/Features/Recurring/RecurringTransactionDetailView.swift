@@ -11,7 +11,7 @@ struct RecurringTransactionDetailView: View {
     let recurring: RecurringTransaction
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
+    @Environment(\.today) private var today
     @State private var isEditing = false
     @State private var isDuplicating = false
     @State private var editingTransaction: Transaction?
@@ -19,14 +19,16 @@ struct RecurringTransactionDetailView: View {
     @State private var isLinking = false
     @State private var isConfirmingDelete = false
     @State private var errorMessage: String?
-
-    /// Whether the schedule was deleted from this screen. Nothing is read from it then, since a deleted model still on
-    /// screen can't be read.
-    private var isRemoved: Bool { recurring.isDeleted || recurring.modelContext == nil }
+    /// A save can change a varying Bill's estimate, so what its transactions start at is read anew after each one,
+    /// rather than on every draw.
+    @StoreSaves private var saves
+    @State private var startingAmount = DrawingCache<AsSaved, Money>()
 
     var body: some View {
-        if isRemoved {
-            ContentUnavailableView("Recurring Transaction Deleted", systemImage: "trash")
+        // Once the schedule is deleted from this screen nothing is read from it, since a deleted model still on screen
+        // can't be read.
+        if recurring.isGone {
+            ContentUnavailableView(Strings.Recurring.deleted, systemImage: "trash")
         } else {
             details
         }
@@ -41,67 +43,69 @@ struct RecurringTransactionDetailView: View {
                         Text(recurring.name)
                             .font(.title3.weight(.semibold))
                         HStack(spacing: 6) {
-                            AmountText(amount: recurring.startingAmount)
+                            AmountText(amount: startingAmount.value(for: AsSaved([recurring], saves: saves)) {
+                                recurring.currentStartingAmount()
+                            })
                             if recurring.estimatesAmount {
                                 EstimatedBadge()
                             }
                         }
                     }
                 }
-                LabeledContent("Wallet") {
-                    Text(recurring.wallet?.name ?? String(localized: "None"))
+                LabeledContent(Strings.Common.wallet) {
+                    Text(recurring.wallet?.name ?? String(localized: Strings.Common.none))
                 }
-                LabeledContent("Category") {
-                    Text(recurring.category?.name ?? String(localized: "None"))
+                LabeledContent(Strings.Common.category) {
+                    Text(recurring.category?.name ?? String(localized: Strings.Common.none))
                 }
                 if let card = recurring.card {
-                    LabeledContent("Card") {
+                    LabeledContent(Strings.Common.card) {
                         Text(card.name)
                     }
                 }
-                LabeledContent("Repeat") {
+                LabeledContent(Strings.Recurring.repeatTitle) {
                     Text(recurring.schedule.summary)
                         .multilineTextAlignment(.trailing)
                 }
-                LabeledContent("Next") {
+                LabeledContent(Strings.Recurring.next) {
                     if recurring.isPaused {
-                        Text("Paused")
+                        Text(Strings.Recurring.paused)
                     } else if let next = recurring.nextDueDay {
                         Text(next.date(), style: .date)
                     } else {
-                        Text("Ended")
+                        Text(Strings.Recurring.ended)
                     }
                 }
                 if let progress = recurring.purchaseProgress {
-                    LabeledContent("Progress") {
+                    LabeledContent(Strings.Recurring.progress) {
                         Text(progress.summary)
                             .multilineTextAlignment(.trailing)
                     }
                 }
                 if !recurring.note.isEmpty {
-                    LabeledContent("Note") {
+                    LabeledContent(Strings.Common.note) {
                         Text(recurring.note)
                             .multilineTextAlignment(.trailing)
                     }
                 }
             } footer: {
                 if recurring.isPaused {
-                    Text("Its wallet is archived, so it makes nothing until the wallet is unarchived.")
+                    Text(Strings.Recurring.walletArchivedFooter)
                 }
             }
 
             Section {
-                Button("Add the Transaction", systemImage: "plus.circle") {
+                Button(Strings.Recurring.addTheTransaction, systemImage: "plus.circle") {
                     addTransactionNow()
                 }
                 .disabled(!recurring.canAddTransactionNow)
                 if recurring.kind == .purchase {
-                    Button("Add a payment", systemImage: "square.and.pencil") {
+                    Button(Strings.Recurring.addAPayment, systemImage: "square.and.pencil") {
                         isAddingPayment = true
                     }
                     .disabled(!recurring.isActive)
                 }
-                Button("Link existing", systemImage: "link") {
+                Button(Strings.Recurring.linkExisting, systemImage: "link") {
                     isLinking = true
                 }
                 ForEach(recurring.attachedTransactions) { transaction in
@@ -112,37 +116,37 @@ struct RecurringTransactionDetailView: View {
                     }
                     .buttonStyle(.plain)
                     .swipeActions(edge: .trailing) {
-                        Button("Unlink") { unlink(transaction) }
+                        Button(Strings.Recurring.unlink) { unlink(transaction) }
                     }
                     .contextMenu {
-                        Button("Unlink") { unlink(transaction) }
+                        Button(Strings.Recurring.unlink) { unlink(transaction) }
                     }
                 }
             } header: {
-                Text("Transactions")
+                Text(Strings.Common.transactions)
             } footer: {
                 if recurring.attachedTransactions.isEmpty {
-                    Text("The transactions it makes appear here, on their due days.")
+                    Text(Strings.Recurring.transactionsFooter)
                 }
             }
 
             Section {
-                Button("Duplicate", systemImage: "doc.on.doc") {
+                Button(Strings.Common.duplicate, systemImage: "doc.on.doc") {
                     isDuplicating = true
                 }
             }
 
             Section {
-                Button("Delete Recurring Transaction", systemImage: "trash", role: .destructive) {
+                Button(Strings.Recurring.deleteRecurring, systemImage: "trash", role: .destructive) {
                     isConfirmingDelete = true
                 }
-                .foregroundStyle(.red)
+                .foregroundStyle(.destructive)
             }
         }
         .navigationTitle(recurring.name)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Edit") { isEditing = true }
+                Button(Strings.Common.edit) { isEditing = true }
             }
         }
         .sheet(isPresented: $isEditing) {
@@ -161,40 +165,36 @@ struct RecurringTransactionDetailView: View {
             RecurringTransactionEditor(mode: .duplicate(recurring))
         }
         .confirmationDialog(
-            "Delete this recurring transaction?",
+            Strings.Recurring.deleteQuestion,
             isPresented: $isConfirmingDelete,
             titleVisibility: .visible
         ) {
-            Button("Delete Recurring Transaction", role: .destructive) { delete() }
-            Button("Cancel", role: .cancel) {}
+            Button(Strings.Recurring.deleteRecurring, role: .destructive) { delete() }
+            Button(Strings.Common.cancel, role: .cancel) {}
         } message: {
-            Text("It goes to Recently Deleted for \(RecentlyDeleted.keptDays) days. The transactions it made or that are attached stay in your wallets.")
+            Text(Strings.Recurring.deleteMessage(RecentlyDeleted.keptDays))
         }
-        .errorAlert("Couldn't Change Recurring Transaction", message: $errorMessage)
+        .errorAlert(Strings.Recurring.couldntChange, message: $errorMessage)
     }
 
     private func addTransactionNow() {
-        do {
-            try recurring.addTransactionNow(in: context)
-        } catch {
-            errorMessage = error.localizedDescription
+        Log.recurring.perform("Adding a transaction now", errorMessage: &errorMessage) {
+            try recurring.addTransactionNow(today: today)
         }
     }
 
     private func delete() {
-        do {
-            try recurring.delete(in: context)
+        let succeeded = Log.recurring.perform("Deleting a Recurring transaction", errorMessage: &errorMessage) {
+            try recurring.delete(today: today)
+        }
+        if succeeded {
             dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 
     private func unlink(_ transaction: Transaction) {
-        do {
-            try recurring.unlink(transaction, in: context)
-        } catch {
-            errorMessage = error.localizedDescription
+        Log.recurring.perform("Unlinking a transaction", errorMessage: &errorMessage) {
+            try recurring.unlink(transaction)
         }
     }
 }

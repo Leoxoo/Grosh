@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 import SwiftData
 import Testing
 @testable import Grosh
@@ -7,24 +8,21 @@ import Testing
 /// The transactions outside Recently Deleted that Home, the Transactions tab, search and Link Existing share: read once,
 /// then kept in step with every save, so they always hold what `@Query(Transaction.notDeleted)` would.
 @MainActor
+@Suite(.namedInTheLog)
 struct NotDeletedTransactionsTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
     private let checking: Wallet
 
     init() throws {
         container = try GroshStore.makeContainer(inMemory: true)
-        checking = Wallet(name: "Checking")
-        container.mainContext.insert(checking)
+        checking = container.mainContext.addWallet("Checking")
     }
 
     @discardableResult
     private func record(_ note: String, in wallet: Wallet? = nil) -> Transaction {
-        let transaction = Transaction(amount: Money(cents: -5_00), day: today, wallet: nil, category: nil, note: note)
-        context.insert(transaction)
-        transaction.wallet = wallet ?? checking
-        return transaction
+        context.record(-5_00, on: today, in: wallet ?? checking, note: note)
     }
 
     private var shared: NotDeletedTransactions.Store { .of(context) }
@@ -62,7 +60,7 @@ struct NotDeletedTransactionsTests {
         try context.save()
         _ = shared
 
-        try [coffee].delete(.onlySelected, in: context)
+        try [coffee].delete(.onlySelected)
         #expect(try notes().shared == ["lunch"])
 
         try coffee.restore()
@@ -77,8 +75,8 @@ struct NotDeletedTransactionsTests {
         try context.save()
         _ = shared
 
-        try [coffee].delete(.onlySelected, in: context)
-        try coffee.deleteForever(in: context)
+        try [coffee].delete(.onlySelected)
+        try coffee.deleteForever()
 
         let notes = try notes()
         #expect(notes.shared == ["lunch"])
@@ -86,78 +84,83 @@ struct NotDeletedTransactionsTests {
     }
 
     @Test func aWalletsTransactionsLeaveWithItAndComeBackWithIt() throws {
-        let savings = Wallet(name: "Savings")
-        context.insert(savings)
+        let savings = context.addWallet("Savings")
         record("coffee")
         record("interest", in: savings)
         try context.save()
         _ = shared
 
-        try savings.delete()
+        try savings.delete(today: TestStore.today)
         #expect(try notes().shared == ["coffee"])
 
-        try savings.restore()
+        try savings.restore(today: today)
         #expect(try notes().shared == ["coffee", "interest"])
 
-        try savings.delete()
-        try savings.deleteForever(in: context)
+        try savings.delete(today: TestStore.today)
+        try savings.deleteForever()
         let notes = try notes()
         #expect(notes.shared == ["coffee"])
         #expect(notes.shared == notes.fetched)
     }
 
-    /// A screen showing them redraws for a change to a transaction through the transaction itself, so a save that
-    /// brings none in and takes none out leaves the list as it was.
+    /// Performance contract (the 16k store, `docs/agents/architecture.md`): a screen showing them redraws for a change to
+    /// a transaction through the transaction itself, so a save that brings none in and takes none out must not
+    /// invalidate the whole list. The last line is the behaviour.
     @Test func editingATransactionKeepsTheListAndShowsTheEdit() throws {
         let coffee = record("coffee")
         try context.save()
         let store = shared
-        var listChanged = false
-        withObservationTracking { _ = store.transactions } onChange: { listChanged = true }
+        // onChange is a Sendable closure, so the flag it sets is behind a lock.
+        let listChanged = OSAllocatedUnfairLock(initialState: false)
+        withObservationTracking { _ = store.transactions } onChange: { listChanged.withLock { $0 = true } }
 
         coffee.amountCents = -7_50
         try context.save()
 
-        #expect(!listChanged)
+        #expect(!listChanged.withLock { $0 })
         #expect(store.transactions.map(\.amountCents) == [-7_50])
     }
 
     /// Balances add up the ledger entries, so a saved change to a transaction's wallet, day or amount is read into its
     /// entry, and the screens adding them up redraw.
     @Test func aSavedChangeToTheWalletDayOrAmountIsReadIntoTheLedger() throws {
-        let savings = Wallet(name: "Savings")
-        context.insert(savings)
+        let savings = context.addWallet("Savings")
         let coffee = record("coffee")
         try context.save()
         let store = shared
 
-        var ledgerChanged = false
-        withObservationTracking { _ = store.entries } onChange: { ledgerChanged = true }
+        // onChange is a Sendable closure, so the flag it sets is behind a lock.
+        let ledgerChanged = OSAllocatedUnfairLock(initialState: false)
+        withObservationTracking { _ = store.entries } onChange: { ledgerChanged.withLock { $0 = true } }
         coffee.amountCents = -7_50
-        #expect(store.entries.map(\.amountCents) == [-5_00])
+        #expect(store.entries.map(\.netCents) == [-5_00])
         try context.save()
-        #expect(ledgerChanged)
-        #expect(store.entries.map(\.amountCents) == [-7_50])
+        #expect(ledgerChanged.withLock { $0 })
+        #expect(store.entries.map(\.netCents) == [-7_50])
 
         coffee.wallet = savings
         coffee.day = today.adding(days: -3)
         try context.save()
-        #expect(store.entries.first?.wallet === savings)
-        #expect(store.entries.first?.dayRaw == today.adding(days: -3).rawValue)
-        #expect(WalletBalances(store.entries, asOf: today).balance(of: savings) == savings.balance(asOf: today))
+        let balances = WalletBalances(store.entries, asOf: today)
+        #expect(balances.balance(of: savings) == Money(cents: -7_50))
+        #expect(balances.balance(of: checking) == Money(cents: 0))
+        #expect(WalletBalances(store.entries, asOf: today.adding(days: -4)).balance(of: savings) == Money(cents: 0))
     }
 
+    /// Performance contract (the 16k store): a saved change that moves no balance must not make every screen adding up
+    /// the ledger redraw.
     @Test func aSavedChangeToAnythingElseLeavesTheLedgerAsItWas() throws {
         let coffee = record("coffee")
         try context.save()
         let store = shared
-        var ledgerChanged = false
-        withObservationTracking { _ = store.entries } onChange: { ledgerChanged = true }
+        // onChange is a Sendable closure, so the flag it sets is behind a lock.
+        let ledgerChanged = OSAllocatedUnfairLock(initialState: false)
+        withObservationTracking { _ = store.entries } onChange: { ledgerChanged.withLock { $0 = true } }
 
         coffee.note = "espresso"
         try context.save()
 
-        #expect(!ledgerChanged)
+        #expect(!ledgerChanged.withLock { $0 })
     }
 
     @Test func eachContextHasItsOwn() throws {

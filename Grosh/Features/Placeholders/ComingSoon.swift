@@ -10,8 +10,8 @@ enum ComingSoon: CaseIterable {
 
     var title: String {
         switch self {
-        case .budgets: String(localized: "Budgets")
-        case .topSpending: String(localized: "Top spending")
+        case .budgets: String(localized: Strings.Screens.budgets)
+        case .topSpending: String(localized: Strings.Settings.topSpending)
         }
     }
 
@@ -27,9 +27,9 @@ enum ComingSoon: CaseIterable {
     var message: String {
         switch self {
         case .budgets:
-            String(localized: "Set a spending limit for a category and see how much is left each month.")
+            String(localized: Strings.Settings.budgetsMessage)
         case .topSpending:
-            String(localized: "Your biggest spending categories this month will appear here.")
+            String(localized: Strings.Settings.topSpendingMessage)
         }
     }
 }

@@ -34,9 +34,9 @@ extension SuccessCue {
             let turnsSoundsOn = new.soundsOn && !old.soundsOn
             let turnsHapticsOn = new.hapticsOn && !old.hapticsOn
             let playsSound = (turnsSoundsOn || picksChime)
-                && SoundsAndHaptics.playsSounds(on: device, soundsOn: new.soundsOn)
+                && SoundsAndHaptics.plays(on: device, isOn: new.soundsOn)
             let playsHaptic = (turnsHapticsOn || picksChime)
-                && SoundsAndHaptics.playsHaptics(on: device, hapticsOn: new.hapticsOn)
+                && SoundsAndHaptics.plays(on: device, isOn: new.hapticsOn)
             guard playsSound || playsHaptic else { return nil }
             self.chime = new.chime
             self.playsSound = playsSound

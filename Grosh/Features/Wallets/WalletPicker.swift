@@ -5,7 +5,7 @@ import SwiftUI
 /// Card's paying wallet is picked from the unarchived wallets, so archived ones stay out and the order matches Home; a
 /// filter picks from every wallet, archived ones included, or none. The Transfer sheet's pickers also show balances.
 struct WalletPicker: View {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     @Binding var selection: Wallet?
     /// Which wallets the picker offers, and what it shows beside them.
     private let offered: Offered
@@ -16,10 +16,10 @@ struct WalletPicker: View {
     private enum Offered {
         /// The unarchived wallets.
         case unarchived
-        /// The unarchived wallets, each with its balance on the day.
-        case unarchivedWithBalances(CalendarDay)
+        /// The unarchived wallets, each with its balance.
+        case unarchivedWithBalances(WalletBalances)
         /// Every wallet, archived ones included, after a first choice that picks none, titled such as "Any".
-        case everyWalletOr(LocalizedStringKey)
+        case everyWalletOr(LocalizedStringResource)
 
         /// The wallets to fetch for these choices.
         var wallets: FetchDescriptor<Wallet> {
@@ -31,24 +31,24 @@ struct WalletPicker: View {
     }
 
     /// Picks from the unarchived wallets.
-    init(title: LocalizedStringKey, selection: Binding<Wallet?>) {
+    init(title: LocalizedStringResource, selection: Binding<Wallet?>) {
         self.init(title: title, selection: selection, offered: .unarchived)
     }
 
-    /// Picks from the unarchived wallets, showing each one's balance on `today`: the chosen wallet's on a Balance row of
-    /// its own under the picker, and every wallet's in its option in the dropdown, so they can be compared before
+    /// Picks from the unarchived wallets, showing each one's balance from `balances`: the chosen wallet's on a Balance
+    /// row of its own under the picker, and every wallet's in its option in the dropdown, so they can be compared before
     /// choosing. The row shows the chosen wallet's color.
-    init(title: LocalizedStringKey, selection: Binding<Wallet?>, balancesAsOf today: CalendarDay) {
-        self.init(title: title, selection: selection, offered: .unarchivedWithBalances(today))
+    init(title: LocalizedStringResource, selection: Binding<Wallet?>, balances: WalletBalances) {
+        self.init(title: title, selection: selection, offered: .unarchivedWithBalances(balances))
     }
 
     /// Picks from every wallet, archived ones included, or none (`noneTitle`, such as "Any"): for filters.
-    init(title: LocalizedStringKey, everyWalletOr noneTitle: LocalizedStringKey, selection: Binding<Wallet?>) {
+    init(title: LocalizedStringResource, everyWalletOr noneTitle: LocalizedStringResource, selection: Binding<Wallet?>) {
         self.init(title: title, selection: selection, offered: .everyWalletOr(noneTitle))
     }
 
     /// Picks from the wallets `offered` names, fetching just those.
-    private init(title: LocalizedStringKey, selection: Binding<Wallet?>, offered: Offered) {
+    private init(title: LocalizedStringResource, selection: Binding<Wallet?>, offered: Offered) {
         self.title = title
         _selection = selection
         self.offered = offered
@@ -56,11 +56,11 @@ struct WalletPicker: View {
     }
 
     var body: some View {
-        if case .unarchivedWithBalances(let today) = offered {
+        if case .unarchivedWithBalances(let balances) = offered {
             LabeledContent(title) {
                 Menu {
                     Picker(title, selection: $selection) {
-                        options(balancesAsOf: today)
+                        options(balances: balances)
                     }
                     .pickerStyle(.inline)
                 } label: {
@@ -70,8 +70,8 @@ struct WalletPicker: View {
                 .buttonStyle(.borderless)
             }
             if let selection {
-                LabeledContent("Balance") {
-                    AmountText(amount: selection.balance(asOf: today), showsColor: false)
+                LabeledContent(Strings.Common.balance) {
+                    AmountText(amount: balances.balance(of: selection), showsColor: false)
                 }
             }
         } else {
@@ -79,7 +79,7 @@ struct WalletPicker: View {
                 if case .everyWalletOr(let noneTitle) = offered {
                     Text(noneTitle).tag(Wallet?.none)
                 }
-                options(balancesAsOf: nil)
+                options(balances: nil)
             }
         }
     }
@@ -94,7 +94,7 @@ struct WalletPicker: View {
                     .lineLimit(1)
                     .foregroundStyle(.primary)
             } else {
-                Text("Choose")
+                Text(Strings.Common.choose)
                     .foregroundStyle(.secondary)
             }
             Image(systemName: "chevron.up.chevron.down")
@@ -104,14 +104,14 @@ struct WalletPicker: View {
         }
     }
 
-    /// An option for each of the choices: the wallet's symbol and name, with its balance on `today` under the name when
-    /// there is a day to show.
-    private func options(balancesAsOf today: CalendarDay?) -> some View {
+    /// An option for each of the choices: the wallet's symbol and name, with its balance under the name when there are
+    /// balances to show.
+    private func options(balances: WalletBalances?) -> some View {
         ForEach(choices) { wallet in
             Label {
                 Text(Self.name(of: wallet))
-                if let today {
-                    Text(wallet.balance(asOf: today).formatted())
+                if let balances {
+                    Text(balances.balance(of: wallet).formatted())
                 }
             } icon: {
                 Image(systemName: wallet.symbolName)
@@ -129,6 +129,6 @@ struct WalletPicker: View {
 
     /// What the picker calls `wallet`: its name, marked when it is archived.
     private static func name(of wallet: Wallet) -> String {
-        wallet.isArchived ? "\(wallet.name) (Archived)" : wallet.name
+        wallet.isArchived ? String(localized: Strings.Common.archivedName(wallet.name)) : wallet.name
     }
 }

@@ -6,13 +6,13 @@ import SwiftUI
 /// selection as it was. Wallets are added, reordered and archived in Account → Wallets, not here.
 struct SelectWalletSheet: View {
     @Binding var selection: WalletSelection
-    let today: CalendarDay
+    let balances: WalletBalances
 
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        let choices = WalletSelectorChoices(wallets: wallets, asOf: today)
+        let choices = WalletSelectorChoices(wallets: wallets, balances: balances)
         NavigationStack {
             List {
                 Section {
@@ -20,30 +20,28 @@ struct SelectWalletSheet: View {
                         .groupedRow(.only)
                 }
                 if !choices.includedInTotal.isEmpty {
-                    Section("Included in total") {
+                    Section(Strings.Common.includedInTotal) {
                         GroupedForEach(choices.includedInTotal) { row($0) }
                     }
                 }
                 if !choices.notInTotal.isEmpty {
-                    Section("Not in total") {
+                    Section(Strings.Common.notInTotal) {
                         GroupedForEach(choices.notInTotal) { row($0) }
                     }
                 }
             }
             .roundedSectionsListStyle()
-            .navigationTitle("Select Wallet")
+            .navigationTitle(Strings.Transactions.selectWallet)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    Button(Strings.Common.close) { dismiss() }
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 360, idealWidth: 400, minHeight: 360, idealHeight: 480)
-        #endif
+        .macSheetSize(.picker)
     }
 
     /// One row: the choice's icon, its name with its balance underneath, and a checkmark when it is the selection.

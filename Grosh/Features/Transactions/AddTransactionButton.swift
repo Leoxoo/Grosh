@@ -10,27 +10,57 @@ struct AddTransactionButton: View {
         } label: {
             Image(systemName: "plus")
                 .font(.title2.weight(.semibold))
+                .foregroundStyle(.onBrand)
                 .frame(width: 56, height: 56)
         }
         .buttonStyle(.glassProminent)
         .buttonBorderShape(.circle)
-        .tint(.green)
-        .accessibilityLabel("Add Transaction")
+        .tint(.brand)
+        .accessibilityLabel(Strings.Transactions.addTransaction)
         .disabled(isAdding == nil)
     }
 }
 
 extension View {
     /// Adds the green + that opens the Add Transaction sheet, floating in the bottom corner. Use it inside the tab's
-    /// `NavigationStack`. On Mac the list also gets bottom room, so the button never covers its last row.
+    /// `NavigationStack`. On Mac the list also gets bottom room, so the button never covers its last row. At the
+    /// accessibility text sizes rows grow so tall that the floating button would cover their amounts and labels, so the
+    /// + sits in the toolbar instead.
     func addTransactionButton() -> some View {
-        overlay(alignment: .bottomTrailing) {
-            AddTransactionButton()
-                .padding()
-        }
-        #if os(macOS)
-        // The 56pt circle, its 16pt padding, and a 16pt gap above the last row.
-        .contentMargins(.bottom, 88, for: .scrollContent)
-        #endif
+        modifier(AddTransactionButtonPlacement())
+    }
+}
+
+/// Where the + goes: floating in the bottom corner, or in the toolbar at the accessibility text sizes.
+private struct AddTransactionButtonPlacement: ViewModifier {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.isAddingTransaction) private var isAdding
+
+    func body(content: Content) -> some View {
+        let inToolbar = dynamicTypeSize.isAccessibilitySize
+        content
+            #if os(macOS)
+            // The 56pt circle, its 16pt padding, and a 16pt gap above the last row. Room in the list's safe area
+            // rather than content margins, which would reach every scroll view in the list too, such as the period
+            // strip; the button, over it, keeps its own place in the corner.
+            .safeAreaPadding(.bottom, 88)
+            #endif
+            .overlay(alignment: .bottomTrailing) {
+                if !inToolbar {
+                    AddTransactionButton()
+                        .padding()
+                }
+            }
+            .toolbar {
+                if inToolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button(Strings.Transactions.addTransaction, systemImage: "plus") {
+                            isAdding?.wrappedValue = true
+                        }
+                        .tint(.brand)
+                        .disabled(isAdding == nil)
+                    }
+                }
+            }
     }
 }

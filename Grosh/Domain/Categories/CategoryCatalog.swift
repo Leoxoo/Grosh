@@ -33,10 +33,11 @@ struct CategoryCatalog {
         sorted(parent.children ?? [])
     }
 
-    /// The categories of `type` the user may file a transaction under, in tree order. Hidden categories, and those
-    /// only the app itself files under (transfers, payments, Starting balance), are left out.
-    func pickerCategories(of type: CategoryType) throws -> [Category] {
-        try categories(of: type, includingHidden: false).filter { $0.lockedRole?.isOfferedInPicker != false }
+    /// The categories of `type` found in `all` that the user may file a transaction under, in tree order. Hidden
+    /// categories, and those only the app itself files under (transfers, payments, Starting balance), are left out.
+    /// For views that already hold the categories from a query.
+    static func pickable(of type: CategoryType, from all: [Category]) -> [Category] {
+        tree(of: type, from: all, includingHidden: false).filter { $0.lockedRole?.isOfferedInPicker != false }
     }
 
     // MARK: Adding and editing
@@ -133,8 +134,8 @@ struct CategoryCatalog {
     /// The draft's name without surrounding spaces, once it is known to be unique within the draft's type.
     /// `category` is the one being edited, which may keep its own name.
     private func checkedName(_ draft: CategoryDraft, for category: Category?) throws -> String {
-        let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { throw CategoryRuleError.nameRequired }
+        try draft.validate()
+        let name = draft.trimmedName
         try checkNameIsFree(name, in: draft.type, except: category)
         return name
     }
@@ -153,14 +154,7 @@ struct CategoryCatalog {
     /// ones included: a parent moves with its subcategories, and a subcategory stays within its parent. They are
     /// numbered afresh, so a category added later goes after them all.
     func move(_ siblings: [Category], fromOffsets source: IndexSet, toOffset destination: Int) throws {
-        let moving = source.map { siblings[$0] }
-        var reordered = siblings.enumerated().filter { !source.contains($0.offset) }.map(\.element)
-        let insertionIndex = destination - source.count(in: 0..<destination)
-        reordered.insert(contentsOf: moving, at: insertionIndex)
-        for (position, category) in reordered.enumerated() {
-            category.sortOrder = position
-        }
-        try context.save()
+        try siblings.move(fromOffsets: source, toOffset: destination, renumbering: \.sortOrder)
     }
 
     // MARK: Hiding
@@ -179,8 +173,8 @@ struct CategoryCatalog {
         try categories(of: source.type).filter { (try? checkMerge(source, into: $0)) != nil }
     }
 
-    /// Moves every transaction of `source` into `target`, then removes `source`. A parent's subcategories move
-    /// under `target`, after its own.
+    /// Moves every transaction, forgiven amount and Recurring transaction of `source` into `target`, then removes
+    /// `source`. A parent's subcategories move under `target`, after its own.
     func merge(_ source: Category, into target: Category) throws {
         try checkMerge(source, into: target)
         for transaction in source.transactions ?? [] {
@@ -212,8 +206,9 @@ struct CategoryCatalog {
 
     // MARK: Deleting
 
-    func canDelete(_ category: Category) -> Bool {
-        (try? checkDelete(category)) != nil
+    /// Whether `category` can be deleted: it isn't locked and has no transactions, as `inUse` (``inUse(_:)``) says.
+    static func canDelete(_ category: Category, inUse: Set<PersistentIdentifier>) -> Bool {
+        !category.isLocked && !inUse.contains(category.persistentModelID)
     }
 
     /// Deletes a category that has no transactions, along with its subcategories.
@@ -233,12 +228,51 @@ struct CategoryCatalog {
 
     /// Whether the category or any of its subcategories has transactions, or an amount forgiven on a Loan or Debt
     /// counts under it, or a Recurring transaction is set to use it. Transactions in Recently Deleted count too, so
-    /// they still have their category when restored.
+    /// they still have their category when restored. Each is counted in the store rather than by loading the
+    /// category's transactions; when the store can't be read, it counts as having some, so nothing is deleted or
+    /// retyped on a guess.
     func hasTransactions(_ category: Category) -> Bool {
-        ([category] + (category.children ?? [])).contains {
-            !($0.transactions ?? []).isEmpty || !($0.forgivenTransactions ?? []).isEmpty
-                || !($0.recurringTransactions ?? []).isEmpty
+        inUse([category]).contains(category.persistentModelID)
+    }
+
+    /// Which of `categories` have transactions, as ``hasTransactions(_:)`` says, each category counted in the store
+    /// once: a screen that offers Delete on many rows asks once for all of them, rather than once per row as it draws.
+    func inUse(_ categories: [Category]) -> Set<PersistentIdentifier> {
+        do {
+            var counted: [PersistentIdentifier: Bool] = [:]
+            var used = Set<PersistentIdentifier>()
+            for category in categories {
+                for filed in [category] + (category.children ?? []) {
+                    let id = filed.persistentModelID
+                    let isUsed = try counted[id] ?? isInUse(filed)
+                    counted[id] = isUsed
+                    if isUsed {
+                        used.insert(category.persistentModelID)
+                        break
+                    }
+                }
+            }
+            return used
+        } catch {
+            Log.store.failed("Counting the categories' transactions", error)
+            return Set(categories.map(\.persistentModelID))
         }
+    }
+
+    private func isInUse(_ category: Category) throws -> Bool {
+        let id = category.persistentModelID
+        var filed = FetchDescriptor<Transaction>(predicate: #Predicate { $0.category?.persistentModelID == id })
+        filed.fetchLimit = 1
+        var forgiven = FetchDescriptor<Transaction>(
+            predicate: #Predicate { $0.forgivenCategory?.persistentModelID == id }
+        )
+        forgiven.fetchLimit = 1
+        var recurring = FetchDescriptor<RecurringTransaction>(
+            predicate: #Predicate { $0.category?.persistentModelID == id }
+        )
+        recurring.fetchLimit = 1
+        return try context.fetchCount(filed) > 0 || context.fetchCount(forgiven) > 0
+            || context.fetchCount(recurring) > 0
     }
 
     // MARK: Helpers
@@ -258,26 +292,3 @@ struct CategoryCatalog {
     }
 }
 
-extension Category {
-    /// Hidden itself, or a subcategory of a hidden parent.
-    var isHiddenInTree: Bool { isHidden || parent?.isHidden == true }
-
-    /// Outgoing transfer or Incoming transfer: one half of a Transfer, which never carries a Card.
-    var isTransferHalf: Bool { lockedRole == .outgoingTransfer || lockedRole == .incomingTransfer }
-}
-
-extension CategoryType {
-    /// Expense and Income categories are the user's own; Debt/Loan and system categories are fixed.
-    var isUserManaged: Bool { self == .expense || self == .income }
-}
-
-extension LockedRole {
-    /// Whether the user picks this category by hand. The rest are filed by their own flows: Transfer,
-    /// Record payment, and a new wallet's Starting balance.
-    var isOfferedInPicker: Bool {
-        switch self {
-        case .otherIncome, .otherExpense, .loan, .debt: true
-        case .outgoingTransfer, .incomingTransfer, .debtCollection, .repayment, .startingBalance: false
-        }
-    }
-}

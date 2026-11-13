@@ -11,24 +11,31 @@ struct CardMergeView: View {
     @Environment(\.modelContext) private var context
 
     var body: some View {
+        // Counted in the store once, when the sheet opens.
+        MadeOnce {
+            Log.store.attempt("Counting a Card's transactions") {
+                try context.fetchCount(source.notDeletedTransactions)
+            } ?? 0
+        } content: { transactionCount in
+            mergeSheet(transactionCount: transactionCount)
+        }
+    }
+
+    private func mergeSheet(transactionCount: Int) -> some View {
         MergeSheet(
             sourceName: source.name,
             targets: source.mergeTargets,
             targetName: \.name,
-            consequences: consequences(into:),
-            emptyDescription: String(localized: "A Card merges into another unarchived Card paid from the same wallet."),
+            consequences: { target in
+                MergeConsequences.text(
+                    sourceName: source.name, transactionCount: transactionCount, targetName: target?.name,
+                    unchosen: String(localized: Strings.Cards.theCardYouPick)
+                )
+            },
+            emptyDescription: String(localized: Strings.Cards.mergeEmpty),
             row: { CardRow(card: $0) },
-            merge: { try source.merge(into: $0, in: context) },
+            merge: { try source.merge(into: $0) },
             onMerged: onMerged
         )
-    }
-
-    private func consequences(into target: Card?) -> String {
-        let destination = target.map { "“\($0.name)”" } ?? String(localized: "the Card you pick")
-        let transactions = (source.transactions ?? []).notDeleted.count
-        let text = transactions == 1
-            ? String(localized: "Its transaction moves to \(destination)")
-            : String(localized: "Its \(transactions) transactions move to \(destination)")
-        return text + String(localized: ". Then “\(source.name)” is removed.")
     }
 }

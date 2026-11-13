@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import Grosh
 
+@Suite(.namedInTheLog)
 struct MoneyTests {
     private let unitedStates = Locale(identifier: "en_US")
 

@@ -3,7 +3,7 @@ import SwiftUI
 
 extension View {
     /// Warns that `wallet` and all its transactions and Recurring transactions will be deleted while it is set, then
-    /// moves them to Recently Deleted as one item (``Wallet/delete(at:)``) and calls `didDelete`.
+    /// moves them to Recently Deleted as one item (``Wallet/delete(today:at:)``) and calls `didDelete`.
     func walletDeleteDialog(_ wallet: Binding<Wallet?>, didDelete: @escaping () -> Void = {}) -> some View {
         modifier(WalletDeleteDialog(wallet: wallet, didDelete: didDelete))
     }
@@ -13,30 +13,31 @@ private struct WalletDeleteDialog: ViewModifier {
     @Binding var wallet: Wallet?
     let didDelete: () -> Void
 
+    @Environment(\.today) private var today
     @State private var errorMessage: String?
 
     func body(content: Content) -> some View {
         content
             .confirmationDialog(
-                "Delete this wallet?",
+                Strings.Wallets.deleteThisWallet,
                 isPresented: Binding(get: { wallet != nil }, set: { if !$0 { wallet = nil } }),
                 titleVisibility: .visible,
                 presenting: wallet
             ) { wallet in
-                Button("Delete Wallet", role: .destructive) { delete(wallet) }
-                Button("Cancel", role: .cancel) {}
+                Button(Strings.Wallets.deleteWallet, role: .destructive) { delete(wallet) }
+                Button(Strings.Common.cancel, role: .cancel) {}
             } message: { wallet in
-                Text("“\(wallet.name)” and all its transactions and Recurring transactions will be deleted and moved to Recently Deleted, where they can be restored for \(RecentlyDeleted.keptDays) days.")
+                Text(Strings.Wallets.deleteMessage(wallet.name, RecentlyDeleted.keptDays))
             }
-            .errorAlert("Couldn't Delete Wallet", message: $errorMessage)
+            .errorAlert(Strings.Wallets.couldntDelete, message: $errorMessage)
     }
 
     private func delete(_ wallet: Wallet) {
-        do {
-            try wallet.delete()
+        let succeeded = Log.store.perform("Deleting a wallet", errorMessage: &errorMessage) {
+            try wallet.delete(today: today)
+        }
+        if succeeded {
             didDelete()
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 }

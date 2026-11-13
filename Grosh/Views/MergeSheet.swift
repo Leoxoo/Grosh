@@ -20,7 +20,7 @@ struct MergeSheet<Target: Identifiable & Equatable, Row: View>: View {
     @Environment(\.dismiss) private var dismiss
     @State private var target: Target?
     @State private var isConfirming = false
-    @State private var errorMessage: String?
+    private let saver = SheetSaver(Strings.Merge.couldntMerge)
 
     var body: some View {
         NavigationStack {
@@ -44,7 +44,7 @@ struct MergeSheet<Target: Identifiable & Equatable, Row: View>: View {
                         .accessibilityAddTraits(candidate == target ? .isSelected : [])
                     }
                 } header: {
-                    Text("Merge into")
+                    Text(Strings.Merge.mergeInto)
                 } footer: {
                     Text(consequences(target))
                 }
@@ -52,46 +52,43 @@ struct MergeSheet<Target: Identifiable & Equatable, Row: View>: View {
             .overlay {
                 if targets.isEmpty {
                     ContentUnavailableView(
-                        "Nothing to Merge Into",
+                        Strings.Merge.nothingToMergeInto,
                         systemImage: "arrow.triangle.merge",
                         description: Text(emptyDescription)
                     )
                 }
             }
-            .navigationTitle("Merge “\(sourceName)”")
+            .navigationTitle(Strings.Merge.title(sourceName))
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button(Strings.Common.cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Merge") { isConfirming = true }
+                    Button(Strings.Common.merge) { isConfirming = true }
                         .disabled(target == nil)
                 }
             }
             .confirmationDialog(
-                "Merge “\(sourceName)” into “\(target.map(targetName) ?? "")”?",
+                Strings.Merge.confirmation(sourceName, target.map(targetName) ?? ""),
                 isPresented: $isConfirming,
                 titleVisibility: .visible
             ) {
-                Button("Merge", role: .destructive, action: performMerge)
+                Button(Strings.Common.merge, role: .destructive, action: performMerge)
             } message: {
-                Text("This can't be undone.")
+                Text(Strings.Common.cantBeUndone)
             }
-            .errorAlert("Couldn't Merge", message: $errorMessage)
+            .failureAlert(saver)
         }
     }
 
     private func performMerge() {
         guard let target else { return }
-        do {
-            try merge(target)
+        if saver.keepingOpen("Merging", { try merge(target) }) {
             dismiss()
             onMerged()
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 }

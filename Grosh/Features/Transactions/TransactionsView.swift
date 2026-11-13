@@ -22,14 +22,20 @@ struct TransactionsView: View {
                     }
                 } else {
                     ContentUnavailableView(
-                        "No Transaction Selected",
+                        Strings.Transactions.noTransactionSelected,
                         systemImage: "list.bullet.rectangle",
-                        description: Text("Select a transaction to see its details.")
+                        description: Text(Strings.Transactions.selectTransactionDescription)
                     )
                 }
             }
             .id(selectedTransaction?.persistentModelID)
+            #if os(macOS)
+            // The window takes its title from the detail, which has none while nothing is selected, so the window
+            // would show the app's name. It names the tab instead, with a transaction open too.
+            .navigationTitle(Strings.Common.transactions)
+            #endif
         }
+        .onAppear { Signpost.opening("Open Transactions") }
         #if os(macOS)
         // The app's sidebar floats over the tab, and a split view laid out under it pushes its detail the sidebar's
         // width away from the list. Beside the sidebar, the split view lays out as it does while the sidebar is closed.
@@ -42,5 +48,5 @@ struct TransactionsView: View {
 
 #Preview {
     TransactionsView()
-        .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+        .modelContainer(try! StoreOpening.open(inMemory: true))
 }

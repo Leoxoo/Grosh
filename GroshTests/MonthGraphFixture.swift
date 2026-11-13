@@ -3,20 +3,22 @@ import Testing
 @testable import Grosh
 
 /// An in-memory store seeded with the default category tree and a Checking wallet, for Month graph tests. It is seen on
-/// `today`, the 12th of a 31-day October, after a 30-day September and a year after another 31-day October.
+/// a day of its own, ``today``, the 12th of a 31-day October, after a 30-day September and a year after another 31-day
+/// October; the snapshot references are drawn on it too.
 @MainActor
 struct MonthGraphFixture {
     let today = day(2026, 10, 12)
-    private let categories: CategoryFixture
-    var context: ModelContext { categories.context }
-    var checking: Wallet { categories.wallet }
+    private let store: TestStore
+    var context: ModelContext { store.context }
+    var container: ModelContainer { store.container }
+    var checking: Wallet { store.checking }
 
     init() throws {
-        categories = try CategoryFixture()
+        store = try TestStore()
     }
 
     func category(_ name: String, _ type: CategoryType = .expense) throws -> Grosh.Category {
-        try categories.category(name, type)
+        try store.category(name, type)
     }
 
     /// Records `cents` (signed, as it moves the wallet) filed under `categoryName` on `day`, in Checking unless another
@@ -26,28 +28,34 @@ struct MonthGraphFixture {
         _ cents: Int, _ categoryName: String, _ type: CategoryType = .expense, on day: CalendarDay,
         in wallet: Wallet? = nil
     ) throws -> Transaction {
-        let transaction = Transaction(amount: Money(cents: cents), day: day, wallet: nil, category: nil)
-        context.insert(transaction)
-        transaction.wallet = wallet ?? checking
-        transaction.category = try category(categoryName, type)
-        return transaction
+        try store.record(cents, categoryName, type, on: day, in: wallet)
     }
 
-    /// A Loan (`.loan`, money lent) or Debt (`.debt`, money borrowed) of `cents`, saved as the Add sheet's Debt/Loan tab
-    /// saves it: left in the report, so only its category keeps it off the cards.
+    /// ``TestStore/recurringDraft(_:_:under:starting:wallet:)``.
+    func recurringDraft(
+        _ name: String, _ cents: Int, under category: Grosh.Category, starting start: CalendarDay,
+        wallet: Wallet? = nil
+    ) -> RecurringDraft {
+        store.recurringDraft(name, cents, under: category, starting: start, wallet: wallet)
+    }
+
+    /// Records a $60 dinner under Restaurants in Checking on the 3rd of October, inserted directly. For one saved as the
+    /// Add sheet saves it, with + Owes me, see ``ExpectationFixture/dinner(_:on:owing:)``.
+    @discardableResult
+    func recordDinner() throws -> Transaction {
+        try record(-60_00, "Restaurants", on: day(2026, 10, 3))
+    }
+
+    /// A Loan (`.loan`, money lent) or Debt (`.debt`, money borrowed) of `cents` with Pasha in Checking, saved as the Add
+    /// sheet's Debt/Loan tab saves it: left in the report, so only its category keeps it off the cards.
     @discardableResult
     func lendOrBorrow(_ role: LockedRole, _ cents: Int, on day: CalendarDay) throws -> Transaction {
-        var draft = TransactionDraft(type: .debtLoan, day: day)
-        draft.wallet = checking
-        draft.amount = Money(cents: cents)
-        draft.category = try context.lockedCategory(role)
-        draft.withName = "Pasha"
-        return try Transaction.create(draft, in: context)
+        try context.recordLoanOrDebt(role, cents, with: context.person("Pasha"), on: day, in: checking)
     }
 
-    /// Forgives what is outstanding on `loanOrDebt` on `day`, under Other Expense for a Loan or Other Income for a Debt.
-    func forgive(_ loanOrDebt: Transaction, on day: CalendarDay) throws {
-        try Forgiveness.record(ForgiveDraft(forgiving: loanOrDebt, on: day, in: context), in: context)
+    /// The Other Income category, which a report reads once and counts an Expense paid back beyond its amount under.
+    func otherIncome() throws -> Grosh.Category {
+        try context.otherCategory(.income)
     }
 
     /// Every transaction in the store, those in Recently Deleted included.
@@ -55,33 +63,33 @@ struct MonthGraphFixture {
         try context.fetch(FetchDescriptor<Transaction>())
     }
 
+    /// What the Report counts for `selection` (``TestStore/history(_:)``).
+    func history(_ selection: WalletSelection = .total) throws -> CountedHistory {
+        try store.history(selection)
+    }
+
+    /// The Report's totals of `period`, this month unless another is given, for `selection`, as of ``today``.
+    func totals(_ selection: WalletSelection = .total, of period: Period? = nil) throws -> PeriodTotals {
+        try store.totals(selection, of: period ?? .month(CalendarMonth(today)), today: today)
+    }
+
     /// The card for `side` showing `month`, this month unless another is given, compared with `choice`, as Home makes
-    /// it: from what it reads from the store for that month (``MonthGraphHistory``) and every Recurring transaction,
-    /// those in Recently Deleted included. Saves first, as the app has by the time Home reads.
+    /// it: from what it reads from the store for that month (``MonthGraphHistory/read(_:in:otherIncome:)``) and every
+    /// Recurring transaction, those in Recently Deleted included. Saves first, as the app has by the time Home reads.
     func graph(
         _ side: SpentOrIncome, in month: CalendarMonth? = nil, comparingWith choice: MonthGraphComparison = .average
     ) throws -> MonthGraph {
         let month = month ?? CalendarMonth(today)
         try context.save()
-        let recurring = try context.fetch(FetchDescriptor<RecurringTransaction>())
-        let history = try context.fetch(MonthGraphHistory.transactions(for: month))
-            + context.fetch(MonthGraphHistory.forgiven)
-        return try MonthGraph(
-            side, of: history.compactMap(\.countedAmount), countingFrom: firstDay(), recurring: recurring,
-            in: .month(month), today: today, comparingWith: choice
-        )
+        let recurring = RecurringSchedules(try context.fetch(FetchDescriptor<RecurringTransaction>()))
+        return try MonthGraphHistory.read(month, in: context, otherIncome: otherIncome())
+            .graph(side, of: month, recurring: recurring, today: today, comparingWith: choice)
     }
 
     /// The months Home's strip offers, from what it reads from the store (``MonthGraphHistory``). Saves first.
     func strip() throws -> [Period] {
         try context.save()
-        return try MonthGraph.months(from: firstDay(), today: today)
-    }
-
-    /// The first day anything counts on the Month graph, as Home reads it from the store.
-    private func firstDay() throws -> CalendarDay? {
-        try MonthGraphHistory.firstDay(
-            earliest: context.fetch(MonthGraphHistory.earliestCounted), forgiven: context.fetch(MonthGraphHistory.forgiven)
-        )
+        return try MonthGraphHistory.read(CalendarMonth(today), in: context, otherIncome: otherIncome())
+            .strip(.month, today: today)
     }
 }

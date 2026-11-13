@@ -31,21 +31,23 @@ struct PeriodStrip: View {
         .scrollPosition($position)
         // Hidden indicators still show on Mac while a mouse is connected or scroll bars are set to always show.
         .scrollIndicators(.never)
-        // The bottom room `addTransactionButton()` gives a list on Mac reaches every scroll view under it, this one
-        // included, and would add 88pt under the tabs.
-        .contentMargins(.vertical, 0, for: .scrollContent)
         // A lazy stack would otherwise take all the height it is offered.
         .fixedSize(horizontal: false, vertical: true)
         .defaultScrollAnchor(.trailing)
-        // Any part of the tab on screen counts as in view, so the button waits until the tab is fully gone.
+        // Any part of the tab on screen counts as in view, so the button waits until the tab is fully gone. This is
+        // called on every frame of a scroll, so it changes state, and starts the button's animation, only when the
+        // answer changes.
         .onScrollTargetVisibilityChange(idType: Period.self, threshold: 0.001) { visible in
+            let inView = visible.contains(current)
+            guard inView != isCurrentPeriodInView else { return }
             withAnimation {
-                isCurrentPeriodInView = visible.contains(current)
+                isCurrentPeriodInView = inView
             }
         }
         .onAppear { scrollToSelection() }
-        // A screen pushed onto a stack lays its strip out mid-transition, so the first scroll can land short of the trailing
-        // end. Scrolling again once the transition has settled puts the selected tab in view.
+        // SwiftUI lays out the strip of a screen pushed onto a stack mid-transition, so the first scroll can land short
+        // of the trailing end, and nothing reports when the push has settled. Scrolling again once it has puts the
+        // selected tab in view.
         .task {
             try? await Task.sleep(for: .milliseconds(400))
             scrollToSelection()
@@ -61,6 +63,9 @@ struct PeriodStrip: View {
                 returnButton(to: current)
             }
         }
+        // Past AX1 a single tab can take most of an iPhone's width, so "Last month" and "This month" no longer fit
+        // side by side and one is cut off at the edge.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 
     private func tab(for period: Period) -> some View {
@@ -75,7 +80,7 @@ struct PeriodStrip: View {
                 .overlay(alignment: .bottom) {
                     if isSelected {
                         Capsule()
-                            .fill(.green)
+                            .fill(.brand)
                             .frame(height: 2)
                     }
                 }
@@ -107,7 +112,7 @@ struct PeriodStrip: View {
         .buttonStyle(.glass)
         .buttonBorderShape(.capsule)
         .controlSize(.small)
-        .accessibilityLabel("Back to \(title)")
+        .accessibilityLabel(Strings.Transactions.backTo(title))
         .padding(.trailing)
         .transition(.opacity)
     }
@@ -122,17 +127,6 @@ struct PeriodStrip: View {
             } else {
                 position.scrollTo(id: selection, anchor: .center)
             }
-        }
-    }
-}
-
-extension Period {
-    /// Stays the period shown while `strip` still offers it; otherwise becomes `current`, the Current period. A strip
-    /// of a wallet with a shorter history, or with the only transaction of its first period gone, may no longer offer
-    /// it.
-    mutating func showCurrentPeriod(_ current: Period, unlessOfferedBy strip: [Period]) {
-        if !strip.contains(self) {
-            self = current
         }
     }
 }

@@ -2,19 +2,21 @@ import SwiftData
 import SwiftUI
 
 /// Picks a category. A transaction's category is picked from the categories of its type the user may pick by hand
-/// (``CategoryCatalog/pickerCategories(of:)``): hidden ones and those the app files itself are left out, and Debt/Loan
+/// (``CategoryCatalog/pickable(of:from:)``): hidden ones and those the app files itself are left out, and Debt/Loan
 /// offers only Loan and Debt; the current selection still shows when it isn't offered any more. A filter picks from
 /// every category of every type, hidden and locked ones included, or none. The list it opens puts the categories used
 /// most in the last month first, each with its subcategories in their usual order, and can be searched by name.
 struct CategoryPicker: View {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     @Binding var selection: Category?
     private let offered: CategoryChoiceList.Offered
     /// The first choice, which picks no category, such as "Any". `nil` offers categories only.
-    private let noneTitle: LocalizedStringKey?
+    private let noneTitle: LocalizedStringResource?
+
+    @Environment(\.today) private var today
 
     /// A transaction's category: those of `type` the user may pick by hand.
-    init(title: LocalizedStringKey, type: CategoryType, selection: Binding<Category?>) {
+    init(title: LocalizedStringResource, type: CategoryType, selection: Binding<Category?>) {
         self.title = title
         _selection = selection
         offered = .pickable(type)
@@ -22,7 +24,7 @@ struct CategoryPicker: View {
     }
 
     /// Any category of any type, hidden and locked ones included, or none (`noneTitle`, such as "Any"): for filters.
-    init(title: LocalizedStringKey, everyCategoryOr noneTitle: LocalizedStringKey, selection: Binding<Category?>) {
+    init(title: LocalizedStringResource, everyCategoryOr noneTitle: LocalizedStringResource, selection: Binding<Category?>) {
         self.title = title
         _selection = selection
         offered = .every
@@ -31,14 +33,16 @@ struct CategoryPicker: View {
 
     var body: some View {
         NavigationLink {
-            CategoryChoiceList(title: title, offered: offered, noneTitle: noneTitle, selection: $selection)
+            CategoryChoiceList(
+                title: title, offered: offered, noneTitle: noneTitle, today: today, selection: $selection
+            )
         } label: {
             LabeledContent(title) {
                 if let selection {
                     CategoryLabel(category: selection, indentsSubcategories: false)
                         .foregroundStyle(.primary)
                 } else {
-                    Text(noneTitle ?? "Choose")
+                    Text(noneTitle ?? Strings.Common.choose)
                 }
             }
         }
@@ -56,33 +60,36 @@ private struct CategoryChoiceList: View {
         case every
     }
 
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     let offered: Offered
-    let noneTitle: LocalizedStringKey?
+    let noneTitle: LocalizedStringResource?
+    /// The day the categories used most lately are counted back from.
+    let today: CalendarDay
     @Binding var selection: Category?
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
-    /// Keeps the list current when categories change.
+    /// Every category, which the choices are arranged from.
     @Query private var categories: [Category]
     /// The transactions that decide which categories are used most lately.
     @Query private var recentTransactions: [Transaction]
     @State private var query = ""
 
     init(
-        title: LocalizedStringKey, offered: Offered, noneTitle: LocalizedStringKey?, selection: Binding<Category?>
+        title: LocalizedStringResource, offered: Offered, noneTitle: LocalizedStringResource?, today: CalendarDay,
+        selection: Binding<Category?>
     ) {
         self.title = title
         self.offered = offered
         self.noneTitle = noneTitle
+        self.today = today
         _selection = selection
-        let firstDay = CalendarDay.today.adding(days: -(CategoryCatalog.recentUseDays - 1)).rawValue
-        _recentTransactions = Query(filter: #Predicate<Transaction> { $0.dayRaw >= firstDay && $0.deletedAt == nil })
+        _recentTransactions = Query(CategoryCatalog.recentTransactions(through: today))
     }
 
     private var isSearching: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
+        let sections = self.sections
         List {
             if noneTitle != nil && !isSearching {
                 Section {
@@ -104,7 +111,7 @@ private struct CategoryChoiceList: View {
                 ContentUnavailableView.search(text: query.trimmingCharacters(in: .whitespacesAndNewlines))
             }
         }
-        .searchable(text: $query, prompt: "Search categories")
+        .searchable(text: $query, prompt: Strings.Categories.searchCategories)
         .navigationTitle(title)
     }
 
@@ -118,7 +125,7 @@ private struct CategoryChoiceList: View {
     private var sections: [ChoiceSection] {
         let all: [ChoiceSection] = switch offered {
         case .pickable(let type):
-            [ChoiceSection(title: nil, categories: (try? CategoryCatalog(context: context).pickerCategories(of: type)) ?? [])]
+            [ChoiceSection(title: nil, categories: CategoryCatalog.pickable(of: type, from: categories))]
         case .every:
             CategoryType.allCases.map { type in
                 ChoiceSection(title: type.title, categories: CategoryCatalog.tree(of: type, from: categories))
@@ -132,7 +139,7 @@ private struct CategoryChoiceList: View {
     /// `tree` as the list shows it: the most used lately first, narrowed to the categories matching the search.
     private func arranged(_ tree: [Category]) -> [Category] {
         CategoryCatalog.matching(
-            query, in: CategoryCatalog.byRecentUse(tree, transactions: recentTransactions, today: .today)
+            query, in: CategoryCatalog.byRecentUse(tree, transactions: recentTransactions, today: today)
         )
     }
 

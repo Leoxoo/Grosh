@@ -1,15 +1,12 @@
 import SwiftUI
 
 extension CategoryType {
-    /// The types the user sees, in order: the segments of Account → Categories and of the Add sheet.
-    static let segments: [CategoryType] = [.expense, .income, .debtLoan]
-
     var title: String {
         switch self {
-        case .expense: String(localized: "Expense")
-        case .income: String(localized: "Income")
-        case .debtLoan: String(localized: "Debt/Loan")
-        case .system: String(localized: "System")
+        case .expense: String(localized: Strings.Common.expense)
+        case .income: String(localized: Strings.Common.income)
+        case .debtLoan: String(localized: Strings.Categories.debtLoan)
+        case .system: String(localized: Strings.Categories.system)
         }
     }
 }
@@ -25,7 +22,10 @@ struct CategoryIcon: View {
         if let subscriptionIcon, let image = CroppedPhoto.image(from: subscriptionIcon) {
             CroppedPhotoImage(image: image, height: size)
         } else {
-            SymbolCircle(symbolName: category?.symbolName ?? "questionmark", color: category?.color ?? .gray, size: size)
+            SymbolCircle(
+                symbolName: category?.symbolName ?? Category.placeholderSymbolName, color: category?.color ?? .gray,
+                size: size
+            )
         }
     }
 }

@@ -11,27 +11,46 @@ struct TransactionListView: View {
     /// The transaction whose detail is showing.
     @Binding var selectedTransaction: Transaction?
 
+    @Environment(\.today) private var today
+
+    var body: some View {
+        TransactionListContent(
+            selectedTransaction: $selectedTransaction, startingPeriod: .month(CalendarMonth(today))
+        )
+    }
+}
+
+/// The list behind ``TransactionListView``, holding the period it shows from the moment the tab opens.
+private struct TransactionListContent: View {
+    @Binding var selectedTransaction: Transaction?
+
     @NotDeletedTransactions private var transactions: [Transaction]
     @Query private var recurringTransactions: [RecurringTransaction]
+    /// A save can change a varying Bill's estimate, so Future's Scheduled rows read the schedules' starting amounts
+    /// anew after each one, rather than on every draw.
+    @StoreSaves private var saves
+    @State private var schedules = DrawingCache<AsSaved, RecurringSchedules>()
+    @Environment(\.today) private var today
     @State private var walletSelection = WalletSelection.total
     /// How long each period in the strip is, chosen in the "…" menu.
     @State private var timeRange = TimeRange.month
-    @State private var period = Period.month(CalendarMonth(.today))
+    @State private var period: Period
     /// Whether the period's transactions are grouped by day or by category, chosen in the "…" menu.
     @State private var grouping = TransactionGrouping.day
     /// Search text and filters. Searching looks across all time and every wallet; filters narrow the period.
     @State private var filter = TransactionFilter()
-    /// Whether the search field is presented, which the toolbar's Search button turns on.
+    /// Whether the search field is open, which the toolbar's Search button turns on.
     @State private var isSearchPresented = false
+    /// How far the list has scrolled from its top, which the title fades with and the header rises with.
+    /// Rises far enough that the Total reaches the middle of the bar's row, where the bar shows it in its place.
+    @State private var scroll = TabRootScroll(rise: 63, shortensHeader: true)
     /// Whether the list is choosing transactions to delete, and the ones chosen so far.
     @State private var isSelecting = false
     @State private var chosen = Set<Transaction>()
 
-    private var today: CalendarDay { .today }
-
-    /// The selected wallet's transactions, or the wallet filter's when one is set, as ledger entries.
-    private var selected: [LedgerEntry] {
-        filter.transactions(in: walletSelection, from: $transactions)
+    init(selectedTransaction: Binding<Transaction?>, startingPeriod: Period) {
+        _selectedTransaction = selectedTransaction
+        _period = State(initialValue: startingPeriod)
     }
 
     /// The periods the strip offers for `selected`, back to its first day with data.
@@ -45,16 +64,23 @@ struct TransactionListView: View {
     }
 
     var body: some View {
-        let today = today
-        let selected = selected
-        let periods = strip(for: selected)
-        let shownDays = period.days(today: today)
-        let shown = filter.listed(from: transactions, selected: selected, on: shownDays)
+        let listing = TransactionListing(
+            transactions, ledger: $transactions, showing: walletSelection, on: period.days(today: today), filter: filter
+        )
+        let shown = listing.transactions
+        let periods = strip(for: listing.selected)
+        // Both places the Wallet selector shows, under the title and in the bar once the header has risen, read the
+        // balances added up here once.
+        let walletSelector = WalletSelector(
+            selection: $walletSelection, balances: WalletBalances($transactions, asOf: today), fillsWidth: false
+        )
         // Future's Scheduled rows are listed by day, and only while nothing is searched, filtered or being selected.
         let scheduled: [ScheduledOccurrence] = period == .future && grouping == .day && !filter.isOn && !isSelecting
-            ? recurringTransactions.scheduledOccurrences(selection: walletSelection, today: today)
+            ? schedules.value(for: AsSaved(recurringTransactions, saves: saves)) {
+                RecurringSchedules(recurringTransactions)
+            }
+            .scheduledOccurrences(selection: walletSelection, today: today)
             : []
-        // The rows highlighted: the chosen ones while selecting, otherwise the one whose detail is showing.
         let highlighted = isSelecting ? chosen : Set([selectedTransaction].compactMap { $0 })
 
         list {
@@ -65,11 +91,11 @@ struct TransactionListView: View {
             } else if shown.isEmpty && scheduled.isEmpty {
                 Section {
                     ContentUnavailableView(
-                        "No Transactions",
+                        Strings.Common.noTransactions,
                         systemImage: "tray",
                         description: Text(period == .future
-                            ? "Transactions dated after today show up here."
-                            : "Nothing was recorded in this period.")
+                            ? Strings.Transactions.futureEmpty
+                            : Strings.Common.nothingRecordedInPeriod)
                     )
                 }
             }
@@ -77,13 +103,14 @@ struct TransactionListView: View {
             switch grouping {
             case .day:
                 TransactionDaySections(
-                    transactions: shown, scheduled: scheduled, isSelected: { highlighted.contains($0) }
-                ) { row($0) }
+                    transactions: shown, scheduled: scheduled, isSelected: { highlighted.contains($0) },
+                    listed: listing.listed, showsWalletIcon: listing.mixesWallets
+                ) { row($0, in: listing) }
             case .category:
-                ForEach(TransactionCategoryGroup.groups(of: shown)) { group in
+                ForEach(TransactionCategoryGroup.groups(of: shown, listed: listing.listed)) { group in
                     Section {
                         GroupedForEach(group.transactions, isSelected: { highlighted.contains($0) }) {
-                            row($0, showsDay: true)
+                            row($0, in: listing, showsDay: true)
                         }
                     } header: {
                         TransactionCategoryHeader(group: group)
@@ -91,59 +118,67 @@ struct TransactionListView: View {
                 }
             }
         }
+        // The matches start at the top, and the period's list again once the search is cleared. Only the list starts
+        // over: the header with the period strip, below, keeps its place.
+        .id(filter.isSearching)
         .roundedSectionsListStyle()
-        .safeAreaInset(edge: .top, spacing: 0) {
+        .tracksTabRootScroll(scroll)
+        // A bar rather than an inset, so the content scrolling under it fades as it does under the system bar.
+        .safeAreaBar(edge: .top, spacing: 0) {
             VStack(spacing: 4) {
                 VStack(spacing: 4) {
-                    WalletSelector(selection: $walletSelection, today: today)
+                    walletSelector
+                        .linedUpWithTabRootTitle(scroll)
+                        .hiddenOnceRisen(scroll)
                     PeriodStrip(periods: periods, selection: $period, current: currentPeriod, today: today)
                 }
                 .hiddenWhileSearching(filter)
                 if filter.isOn {
-                    FilterSummaryFigures(filter: $filter, transactions: shown)
+                    FilterSummary(filter: $filter, listing: listing)
                 } else {
                     PeriodSummaryView(
-                        summary: PeriodSummary(of: selected, in: period, today: today), period: period, today: today
+                        summary: PeriodSummary(of: listing.selected, in: period, today: today), period: period
                     )
                 }
             }
             .padding(.vertical, 8)
-            .background(.bar)
+            .risingWithTabRootTitle(scroll)
         }
-        .modifier(SearchWhileOpen(text: $filter.searchText, isOpen: $isSearchPresented))
-        .onChange(of: walletSelection) {
+        .modifier(TransactionSearchField(text: $filter.searchText, isOpen: $isSearchPresented))
+        .onChange(of: listing.selection) {
             // A wallet with a shorter history may not reach back to the period being shown.
-            period.showCurrentPeriod(currentPeriod, unlessOfferedBy: strip(for: selected))
-        }
-        .onChange(of: filter.wallet) {
-            period.showCurrentPeriod(currentPeriod, unlessOfferedBy: strip(for: selected))
+            period.showCurrentPeriod(currentPeriod, unlessOfferedBy: periods)
         }
         .onChange(of: timeRange) {
             // Unlike a wallet change, a new time range always starts on the Current period, even from Future.
             period = currentPeriod
         }
         .transactionSelectionMode(
-            isSelecting: $isSelecting, chosen: $chosen, title: String(localized: "Transactions")
+            isSelecting: $isSelecting, chosen: $chosen, title: String(localized: Strings.Common.transactions)
         )
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .tabRootTitle(Strings.Common.transactions, scroll: scroll, showsSmallTitle: isSelecting) {
+            walletSelector
+        }
         .toolbar {
             if !isSelecting {
                 ToolbarItem(placement: .primaryAction) {
                     TransactionsMenu(
                         walletSelection: walletSelection, timeRange: $timeRange, grouping: $grouping,
-                        startSelecting: startSelecting
+                        startSelecting: startSelecting, filter: $filter
                     )
                 }
                 #if os(iOS)
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Search", systemImage: "magnifyingglass") { isSearchPresented = true }
+                    Button(Strings.Screens.search, systemImage: "magnifyingglass") { isSearchPresented = true }
                 }
                 #endif
+                #if !os(iOS)
+                // On iPhone and iPad, Filters is in the "…" menu: beside the tab's title the bar has room for two
+                // buttons (ADR-0009).
                 ToolbarItem(placement: .primaryAction) {
                     TransactionFilterButton(filter: $filter)
                 }
+                #endif
             }
         }
         .addTransactionButton()
@@ -163,16 +198,14 @@ struct TransactionListView: View {
     }
 
     @ViewBuilder
-    private func row(_ transaction: Transaction, showsDay: Bool = false) -> some View {
-        // The Total with no wallet filter lists every wallet; a selected wallet or a wallet filter lists one.
-        let showsWalletIcon = walletSelection == .total && filter.wallet == nil
+    private func row(_ transaction: Transaction, in listing: TransactionListing, showsDay: Bool = false) -> some View {
+        let row = TransactionRow(
+            transaction: transaction, showsDay: showsDay, showsWalletIcon: listing.mixesWallets, listed: listing.listed
+        )
         if isSelecting {
-            TransactionRow(transaction: transaction, showsDay: showsDay, showsWalletIcon: showsWalletIcon)
-                .tag(transaction)
+            row.tag(transaction)
         } else {
-            NavigationLink(value: transaction) {
-                TransactionRow(transaction: transaction, showsDay: showsDay, showsWalletIcon: showsWalletIcon)
-            }
+            NavigationLink(value: transaction) { row }
         }
     }
 
@@ -190,7 +223,7 @@ private struct TransactionCategoryHeader: View {
     var body: some View {
         HStack(spacing: 8) {
             CategoryIcon(category: group.category, size: 20)
-            Text(group.category?.name ?? String(localized: "Uncategorized"))
+            Text(group.category?.name ?? String(localized: Strings.Common.uncategorized))
             Spacer()
             AmountText(amount: group.total, showsPlusSign: true, showsColor: false)
         }
@@ -199,20 +232,22 @@ private struct TransactionCategoryHeader: View {
 }
 
 /// Adds the system search field. On iPhone and iPad it is there only while the Search button has it open, or search text
-/// is left to clear, so it doesn't take room from the header the rest of the time. Mac keeps its search field in the
-/// toolbar, and has no Search button.
-private struct SearchWhileOpen: ViewModifier {
+/// is left to clear, so it doesn't take room from the header the rest of the time. It hangs on an empty background
+/// rather than on the list: a modifier that comes and goes on the list itself rebuilds the list, which loses its place
+/// and redraws the period strip mid-animation. Mac keeps its search field in the toolbar, and has no Search button.
+private struct TransactionSearchField: ViewModifier {
     @Binding var text: String
     @Binding var isOpen: Bool
 
     func body(content: Content) -> some View {
         #if os(macOS)
-        content.searchable(text: $text, prompt: "Note, category or amount")
+        content.searchable(text: $text, prompt: Strings.Common.searchPrompt)
         #else
-        if isOpen || !text.isEmpty {
-            content.searchable(text: $text, isPresented: $isOpen, prompt: "Note, category or amount")
-        } else {
-            content
+        content.background {
+            if isOpen || !text.isEmpty {
+                Color.clear
+                    .searchable(text: $text, isPresented: $isOpen, prompt: Strings.Common.searchPrompt)
+            }
         }
         #endif
     }

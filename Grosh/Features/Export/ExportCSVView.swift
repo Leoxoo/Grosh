@@ -5,6 +5,7 @@ import SwiftUI
 /// share sheet. Import from MoneyLover restores the file with "Replace all data".
 struct ExportCSVView: View {
     @Environment(\.modelContext) private var context
+    @Environment(\.today) private var today
     /// The written file, once it is ready to share.
     @State private var file: URL?
     @State private var errorMessage: String?
@@ -14,34 +15,34 @@ struct ExportCSVView: View {
             Section {
                 if let file {
                     ShareLink(item: file) {
-                        Label("Share CSV File…", systemImage: "square.and.arrow.up")
+                        Label(Strings.ImportExport.shareCSV, systemImage: "square.and.arrow.up")
                     }
                 } else {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                 }
             } footer: {
-                Text("Every transaction in MoneyLover's CSV format, with its Card and the transactions it is linked to. Import from MoneyLover restores it with “Replace all data”.")
+                Text(Strings.ImportExport.exportFooter)
             }
         }
-        .navigationTitle("Export CSV")
+        .navigationTitle(Strings.Screens.exportCSV)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .task {
             write()
         }
-        .errorAlert("Couldn't Export", message: $errorMessage)
+        .errorAlert(Strings.ImportExport.couldntExport, message: $errorMessage)
     }
 
     /// Writes the export to a temporary file named for today.
     private func write() {
-        do {
-            let url = URL.temporaryDirectory.appending(path: GroshCSVExport.fileName(on: .today))
+        let url = URL.temporaryDirectory.appending(path: GroshCSVExport.fileName(on: today))
+        let written = Log.store.perform("Writing the CSV export", errorMessage: &errorMessage) {
             try GroshCSVExport.csv(in: context).write(to: url, atomically: true, encoding: .utf8)
+        }
+        if written {
             file = url
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 }
@@ -50,5 +51,5 @@ struct ExportCSVView: View {
     NavigationStack {
         ExportCSVView()
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+    .modelContainer(try! StoreOpening.open(inMemory: true))
 }
