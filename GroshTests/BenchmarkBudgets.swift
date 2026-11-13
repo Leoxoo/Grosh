@@ -10,31 +10,31 @@ import Testing
 /// failure and how to record a budget.
 enum BenchmarkBudgets {
     /// The setup the budgets were measured on, copied from the `BENCH setup:` line of a benchmark run on it.
-    static let recordedSetup = "Mac16,7 (Apple M4 Pro) / iPhone18,1 simulator / iOS 27.0 (24A434) / Xcode 27.1 (27A9275) / optimized"
+    static let recordedSetup = "Mac16,7 (Apple M4 Pro) / iPhone18,1 simulator / iOS 27.0 (24A434) / Xcode 27.2 (27B52) / optimized"
 
     /// Each step's budget in milliseconds: the most the median of its timed runs may be, which is the median measured
     /// plus headroom for noise. The key is the step's name as it is passed to `time` or `report`:
     ///
     ///     "<step name>": <milliseconds>,
     static let steps: [String: Double] = [
-        "Home Month graph work for a month 2½ years back": 58,
+        "Home Month graph work for a month 2½ years back": 62,
         "Transactions body work for a month 2½ years back": 15,
-        "launch: open store + startup work": 23,
-        "launch: open store + startup work + first frame of Home": 666,
-        "open Account": 45,
-        "open Debts & Loans": 74,
-        "open Home": 174,
-        "open Home (cold store)": 592,
-        "open Recently Deleted": 73,
-        "open Recurring": 110,
-        "open Transactions": 148,
-        "open Wallets": 150,
-        "open a Card's transactions": 95,
-        "save a new transaction with Home and Transactions open": 185,
-        "scroll: a screenful (13) of transaction rows": 38,
+        "launch: open store + startup work": 18,
+        "launch: open store + startup work + first frame of Home": 249,
+        "open Account": 57,
+        "open Debts & Loans": 47,
+        "open Home": 189,
+        "open Home (cold store)": 199,
+        "open Recently Deleted": 74,
+        "open Recurring": 103,
+        "open Transactions": 149,
+        "open Wallets": 76,
+        "open a Card's transactions": 88,
+        "save a new transaction with Home and Transactions open": 205,
+        "scroll: a screenful (13) of transaction rows": 40,
         "scroll: a screenful (13) of transaction rows paid with a Card with a photo": 41,
-        "search for \"12\" and group the results by day": 65,
-        "search for \"Lunch\" and group the results by day": 62,
+        "search for \"12\" and group the results by day": 83,
+        "search for \"Lunch\" and group the results by day": 79,
     ]
 }
 
