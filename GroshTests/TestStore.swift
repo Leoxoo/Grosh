@@ -3,7 +3,9 @@ import SwiftData
 import Testing
 @testable import Grosh
 
-/// An in-memory store seeded with the default category tree and one wallet, Checking, seen on ``today``.
+/// An in-memory store seeded with the default category tree and one wallet, Checking, seen on ``today``. Each save is
+/// followed by counting the saved month totals it made dirty, as the app's store does, and once the test ends its totals
+/// are checked against a full count of its transactions (``SavedTotalsCheck``, ADR-0013).
 @MainActor
 struct TestStore {
     /// The day most suites are seen on. The Month graph suites have a day of their own, ``MonthGraphFixture/today``.
@@ -16,6 +18,8 @@ struct TestStore {
 
     init() throws {
         container = try GroshStore.makeContainer(inMemory: true)
+        WalletMonthTotals.recountAfterEachSave(of: container.mainContext)
+        SavedTotalsCheck.stores?.add(container)
         try CategorySeeder.seedIfNeeded(in: container.mainContext)
         checking = container.mainContext.addWallet("Checking")
     }

@@ -20,7 +20,7 @@ Design every change for **the 16k store**: about 16,000 transactions over six ye
 | `Grosh/Debug/` | The 16k store generator and the UI test launch hook. | Wrapped in `#if DEBUG`, so the shipped app never carries them. |
 | `GroshTests/` | Swift Testing suites, one per behaviour, each with its own in-memory container (`GroshStore.makeContainer(inMemory: true)`), plus shared fixtures: `TestStore.swift` (the seeded store, its day, and the helpers that make wallets, transactions, Loans, payments and paybacks the way the app does) and the `*Fixture.swift` built on it. | A Domain rule ships with tests written first. |
 
-The app, the UI test store and every preview open the store through `StoreOpening.open` (or `StoreOpening.prepare` on a container opened elsewhere), so each starts from the same seeded, migrated store. Startup work runs in `GroshApp` on `scenePhase == .active`: `RecentlyDeleted.purgeExpired` and `RecurringTransaction.catchUp`. Both are on the launch benchmark.
+The app, the UI test store and every preview open the store through `StoreOpening.open` (or `StoreOpening.prepare` on a container opened elsewhere), so each starts from the same seeded, migrated store. From then on, each save of its main context is followed, before the save returns, by counting again the saved month totals the save made dirty (`WalletMonthTotals`, ADR-0013); `TestStore` does the same, and checks every test's totals against a full count when the test ends. Startup work runs in `GroshApp` on `scenePhase == .active`: `RecentlyDeleted.purgeExpired` and `RecurringTransaction.catchUp`. Both are on the launch benchmark.
 
 ## Where a screen gets its transactions
 

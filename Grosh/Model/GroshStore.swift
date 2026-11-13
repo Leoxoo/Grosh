@@ -7,6 +7,7 @@ enum GroshStore {
     static let schema = Schema([
         Wallet.self, Category.self, Card.self, Transaction.self, Reimbursement.self, RecurringTransaction.self,
         Person.self, ExpectedReimbursement.self, WalletMonthTotal.self, DirtyWalletMonth.self,
+        WalletMonthTotalFormat.self,
     ])
 
     static func makeContainer(inMemory: Bool = false) throws -> ModelContainer {
