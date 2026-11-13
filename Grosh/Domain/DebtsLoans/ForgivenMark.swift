@@ -27,6 +27,6 @@ nonisolated extension ForgivenMarked {
     }
 }
 
-extension Transaction: ForgivenMarked {}
+nonisolated extension Transaction: ForgivenMarked {}
 
-extension ExpectedReimbursement: ForgivenMarked {}
+nonisolated extension ExpectedReimbursement: ForgivenMarked {}

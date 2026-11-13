@@ -155,14 +155,16 @@ extension ExpectedReimbursement {
     var personName: String { person?.name ?? "" }
 }
 
-// MARK: Changing it
-
 extension ExpectedReimbursement: RemindedRecord, ListedWithReminder {
     /// Every expectation takes a reminder.
     func checkTakesReminder() {}
 
     var openReminderDay: CalendarDay? { isOpen ? reminderDay : nil }
+}
 
+// MARK: Changing it
+
+extension ExpectedReimbursement {
     /// Closes an open-amount expectation by hand on `day`: nothing more is expected. Saves.
     func close(on day: CalendarDay) throws {
         guard isOpen else { throw ExpectedReimbursementRuleError.notOpen }
