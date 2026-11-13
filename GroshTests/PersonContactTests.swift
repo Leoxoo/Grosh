@@ -203,7 +203,7 @@ struct PersonContactTests {
         let linked = try Person.add(pasha, in: context)
         let dinner = try store.eat(with: [linked, try context.insertPerson("Anna")])
         let deleted = try store.eat(with: [linked])
-        deleted.deletedAt = .now
+        deleted.changeCounted { $0.deletedAt = .now }
         try context.save()
         let contacts = RecordingContactLookup([Contact(identifier: "c-pasha", name: "Pavel")])
 

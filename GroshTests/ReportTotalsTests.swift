@@ -100,7 +100,7 @@ struct ReportTotalsTests {
     @Test func aWalletsForgivenLoanCountsOnlyWhenItIsSelected() throws {
         let savings = context.addWallet("Savings")
         let loan = try store.lendOrBorrow(.loan, 250_00, on: day(2026, 9, 20))
-        loan.wallet = savings
+        loan.changeCounted { $0.wallet = savings }
         try store.context.forgive(loan, on: day(2026, 10, 5))
 
         #expect(try store.totals(.wallet(checking)).spent == Money(cents: 0))

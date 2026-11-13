@@ -41,9 +41,11 @@ nonisolated struct SplitPart {
     /// Sets what this part holds on `transaction`: its amount (signed by its category), category, day, note, With and
     /// Event.
     fileprivate func apply(to transaction: Transaction) {
-        transaction.amountCents = amount.cents * (category?.sign ?? 1)
+        transaction.changeCounted {
+            $0.amountCents = amount.cents * (category?.sign ?? 1)
+            $0.day = day
+        }
         transaction.category = category
-        transaction.day = day
         transaction.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
         transaction.setPeople(people)
         transaction.eventName = eventName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -243,13 +245,16 @@ extension Transaction {
         let parts = try context.fetch(linkedTransactions)
         guard isSplitPart, parts.contains(self), let original = parts.splitOriginal, parts.count > 1
         else { throw SplitRuleError.notSplit }
-        original.amountCents = parts.reduce(0) { $0 + $1.amountCents }
+        let total = parts.reduce(0) { $0 + $1.amountCents }
+        original.changeCounted { $0.amountCents = total }
         original.leaveLink()
         for part in parts where part != original {
             // Moved off first, so deleting the part doesn't take its Reimbursements with it.
             for reimbursement in part.reimbursements ?? [] {
                 reimbursement.move(to: original)
             }
+            // Its amount went to the original, so it leaves the balance of its own day's month, which may be another.
+            part.changeCounted { $0.amountCents = 0 }
             context.delete(part)
         }
         try context.save()

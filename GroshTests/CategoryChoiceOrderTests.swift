@@ -73,7 +73,7 @@ struct CategoryChoiceOrderTests {
     @Test func deletedAndFutureTransactionsDontCount() throws {
         try spend(2, on: "Products", day: today.adding(days: 1))
         for transaction in try spend(2, on: "Products") {
-            transaction.deletedAt = .now
+            transaction.changeCounted { $0.deletedAt = .now }
         }
         try spend(1, on: "Shopping")
 

@@ -97,7 +97,7 @@ struct WalletBalanceTests {
         record(-20_00, on: CalendarDay(year: 2026, month: 10, day: 10), in: checking)
         record(25_50, on: today, in: cash)
         record(5_000_00, on: today, in: brokerage)
-        context.record(-9_00, on: today, in: cash).deletedAt = .now
+        context.record(-9_00, on: today, in: cash).changeCounted { $0.deletedAt = .now }
         try context.save()
 
         let balances = WalletBalances(NotDeletedTransactions.Store.of(context).entries, asOf: today)

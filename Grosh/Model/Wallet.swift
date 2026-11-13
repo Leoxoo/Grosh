@@ -1,7 +1,8 @@
 import Foundation
 import SwiftData
 
-/// A place the user's money is held. Its balance is always derived from its transactions, never stored.
+/// A place the user's money is held. Its balance is always derived from its transactions; the saved month totals are
+/// only a copy of them (ADR-0013).
 @Model
 final class Wallet {
     /// The symbol a wallet starts with: a wallet.
@@ -26,6 +27,14 @@ final class Wallet {
 
     @Relationship(deleteRule: .nullify, inverse: \RecurringTransaction.wallet)
     var recurringTransactions: [RecurringTransaction]? = []
+
+    /// The wallet's saved month totals, which go with it (ADR-0013).
+    @Relationship(deleteRule: .cascade, inverse: \WalletMonthTotal.wallet)
+    var monthTotals: [WalletMonthTotal]? = []
+
+    /// The wallet's months marked dirty since they were last counted (ADR-0013).
+    @Relationship(deleteRule: .cascade, inverse: \DirtyWalletMonth.wallet)
+    var dirtyMonths: [DirtyWalletMonth]? = []
 
     init(
         name: String, symbolName: String = Wallet.defaultSymbolName, color: PaletteColor = .green, sortOrder: Int = 0

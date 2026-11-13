@@ -113,7 +113,9 @@ enum BenchmarkStore {
 
         // Some waiting in Recently Deleted, not yet due to be removed.
         let recent = try context.fetch(Transaction.recent(limit: 150, asOf: today))
-        for transaction in recent.suffix(100) { transaction.deletedAt = .now.addingTimeInterval(-5 * 86_400) }
+        for transaction in recent.suffix(100) {
+            transaction.changeCounted { $0.deletedAt = .now.addingTimeInterval(-5 * 86_400) }
+        }
 
         // Recurring transactions, dealt with through today so opening the app has nothing to make.
         for index in 0..<12 {

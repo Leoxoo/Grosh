@@ -54,7 +54,7 @@ nonisolated extension Collection where Element == Transaction {
         let context = try first.storeContext()
         let deleting = try scope == .withRelated ? related() + Array(self) : Array(self)
         for transaction in deleting {
-            transaction.deletedAt = now
+            transaction.changeCounted { $0.deletedAt = now }
             transaction.deletedWithWallet = false
         }
         try context.save()

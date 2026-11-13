@@ -73,7 +73,7 @@ extension Transaction {
     /// Its Estimated mark, its reminder and so its bell item go with it. Saves.
     func confirmAmount(_ draft: EstimatedAmountDraft) throws {
         try draft.validate()
-        amountCents = draft.amount.cents * (amountCents < 0 ? -1 : 1)
+        changeCounted { $0.amountCents = draft.amount.cents * ($0.amountCents < 0 ? -1 : 1) }
         clearEstimate()
         try saveToStore()
     }
