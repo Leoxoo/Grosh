@@ -150,11 +150,15 @@ struct PerformanceBenchmarks {
             _ = PeriodSummary(of: listing.selected, in: old, today: today)
             _ = TransactionDay.days(of: listing.transactions, scheduled: [])
         }
+        // Home hands the Month graph the currency of the wallets it reads for the Total.
+        let currencyCode = WalletSelection.total.currencyCode(among: try container.mainContext.fetch(Wallet.unarchived))
         try time("Home Month graph work for a month 2½ years back") {
             let context = container.mainContext
             let month = CalendarMonth(today).adding(months: -30)
             let recurring = RecurringSchedules(try context.fetch(FetchDescriptor<RecurringTransaction>()))
-            let history = try MonthGraphHistory.read(month, in: context, otherIncome: context.otherCategory(.income))
+            let history = try MonthGraphHistory.read(
+                month, in: context, currencyCode: currencyCode, otherIncome: context.otherCategory(.income)
+            )
             _ = history.strip(.month, today: today)
             for side in SpentOrIncome.allCases {
                 _ = history.graph(side, of: month, recurring: recurring, today: today)

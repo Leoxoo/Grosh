@@ -39,19 +39,14 @@ struct CountedHistory {
         _ transactions: [Transaction], selection: WalletSelection, currencyCode: String, otherIncome: Category,
         firstDay: CalendarDay??
     ) {
-        var counted: [CountedAmount] = []
-        var sources: [Transaction] = []
-        for transaction in transactions {
-            guard let amount = transaction.countedAmount(
-                in: selection, currencyCode: currencyCode, otherIncome: otherIncome
-            ) else { continue }
-            counted.append(amount)
-            sources.append(transaction)
-        }
+        let found = CountedAmount.counted(
+            transactions, in: selection, currencyCode: currencyCode, otherIncome: otherIncome
+        )
+        let counted = found.map(\.amount)
         self.selection = selection
         self.currencyCode = currencyCode
         self.counted = counted
-        self.transactions = sources
+        self.transactions = found.map(\.transaction)
         self.firstDay = firstDay ?? counted.firstDay
     }
 

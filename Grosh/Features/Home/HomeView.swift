@@ -53,7 +53,10 @@ private struct HomeContent: View {
                     }
                 }
 
-                HomeMonthGraph(today: today, period: $monthPeriod, isShowingReport: $isShowingReport)
+                HomeMonthGraph(
+                    today: today, period: $monthPeriod, isShowingReport: $isShowingReport,
+                    currencyCode: WalletSelection.total.currencyCode(among: wallets)
+                )
 
                 HomeComingSoonCards()
 

@@ -140,6 +140,20 @@ struct EstimatedAmountTests {
         #expect(RecurringFigures([varying, fixed]).startingAmount(of: varying).cents == -5_000)
     }
 
+    @Test func aScreenReadsTheEstimateOnceUntilTheNextSave() throws {
+        let utilities = context.addCategory("Utilities")
+        let varying = try RecurringTransaction.create(electricity(under: utilities), today: today, in: context)
+        try record(5_000, under: utilities)
+        let schedules = RecurringSchedules([varying])
+
+        #expect(schedules.startingAmount(of: varying).cents == -5_000)
+        try record(7_000, under: utilities)
+
+        // Kept from the first read; a screen makes its schedules again after a save.
+        #expect(schedules.startingAmount(of: varying).cents == -5_000)
+        #expect(RecurringSchedules([varying]).startingAmount(of: varying).cents == -6_000)
+    }
+
     @Test func theReminderComesTheChosenNumberOfDaysAfterTheOccurrence() throws {
         let utilities = context.addCategory("Utilities")
         let recurring = try RecurringTransaction.create(

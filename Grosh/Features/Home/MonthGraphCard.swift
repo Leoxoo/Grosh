@@ -13,8 +13,9 @@ struct HomeMonthGraph: View {
     @Binding var period: Period
     /// Whether the Report is open, which "See reports" turns on. Home presents the Report, outside this list row.
     @Binding var isShowingReport: Bool
+    /// The Total's currency (``WalletSelection/currencyCode(among:)``), from the wallets Home already reads for the Total.
+    let currencyCode: String
 
-    @Query(Wallet.unarchived) private var wallets: [Wallet]
     @State private var side = SpentOrIncome.spent
     @AppStorage(AppSettings.comparesWithLastYear) private var comparesWithLastYear
 
@@ -22,7 +23,7 @@ struct HomeMonthGraph: View {
         OtherIncomeReader { otherIncome in
             HomeMonthGraphContent(
                 today: today, period: $period, isShowingReport: $isShowingReport,
-                currencyCode: WalletSelection.total.currencyCode(among: wallets), otherIncome: otherIncome,
+                currencyCode: currencyCode, otherIncome: otherIncome,
                 side: $side, comparesWithLastYear: $comparesWithLastYear
             )
         }
@@ -251,11 +252,13 @@ extension SpentOrIncome {
 /// Home's Month graph on the month of the day the preview shows.
 private struct HomeMonthGraphPreview: View {
     @Environment(\.today) private var today
+    @Query(Wallet.unarchived) private var wallets: [Wallet]
 
     var body: some View {
         List {
             HomeMonthGraph(
-                today: today, period: .constant(.month(CalendarMonth(today))), isShowingReport: .constant(false)
+                today: today, period: .constant(.month(CalendarMonth(today))), isShowingReport: .constant(false),
+                currencyCode: WalletSelection.total.currencyCode(among: wallets)
             )
         }
     }

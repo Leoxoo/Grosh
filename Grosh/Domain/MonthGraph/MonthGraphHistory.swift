@@ -9,8 +9,8 @@ import SwiftData
 /// strip starts and the Average counts months from.
 ///
 /// Home reads these with `@Query` and puts them together with ``firstDay(earliest:forgiven:currencyCode:otherIncome:)`` and
-/// ``history(read:forgiven:firstDay:currencyCode:otherIncome:)``. ``read(_:in:otherIncome:)`` does the same from a model
-/// context, for tests and the benchmark, so they go through Home's own wiring.
+/// ``history(read:forgiven:firstDay:currencyCode:otherIncome:)``. ``read(_:in:currencyCode:otherIncome:)`` does the same
+/// from a model context, for tests and the benchmark, so they go through Home's own wiring.
 enum MonthGraphHistory {
     /// The months the graph of `month` sums, oldest first: those its comparisons read, then `month` itself.
     static func months(for month: CalendarMonth) -> [CalendarMonth] {
@@ -135,11 +135,20 @@ enum MonthGraphHistory {
     }
 
     /// The history of `month`, read from `context` in one call as Home reads it through its queries: the Total's
-    /// currency among the unarchived wallets, then the same ``firstDay(earliest:forgiven:currencyCode:otherIncome:)``
-    /// and ``history(read:forgiven:firstDay:currencyCode:otherIncome:)`` over the same descriptors. Home itself never
-    /// calls it; the tests and benchmarks read Home's history with it.
+    /// currency among the unarchived wallets, then ``read(_:in:currencyCode:otherIncome:)``. Home itself never calls
+    /// it; the tests read Home's history with it.
     static func read(_ month: CalendarMonth, in context: ModelContext, otherIncome: Category) throws -> CountedHistory {
         let currencyCode = WalletSelection.total.currencyCode(among: try context.fetch(Wallet.unarchived))
+        return try read(month, in: context, currencyCode: currencyCode, otherIncome: otherIncome)
+    }
+
+    /// The history of `month` in `currencyCode`, the Total's, read from `context` as Home reads it through its queries:
+    /// the same ``firstDay(earliest:forgiven:currencyCode:otherIncome:)`` and
+    /// ``history(read:forgiven:firstDay:currencyCode:otherIncome:)`` over the same descriptors. Home takes the currency
+    /// from the wallets it already reads for the Total, and so does the benchmark.
+    static func read(
+        _ month: CalendarMonth, in context: ModelContext, currencyCode: String, otherIncome: Category
+    ) throws -> CountedHistory {
         let forgiven = try context.fetch(Self.forgiven)
         let firstDay = firstDay(
             earliest: try context.fetch(earliestCounted(currencyCode: currencyCode)), forgiven: forgiven,

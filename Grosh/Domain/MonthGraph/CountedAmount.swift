@@ -59,7 +59,17 @@ extension Transaction {
     func countedAmount(
         in selection: WalletSelection = .total, currencyCode: String, otherIncome: Category
     ) -> CountedAmount? {
-        guard selection.includes(self), !isInRecentlyDeleted else { return nil }
+        guard CountedAmount.counts(wallet, in: selection, currencyCode: currencyCode) else { return nil }
+        return countedAmount(fromCountedWalletIn: selection, currencyCode: currencyCode, otherIncome: otherIncome)
+    }
+
+    /// ``countedAmount(in:currencyCode:otherIncome:)`` once its wallet is known to count
+    /// (``CountedAmount/counts(_:in:currencyCode:)``), which a whole history asks once per wallet rather than once per
+    /// transaction.
+    fileprivate func countedAmount(
+        fromCountedWalletIn selection: WalletSelection, currencyCode: String, otherIncome: Category
+    ) -> CountedAmount? {
+        guard !isInRecentlyDeleted else { return nil }
         if let forgiveness {
             return CountedAmount(
                 forgiveness.reportAmount, filedUnder: forgiveness.category, on: forgiveness.day, countingIn: currencyCode
@@ -69,12 +79,49 @@ extension Transaction {
         let inTotal = selection == .total
         if inTotal, isHiddenInTotal { return nil }
         let cents = inTotal ? totalViewNetCents : netCents
-        let net = Money(cents: cents, currencyCode: amount.currencyCode)
+        // The wallet is in `currencyCode`, so its currency isn't read again.
+        let net = Money(cents: cents, currencyCode: currencyCode)
         if category?.type == .expense, amountCents < 0, cents >= 0 {
             guard cents > 0 else { return nil }
             return CountedAmount(net, filedUnder: otherIncome, on: day, countingIn: currencyCode)
         }
         return CountedAmount(net, filedUnder: category, on: day, countingIn: currencyCode)
+    }
+}
+
+nonisolated extension CountedAmount {
+    /// Whether a transaction paid from `wallet` can count in `selection` in a figure written in `currencyCode`: the
+    /// selection holds the wallet, and the wallet is in that currency. A Total holding wallets in two currencies counts
+    /// those of the one it is labelled with (``WalletSelection/currencyCode(among:)``).
+    static func counts(_ wallet: Wallet?, in selection: WalletSelection, currencyCode: String) -> Bool {
+        guard let wallet else { return false }
+        return selection.includesWallet(wallet) && wallet.currencyCode == currencyCode
+    }
+
+    /// What each of `transactions` counts in `selection`, in `currencyCode`
+    /// (``Transaction/countedAmount(in:currencyCode:otherIncome:)``), with the transaction it is from, leaving out those
+    /// that count nothing. Whether a wallet counts is worked out once for each wallet, not once for each of its
+    /// transactions.
+    static func counted(
+        _ transactions: some Sequence<Transaction>, in selection: WalletSelection, currencyCode: String,
+        otherIncome: Category
+    ) -> [(transaction: Transaction, amount: CountedAmount)] {
+        var walletCounts: [ObjectIdentifier: Bool] = [:]
+        var counted: [(transaction: Transaction, amount: CountedAmount)] = []
+        for transaction in transactions {
+            guard let wallet = transaction.wallet else { continue }
+            let id = ObjectIdentifier(wallet)
+            let walletCountsHere = walletCounts[id] ?? {
+                let counts = counts(wallet, in: selection, currencyCode: currencyCode)
+                walletCounts[id] = counts
+                return counts
+            }()
+            guard walletCountsHere, let amount = transaction.countedAmount(
+                fromCountedWalletIn: selection, currencyCode: currencyCode, otherIncome: otherIncome
+            ) else { continue }
+            counted.append((transaction, amount))
+        }
+        return counted
     }
 }
 

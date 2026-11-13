@@ -56,9 +56,14 @@ nonisolated enum AmountEstimate {
             predicate: usable,
             sortBy: [SortDescriptor(\.dayRaw, order: .reverse), SortDescriptor(\.createdAt, order: .reverse)]
         )
-        newest.fetchLimit = sampleSize
-        let found = try context.fetch(newest)
-        guard found.count == sampleSize, let last = found.last else { return found }
+        // One more than the sample: only when it ties with the last of the sample can more ties follow, so the store is
+        // read a second time only then.
+        newest.fetchLimit = sampleSize + 1
+        let read = try context.fetch(newest)
+        let found = Array(read.prefix(sampleSize))
+        guard read.count > sampleSize, let last = found.last,
+              read[sampleSize].dayRaw == last.dayRaw, read[sampleSize].createdAt == last.createdAt
+        else { return found }
         let dayRaw = last.dayRaw
         let createdAt = last.createdAt
         let tied = try context.fetch(FetchDescriptor<Transaction>(predicate: #Predicate { transaction in
