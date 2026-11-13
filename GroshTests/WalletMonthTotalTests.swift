@@ -232,8 +232,7 @@ struct WalletMonthTotalTests {
         try context.save()
 
         let found = try WalletMonthTotals.mismatches(in: context).map { mismatch in
-            let month = mismatch.walletMonth
-            return "\(month.wallet.name) \(month.month.numericTitle): saved \(mismatch.savedCents), "
+            return "\(mismatch.wallet.name) \(mismatch.month.numericTitle): saved \(mismatch.savedCents), "
                 + "counted \(mismatch.countedCents)"
         }
 
@@ -267,7 +266,7 @@ struct WalletMonthTotalTests {
 
         let read = try WalletMonthTotals.read(through: CalendarMonth(year: 2026, month: 10), in: other)
 
-        #expect(describe(read) == ["Cash 2026-09: -800", "Cash 2026-10: -1200"])
+        #expect(try describe(read, in: other) == ["Cash 2026-09: -800", "Cash 2026-10: -1200"])
         #expect(saves.count == 0)
         #expect(!other.hasChanges)
     }
@@ -292,7 +291,7 @@ struct WalletMonthTotalTests {
 
         let read = try WalletMonthTotals.read(through: CalendarMonth(year: 2026, month: 10), in: context)
 
-        #expect(describe(read) == ["Checking 2026-09: -3000", "Checking 2026-10: -1000"])
+        #expect(try describe(read, in: context) == ["Checking 2026-09: -3000", "Checking 2026-10: -1000"])
     }
 }
 
@@ -329,8 +328,9 @@ private func describe(_ total: WalletMonthTotal) -> String {
 
 /// The nets ``WalletMonthTotals/read(through:in:)`` gave, as ``totals(in:)`` writes them.
 @MainActor
-private func describe(_ read: [WalletMonthTotals.WalletMonth: Int]) -> Set<String> {
-    Set(read.map { describe($0.key.wallet, $0.key.month, $0.value) })
+private func describe(_ read: [WalletMonthTotals.WalletMonth: Int], in context: ModelContext) throws -> Set<String> {
+    let wallets = Dictionary(uniqueKeysWithValues: try context.fetch(FetchDescriptor<Wallet>()).map { (ObjectIdentifier($0), $0) })
+    return Set(read.map { describe(wallets[$0.key.wallet], $0.key.month, $0.value) })
 }
 
 @MainActor

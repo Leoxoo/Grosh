@@ -90,6 +90,20 @@ struct SavedBalanceTests {
         #expect(saves.count == 0)
     }
 
+    @Test func whenTheSavedTotalsCantBeReadTheBalancesAreCountedFromEveryTransaction() throws {
+        // A refusal, so the failure this test causes on purpose is logged as info rather than failing the log check.
+        struct Unreadable: RuleRefusal {}
+        record(100_00, on: day(2025, 12, 1))
+        record(-12_76, on: day(2026, 9, 8))
+        record(-7_00, on: day(2026, 10, 31))
+        try context.save()
+
+        let balances = WalletBalances.readOrCount(asOf: today, in: context) { _, _ in throw Unreadable() }
+
+        // Slow, but never a wrong $0.
+        #expect(balances.balance(of: checking) == Money(cents: 87_24))
+    }
+
     // MARK: On screen
 
     /// Home, the Wallets list and the Wallet selector read their balances through ``SavedWalletBalances``.

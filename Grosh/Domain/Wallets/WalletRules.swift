@@ -84,7 +84,7 @@ nonisolated struct WalletBalances {
     ) {
         var centsByWallet: [ObjectIdentifier: Int] = [:]
         for (month, netCents) in monthNets {
-            centsByWallet[ObjectIdentifier(month.wallet), default: 0] += netCents
+            centsByWallet[month.wallet, default: 0] += netCents
         }
         for transaction in datedLaterThisMonth {
             guard let wallet = transaction.wallet else { continue }
@@ -112,6 +112,21 @@ nonisolated struct WalletBalances {
             monthNets: try WalletMonthTotals.read(through: CalendarMonth(today), in: context),
             datedLaterThisMonth: try context.fetch(datedLaterThisMonth(than: today))
         )
+    }
+
+    /// Every wallet's balance on `today`, from the saved month totals (`fromSavedTotals`, ``read(asOf:in:)``) or, when
+    /// they can't be read, counted from every transaction outside Recently Deleted: slow, but never a wrong $0. Logs
+    /// what failed.
+    @MainActor
+    static func readOrCount(
+        asOf today: CalendarDay, in context: ModelContext,
+        fromSavedTotals: @MainActor (CalendarDay, ModelContext) throws -> WalletBalances = read(asOf:in:)
+    ) -> WalletBalances {
+        Log.store.attempt("Reading the wallets' balances") { try fromSavedTotals(today, context) }
+            ?? Log.store.attempt("Counting the wallets' balances from every transaction") {
+                WalletBalances(try context.fetch(Transaction.notDeleted), asOf: today)
+            }
+            ?? WalletBalances([LedgerEntry](), asOf: today)
     }
 
     /// The wallet's balance, in its own currency.
