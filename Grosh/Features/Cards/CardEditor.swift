@@ -33,7 +33,7 @@ private struct CardForm: View {
     @State private var draft: CardDraft
     @State private var isMerging = false
     @State private var isConfirmingDelete = false
-    private var saver = SheetSaver(Strings.Cards.couldntSave)
+    private let saver = SheetSaver(Strings.Cards.couldntSave)
 
     init(mode: EditorMode<Card>, startingDraft: CardDraft, hasTransactions: Bool) {
         self.mode = mode

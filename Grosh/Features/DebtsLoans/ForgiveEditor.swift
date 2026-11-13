@@ -28,7 +28,7 @@ private struct ForgiveForm: View {
     @Environment(\.modelContext) private var context
 
     @State private var draft: ForgiveDraft
-    private var saver = SheetSaver(Strings.DebtsLoans.couldntForgive)
+    private let saver = SheetSaver(Strings.DebtsLoans.couldntForgive)
 
     init(startingDraft: ForgiveDraft) {
         _draft = State(initialValue: startingDraft)

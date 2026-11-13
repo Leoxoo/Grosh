@@ -11,7 +11,7 @@ struct PastOccurrencesView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var selected: Set<CalendarDay> = []
-    private var saver = SheetSaver(Strings.Recurring.couldntAddTransactions, log: Log.recurring)
+    private let saver = SheetSaver(Strings.Recurring.couldntAddTransactions, log: Log.recurring)
 
     init(recurring: RecurringTransaction, days: [CalendarDay]) {
         self.recurring = recurring

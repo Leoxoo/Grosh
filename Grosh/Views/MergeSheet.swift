@@ -20,7 +20,7 @@ struct MergeSheet<Target: Identifiable & Equatable, Row: View>: View {
     @Environment(\.dismiss) private var dismiss
     @State private var target: Target?
     @State private var isConfirming = false
-    private var saver = SheetSaver(Strings.Merge.couldntMerge)
+    private let saver = SheetSaver(Strings.Merge.couldntMerge)
 
     var body: some View {
         NavigationStack {

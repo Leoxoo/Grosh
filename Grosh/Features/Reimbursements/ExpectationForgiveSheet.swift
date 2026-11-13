@@ -11,7 +11,7 @@ struct ExpectationForgiveSheet: View {
     /// The day the user picked, or `nil` while it is still today.
     @State private var pickedDay: CalendarDay?
     @State private var note = ""
-    private var saver = SheetSaver(Strings.DebtsLoans.couldntForgive)
+    private let saver = SheetSaver(Strings.DebtsLoans.couldntForgive)
 
     private var day: Binding<CalendarDay> {
         Binding(get: { pickedDay ?? today }, set: { pickedDay = $0 })

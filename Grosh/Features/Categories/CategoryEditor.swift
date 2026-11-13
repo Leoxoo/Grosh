@@ -67,7 +67,7 @@ private struct CategoryForm: View {
     /// The parent categories offered for the type shown, read from the store when the type changes rather than on every
     /// draw, which is every keystroke in Name.
     @State private var keptParentOptions = DrawingCache<CategoryType, [Category]>()
-    private var saver = SheetSaver(Strings.Categories.couldntSave)
+    private let saver = SheetSaver(Strings.Categories.couldntSave)
 
     init(mode: CategoryEditor.Mode, startingDraft: CategoryDraft, inUse: Set<PersistentIdentifier>) {
         self.mode = mode

@@ -15,7 +15,7 @@ struct SplitSheet: View {
     @State private var editing: SplitPartRef?
     /// Whether the editor is open on a part about to be added.
     @State private var isAddingPart = false
-    private var saver = SheetSaver(Strings.Transactions.couldntSplit)
+    private let saver = SheetSaver(Strings.Transactions.couldntSplit)
 
     init(transaction: Transaction) {
         self.transaction = transaction

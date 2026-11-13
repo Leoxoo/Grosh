@@ -38,7 +38,7 @@ private struct WalletForm: View {
     @State private var keypad = KeypadTarget()
     @FocusState private var isNameFocused: Bool
     @State private var startingDay: CalendarDay
-    private var saver = SheetSaver(Strings.Wallets.couldntSave)
+    private let saver = SheetSaver(Strings.Wallets.couldntSave)
     @State private var isAdjustingBalance = false
     /// The wallet waiting for the user to confirm deleting it.
     @State private var deleting: Wallet?
