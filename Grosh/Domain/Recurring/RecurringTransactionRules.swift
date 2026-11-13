@@ -345,7 +345,8 @@ extension RecurringTransaction {
         Money(cents: (estimateCents ?? amountCents) * (category?.sign ?? -1), currencyCode: currencyCode)
     }
 
-    /// What its transactions start at now, a varying Bill's estimate read from the store. X    /// schedules reads them once through ``RecurringSchedules``.
+    /// What its transactions start at now, a varying Bill's estimate read from the store. A screen showing many
+    /// schedules reads them once through ``RecurringSchedules``.
     func currentStartingAmount() -> Money {
         startingAmount(estimateCents: currentEstimateCents())
     }

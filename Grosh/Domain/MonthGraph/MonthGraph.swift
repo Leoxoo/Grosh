@@ -64,7 +64,7 @@ struct MonthGraph {
     /// selection's (``WalletSelection/currencyCode(among:)``).
     init(
         _ side: SpentOrIncome, of counted: [CountedAmount], countingFrom firstDay: CalendarDay?,
-        recurring: RecurringSchedules = .none, in period: Period, today: CalendarDay,
+        recurring: RecurringSchedules, in period: Period, today: CalendarDay,
         comparingWith choice: MonthGraphComparison = .average, selection: WalletSelection = .total,
         currencyCode: String
     ) {
