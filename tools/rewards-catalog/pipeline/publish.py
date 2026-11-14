@@ -57,19 +57,20 @@ def catalog(cards: list[dict], candidates: dict[str, dict], decisions: dict, pre
     published = []
     for card in sorted(cards, key=lambda c: c["id"]):
         candidate = candidates.get(card["id"])
-        if candidate is None and card["id"] in before:
+        added = any("added" in entry for entry in decisions.get(card["id"], {}).values())
+        if candidate is None and card["id"] in before and not added:
             published.append(before[card["id"]])
             continue
-        rules = review.accepted_rules(candidate, decisions) if candidate else []
-        if not rules:  # nobody has checked this card, so its seed facts aren't ours to ship
+        shown = candidate or review.empty_candidate(card["id"])
+        entries = review.accepted_entries(shown, decisions)
+        if not entries:  # nobody has checked this card, so its seed facts aren't ours to ship
             continue
-        card_decisions = decisions[card["id"]]
         published.append({
             **{field: card[field] for field in CARD_FIELDS},
-            "verifiedAt": max(card_decisions[review.rule_key(card["id"], r)]["decidedAt"] for r in rules),
-            "cardConditions": sorted(candidate.get("cardConditions", [])),
+            "verifiedAt": max(day for _, day in entries),
+            "cardConditions": sorted(shown.get("cardConditions") or before.get(card["id"], {}).get("cardConditions", [])),
             **{name: bool((options or {}).get(card["id"], {}).get(name)) for name in review.CARD_OPTIONS},
-            "rules": sorted((published_rule(r) for r in rules), key=lambda r: json.dumps(r, sort_keys=True)),
+            "rules": sorted((published_rule(r) for r, _ in entries), key=lambda r: json.dumps(r, sort_keys=True)),
         })
     # The date says when the catalog last changed, so a rerun that changes nothing else keeps it.
     unchanged = previous and previous.get("formatVersion") == FORMAT_VERSION and previous.get("cards") == published

@@ -1160,6 +1160,74 @@ class OtherCardsTests(unittest.TestCase):
         self.assertEqual((len(result["rules"]), result["rejected"]), (1, []))
 
 
+class QuoteRepairTests(unittest.TestCase):
+    """A quote that skips a heading in a tile is the page's own words with the heading put back (repair_quote)."""
+
+    TILES = "\n".join([
+        "Gold Card", "3X", "POINTS", "On Flights & Pre-Paid Hotels\u2021", "Booked on AmexTravel.com.\u2021",
+        "1X", "POINTS", "On All Other Eligible Purchases", "Made using the Gold Card.\u2021",
+        "Categories Eligible to Earn 4X Points",
+        "Earn 4X Membership Rewards\u00ae points on the top 2 categories where your business spends the most each billing cycle from 6 categories:",
+        "Purchases at restaurants", "Purchases at gas stations",
+    ])
+    GOLD = {**CARD, "name": "Gold Card"}
+
+    def reply(self, *rules):
+        return lambda messages: json.dumps({"cardConditions": [], "rules": list(rules)})
+
+    def test_the_page_words_replace_a_quote_that_left_out_the_heading(self):
+        repaired = extract.repair_quote("3X POINTS Booked on AmexTravel.com.\u2021", self.TILES)
+        self.assertEqual(repaired, "3X\nPOINTS\nOn Flights & Pre-Paid Hotels\u2021\nBooked on AmexTravel.com.\u2021")
+        self.assertIn(normalize(repaired), normalize(self.TILES))
+
+    def test_a_quote_that_is_not_the_pages_is_not_repaired(self):
+        self.assertIsNone(extract.repair_quote("3X POINTS Booked on Expedia.com.", self.TILES))  # a word the page lacks
+        self.assertIsNone(extract.repair_quote("3X Booked", self.TILES))  # too short to say anything
+        self.assertIsNone(extract.repair_quote("Booked on AmexTravel.com. 3X", self.TILES))  # out of order
+        far = "3X\n" + "Filler line.\n" * 8 + "Booked on AmexTravel.com."
+        self.assertIsNone(extract.repair_quote("3X Booked on AmexTravel.com.", far))  # too far apart
+
+    def test_a_tile_the_model_shortened_is_accepted_with_the_pages_words_as_its_quote(self):
+        travel = rule(categories=["travel"], rate=3, unit="per-dollar", requires=["issuer-booking"], quote="3X POINTS Booked on AmexTravel.com.\u2021")
+        base = rule(categories=["everything-else"], rate=1, unit="per-dollar", quote="1X POINTS Made using the Gold Card.\u2021")
+        result = extract_card(self.GOLD, self.TILES, "h", self.reply(travel, base), "m", follow_up=False)
+        self.assertEqual(result["rejected"], [])
+        quotes = {r["categories"][0]: r["evidence"]["quote"] for r in result["rules"]}
+        self.assertEqual(quotes["travel"], "3X\nPOINTS\nOn Flights & Pre-Paid Hotels\u2021\nBooked on AmexTravel.com.\u2021")
+        self.assertIn("On All Other Eligible Purchases", quotes["everything-else"])
+
+    def test_flights_and_hotels_together_are_travel(self):
+        self.assertTrue(extract._category_fits("travel", normalize("3x points on flights & pre-paid hotels")))
+        self.assertFalse(extract._category_fits("travel", normalize("3x points on flights")))
+
+    def test_the_top_n_categories_of_a_list_are_a_top_spend_rule(self):
+        mislabeled = rule(categories=["dining"], rate=4, unit="per-dollar", quote=self.TILES.splitlines()[10])
+        result = extract_card(self.GOLD, self.TILES, "h", self.reply(mislabeled), "m", follow_up=False)
+        (top,) = result["rules"]
+        self.assertEqual((top["selection"], top["picks"], top["categories"], top["hasOtherChoices"]), ("top-spend", 2, ["dining"], True))
+
+    def test_a_quote_that_says_who_chooses_is_left_as_it_was(self):
+        chosen = rule(categories=["dining"], rate=3, quote=CHOICE)
+        self.assertEqual(extract._retype_top_spend(chosen), chosen)
+
+    def test_rejected_proposals_are_checked_again_without_the_model(self):
+        shortened = rule(categories=["travel"], rate=3, unit="per-dollar", requires=["issuer-booking"], quote="3X POINTS Booked on AmexTravel.com.\u2021")
+        candidate = {**extract._empty_candidate(self.GOLD, "m", "11", "h", "no-rules"), "rejected": [{"rule": shortened, "reason": "old"}, {"cardCondition": "x", "reason": "y"}]}
+        self.assertEqual(extract.recheck_rejected(self.GOLD, candidate, self.TILES), 1)
+        self.assertEqual((len(candidate["rules"]), candidate["status"]), (1, "ok"))
+        self.assertEqual(candidate["rejected"], [{"cardCondition": "x", "reason": "y"}])
+        self.assertEqual(extract.recheck_rejected(self.GOLD, candidate, self.TILES), 0)
+
+
+class VouchedRuleTests(unittest.TestCase):
+    def test_a_vouched_rule_only_needs_its_shape(self):
+        said = rule(categories=["travel"], rate=3, quote="Earn 5% cash back on dining.")  # the quote doesn't say it
+        self.assertIn("not in the quote", validate_rule(said, None))
+        self.assertIsNone(validate_rule(said, None, vouched=True))
+        self.assertIn("one category", validate_rule(rule(categories=["travel", "dining"]), None, vouched=True))
+        self.assertIn("not a date", validate_rule(rule(validFrom="soon"), None, vouched=True))
+
+
 class StatsTests(unittest.TestCase):
     def test_calls_are_totalled_including_what_a_server_leaves_out(self):
         calls = [

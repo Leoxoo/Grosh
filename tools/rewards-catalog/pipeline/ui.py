@@ -390,7 +390,7 @@ class App:
                 },
                 "pending": pending,
                 # how many of its rules wait for a person, or were accepted or rejected (None: nothing to review)
-                "review": review.card_review(candidate, decisions)["counts"] if candidate and candidate.get("rules") else None,
+                "review": self._counts(card["id"], candidate, decisions),
             })
         summary: dict[str, int] = {"cards": len(rows), "fetched": 0, "pending": 0, "extracted": 0, "failed": 0,
                                    **dict.fromkeys(review.COUNTS, 0)}
@@ -407,6 +407,12 @@ class App:
             "job": self.job.snapshot(with_log=False) if self.job else None,
         }
 
+    @staticmethod
+    def _counts(card_id: str, candidate: dict | None, decisions: dict) -> dict | None:
+        """How many of a card's rules (the model's and the ones a person added) wait or were decided; None if it has none."""
+        counts = review.card_review(candidate or review.empty_candidate(card_id), decisions)["counts"]
+        return counts if sum(counts.values()) else None
+
     def card_detail(self, card_id: str) -> dict:
         card = self.card(card_id)
         state = fetch.read_json(self.paths.state, {}).get(card_id)
@@ -421,7 +427,7 @@ class App:
         return {
             "card": card, "fetch": state, "candidate": candidate,
             # each rule with its decision, as the person fixed it if they did (review.card_review)
-            "review": review.card_review(candidate, review.load_decisions(self.paths.decisions)) if candidate else None,
+            "review": review.card_review(candidate or review.empty_candidate(card_id), review.load_decisions(self.paths.decisions)),
             "manual": fetch.read_json(self.paths.manual, {}).get(card_id), "page": page,
             "options": review.load_options(self.paths.options).get(card_id, {}),
         }
@@ -442,27 +448,49 @@ class App:
         decisions = review.load_decisions(self.paths.decisions)
         entries = []
         for card in self.cards():
-            candidate = self.candidate(card["id"])
-            if candidate and candidate.get("rules"):
-                entries.append({**review.card_review(candidate, decisions), "name": card["name"], "issuer": card["issuer"]})
+            view = review.card_review(self.candidate(card["id"]) or review.empty_candidate(card["id"]), decisions)
+            if view["rules"]:
+                entries.append({**view, "name": card["name"], "issuer": card["issuer"]})
         return {"cards": entries, "summary": review.summarize(entries)}
 
     def decide(self, body: dict) -> dict:
         card = self.card(str(body.get("cardId")))
-        candidate = self.candidate(card["id"])
-        if not candidate:
-            raise Problem(f"{card['name']} has no candidate to review: extract it first.", 404)
         key, decision, today = str(body.get("key")), str(body.get("decision")), date.today().isoformat()
-        if decision == "edit":
+        candidate = self.candidate(card["id"])
+        mine = key in review.load_decisions(self.paths.decisions).get(card["id"], {})  # a rule a person added needs no candidate
+        if not candidate and decision != "add" and not mine:
+            raise Problem(f"{card['name']} has no candidate to review: extract it first.", 404)
+        candidate = candidate or review.empty_candidate(card["id"])
+        page_file = self.paths.cache / card["id"] / "latest.txt"
+        page_text = page_file.read_text(encoding="utf-8") if page_file.exists() else None
+        if decision == "add":  # a rule the model missed, or one the checks rejected and a person uses anyway
+            fields = body.get("rule")
+            if not isinstance(fields, dict):
+                raise Problem("A new rule needs its fields")
+            decisions = review.add_rule(card, candidate, fields, page_text, body.get("vouch") is True, self.paths.decisions, today)
+        elif decision == "edit":
             changes = body.get("changes")
             if not isinstance(changes, dict):
                 raise Problem("An edit needs the changes")
-            page_file = self.paths.cache / card["id"] / "latest.txt"
-            page_text = page_file.read_text(encoding="utf-8") if page_file.exists() else None
             decisions = review.edit(candidate, key, changes, page_text, self.paths.decisions, today)
         else:
             decisions = review.decide(candidate, key, decision, self.paths.decisions, today)
         return {**review.card_review(candidate, decisions), "name": card["name"], "issuer": card["issuer"]}
+
+    def recheck_card(self, card_id: str) -> dict:
+        """Run the card's rejected proposals through the checks again, without the model (extract.recheck_rejected), and
+        save what now passes. The checks improve, and a saved extraction shouldn't need the model again to benefit."""
+        card = self.card(card_id)
+        candidate = self.candidate(card_id)
+        page_file = self.paths.cache / card_id / "latest.txt"
+        if not candidate or not candidate.get("rejected"):
+            return {"gained": 0, "rejected": 0}
+        if not page_file.exists():
+            raise Problem("The page isn't saved on this machine: fetch it first.", 404)
+        gained = extract.recheck_rejected(card, candidate, page_file.read_text(encoding="utf-8"))
+        if gained:
+            fetch.write_json(self.paths.candidates / f"{card_id}.json", candidate)
+        return {"gained": gained, "rejected": len(candidate["rejected"])}
 
     def publish_catalog(self) -> dict:
         """Write the accepted rules to the catalog file (publish.py) and say how much went in."""
@@ -800,6 +828,8 @@ class App:
             return 200, self._route(method, path, query, body)
         except Problem as problem:
             return problem.status, {"error": str(problem)}
+        except review.NeedsVouching as problem:  # the page offers "use it anyway"
+            return 400, {"error": str(problem), "canVouch": True}
         except ValueError as problem:
             return 400, {"error": str(problem)}
 
@@ -841,6 +871,8 @@ class App:
                 return self.stop_job()
             if match := re.fullmatch(r"/api/card/([\w.-]+)/try", path):
                 return self.try_card(match.group(1))
+            if match := re.fullmatch(r"/api/card/([\w.-]+)/recheck", path):
+                return self.recheck_card(match.group(1))
         raise Problem("Not found", 404)
 
 

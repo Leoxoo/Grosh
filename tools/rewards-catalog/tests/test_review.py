@@ -39,6 +39,80 @@ class ReviewCase(unittest.TestCase):
         return review.accepted_rules(cand, review.load_decisions(self.path))
 
 
+class AddedRuleTests(ReviewCase):
+    CARD = {"id": "bank-savor", "name": "Savor", "issuer": "Bank", "sourceUrl": URL}
+    PAGE = "Savor\nEarn unlimited 3% cash back on dining.\nEarn 1% cash back on all other purchases."
+
+    def add(self, cand, fields, vouch=False, page=PAGE):
+        return review.add_rule(self.CARD, cand, fields, page, vouch, self.path, "2026-11-14")
+
+    def gas(self, **changes):
+        return {"categories": ["gas"], "rate": 3, "unit": "percent", "quote": "Earn 3% cash back on gas.", **changes}
+
+    def test_a_rule_the_page_backs_is_added_and_accepted_without_a_candidate(self):
+        self.add(None, {"categories": ["dining"], "rate": 3, "unit": "percent", "quote": "Earn unlimited 3% cash back on dining."})
+        empty = review.empty_candidate("bank-savor")
+        (row,) = review.card_review(empty, review.load_decisions(self.path))["rules"]
+        self.assertEqual((row["decision"], row["added"], row["overrides"], row["summary"]), ("accept", True, None, "3% on dining"))
+        self.assertEqual(row["rule"]["verified"], "page")
+        self.assertEqual(len(self.accepted(empty)), 1)
+
+    def test_a_rule_the_checks_do_not_back_needs_the_person_to_vouch(self):
+        with self.assertRaises(review.NeedsVouching) as caught:
+            self.add(None, self.gas())  # the page has no such sentence
+        self.assertIn("not on the page", caught.exception.problem)
+        self.assertFalse(self.path.exists())
+        self.add(None, self.gas(), vouch=True)
+        (row,) = review.card_review(review.empty_candidate("bank-savor"), review.load_decisions(self.path))["rules"]
+        self.assertEqual((row["rule"]["verified"], row["added"], "not on the page" in row["overrides"]), ("override", True, True))
+        self.assertIn("used it anyway", " ".join(row["warnings"]))
+        self.assertEqual(len(self.accepted(review.empty_candidate("bank-savor"))), 1)
+
+    def test_a_rule_that_cannot_be_stored_is_refused_even_when_vouched(self):
+        with self.assertRaises(ValueError) as caught:
+            self.add(None, self.gas(categories=["gas", "dining"]), vouch=True)
+        self.assertNotIsInstance(caught.exception, review.NeedsVouching)
+        with self.assertRaises(ValueError):
+            self.add(None, {"rate": 3, "unit": "percent"})  # no quote
+        with self.assertRaises(ValueError):
+            self.add(None, self.gas(color="red"))
+
+    def test_added_rules_join_the_candidates_and_survive_a_new_extraction(self):
+        cand = candidate(self.dining)
+        self.decide(cand, 0, "accept")
+        self.add(cand, self.gas(), vouch=True)
+        rules = self.accepted(cand)
+        self.assertEqual([r["categories"] for r in rules], [["dining"], ["gas"]])
+        fresh = candidate()  # extracted again: the model finds nothing, the person's rules stay
+        self.assertEqual([r["categories"] for r in self.accepted(fresh)], [["gas"]])
+
+    def test_the_same_rule_found_by_an_extraction_is_not_listed_twice(self):
+        cand = candidate(self.dining)
+        self.add(cand, {"categories": ["dining"], "rate": 3, "unit": "percent", "quote": "Earn unlimited 3% cash back on dining."})
+        view = review.card_review(cand, review.load_decisions(self.path))
+        self.assertEqual(len(view["rules"]), 1)
+
+    def test_reject_keeps_an_added_rule_and_undo_removes_it(self):
+        cand = candidate()
+        self.add(cand, self.gas(), vouch=True)
+        key = review.card_review(cand, review.load_decisions(self.path))["rules"][0]["key"]
+        review.decide(cand, key, "reject", self.path, "2026-11-15")
+        (row,) = review.card_review(cand, review.load_decisions(self.path))["rules"]
+        self.assertEqual((row["decision"], row["added"]), ("reject", True))
+        self.assertEqual(self.accepted(cand), [])
+        review.decide(cand, key, "undo", self.path, "2026-11-15")
+        self.assertEqual(review.card_review(cand, review.load_decisions(self.path))["rules"], [])
+
+    def test_an_added_rule_can_be_fixed_and_keeps_being_added(self):
+        cand = candidate()
+        self.add(cand, self.gas(), vouch=True)
+        key = review.card_review(cand, review.load_decisions(self.path))["rules"][0]["key"]
+        review.edit(cand, key, {"rate": 4}, None, self.path, "2026-11-15")  # a vouched rule's shape is all that is checked
+        (row,) = review.card_review(cand, review.load_decisions(self.path))["rules"]
+        self.assertEqual((row["rule"]["rate"], row["edited"], row["added"], row["decision"]), (4, True, True, "accept"))
+        self.assertEqual([r["rate"] for r in self.accepted(cand)], [4])
+
+
 class PaidWithAndMerchantsTests(ReviewCase):
     PAYPAL = "Earn 3% cash back on purchases made through PayPal."
 
