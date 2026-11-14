@@ -32,6 +32,11 @@ final class Card {
     var catalogSnapshot: Data?
     /// What one point or mile of a points or miles Card is worth, in cents.
     var pointValueCents: Double = 1
+    /// The rates the user entered (``EnteredRate``), as JSON: a Custom card's own, or a linked Card's Edited rates.
+    var enteredRatesData: Data?
+    /// Whether a Custom card earns cash back or points (``RewardKind``); `nil` for cash back. A linked Card earns what
+    /// its entry does.
+    var ownRewardKindRaw: String?
 
     var payingWallet: Wallet?
 

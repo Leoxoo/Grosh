@@ -20,6 +20,10 @@ nonisolated struct CardDraft {
     var catalogCard: CatalogCard?
     /// What one point or mile is worth, in cents, for a points or miles Card. 1¢ unless the user changes it.
     var pointValueCents: Double = 1
+    /// What the user set a Custom card to earn, which its rate editor sets; a linked Card earns what its entry does.
+    private(set) var ownRewardKind: RewardKind?
+    /// How many Edited rates linking the Card to another entry removes (Change catalog card), for its confirmation.
+    private(set) var editedRatesRemovedByChange = 0
 
     init(
         name: String, kind: CardKind, payingWallet: Wallet?, color: PaletteColor = .blue, lastFourDigits: String? = nil,
@@ -90,8 +94,11 @@ nonisolated extension CardDraft {
             statementDay: card.statementDay,
             imageData: card.imageData
         )
-        catalogCard = CardRewards(of: card, in: catalog).entry
+        let rewards = CardRewards(of: card, in: catalog)
+        catalogCard = rewards.entry
         pointValueCents = card.pointValueCents
+        ownRewardKind = card.ownRewardKind
+        editedRatesRemovedByChange = rewards.entry == nil ? 0 : rewards.enteredRates.count
     }
 
     /// A new Card, as Add Card starts it: a Credit card with no name yet.
@@ -105,8 +112,8 @@ nonisolated extension CardDraft {
         return draft
     }
 
-    /// Whether the Card has a Point value: one linked to a points or miles entry.
-    var offersPointValue: Bool { catalogCard?.rewardKind.earnsPoints == true }
+    /// Whether the Card has a Point value: one that earns points or miles, as its entry does or a Custom card was set to.
+    var offersPointValue: Bool { (catalogCard?.rewardKind ?? ownRewardKind)?.earnsPoints == true }
 
     /// Whether the Card can have a statement date: only a Credit card has a statement; a Debit card spends straight
     /// from its wallet.
@@ -176,7 +183,7 @@ extension Card {
     static func insert(_ draft: CardDraft, in context: ModelContext) throws -> Card {
         let card = Card(name: draft.name, kind: draft.kind, payingWallet: nil, sortOrder: try context.nextSortOrder(\Card.sortOrder))
         context.insert(card)
-        card.apply(draft)
+        try card.apply(draft)
         return card
     }
 
@@ -185,11 +192,11 @@ extension Card {
         guard try draft.payingWallet == payingWallet || !hasTransactions() else {
             throw CardRuleError.payingWalletHasTransactions
         }
-        apply(draft)
+        try apply(draft)
         try saveToStore()
     }
 
-    private func apply(_ draft: CardDraft) {
+    private func apply(_ draft: CardDraft) throws {
         name = draft.trimmedName
         kind = draft.kind
         payingWallet = draft.payingWallet
@@ -198,7 +205,7 @@ extension Card {
         statementDay = draft.statementDay
         imageData = draft.imageData
         pointValueCents = draft.pointValueCents
-        keepLink(to: draft.catalogCard)
+        try keepLink(to: draft.catalogCard)
     }
 
     // MARK: Rewards catalog
@@ -207,11 +214,20 @@ extension Card {
     /// another entry is Change catalog card: the Card keeps its name, image, wallet, Statement date and transactions.
     /// Saves.
     func link(to entry: CatalogCard?) throws {
-        keepLink(to: entry)
+        try keepLink(to: entry)
         try saveToStore()
     }
 
-    private func keepLink(to entry: CatalogCard?) {
+    private func keepLink(to entry: CatalogCard?) throws {
+        if entry?.id != catalogCardID {
+            // Change catalog card removes what was set for the old entry. Unlinking keeps the rates the user entered,
+            // which make it a Custom card earning what the entry did, but drops their removals of the catalog's.
+            if entry == nil, catalogCardID != nil, ownRewardKindRaw == nil {
+                ownRewardKindRaw = lastCatalogEntry?.rewardKind.rawValue
+            }
+            let kept = entry == nil ? enteredRates.filter { !$0.isRemoval } : catalogCardID == nil ? enteredRates : []
+            try keepEnteredRates(kept)
+        }
         catalogCardID = entry?.id
         let snapshot = entry.flatMap(Self.snapshot(of:))
         if catalogSnapshot != snapshot {
@@ -242,7 +258,7 @@ extension Card {
         let linked = try context.fetch(FetchDescriptor<Card>(predicate: #Predicate { $0.catalogCardID != nil }))
         for card in linked {
             if let id = card.catalogCardID, let entry = catalog.card(id) {
-                card.keepLink(to: entry)
+                try card.keepLink(to: entry)
             }
         }
         if context.hasChanges {

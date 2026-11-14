@@ -44,8 +44,8 @@ struct CardRewardsTests {
         #expect(shown.map(\.reward.id) == ["dining", "groceries", "everything-else"])
         #expect(shown.map(\.effectiveRate) == [3, 3, 1])
         #expect(shown.allSatisfy { $0.multiplier == nil })
-        #expect(shown[0].rule.capAmount == 2500)
-        #expect(shown[0].rule.evidence.quote == "Earn 3% cash back on dining and at grocery stores.")
+        #expect(shown[0].cap == RateCap(amount: 2500, period: .quarter, currencyCode: "USD"))
+        #expect(shown[0].rule?.evidence.quote == "Earn 3% cash back on dining and at grocery stores.")
     }
 
     @Test func rotatingPaidWithMerchantTierAndOpenDateRatesAreLeftOut() throws {
@@ -61,7 +61,7 @@ struct CardRewardsTests {
         #expect(shown.map(\.reward.id) == ["dining", "travel", "everything-else"])
         #expect(shown.map(\.multiplier) == [3, 2, 1])
         #expect(shown.map(\.effectiveRate) == [3, 2, 1])
-        #expect(shown[0].rule.requires == ["activation"])
+        #expect(shown[0].rule?.requires == ["activation"])
     }
 
     @Test func aPercentRateOnAPointsCardIsAlreadyAnEffectiveRate() throws {

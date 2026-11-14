@@ -86,12 +86,16 @@ struct RewardCategories {
 
     /// Removes one of the user's own Reward categories. Every category that counted as it goes back to Everything else:
     /// a top-level one to having none of its own, a subcategory to Everything else of its own, so it doesn't take up
-    /// its parent's instead. Saves.
+    /// its parent's instead, and every rate a Card had for it goes too. Saves.
     func delete(_ own: OwnRewardCategory) throws {
         let id: String? = own.key
         let counting = try context.fetch(FetchDescriptor<Category>(predicate: #Predicate { $0.ownRewardsAs == id }))
         for category in counting {
             category.ownRewardsAs = category.parent == nil ? nil : RewardCategory.everythingElse.id
+        }
+        let rated = try context.fetch(FetchDescriptor<Card>(predicate: #Predicate { $0.enteredRatesData != nil }))
+        for card in rated where card.enteredRates.contains(where: { $0.reward == own.key }) {
+            try card.keepEnteredRates(card.enteredRates.filter { $0.reward != own.key })
         }
         try own.storeContext().delete(own)
         try context.save()

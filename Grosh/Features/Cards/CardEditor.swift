@@ -158,7 +158,11 @@ private struct CardForm: View {
             ) { entry in
                 Button(Strings.Rewards.change) { draft.catalogCard = entry }
             } message: { _ in
-                Text(Strings.Rewards.changeCatalogCardMessage)
+                if draft.editedRatesRemovedByChange > 0 {
+                    Text(Strings.Rewards.changeRemovesEditedRates(draft.editedRatesRemovedByChange))
+                } else {
+                    Text(Strings.Rewards.changeCatalogCardMessage)
+                }
             }
             .onChange(of: pointValueText) {
                 draft.pointValueCents = CardRateText.parseNumber(pointValueText) ?? 0
