@@ -124,9 +124,9 @@
     "embedded": true,
     "finalUrl": "https://www.americanexpress.com/us/credit-cards/",
     "hash": "0b93d540e9d72490dfc6a19c348a48ce573528756ce6285cdf745c6d14daf4b6",
-    "lastStatus": "ok",
+    "lastStatus": "needs-browser",
     "textChars": 202351,
-    "url": "https://www.americanexpress.com/us/credit-cards/card/amex-everyday/"
+    "url": "https://global.americanexpress.com/card-benefits/view-all/amex-everyday"
   },
   "american-express-everyday-preferred": {
     "changedAt": "2026-11-14",
