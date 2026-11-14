@@ -113,6 +113,34 @@ class AddedRuleTests(ReviewCase):
         self.assertEqual([r["rate"] for r in self.accepted(cand)], [4])
 
 
+class FixSeveralCategoriesTests(ReviewCase):
+    QUOTE = "You can also get 5X points on all flights booked on AmexTravel.com."
+    PAGE = "Platinum\n" + QUOTE
+
+    def flights(self) -> dict:
+        return candidate(rule(categories=["airlines"], rate=5, unit="per-dollar", requires=["issuer-booking"], quote=self.QUOTE))
+
+    def fix(self, cand, vouch):
+        key = review.rule_key(cand["cardId"], cand["rules"][0])
+        return review.edit(cand, key, {"categories": ["airlines", "hotels"]}, self.PAGE, self.path, "2026-11-14", vouch)
+
+    def test_a_fix_the_quote_does_not_back_saves_nothing_and_offers_to_use_it_anyway(self):
+        cand = self.flights()
+        with self.assertRaises(review.NeedsVouching) as caught:
+            self.fix(cand, False)
+        self.assertIn("hotels", caught.exception.problem)
+        self.assertFalse(self.path.exists())
+
+    def test_several_categories_become_one_rule_each_and_the_unbacked_one_is_marked(self):
+        cand = self.flights()
+        self.fix(cand, True)
+        rows = review.card_review(cand, review.load_decisions(self.path))["rules"]
+        self.assertEqual([(r["rule"]["categories"], r["rule"]["verified"], r["added"], r["decision"]) for r in rows],
+                         [(["airlines"], "page", False, "accept"), (["hotels"], "override", True, "accept")])
+        self.assertIn("hotels", rows[1]["overrides"])
+        self.assertEqual([r["categories"] for r in self.accepted(cand)], [["airlines"], ["hotels"]])
+
+
 class PaidWithAndMerchantsTests(ReviewCase):
     PAYPAL = "Earn 3% cash back on purchases made through PayPal."
 

@@ -665,7 +665,7 @@ function reviewRule(cardId, x) {
     await openCard(cardId, true); loadOverview();
   };
   const press = (decision) => async (e) => { e.target.disabled = true; try { await send({ decision }); } catch (err) { alert(err.message); e.target.disabled = false; } };
-  const fix = () => fill(fixArea, fixArea.childNodes.length ? null : fixForm(r, (changes) => send({ decision: "edit", changes }), () => fill(fixArea)));
+  const fix = () => fill(fixArea, fixArea.childNodes.length ? null : fixForm(r, (changes, vouch) => send({ decision: "edit", changes, vouch }), () => fill(fixArea)));
   return h("div", { class: "rule" + (x.decision === "accept" ? " accepted" : x.decision === "reject" ? " rejected" : "") },
     h("div", { class: "head" }, h("span", { class: "rate", text: rateText(r) }), h("span", { class: "kind", text: ruleKind(r) })),
     h("div", { class: "small", style: "margin-top: 4px" },
@@ -701,8 +701,8 @@ function fixForm(r, save, cancel) {
   const paysWith = h("input", { type: "text", value: r.paysWith || "", placeholder: "PayPal, Apple Pay", style: "width: 160px" });
   const merchants = h("input", { type: "text", value: (r.merchants || []).join(", "), placeholder: "Amazon, Costco", style: "width: 240px" });
   unit.value = r.unit; capPeriod.value = r.capPeriod || ""; tier.value = r.tier || "";
-  const submit = async (e) => {
-    e.target.disabled = true; fill(error);
+  const submit = (vouch) => async (e) => {
+    const button = e.target; button.disabled = true; fill(error);
     const cap = capAmount.value === "" ? null : +capAmount.value;
     try {
       await save({
@@ -710,17 +710,21 @@ function fixForm(r, save, cancel) {
         capAmount: cap, capPeriod: cap == null ? null : capPeriod.value || null,
         requires: reqs.filter((b) => b.checked).map((b) => b.value), tier: tier.value || null,
         paysWith: paysWith.value.trim() || null, merchants: merchants.value.split(",").map((m) => m.trim()).filter(Boolean),
-      });
-    } catch (err) { fill(error, h("div", { class: "result bad", text: err.message })); e.target.disabled = false; }
+      }, vouch);
+    } catch (err) {
+      fill(error, h("div", { class: "result bad", text: err.message }),
+        err.canVouch ? h("div", { class: "row" }, h("button", { type: "button", class: "danger", text: "Use it anyway", title: "You've checked the page: saves it as written, marked as used against the checks", onclick: submit(true) })) : null);
+      button.disabled = false;
+    }
   };
   return h("div", { class: "fix" },
-    h("div", { class: "small muted", text: r.selection === "fixed" ? "A fixed rate has one category, or none if it's for a way of paying or named merchants." : `This rule is "${r.selection}": tick every category it offers.` }),
+    h("div", { class: "small muted", text: r.selection === "fixed" ? "A fixed rate has one category, or none if it's for a way of paying or named merchants. Tick several and it becomes one rule per category." : `This rule is "${r.selection}": tick every category it offers.` }),
     h("div", { class: "cats" }, cat.categories.map((c, i) => h("label", { title: c.help }, cats[i], c.label))),
     h("div", { class: "row" }, h("label", {}, "Rate ", rate), h("label", {}, "Unit ", unit), h("label", {}, "Cap $ ", capAmount), h("label", {}, "per ", capPeriod), h("label", {}, "Tier ", tier)),
     h("div", { class: "reqs" }, "Requires: ", cat.requires.map((q, i) => h("label", {}, reqs[i], q)), h("label", {}, "paying with ", paysWith)),
     h("div", { class: "row" }, h("label", {}, "Only at ", merchants)),
     error,
-    h("div", { class: "row" }, h("button", { type: "button", class: "primary", text: "Save and accept", onclick: submit }), h("button", { type: "button", text: "Cancel", onclick: cancel })));
+    h("div", { class: "row" }, h("button", { type: "button", class: "primary", text: "Save and accept", onclick: submit(false) }), h("button", { type: "button", text: "Cancel", onclick: cancel })));
 }
 
 // A rule a person adds (the model missed it) or uses although the checks rejected it: every field of a rule, and its quote.

@@ -88,8 +88,8 @@ def empty_candidate(card_id: str) -> dict:
 class NeedsVouching(ValueError):
     """The checks don't back a rule a person gave: `problem` says why. The person may still use it, saying so."""
 
-    def __init__(self, problem: str) -> None:
-        super().__init__(f"The checks don't back this rule: {problem}")
+    def __init__(self, problem: str, message: str | None = None) -> None:
+        super().__init__(message or f"The checks don't back this rule: {problem}")
         self.problem = problem
 
 
@@ -209,10 +209,15 @@ def add_rule(card: dict, candidate: dict | None, fields: dict, page_text: str | 
     return decisions
 
 
-def edit(candidate: dict, key: str, changes: dict, page_text: str | None, path: Path = DECISIONS, today: str = "") -> dict:
+def edit(candidate: dict, key: str, changes: dict, page_text: str | None, path: Path = DECISIONS, today: str = "",
+         vouch: bool = False) -> dict:
     """Fix what one of the candidate's rules says (EDITABLE fields only) and accept the fixed rule. It is checked
     like any proposal, against `page_text` when there is one; a hand-entered rule whose quote the page doesn't
-    confirm is checked without it, as it was entered. ValueError, and nothing saved, if the fix doesn't hold."""
+    confirm is checked without it, as it was entered. A fixed rule given several categories is one rule per category
+    with the same quote, as the extraction does it: the first replaces this rule and the others are added beside it
+    (add_rule's "added"), each checked on its own. If the checks don't back a rule, NeedsVouching says why and nothing
+    is saved; the same call with `vouch` true saves it as verified "override" with the reason, as add_rule does. Only a
+    rule that couldn't be stored at all is refused (ValueError)."""
     decisions = load_decisions(path)
     rule = _find(candidate, key, decisions)
     if rule.get("verified") == "calendar":
@@ -222,22 +227,45 @@ def edit(candidate: dict, key: str, changes: dict, page_text: str | None, path: 
     proposal = {field: rule.get(field) for field in extract.RULE_SCHEMA["required"] if field != "quote"}
     proposal.update(changes, quote=rule["evidence"]["quote"])
     page_norm, rows = (extract.normalize(page_text), extract.tier_rows(page_text)) if page_text else (None, None)
-    problem = extract.validate_rule(proposal, page_norm, rows)
-    verified = "page"
-    if rule.get("verified") == "override":  # a person vouched for it: only its shape is checked again
-        problem, verified = extract.validate_rule(proposal, None, vouched=True), "override"
-    elif problem and page_norm is not None and rule.get("verified") == "manual":
-        problem, verified = extract.validate_rule(proposal, None), "manual"
-    if problem:
-        raise ValueError(f"The quote doesn't back that change: {problem}")
-    edited = extract.candidate_rule(proposal, rule["evidence"]["url"], rule["evidence"]["pageHash"],
-                                    verified if page_norm or verified == "override" else rule["verified"])
-    mine = {k: v for k, v in decisions.get(candidate["cardId"], {}).get(key, {}).items() if k in ADDED_FIELDS}
-    decisions.setdefault(candidate["cardId"], {})[key] = {
-        **mine, "decision": "accept", "decidedAt": today, "rule": describe(edited), "quote": rule["evidence"]["quote"], "edited": edited,
-    }
+    categories = proposal.get("categories")
+    parts = [proposal]
+    if proposal.get("selection") == "fixed" and isinstance(categories, list) and len(categories) > 1:
+        parts = [{**proposal, "categories": [c], "conditions": extract._conditions_about(proposal["conditions"], c)} for c in categories]
+    judged = [_edit_verdict(part, rule, page_norm, rows, vouch) for part in parts]  # nothing is saved unless every part holds
+    card_decisions = decisions.setdefault(candidate["cardId"], {})
+    mine = {k: v for k, v in card_decisions.get(key, {}).items() if k in ADDED_FIELDS}
+    for number, (part, (verified, reason)) in enumerate(zip(parts, judged)):
+        made = extract.candidate_rule(part, rule["evidence"]["url"], rule["evidence"]["pageHash"],
+                                      verified if page_norm or verified == "override" else rule["verified"])
+        entry = {"decision": "accept", "decidedAt": today, "rule": describe(made), "quote": rule["evidence"]["quote"]}
+        if number == 0:
+            card_decisions[key] = {**mine, **entry, "edited": made, **({"overrides": reason} if reason else {})}
+        else:
+            card_decisions[rule_key(candidate["cardId"], made)] = {**entry, "added": made, **({"overrides": reason} if reason else {})}
     fetch.write_json(path, decisions)
     return decisions
+
+
+def _edit_verdict(part: dict, rule: dict, page_norm: str | None, rows: dict | None, vouch: bool) -> tuple[str, str | None]:
+    """(how a fixed rule is verified, why the checks didn't back it or None) for one rule a fix makes. NeedsVouching when
+    they don't and the person hasn't vouched; ValueError when it can't be stored whatever they say."""
+    if rule.get("verified") == "override":  # a person vouched for it: only its shape is checked again
+        problem = extract.validate_rule(part, None, vouched=True)
+        if problem:
+            raise ValueError(problem)
+        return "override", None
+    problem = extract.validate_rule(part, page_norm, rows)
+    verified = "page"
+    if problem and page_norm is not None and rule.get("verified") == "manual":
+        problem, verified = extract.validate_rule(part, None), "manual"
+    if not problem:
+        return verified, None
+    shape = extract.validate_rule(part, None, vouched=True)
+    if shape:
+        raise ValueError(shape)
+    if not vouch:
+        raise NeedsVouching(problem, f"The quote doesn't back that change: {problem}")
+    return "override", problem
 
 
 def _find(candidate: dict, key: str, decisions: dict | None = None) -> dict:

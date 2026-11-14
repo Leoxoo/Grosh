@@ -472,7 +472,7 @@ class App:
             changes = body.get("changes")
             if not isinstance(changes, dict):
                 raise Problem("An edit needs the changes")
-            decisions = review.edit(candidate, key, changes, page_text, self.paths.decisions, today)
+            decisions = review.edit(candidate, key, changes, page_text, self.paths.decisions, today, body.get("vouch") is True)
         else:
             decisions = review.decide(candidate, key, decision, self.paths.decisions, today)
         return {**review.card_review(candidate, decisions), "name": card["name"], "issuer": card["issuer"]}
