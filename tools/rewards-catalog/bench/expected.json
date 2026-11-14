@@ -1,0 +1,30 @@
+{
+  "american-express-blue-cash-everyday": [
+    {"categories": ["groceries"], "selection": "fixed", "rate": 3, "capAmount": 6000, "capPeriod": "year"},
+    {"categories": ["online-shopping"], "selection": "fixed", "rate": 3, "capAmount": 6000, "capPeriod": "year"},
+    {"categories": ["gas"], "selection": "fixed", "rate": 3, "capAmount": 6000, "capPeriod": "year"},
+    {"categories": ["everything-else"], "selection": "fixed", "rate": 1}
+  ],
+  "capital-one-savor": [
+    {"categories": ["dining"], "selection": "fixed", "rate": 3},
+    {"categories": ["groceries"], "selection": "fixed", "rate": 3},
+    {"categories": ["streaming"], "selection": "fixed", "rate": 3},
+    {"categories": ["travel"], "selection": "fixed", "rate": 5, "requires": ["issuer-booking"]},
+    {"categories": ["everything-else"], "selection": "fixed", "rate": 1}
+  ],
+  "chase-freedom-flex": [
+    {"categories": ["dining"], "selection": "fixed", "rate": 3},
+    {"categories": ["drugstores"], "selection": "fixed", "rate": 3},
+    {"categories": ["travel"], "selection": "fixed", "rate": 5, "requires": ["issuer-booking"]},
+    {"categories": ["everything-else"], "selection": "fixed", "rate": 1},
+    {"categories": [], "selection": "rotating", "rate": 5, "capAmount": 1500, "capPeriod": "quarter", "requires": ["activation"]}
+  ],
+  "discover-discover-it": [
+    {"categories": ["everything-else"], "selection": "fixed", "rate": 1},
+    {"categories": [], "selection": "rotating", "rate": 5, "requires": ["activation"]}
+  ],
+  "goldman-sachs-apple-card": [
+    {"categories": [], "selection": "fixed", "rate": 2, "paysWith": "Apple Pay"},
+    {"categories": ["everything-else"], "selection": "fixed", "rate": 1}
+  ]
+}

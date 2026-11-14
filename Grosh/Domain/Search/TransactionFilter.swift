@@ -68,6 +68,7 @@ nonisolated struct TransactionFilter: Equatable {
                     || transaction.note.localizedStandardContains(query)
                     || transaction.withName.localizedStandardContains(query)
                     || transaction.category?.name.localizedStandardContains(query) == true
+                    || transaction.card?.name.localizedStandardContains(query) == true
                     || amount?.matches(cents: transaction.amountCents) == true)
         }
     }

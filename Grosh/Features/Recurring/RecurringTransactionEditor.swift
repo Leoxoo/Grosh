@@ -119,7 +119,10 @@ private struct RecurringForm: View {
             if draft.kind == .subscription {
                 PhotoField(shape: .appIcon, data: $draft.iconData)
             }
-            CardPicker(title: Strings.Common.card, wallet: draft.wallet, selection: $draft.card)
+            CardPicker(
+                title: Strings.Common.card, wallet: draft.wallet, category: draft.category, day: draft.startDay,
+                selection: $draft.card
+            )
             fields.noteField($draft.note)
             DayStepper(title: Strings.Recurring.starts, day: $draft.startDay)
         } footer: {

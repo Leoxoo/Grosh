@@ -65,6 +65,7 @@ struct CategoryCatalog {
             sortOrder: try nextOrder(of: draft.type, under: draft.parent),
             ownKind: draft.ownKind
         )
+        category.ownRewardsAs = draft.storedRewardsAs
         context.insert(category)
         return category
     }
@@ -91,6 +92,7 @@ struct CategoryCatalog {
         category.symbolName = draft.symbolName
         category.color = draft.color
         category.ownKind = draft.ownKind
+        category.ownRewardsAs = draft.storedRewardsAs
         if isRetyped || draft.parent != category.parent {
             category.sortOrder = try nextOrder(of: draft.type, under: draft.parent)
             category.parent = draft.parent
@@ -98,6 +100,9 @@ struct CategoryCatalog {
         if isRetyped {
             for retyped in [category] + children {
                 retyped.type = draft.type
+                if draft.type != .expense {
+                    retyped.ownRewardsAs = nil
+                }
             }
         }
         try context.save()

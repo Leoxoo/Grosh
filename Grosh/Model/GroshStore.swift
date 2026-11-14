@@ -9,7 +9,7 @@ enum GroshStore {
     /// The user's data: what sync, once it is switched on, carries between their devices (ADR-0001).
     static let synced: [any PersistentModel.Type] = [
         Wallet.self, Category.self, Card.self, Transaction.self, Reimbursement.self, RecurringTransaction.self,
-        Person.self, ExpectedReimbursement.self,
+        Person.self, ExpectedReimbursement.self, OwnRewardCategory.self, StoreMilestone.self,
     ]
 
     /// What each device works out for itself from the synced models and must never sync: the saved month totals, their

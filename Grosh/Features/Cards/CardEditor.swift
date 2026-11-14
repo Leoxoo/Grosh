@@ -1,14 +1,19 @@
 import SwiftData
 import SwiftUI
 
-/// Adds a Card or edits one. Editing also archives, merges or deletes it.
+/// Adds a Card or edits one: its details, and the rewards catalog card it is. Editing also archives, merges or deletes
+/// it.
 struct CardEditor: View {
     let mode: EditorMode<Card>
+    /// The draft a new Card starts as, such as one linked to the catalog entry the user picked.
+    var newDraft = CardDraft.new
+
+    @Environment(\.rewardsCatalog) private var catalog
 
     var body: some View {
         MadeOnce {
             (
-                draft: mode.editing.map { CardDraft($0) } ?? CardDraft.new,
+                draft: mode.editing.map { CardDraft($0, catalog: catalog) } ?? newDraft,
                 hasTransactions: mode.editing.map { card in
                     Log.store.attempt("Counting a Card's transactions") { try card.hasTransactions() } ?? true
                 } ?? false
@@ -33,12 +38,20 @@ private struct CardForm: View {
     @State private var draft: CardDraft
     @State private var isMerging = false
     @State private var isConfirmingDelete = false
+    @State private var isChoosingCatalogCard = false
+    /// The catalog card the user picked to change to, while they confirm.
+    @State private var changingTo: CatalogCard?
+    /// The Point value as typed. The draft takes each change as it is typed, so Save never misses one; text that isn't
+    /// a number makes it 0, which the Card rules refuse.
+    @State private var pointValueText: String
+    @Environment(\.rewardsCatalog) private var catalog
     private let saver = SheetSaver(Strings.Cards.couldntSave)
 
     init(mode: EditorMode<Card>, startingDraft: CardDraft, hasTransactions: Bool) {
         self.mode = mode
         self.hasTransactions = hasTransactions
         _draft = State(initialValue: startingDraft)
+        _pointValueText = State(initialValue: CardRateText.number(startingDraft.pointValueCents))
     }
 
     /// The Card being edited, until it is merged away or deleted (the sheet may draw once more while closing).
@@ -91,6 +104,8 @@ private struct CardForm: View {
                     statementSection
                 }
 
+                rewardsSection
+
                 Section {
                     PaletteColorGrid(selection: $draft.color)
                         .disabled(draft.imageData != nil)
@@ -124,6 +139,33 @@ private struct CardForm: View {
                 if let card = editedCard {
                     CardMergeView(source: card) { dismiss() }
                 }
+            }
+            .sheet(isPresented: $isChoosingCatalogCard) {
+                CatalogCardSearchSheet { entry in
+                    guard entry != draft.catalogCard else { return }
+                    if draft.catalogCard == nil {
+                        draft.catalogCard = entry
+                    } else {
+                        changingTo = entry
+                    }
+                }
+            }
+            .confirmationDialog(
+                Strings.Rewards.changeTo(changingTo?.name ?? ""),
+                isPresented: Binding(get: { changingTo != nil }, set: { if !$0 { changingTo = nil } }),
+                titleVisibility: .visible,
+                presenting: changingTo
+            ) { entry in
+                Button(Strings.Rewards.change) { draft.catalogCard = entry }
+            } message: { _ in
+                if draft.editedRatesRemovedByChange > 0 {
+                    Text(Strings.Rewards.changeRemovesEditedRates(draft.editedRatesRemovedByChange))
+                } else {
+                    Text(Strings.Rewards.changeCatalogCardMessage)
+                }
+            }
+            .onChange(of: pointValueText) {
+                draft.pointValueCents = CardRateText.parseNumber(pointValueText) ?? 0
             }
             .failureAlert(saver)
         }
@@ -160,6 +202,40 @@ private struct CardForm: View {
                 Text(Strings.Cards.statementDayFooter)
             } else {
                 Text(Strings.Cards.addStatementDayFooter)
+            }
+        }
+    }
+
+    /// The catalog card this Card is, with Change catalog card and Unlink, and the Point value of a points or miles
+    /// card; or, for a Card not linked yet, Add rewards.
+    private var rewardsSection: some View {
+        Section {
+            if let entry = draft.catalogCard {
+                CatalogCardLabel(card: entry, isNoLongerInCatalog: catalog.card(entry.id) == nil)
+                Button(Strings.Rewards.changeCatalogCard) { isChoosingCatalogCard = true }
+                Button(Strings.Rewards.unlink, role: .destructive) { draft.catalogCard = nil }
+                if draft.offersPointValue {
+                    LabeledContent(Strings.Rewards.pointValue) {
+                        HStack(spacing: 2) {
+                            TextField(Strings.Rewards.pointValue, text: $pointValueText)
+                                .multilineTextAlignment(.trailing)
+                                #if os(iOS)
+                                .keyboardType(.decimalPad)
+                                #endif
+                            Text(verbatim: "¢")
+                        }
+                    }
+                }
+            } else {
+                Button(Strings.Rewards.addRewards) { isChoosingCatalogCard = true }
+            }
+        } header: {
+            Text(Strings.Rewards.rewardsCard)
+        } footer: {
+            if draft.catalogCard == nil {
+                Text(Strings.Rewards.linkFooter)
+            } else if draft.offersPointValue {
+                Text(Strings.Rewards.pointValueFooter)
             }
         }
     }
