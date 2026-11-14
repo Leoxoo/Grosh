@@ -52,8 +52,6 @@ nonisolated struct CardRewards {
     let rewardKind: RewardKind
     /// A Custom card's rates, or a linked Card's Edited rates and removals.
     let enteredRates: [EnteredRate]
-    /// The rotating quarters the user marked Activated, by first day.
-    let activatedQuarters: Set<String>
     /// Your choice per rate, by ``CatalogRule/choiceKey``.
     let yourChoices: [String: [String]]
 
@@ -69,7 +67,6 @@ nonisolated struct CardRewards {
         pointValueCents = card.pointValueCents
         rewardKind = entry?.rewardKind ?? card.ownRewardKind ?? .cashback
         enteredRates = card.enteredRates
-        activatedQuarters = card.activatedQuarters
         yourChoices = card.yourChoices
     }
 

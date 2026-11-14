@@ -1,9 +1,10 @@
 import SwiftData
 import SwiftUI
 
-/// The top of a Card's page: what the Card earns, one row per Reward category, best first and Everything else last,
-/// then its rotating quarters with their Activated switches, its rates on Your choice or the top category, and the
-/// rates it earns only when paid a certain way or at certain merchants. A points or miles Card shows each rate's
+/// The top of a Card's page: what a purchase in each Reward category earns with the Card, every bonus that covers it
+/// counted and added up when the card's Bonuses add up, best first and Everything else last; its rates on Your choice or
+/// the top category; and the rates it earns only when paid a certain way or at certain merchants. Then the current
+/// rotating quarter, its dates and days left first, and the next one. A points or miles Card shows each rate's
 /// Multiplier as a pill, and an Edited rate says so. A row opens its details. A Card that isn't linked offers Add
 /// rewards, which links it to the catalog; the pencil opens the rate editor.
 struct CardRewardsSection: View {
@@ -20,72 +21,74 @@ struct CardRewardsSection: View {
         let rewards = CardRewards(of: card, in: catalog)
         let own = ownRewardCategories.map(RewardCategory.init)
         let page = rewards.page(on: today, own: own)
-        let rates = page.rates
         let currencyCode = card.payingWallet.currencyCodeOrDefault
-        Section {
-            if rewards.entry == nil {
-                Button {
-                    isLinking = true
-                } label: {
-                    HStack {
-                        Text(Strings.Rewards.addRewards)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-                .tint(.primary)
-            }
-            if let entry = rewards.entry, rates.isEmpty || rewards.isNoLongerInCatalog {
-                CatalogCardLabel(card: entry, isNoLongerInCatalog: rewards.isNoLongerInCatalog)
-            }
-            ForEach(rates) { rate in
-                NavigationLink {
-                    CardRateDetailView(rate: rate, rewards: rewards, currencyCode: currencyCode)
-                } label: {
-                    CardRateRow(rate: rate)
-                }
-            }
-            ForEach(page.quarters) { quarter in
-                QuarterRow(quarter: quarter, isActivated: activated(quarter))
-            }
-            ForEach(page.choices) { choice in
-                if choice.isTopSpend && choice.chosen.isEmpty {
-                    // Only a top-spend rate with no Your choice reads the Card's spending this period.
-                    TopSpendRow(card: card, choiceKey: choice.key, today: today, own: own)
-                } else {
-                    NavigationLink {
-                        YourChoiceView(card: card, choice: choice)
+        Group {
+            Section {
+                if rewards.entry == nil {
+                    Button {
+                        isLinking = true
                     } label: {
-                        ChoiceRow(choice: choice)
+                        HStack {
+                            Text(Strings.Rewards.addRewards)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .tint(.primary)
+                }
+                if let entry = rewards.entry, page.earned.isEmpty || rewards.isNoLongerInCatalog {
+                    CatalogCardLabel(card: entry, isNoLongerInCatalog: rewards.isNoLongerInCatalog)
+                }
+                ForEach(page.earned) { earning in
+                    NavigationLink {
+                        EarnedRateDetailView(earning: earning, rewards: rewards, currencyCode: currencyCode)
+                    } label: {
+                        EarnedRateRow(earning: earning)
                     }
                 }
-            }
-            if let rotating = page.rotatingWithoutQuarter {
-                ConditionalRow(text: Strings.Rewards.onRotatingCategories(CardRateText.percent(rotating.effectiveRate)))
-            }
-            ForEach(Array(page.conditional.enumerated()), id: \.offset) { _, rate in
-                NavigationLink {
-                    CardRateDetailView(rate: rate, rewards: rewards, currencyCode: currencyCode)
-                } label: {
-                    ConditionalRow(text: CardRateText.condition(of: rate))
+                ForEach(page.choices) { choice in
+                    if choice.isTopSpend && choice.chosen.isEmpty {
+                        // Only a top-spend rate with no Your choice reads the Card's spending this period.
+                        TopSpendRow(card: card, choiceKey: choice.key, today: today, own: own)
+                    } else {
+                        NavigationLink {
+                            YourChoiceView(card: card, choice: choice)
+                        } label: {
+                            ChoiceRow(choice: choice)
+                        }
+                    }
+                }
+                if let rotating = page.rotatingWithoutQuarter {
+                    ConditionalRow(text: Strings.Rewards.onRotatingCategories(CardRateText.percent(rotating.effectiveRate)))
+                }
+                ForEach(Array(page.conditional.enumerated()), id: \.offset) { _, rate in
+                    NavigationLink {
+                        CardRateDetailView(rate: rate, rewards: rewards, currencyCode: currencyCode)
+                    } label: {
+                        ConditionalRow(text: CardRateText.condition(of: rate))
+                    }
+                }
+            } header: {
+                HStack {
+                    Text(Strings.Rewards.rewards)
+                    Spacer()
+                    Button {
+                        isEditingRates = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .accessibilityLabel(Strings.Rewards.editRates)
+                    }
+                }
+            } footer: {
+                if rewards.isNoLongerInCatalog {
+                    Text(Strings.Rewards.noLongerInCatalogFooter)
                 }
             }
-        } header: {
-            HStack {
-                Text(Strings.Rewards.rewards)
-                Spacer()
-                Button {
-                    isEditingRates = true
-                } label: {
-                    Image(systemName: "pencil")
-                        .accessibilityLabel(Strings.Rewards.editRates)
-                }
-            }
-        } footer: {
-            if rewards.isNoLongerInCatalog {
-                Text(Strings.Rewards.noLongerInCatalogFooter)
+
+            ForEach(page.quarters) { quarter in
+                QuarterSection(quarter: quarter, today: today)
             }
         }
         .sheet(isPresented: $isLinking) {
@@ -100,61 +103,123 @@ struct CardRewardsSection: View {
         }
         .errorAlert(Strings.Cards.couldntChange, message: $errorMessage)
     }
-
-    /// The quarter's Activated switch, which saves as it is flipped.
-    private func activated(_ quarter: QuarterRate) -> Binding<Bool> {
-        Binding(
-            get: { quarter.isActivated },
-            set: { isOn in
-                Log.store.perform("Marking a quarter Activated", errorMessage: &errorMessage) {
-                    try card.setActivated(quarter.start, isOn)
-                }
-            }
-        )
-    }
 }
 
-/// A rotating quarter: "5% Groceries, Dining · Oct–Dec", what it needs or its cap under it, and its Activated switch
-/// when the bank asks for one.
-private struct QuarterRow: View {
-    let quarter: QuarterRate
-    @Binding var isActivated: Bool
+/// What a purchase in one Reward category earns: the Multiplier pill for a points or miles Card, the category, Edited
+/// when the user changed a rate in it, the Effective rate on the right, and how it adds up under it ("1% base + 2% +
+/// 4% Oct–Dec") or which quarter it is.
+private struct EarnedRateRow: View {
+    let earning: PurchaseEarning
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
+            if let multiplier = earning.multiplier {
+                Text(Strings.Rewards.multiplier(CardRateText.number(multiplier)))
+                    .monospacedDigit()
+                    .capsuleBadge(.tint, on: .accentColor)
+            }
             VStack(alignment: .leading, spacing: 2) {
-                Text(Strings.Rewards.quarter(
-                    CardRateText.percent(quarter.rate.effectiveRate), quarter.rewards.map(\.name).formatted(.list(type: .and)),
-                    CardRateText.months(from: quarter.from, to: quarter.to)
-                ))
-                Text(detail)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text(earning.reward.name)
+                    if earning.isEdited {
+                        Text(Strings.Rewards.edited)
+                            .capsuleBadge(.secondary, on: .secondary)
+                    }
+                }
+                if let detail = CardRateText.breakdown(of: earning) {
+                    Text(detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
             Spacer()
-            if quarter.needsActivation {
-                Toggle(Strings.Rewards.activated, isOn: $isActivated)
-                    .labelsHidden()
-            }
+            Text(CardRateText.percent(earning.effectiveRate))
+                .monospacedDigit()
+                .fontWeight(.semibold)
         }
         .accessibilityElement(children: .combine)
     }
+}
 
-    private var detail: String {
-        var parts: [String] = []
-        if quarter.needsActivation && !quarter.isActivated {
-            parts.append(String(localized: Strings.Rewards.activateToEarn(CardRateText.percent(quarter.rate.effectiveRate))))
-        } else if !quarter.isCurrent {
-            parts.append(String(localized: Strings.Rewards.datesFrom(CardRateText.day(quarter.from))))
-        } else if let cap = quarter.rate.cap.flatMap({ CardRateText.cap($0, currencyCode: $0.currencyCode ?? "USD") }) {
-            parts.append(cap)
-        } else {
-            parts.append(String(localized: Strings.Rewards.earning))
+/// What a purchase in one Reward category earns, how it adds up, and each rate it is made of, which opens its details.
+private struct EarnedRateDetailView: View {
+    let earning: PurchaseEarning
+    let rewards: CardRewards
+    let currencyCode: String
+
+    var body: some View {
+        List {
+            Section {
+                LabeledContent(Strings.Rewards.effectiveRate) {
+                    Text(CardRateText.percent(earning.effectiveRate))
+                        .monospacedDigit()
+                        .fontWeight(.semibold)
+                }
+            } footer: {
+                if earning.isAddedUp {
+                    Text(Strings.Rewards.addsUpFooter)
+                }
+            }
+            Section(earning.isAddedUp ? Strings.Rewards.howItAddsUp : Strings.Rewards.rate) {
+                ForEach(Array(earning.parts.enumerated()), id: \.offset) { index, part in
+                    NavigationLink {
+                        CardRateDetailView(rate: part.rate, rewards: rewards, currencyCode: currencyCode)
+                    } label: {
+                        LabeledContent(CardRateText.partName(part, isFirst: index == 0, of: earning)) {
+                            Text(index == 0 || !earning.isAddedUp
+                                ? CardRateText.percent(part.adds) : "+" + CardRateText.percent(part.adds))
+                                .monospacedDigit()
+                        }
+                    }
+                }
+            }
         }
-        if !quarter.merchants.isEmpty {
-            parts.append(String(localized: Strings.Rewards.alsoAt(quarter.merchants.formatted(.list(type: .and)))))
+        .navigationTitle(earning.reward.name)
+    }
+}
+
+/// A rotating quarter in a section of its own: its dates in the accent color and the days left, or when it starts, its
+/// rate, each Reward category and merchant it covers, and its spending limit.
+private struct QuarterSection: View {
+    let quarter: QuarterRate
+    let today: CalendarDay
+
+    var body: some View {
+        Section {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(CardRateText.dayRange(from: quarter.from, to: quarter.to))
+                        .font(.headline)
+                        .foregroundStyle(quarter.isCurrent ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                    Text(quarter.isCurrent
+                        ? Strings.Rewards.daysLeft(quarter.daysLeft(from: today))
+                        : Strings.Rewards.datesFrom(CardRateText.day(quarter.from)))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text(CardRateText.percent(quarter.rate.effectiveRate))
+                    .font(.title3.weight(.semibold))
+                    .monospacedDigit()
+            }
+            ForEach(quarter.rewards) { reward in
+                Label(reward.name, systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(quarter.isCurrent ? .primary : .secondary)
+            }
+            ForEach(quarter.merchants, id: \.self) { merchant in
+                Label(merchant, systemImage: "checkmark.circle")
+                    .foregroundStyle(.secondary)
+            }
+            if let cap = quarter.rate.cap.flatMap({ CardRateText.cap(amountOf: $0, currencyCode: $0.currencyCode ?? "USD") }) {
+                LabeledContent(Strings.Rewards.spendingLimit, value: cap)
+            }
+        } header: {
+            Text(quarter.isCurrent ? Strings.Rewards.quarterlyBonus : Strings.Rewards.nextQuarter)
+        } footer: {
+            if quarter.needsActivation {
+                Text(Strings.Rewards.activateWithBank)
+            }
         }
-        return parts.joined(separator: " · ")
     }
 }
 

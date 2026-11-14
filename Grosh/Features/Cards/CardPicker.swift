@@ -198,8 +198,8 @@ private struct CardChoiceList: View {
 }
 
 /// What a transaction's Card choices were worked out from: a ``DrawingCache`` key, so they are worked out again when the
-/// wallet, category, picked Card, day or the user's own Reward categories change, or the store saves (an Activated
-/// quarter, Your choice, a rate or a transaction).
+/// wallet, category, picked Card, day or the user's own Reward categories change, or the store saves (Your choice, a
+/// rate or a transaction).
 private struct CardChoicesKey: Equatable {
     let wallet: PersistentIdentifier?
     let category: PersistentIdentifier?

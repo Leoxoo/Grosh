@@ -3,8 +3,8 @@ import SwiftData
 import Testing
 @testable import Grosh
 
-/// The catalog's rules that depend on more than a purchase's category: rotating quarters earned only between their
-/// dates once Activated, a rate on Your choice, a rate on the top-spend category, rates limited to a way of paying or to
+/// The catalog's rules that depend on more than a purchase's category: rotating quarters earned between their dates,
+/// a rate on Your choice, a rate on the top-spend category, rates limited to a way of paying or to
 /// merchants (shown, never earned), and Bonuses add up.
 @MainActor
 @Suite(.namedInTheLog)
@@ -66,31 +66,24 @@ struct ConditionalRateTests {
 
     // MARK: Rotating quarters
 
-    @Test func eachCurrentOrComingQuarterIsShownNotActivated() throws {
+    @Test func eachCurrentOrComingQuarterIsShown() throws {
         let (card, catalog) = try linked(Self.flex())
         let page = CardRewards(of: card, in: catalog).page(on: TestStore.today)
         #expect(page.quarters.map(\.start) == ["2026-10-01", "2027-01-01"])
         #expect(page.quarters.map { $0.rewards.map(\.id) } == [["dining", "groceries"], ["groceries", "streaming"]])
-        #expect(page.quarters.allSatisfy { !$0.isActivated && $0.needsActivation })
         #expect(page.quarters.map(\.isCurrent) == [true, false])
         #expect(page.quarters.first?.rate.cap == RateCap(amount: 1500, period: .quarter, currencyCode: "USD"))
         #expect(page.rotatingWithoutQuarter == nil)
     }
 
-    @Test func aQuarterIsEarnedOnlyOnceActivatedAndBetweenItsDates() throws {
+    @Test func aQuarterIsEarnedBetweenItsDates() throws {
         let (card, catalog) = try linked(Self.flex(stacks: false))
-        #expect(earning(card, catalog, "groceries")?.effectiveRate == 1)
-        #expect(earning(card, catalog, "groceries")?.activateFor == 5)
-        try card.setActivated("2026-10-01", true)
         #expect(earning(card, catalog, "groceries")?.effectiveRate == 5)
         #expect(earning(card, catalog, "groceries")?.reward.id == "groceries")
-        #expect(earning(card, catalog, "groceries")?.activateFor == nil)
-        #expect(earning(card, catalog, "groceries", on: day(2027, 1, 15))?.effectiveRate == 1)
-        try card.setActivated("2027-01-01", true)
+        #expect(earning(card, catalog, "groceries", on: day(2027, 1, 15))?.effectiveRate == 5)
         #expect(earning(card, catalog, "streaming", on: day(2027, 1, 15))?.effectiveRate == 5)
         #expect(earning(card, catalog, "streaming")?.effectiveRate == 1)
-        try card.setActivated("2026-10-01", false)
-        #expect(earning(card, catalog, "groceries")?.effectiveRate == 1)
+        #expect(earning(card, catalog, "gas")?.effectiveRate == 1)
     }
 
     @Test func aRotatingRuleWithNoDatedQuarterIsShownAndNeverEarned() throws {
@@ -99,14 +92,12 @@ struct ConditionalRateTests {
         #expect(page.quarters.isEmpty)
         #expect(page.rotatingWithoutQuarter?.effectiveRate == 5)
         #expect(earning(card, catalog, "groceries")?.effectiveRate == 1)
-        #expect(earning(card, catalog, "groceries")?.activateFor == nil)
     }
 
     // MARK: Bonuses add up
 
     @Test func bonusesAddUpWhenTheCardSaysSo() throws {
         let (card, catalog) = try linked(Self.flex())
-        try card.setActivated("2026-10-01", true)
         #expect(earning(card, catalog, "dining")?.effectiveRate == 7)
         #expect(earning(card, catalog, "groceries")?.effectiveRate == 5)
         #expect(earning(card, catalog, "drugstores")?.effectiveRate == 3)
@@ -116,9 +107,29 @@ struct ConditionalRateTests {
 
     @Test func otherwiseAPurchaseEarnsTheBestSingleRate() throws {
         let (card, catalog) = try linked(Self.flex(stacks: false))
-        try card.setActivated("2026-10-01", true)
         #expect(earning(card, catalog, "dining")?.effectiveRate == 5)
         #expect(earning(card, catalog, "drugstores")?.effectiveRate == 3)
+    }
+
+    @Test func theCardsPageShowsWhatEachCategoryEarnsAddedUp() throws {
+        let (card, catalog) = try linked(Self.flex())
+        let earned = CardRewards(of: card, in: catalog).page(on: TestStore.today).earned
+        #expect(earned.map(\.reward.id) == ["dining", "groceries", "drugstores", "everything-else"])
+        #expect(earned.map(\.effectiveRate) == [7, 5, 3, 1])
+        let dining = try #require(earned.first)
+        #expect(dining.parts.map(\.adds) == [1, 2, 4])
+        #expect(dining.parts.map { $0.quarter?.start } == [nil, nil, "2026-10-01"])
+        let january = CardRewards(of: card, in: catalog).page(on: day(2027, 1, 15)).earned
+        #expect(january.map(\.reward.id) == ["groceries", "streaming", "dining", "drugstores", "everything-else"])
+        #expect(january.map(\.effectiveRate) == [5, 5, 3, 3, 1])
+    }
+
+    @Test func withoutAddingUpThePageShowsTheBestSingleRate() throws {
+        let (card, catalog) = try linked(Self.flex(stacks: false))
+        let dining = try #require(CardRewards(of: card, in: catalog).page(on: TestStore.today).earned.first)
+        #expect(dining.reward.id == "dining")
+        #expect(dining.effectiveRate == 5)
+        #expect(dining.parts.map(\.adds) == [5])
     }
 
     // MARK: Your choice
@@ -216,7 +227,6 @@ struct ConditionalRateTests {
         #expect(page.quarters.isEmpty)
         #expect(page.conditional.map { $0.rule?.paysWith } == ["PayPal"])
         #expect(earning(linked, catalog, "groceries")?.effectiveRate == 1)
-        #expect(earning(linked, catalog, "groceries")?.activateFor == nil)
     }
 
     @Test func aQuartersMerchantsAreShownWithIt() throws {
@@ -229,7 +239,6 @@ struct ConditionalRateTests {
 
     @Test func aQuarterIsEarnedByThePurchasesOwnDay() throws {
         let (card, catalog) = try linked(Self.flex(stacks: false))
-        try card.setActivated("2026-10-01", true)
         #expect(earning(card, catalog, "groceries", on: day(2026, 9, 20))?.effectiveRate == 1)
         #expect(earning(card, catalog, "groceries", on: day(2026, 12, 31))?.effectiveRate == 5)
     }
@@ -264,27 +273,25 @@ struct ConditionalRateTests {
 
     // MARK: Change catalog card
 
-    @Test func changingCatalogCardRemovesActivatedQuartersAndYourChoice() throws {
+    @Test func changingCatalogCardRemovesYourChoice() throws {
         let catalog = try Fixture.catalog(cards: [Self.flex(), Self.customized])
         var draft = CardDraft.new(from: try #require(catalog.card("test-customized")))
         draft.payingWallet = store.checking
         let card = try Card.create(draft, in: store.context)
         let key = try #require(CardRewards(of: card, in: catalog).page(on: TestStore.today).choices.first?.key)
         try card.setYourChoice(["gas"], for: key, in: catalog)
-        try card.setActivated("2026-10-01", true)
         try card.link(to: try #require(catalog.card("test-flex")))
-        #expect(card.activatedQuarters.isEmpty)
         #expect(card.yourChoices.isEmpty)
     }
 
     // MARK: The Card picker
 
-    @Test func thePickerSaysWhatActivatingWouldEarn() throws {
-        let (card, catalog) = try linked(Self.flex(stacks: false))
+    @Test func thePickerSaysWhatACategoryEarnsAddedUp() throws {
+        let (card, catalog) = try linked(Self.flex())
         try RewardCategories(context: store.context).setRewardsAs(of: try store.category("Products"), to: "groceries")
         let order = CardEarning.ordered(
             [card], for: try store.category("Products"), in: catalog, own: [], on: TestStore.today, spending: { _ in [:] }
         )
-        #expect(order.first?.detail == "1% · Activate for 5%")
+        #expect(order.first?.detail == "5% · Groceries")
     }
 }

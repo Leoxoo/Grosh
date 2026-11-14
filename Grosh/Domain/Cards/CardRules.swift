@@ -227,8 +227,7 @@ extension Card {
             }
             let kept = entry == nil ? enteredRates.filter { !$0.isRemoval } : catalogCardID == nil ? enteredRates : []
             try keepEnteredRates(kept)
-            // Activated quarters and Your choice belong to the old entry's rules (ADR-0014).
-            activatedQuartersRaw = nil
+            // Your choice belongs to the old entry's rules (ADR-0014).
             yourChoicesData = nil
         }
         catalogCardID = entry?.id
