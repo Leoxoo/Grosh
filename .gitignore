@@ -66,3 +66,5 @@ __pycache__/
 
 # Personal Claude Code settings, such as the local model for test fixes (docs/agents/local-fixes.md)
 .claude/settings.local.json
+.DS_Store
+tools/.DS_Store
