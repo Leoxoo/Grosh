@@ -323,7 +323,7 @@ What the app sends the developer, with the user's one-time permission, when the 
 _Avoid_: Report, log, feedback
 
 **Activated**:
-The user's mark that they activated a rotating quarter's bonus on a Card. Until then the quarter's rate is shown but not earned.
+A rotating quarter's bonus as Grosh counts it: earned on every purchase between the quarter's dates. Banks ask the cardholder to activate each quarter; Grosh shows that, and doesn't ask whether they did.
 
 **Your choice**:
 The Reward category the user picked for a rate whose category the cardholder chooses (Customized Cash) or that goes to the top-spend category (Custom Cash). A top-spend rate with no choice goes to the Reward category the Card was used most for in the statement period so far, or the calendar month when the Card has no Statement date.

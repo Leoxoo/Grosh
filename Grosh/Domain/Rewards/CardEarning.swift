@@ -9,14 +9,9 @@ nonisolated struct CardEarning: Identifiable {
 
     var id: ObjectIdentifier { ObjectIdentifier(card) }
 
-    /// The picker's second line: "3% · Dining" for cash back, "3× · 3% · Dining" for points or miles, and "1% · Activate
-    /// for 5%" when Activating a current quarter would earn more.
+    /// The picker's second line: "3% · Dining" for cash back, "3× · 3% · Dining" for points or miles.
     var detail: String? {
         guard let earning else { return nil }
-        if let activateFor = earning.activateFor {
-            return [CardRateText.percent(earning.effectiveRate), String(localized: Strings.Rewards.activateFor(CardRateText.percent(activateFor)))]
-                .joined(separator: " · ")
-        }
         let multiplier = earning.multiplier.map { String(localized: Strings.Rewards.multiplier(CardRateText.number($0))) }
         return [multiplier, CardRateText.percent(earning.effectiveRate), earning.reward.name]
             .compactMap(\.self).joined(separator: " · ")

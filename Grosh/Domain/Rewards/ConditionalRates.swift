@@ -1,26 +1,29 @@
 import Foundation
 import SwiftData
 
-/// One rotating quarter a Card's page shows: its Reward categories, its rate and its dates, earned only between them
-/// and, when it needs activating, only once the user marks it Activated.
+/// One rotating quarter a Card's page shows: its Reward categories, its rate and its dates, earned between them. Grosh
+/// counts it as activated: the bank asks the cardholder to, and the page says so.
 nonisolated struct QuarterRate: Identifiable, Hashable, Sendable {
-    /// The quarter's first day as the catalog writes it (`yyyy-MM-dd`), which Activated is kept by.
+    /// The quarter's first day as the catalog writes it (`yyyy-MM-dd`).
     let start: String
     let from: CalendarDay
     let to: CalendarDay
     let rewards: [RewardCategory]
     let rate: CardRate
+    /// Whether the bank asks the cardholder to activate it.
     let needsActivation: Bool
-    let isActivated: Bool
-    /// Whether the day asked about is between its dates; otherwise it is still to come.
+    /// Whether the day asked about is between its dates, so it is earned; otherwise it is still to come.
     let isCurrent: Bool
     /// The merchants it also earns at, besides its Reward categories.
     let merchants: [String]
 
     var id: String { "\(start) \(rewards.map(\.id).joined(separator: ","))" }
 
-    /// Whether a purchase on a day between its dates earns it.
-    var isEarned: Bool { isCurrent && (isActivated || !needsActivation) }
+    /// The days left in it from `day`, the last day included.
+    func daysLeft(from day: CalendarDay) -> Int {
+        let calendar = Calendar.utcGregorian
+        return (calendar.dateComponents([.day], from: day.date(in: calendar), to: to.date(in: calendar)).day ?? 0) + 1
+    }
 }
 
 /// A rate whose Reward category the cardholder picks (Customized Cash) or that goes to the category the Card was used
@@ -61,7 +64,11 @@ nonisolated struct ChoiceRate: Identifiable, Hashable, Sendable {
 /// Your choice or the top-spend category, a rotating rate with no quarter dated yet, and rates limited to a way of
 /// paying or to merchants, which are shown and never earned.
 nonisolated struct CardRewardsPage {
+    /// The fixed rates per Reward category, each as the catalog or the user states it.
     let rates: [CardRate]
+    /// What a purchase in each Reward category the Card has a rate for earns, every bonus that covers it counted
+    /// (``CardRewards/earning(for:on:own:spending:)``), best first and Everything else last: what the page lists.
+    let earned: [PurchaseEarning]
     let quarters: [QuarterRate]
     let choices: [ChoiceRate]
     /// A rotating rate shown as "5% on rotating categories" while no quarter of it is current or coming. Never earned.
@@ -70,15 +77,33 @@ nonisolated struct CardRewardsPage {
     let conditional: [CardRate]
 }
 
-/// What a purchase counting as a Reward category earns with a Card, as the Card picker shows it.
-nonisolated struct PurchaseEarning: Hashable, Sendable {
+/// What a purchase counting as a Reward category earns with a Card, as its page and the Card picker show it.
+nonisolated struct PurchaseEarning: Identifiable, Hashable, Sendable {
     /// The Reward category whose rate it is: the purchase's own when any bonus covers it, else Everything else.
     let reward: RewardCategory
     let effectiveRate: Double
     /// Points or miles per dollar, for a points or miles Card whose every rate here is stated that way.
     let multiplier: Double?
-    /// What it would earn once a current quarter covering it is Activated, when that is more.
-    let activateFor: Double?
+    /// The rates it is made of and what each adds: the Base rate and each bonus over it when the card's Bonuses add up,
+    /// else the one best rate.
+    let parts: [EarningPart]
+
+    var id: String { reward.id }
+
+    /// Whether it is more than one rate added up.
+    var isAddedUp: Bool { parts.count > 1 }
+
+    /// Whether the user changed a rate it is made of.
+    var isEdited: Bool { parts.contains { $0.rate.isEdited } }
+}
+
+/// One rate a purchase's earning is made of, and what it adds to it.
+nonisolated struct EarningPart: Hashable, Sendable {
+    let rate: CardRate
+    /// What it adds, in percent: all of it for the Base rate or a best single rate, else what it earns over the Base.
+    let adds: Double
+    /// The rotating quarter it is, if it is one.
+    let quarter: QuarterRate?
 }
 
 /// Why Your choice was refused.
@@ -113,8 +138,16 @@ nonisolated extension CardRewards {
         let rotating = rules.first {
             $0.selection == "rotating" && $0.validFrom == nil && $0.validTo == nil && $0.isEarnableByCategory
         }
+        let fixed = rates(on: today, own: own)
+        let choices = choiceRates(on: today, own: own, spending: spending)
+        var covered = Set(fixed.map(\.reward.id))
+        covered.formUnion(quarters.filter(\.isCurrent).flatMap { $0.rewards.map(\.id) })
+        covered.formUnion(choices.flatMap { $0.earnedOn.map(\.id) })
+        let earned = RewardCategory.listed(own: own).filter { covered.contains($0.id) }
+            .compactMap { earning(for: $0.id, on: today, own: own, spending: spending) }
         return CardRewardsPage(
-            rates: rates(on: today, own: own),
+            rates: fixed,
+            earned: Self.sorted(earned),
             quarters: quarters,
             choices: choiceRates(on: today, own: own, spending: spending),
             rotatingWithoutQuarter: quarters.isEmpty ? rotating.map { rate(of: $0, on: .everythingElse) } : nil,
@@ -138,16 +171,26 @@ nonisolated extension CardRewards {
         bonuses += choiceRates(on: today, own: own, spending: spending)
             .filter { $0.earnedOn.contains { $0.id == reward } }.map(\.rate)
         let quarters = quarterRates(on: today, own: own).filter { $0.isCurrent && $0.rewards.contains { $0.id == reward } }
-        let earned = combine(base: base, bonuses: bonuses + quarters.filter(\.isEarned).map(\.rate))
-        guard let earned else { return nil }
-        let unactivated = quarters.filter { !$0.isEarned }.map(\.rate)
-        let activated = unactivated.isEmpty ? nil : combine(base: base, bonuses: bonuses + quarters.map(\.rate))
-        let covered = bonuses.count + quarters.filter(\.isEarned).count > 0
+        let sources = bonuses.map { (rate: $0, quarter: QuarterRate?.none) }
+            + quarters.map { (rate: $0.rate, quarter: Optional($0)) }
+        guard let earned = combine(base: base, bonuses: sources) else { return nil }
         let name = RewardCategory.named(reward, in: RewardCategory.listed(own: own))
         return PurchaseEarning(
-            reward: covered ? name : .everythingElse, effectiveRate: earned.effectiveRate, multiplier: earned.multiplier,
-            activateFor: activated.flatMap { $0.effectiveRate > earned.effectiveRate ? $0.effectiveRate : nil }
+            reward: sources.isEmpty ? .everythingElse : name, effectiveRate: earned.effectiveRate,
+            multiplier: earned.multiplier, parts: earned.parts
         )
+    }
+
+    /// Best Effective rate first and Everything else last; equal ones in the order given.
+    private static func sorted(_ earned: [PurchaseEarning]) -> [PurchaseEarning] {
+        earned.enumerated().sorted { lhs, rhs in
+            let lhsLast = lhs.element.reward == .everythingElse, rhsLast = rhs.element.reward == .everythingElse
+            if lhsLast != rhsLast { return rhsLast }
+            if lhs.element.effectiveRate != rhs.element.effectiveRate {
+                return lhs.element.effectiveRate > rhs.element.effectiveRate
+            }
+            return lhs.offset < rhs.offset
+        }.map(\.element)
     }
 
     /// Whether the Card has a top-spend rate with no Your choice, so its current period's spending is needed.
@@ -156,15 +199,23 @@ nonisolated extension CardRewards {
     }
 
     /// Base plus what each bonus adds over it, when the card's Bonuses add up; otherwise the best single rate.
-    private func combine(base: CardRate?, bonuses: [CardRate]) -> (effectiveRate: Double, multiplier: Double?)? {
+    private func combine(
+        base: CardRate?, bonuses: [(rate: CardRate, quarter: QuarterRate?)]
+    ) -> (effectiveRate: Double, multiplier: Double?, parts: [EarningPart])? {
         guard base != nil || !bonuses.isEmpty else { return nil }
         let baseRate = base?.effectiveRate ?? 0
-        let total = entry?.bonusesStack == true
-            ? baseRate + bonuses.map { max(0, $0.effectiveRate - baseRate) }.reduce(0, +)
-            : ([baseRate] + bonuses.map(\.effectiveRate)).max() ?? baseRate
-        let used = [base].compactMap(\.self) + bonuses
-        let inPoints = rewardKind.earnsPoints && used.allSatisfy { $0.multiplier != nil } && pointValueCents > 0
-        return (total, inPoints ? total / pointValueCents : nil)
+        var parts = base.map { [EarningPart(rate: $0, adds: baseRate, quarter: nil)] } ?? []
+        if entry?.bonusesStack == true {
+            parts += bonuses.filter { $0.rate.effectiveRate > baseRate }.map {
+                EarningPart(rate: $0.rate, adds: $0.rate.effectiveRate - baseRate, quarter: $0.quarter)
+            }
+        } else if let best = bonuses.max(by: { $0.rate.effectiveRate < $1.rate.effectiveRate }),
+                  best.rate.effectiveRate > baseRate || base == nil {
+            parts = [EarningPart(rate: best.rate, adds: best.rate.effectiveRate, quarter: best.quarter)]
+        }
+        let total = parts.map(\.adds).reduce(0, +)
+        let inPoints = rewardKind.earnsPoints && parts.allSatisfy { $0.rate.multiplier != nil } && pointValueCents > 0
+        return (total, inPoints ? total / pointValueCents : nil, parts)
     }
 
     private func quarterRates(on today: CalendarDay, own: [RewardCategory]) -> [QuarterRate] {
@@ -178,8 +229,8 @@ nonisolated extension CardRewards {
             return QuarterRate(
                 start: start, from: from, to: to, rewards: rewards,
                 rate: rate(of: rule, on: rewards.first ?? .everythingElse),
-                needsActivation: rule.requires.contains("activation"), isActivated: activatedQuarters.contains(start),
-                isCurrent: from <= today, merchants: rule.merchants
+                needsActivation: rule.requires.contains("activation"), isCurrent: from <= today,
+                merchants: rule.merchants
             )
         }.sorted { $0.from < $1.from }
     }
@@ -205,23 +256,6 @@ nonisolated extension CardRewards {
 }
 
 extension Card {
-    /// The rotating quarters the user marked Activated, by each quarter's first day as the catalog writes it.
-    var activatedQuarters: Set<String> {
-        Set((activatedQuartersRaw ?? "").split(separator: ",").map(String.init))
-    }
-
-    /// Marks the quarter starting `start` Activated, or not. Saves.
-    func setActivated(_ start: String, _ isActivated: Bool) throws {
-        var quarters = activatedQuarters
-        if isActivated {
-            quarters.insert(start)
-        } else {
-            quarters.remove(start)
-        }
-        activatedQuartersRaw = quarters.isEmpty ? nil : quarters.sorted().joined(separator: ",")
-        try saveToStore()
-    }
-
     /// Your choice for each rate it was set for, by ``CatalogRule/choiceKey``.
     var yourChoices: [String: [String]] {
         guard let yourChoicesData else { return [:] }

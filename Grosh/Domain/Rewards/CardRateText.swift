@@ -39,6 +39,38 @@ nonisolated enum CardRateText {
         return Strings.Rewards.atMerchants(on, (rate.rule?.merchants ?? []).formatted(.list(type: .or)))
     }
 
+    /// A quarter's days as "Oct 1 – Dec 31".
+    static func dayRange(from: CalendarDay, to: CalendarDay) -> String {
+        let style = Date.FormatStyle().month(.abbreviated).day()
+        return "\(from.date().formatted(style)) – \(to.date().formatted(style))"
+    }
+
+    /// How a purchase's earning adds up, under its row: "1% base + 2% + 4% Oct–Dec" when it is several rates, the
+    /// quarter ("Oct–Dec quarter") when it is one quarter's, else `nil`.
+    static func breakdown(of earning: PurchaseEarning) -> String? {
+        if earning.isAddedUp {
+            return earning.parts.enumerated().map { index, part in
+                if index == 0 && part.quarter == nil && part.rate.reward == .everythingElse {
+                    return String(localized: Strings.Rewards.baseShare(percent(part.adds)))
+                }
+                let share = percent(part.adds)
+                return part.quarter.map { "\(share) \(months(from: $0.from, to: $0.to))" } ?? share
+            }.joined(separator: " + ")
+        }
+        return earning.parts.first?.quarter.map { String(localized: Strings.Rewards.quarterBonus(months(from: $0.from, to: $0.to))) }
+    }
+
+    /// What one rate in a purchase's earning is: the Base rate, a quarter ("Oct–Dec quarter"), or its Reward category.
+    static func partName(_ part: EarningPart, isFirst: Bool, of earning: PurchaseEarning) -> String {
+        if let quarter = part.quarter {
+            return String(localized: Strings.Rewards.quarterBonus(months(from: quarter.from, to: quarter.to)))
+        }
+        if part.rate.reward == .everythingElse && earning.reward != .everythingElse {
+            return String(localized: Strings.Rewards.baseRate)
+        }
+        return part.rate.reward.name
+    }
+
     /// `day` as the user's calendar writes a date.
     static func day(_ day: CalendarDay) -> String {
         day.date().formatted(date: .abbreviated, time: .omitted)
@@ -52,6 +84,11 @@ nonisolated enum CardRateText {
         case let (nil, to?): String(localized: Strings.Rewards.datesUntil(to))
         case (nil, nil): nil
         }
+    }
+
+    /// A cap's amount alone, as "$1,500".
+    static func cap(amountOf cap: RateCap, currencyCode: String) -> String? {
+        cap.amount.map { money($0, currencyCode: currencyCode) }
     }
 
     /// A rate's cap as "Up to $1,500 a quarter", in `currencyCode`.
