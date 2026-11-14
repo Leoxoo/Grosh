@@ -2,19 +2,29 @@ import Foundation
 import SwiftData
 
 extension Transaction {
-    /// The transactions linked to this one, shown as its Related transactions: the other half of a transfer,
-    /// or a Loan or Debt and its payments. Listed newest first.
-    func related(in context: ModelContext) throws -> [Transaction] {
-        related(among: try context.fetch(linkedTransactions))
+    /// The transactions linked to this one, shown as its Related transactions: the other half of a transfer, the other
+    /// parts of a Split, a Loan or Debt and its payments, or an Expense and its paybacks into other wallets (ADR-0012).
+    /// Listed newest first.
+    func related() throws -> [Transaction] {
+        guard linkID != nil else { return [] }
+        return related(among: try storeContext().fetch(linkedTransactions))
     }
 
     /// Every transaction sharing this one's link, this one included, outside Recently Deleted; nothing when it has no
     /// link. A list made from them stays current, since a transaction linked later (such as a payment on a Loan,
     /// which leaves the Loan itself unchanged) changes what this fetches. A linked transaction in Recently Deleted
     /// is left out until it is restored, as the other half of a transfer shows as a dash.
-    var linkedTransactions: FetchDescriptor<Transaction> {
+    var linkedTransactions: FetchDescriptor<Transaction> { linked(withRecentlyDeleted: false) }
+
+    /// Every transaction sharing this one's link, this one and those in Recently Deleted included; nothing when it has
+    /// no link.
+    var linkedTransactionsWithRecentlyDeleted: FetchDescriptor<Transaction> { linked(withRecentlyDeleted: true) }
+
+    private func linked(withRecentlyDeleted: Bool) -> FetchDescriptor<Transaction> {
         guard let link = linkID else { return FetchDescriptor(predicate: #Predicate { _ in false }) }
-        return FetchDescriptor(predicate: #Predicate { $0.linkID == link && $0.deletedAt == nil })
+        return FetchDescriptor(predicate: #Predicate { transaction in
+            transaction.linkID == link && (withRecentlyDeleted || transaction.deletedAt == nil)
+        })
     }
 
     /// The Related transactions among `linked` (what ``linkedTransactions`` fetches): all but this one, newest first.

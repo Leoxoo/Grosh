@@ -4,13 +4,10 @@ import Testing
 
 /// Which days a Card's periods cover: a statement period runs from the day after one statement date through the next,
 /// and a statement date of 29–31 falls on the month's last day in shorter months. Other Cards use calendar months.
+@Suite(.namedInTheLog)
 struct CardPeriodTests {
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
     private let unitedStates = Locale(identifier: "en_US")
-
-    private func day(_ year: Int, _ month: Int, _ day: Int) -> CalendarDay {
-        CalendarDay(year: year, month: month, day: day)
-    }
 
     private func statement(on statementDay: Int, holding day: CalendarDay) -> DayRange {
         CardPeriod(containing: day, statementDay: statementDay).days

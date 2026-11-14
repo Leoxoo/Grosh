@@ -4,14 +4,15 @@ import Testing
 @testable import Grosh
 
 @MainActor
+@Suite(.namedInTheLog)
 struct CardManagementTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
     private let checking: Wallet
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
+        container = try TestStore.makeContainer()
         try CategorySeeder.seedIfNeeded(in: container.mainContext)
         checking = try Wallet.create(name: "Checking", startingBalance: Money(cents: 0), on: today, in: container.mainContext)
     }
@@ -28,31 +29,29 @@ struct CardManagementTests {
         #expect(card.statementDay == 31)
     }
 
-    @Test func aStatementDateFallsOnTheMonthsLastDayWhenTheMonthIsShorter() throws {
-        let appleCard = try Card.create(CardDraft(name: "Apple Card", kind: .credit, payingWallet: checking, statementDay: 31), in: context)
-        let chase = try Card.create(CardDraft(name: "Chase", kind: .credit, payingWallet: checking, statementDay: 15), in: context)
-        let debit = try Card.create(CardDraft(name: "Navy Federal Debit", kind: .debit, payingWallet: checking), in: context)
-
-        #expect(appleCard.statementClosingDay(year: 2026, month: 10) == CalendarDay(year: 2026, month: 10, day: 31))
-        #expect(appleCard.statementClosingDay(year: 2026, month: 4) == CalendarDay(year: 2026, month: 4, day: 30))
-        #expect(appleCard.statementClosingDay(year: 2026, month: 2) == CalendarDay(year: 2026, month: 2, day: 28))
-        #expect(appleCard.statementClosingDay(year: 2028, month: 2) == CalendarDay(year: 2028, month: 2, day: 29))
-        #expect(chase.statementClosingDay(year: 2026, month: 2) == CalendarDay(year: 2026, month: 2, day: 15))
-        #expect(debit.statementClosingDay(year: 2026, month: 2) == nil)
-    }
-
     private func allCards() throws -> [Card] {
         try context.fetch(FetchDescriptor<Card>())
     }
 
-    @Test func theStatementDateCanOnlyBeSetOnCreditCards() throws {
-        #expect(throws: CardRuleError.statementDateRequiresCredit) {
-            try Card.create(
-                CardDraft(name: "Navy Federal Debit", kind: .debit, payingWallet: checking, statementDay: 15),
-                in: context
-            )
-        }
-        #expect(try allCards().isEmpty)
+    @Test func theCardsListAndFilterKeepACardWithNoPayingWallet() throws {
+        let archived = try Card.create(CardDraft(name: "Old", kind: .debit, payingWallet: checking), in: context)
+        try archived.archive()
+        let unpaid = Card(name: "Unpaid", kind: .debit, payingWallet: nil)
+        context.insert(unpaid)
+        try context.save()
+
+        #expect(try context.fetch(Card.unarchived) == [unpaid])
+        #expect(try context.fetch(Card.archived) == [archived])
+        #expect(try Set(context.fetch(Card.listed)) == [archived, unpaid])
+    }
+
+    /// Only a Credit card has a statement; a Debit card spends straight from its wallet, so it saves no statement date.
+    @Test func aDebitCardSavesNoStatementDate() throws {
+        let card = try Card.create(
+            CardDraft(name: "Navy Federal Debit", kind: .debit, payingWallet: checking, statementDay: 15),
+            in: context
+        )
+        #expect(card.statementDay == nil)
     }
 
     @Test(arguments: [0, 32, -1])
@@ -62,22 +61,17 @@ struct CardManagementTests {
         }
     }
 
-    @Test func editingACardRefusesAStatementDateOnDebitAndLeavesTheCardAsItWas() throws {
+    @Test func turningACreditCardIntoDebitDropsItsStatementDate() throws {
         let card = try Card.create(
             CardDraft(name: "Navy Federal", kind: .credit, payingWallet: checking, statementDay: 12),
             in: context
         )
         var details = CardDraft(card)
         details.kind = .debit
-
-        #expect(throws: CardRuleError.statementDateRequiresCredit) { try card.update(with: details) }
-        #expect(card.kind == .credit)
-        #expect(card.statementDay == 12)
-
-        details.statementDay = nil
         details.name = "Navy Federal Debit"
         details.lastFourDigits = "4821"
         try card.update(with: details)
+
         #expect(card.name == "Navy Federal Debit")
         #expect(card.kind == .debit)
         #expect(card.statementDay == nil)
@@ -111,17 +105,12 @@ struct CardManagementTests {
         #expect(card.name == "Discover")
     }
 
-    @discardableResult
-    private func addCard(_ name: String, kind: CardKind = .credit, paidFrom wallet: Wallet? = nil) throws -> Card {
-        try Card.create(CardDraft(name: name, kind: kind, payingWallet: wallet ?? checking), in: context)
-    }
-
     @Test func thePickerOffersOnlyCardsPaidFromTheTransactionsWalletInTheOrderTheyWereAdded() throws {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
-        try addCard("Wells Fargo")
-        try addCard("Savings Debit", kind: .debit, paidFrom: savings)
-        try addCard("Navy Federal Debit", kind: .debit)
-        try addCard("Apple Card")
+        try context.addCard("Wells Fargo", paidFrom: checking)
+        try context.addCard("Savings Debit", kind: .debit, paidFrom: savings)
+        try context.addCard("Navy Federal Debit", kind: .debit, paidFrom: checking)
+        try context.addCard("Apple Card", paidFrom: checking)
 
         #expect(Card.pickerChoices(for: checking, keeping: nil).map(\.name) == ["Wells Fargo", "Navy Federal Debit", "Apple Card"])
         #expect(Card.pickerChoices(for: savings, keeping: nil).map(\.name) == ["Savings Debit"])
@@ -129,17 +118,14 @@ struct CardManagementTests {
     }
 
     private func addExpense(_ cents: Int, paidWith card: Card?, on day: CalendarDay? = nil) throws -> Transaction {
-        let transaction = Transaction(amount: Money(cents: -cents), day: day ?? today, wallet: nil, category: nil)
-        context.insert(transaction)
-        transaction.wallet = checking
-        transaction.category = try context.lockedCategory(.otherExpense)
-        transaction.card = card
-        return transaction
+        context.record(
+            -cents, on: day ?? today, in: checking, under: try context.lockedCategory(.otherExpense), card: card
+        )
     }
 
     @Test func anArchivedCardLeavesThePickerButStaysVisibleOnPastTransactions() throws {
-        let navyFederal = try addCard("Navy Federal")
-        let appleCard = try addCard("Apple Card")
+        let navyFederal = try context.addCard("Navy Federal", paidFrom: checking)
+        let appleCard = try context.addCard("Apple Card", paidFrom: checking)
         let lunch = try addExpense(12_76, paidWith: navyFederal)
 
         try navyFederal.archive()
@@ -153,8 +139,8 @@ struct CardManagementTests {
     }
 
     @Test func anUnarchivedCardReturnsToThePickerInItsPlace() throws {
-        let navyFederal = try addCard("Navy Federal")
-        try addCard("Apple Card")
+        let navyFederal = try context.addCard("Navy Federal", paidFrom: checking)
+        try context.addCard("Apple Card", paidFrom: checking)
         try navyFederal.archive()
 
         try navyFederal.unarchive()
@@ -163,68 +149,68 @@ struct CardManagementTests {
     }
 
     @Test func mergingMovesEveryTransactionToTheTargetCardAndRemovesTheSource() throws {
-        let nfcu = try addCard("NFCU")
-        let navyFederal = try addCard("Navy Federal")
+        let nfcu = try context.addCard("NFCU", paidFrom: checking)
+        let navyFederal = try context.addCard("Navy Federal", paidFrom: checking)
         let lunch = try addExpense(12_76, paidWith: nfcu)
         let groceries = try addExpense(84_10, paidWith: nfcu, on: CalendarDay(year: 2026, month: 9, day: 30))
         let petrol = try addExpense(40_00, paidWith: navyFederal)
 
-        try nfcu.merge(into: navyFederal, in: context)
+        try nfcu.merge(into: navyFederal)
 
         #expect(lunch.card == navyFederal)
         #expect(groceries.card == navyFederal)
         #expect(petrol.card == navyFederal)
         #expect(Set(navyFederal.transactions ?? []) == [lunch, groceries, petrol])
         #expect(try allCards().map(\.name) == ["Navy Federal"])
-        #expect(checking.balance(asOf: today) == Money(cents: -136_86))
+        #expect(walletBalance(checking, asOf: today) == Money(cents: -136_86))
     }
 
     @Test func mergingKeepsTheImageOfTheCardMergedInto() throws {
-        let nfcu = try addCard("NFCU")
-        let navyFederal = try addCard("Navy Federal")
+        let nfcu = try context.addCard("NFCU", paidFrom: checking)
+        let navyFederal = try context.addCard("Navy Federal", paidFrom: checking)
         nfcu.imageData = Data([4, 5, 6])
         navyFederal.imageData = Data([1, 2, 3])
 
-        try nfcu.merge(into: navyFederal, in: context)
+        try nfcu.merge(into: navyFederal)
 
         #expect(navyFederal.imageData == Data([1, 2, 3]))
     }
 
     @Test func aCardMergesOnlyIntoTheOtherUnarchivedCardsPaidFromTheSameWallet() throws {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
-        let nfcu = try addCard("NFCU")
-        try addCard("Savings Debit", kind: .debit, paidFrom: savings)
-        try addCard("Navy Federal")
-        try addCard("Old Amex").archive()
-        try addCard("Apple Card")
+        let nfcu = try context.addCard("NFCU", paidFrom: checking)
+        try context.addCard("Savings Debit", kind: .debit, paidFrom: savings)
+        try context.addCard("Navy Federal", paidFrom: checking)
+        try context.addCard("Old Amex", paidFrom: checking).archive()
+        try context.addCard("Apple Card", paidFrom: checking)
 
         #expect(nfcu.mergeTargets.map(\.name) == ["Navy Federal", "Apple Card"])
     }
 
     @Test func mergingIntoACardPaidFromAnotherWalletIsRefusedAndMovesNothing() throws {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
-        let nfcu = try addCard("NFCU")
-        let savingsDebit = try addCard("Savings Debit", kind: .debit, paidFrom: savings)
+        let nfcu = try context.addCard("NFCU", paidFrom: checking)
+        let savingsDebit = try context.addCard("Savings Debit", kind: .debit, paidFrom: savings)
         let lunch = try addExpense(12_76, paidWith: nfcu)
 
-        #expect(throws: CardRuleError.mergeIntoAnotherWallet) { try nfcu.merge(into: savingsDebit, in: context) }
+        #expect(throws: CardRuleError.mergeIntoAnotherWallet) { try nfcu.merge(into: savingsDebit) }
         #expect(lunch.card == nfcu)
         #expect(Set(try allCards()) == [nfcu, savingsDebit])
     }
 
     @Test func mergingIntoAnArchivedCardIsRefused() throws {
-        let nfcu = try addCard("NFCU")
-        let oldAmex = try addCard("Old Amex")
+        let nfcu = try context.addCard("NFCU", paidFrom: checking)
+        let oldAmex = try context.addCard("Old Amex", paidFrom: checking)
         try oldAmex.archive()
         let lunch = try addExpense(12_76, paidWith: nfcu)
 
-        #expect(throws: CardRuleError.mergeIntoArchived) { try nfcu.merge(into: oldAmex, in: context) }
+        #expect(throws: CardRuleError.mergeIntoArchived) { try nfcu.merge(into: oldAmex) }
         #expect(lunch.card == nfcu)
     }
 
     @Test func aCardThatPaidForTransactionsKeepsItsPayingWallet() throws {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
-        let nfcu = try addCard("NFCU")
+        let nfcu = try context.addCard("NFCU", paidFrom: checking)
         _ = try addExpense(12_76, paidWith: nfcu)
         var details = CardDraft(nfcu)
         details.payingWallet = savings
@@ -237,7 +223,7 @@ struct CardManagementTests {
 
     @Test func aCardWithoutTransactionsCanMoveToAnotherPayingWallet() throws {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
-        let unused = try addCard("PayPal")
+        let unused = try context.addCard("PayPal", paidFrom: checking)
         var details = CardDraft(unused)
         details.payingWallet = savings
 
@@ -247,25 +233,25 @@ struct CardManagementTests {
     }
 
     @Test func aCardCannotBeMergedIntoItself() throws {
-        let amex = try addCard("Amex")
+        let amex = try context.addCard("Amex", paidFrom: checking)
         let dinner = try addExpense(55_00, paidWith: amex)
 
-        #expect(throws: CardRuleError.mergeIntoItself) { try amex.merge(into: amex, in: context) }
+        #expect(throws: CardRuleError.mergeIntoItself) { try amex.merge(into: amex) }
         #expect(try allCards() == [amex])
         #expect(dinner.card == amex)
     }
 
     @Test func deletingACardThatHasTransactionsRequiresMergingFirst() throws {
-        let boa = try addCard("Bank of America")
-        let citi = try addCard("Citi")
-        let unused = try addCard("PayPal")
+        let boa = try context.addCard("Bank of America", paidFrom: checking)
+        let citi = try context.addCard("Citi", paidFrom: checking)
+        let unused = try context.addCard("PayPal", paidFrom: checking)
         let dinner = try addExpense(55_00, paidWith: boa)
 
-        #expect(throws: CardRuleError.hasTransactions) { try boa.delete(in: context) }
+        #expect(throws: CardRuleError.hasTransactions) { try boa.delete() }
         #expect(dinner.card == boa)
 
-        try unused.delete(in: context)
-        try boa.merge(into: citi, in: context)
+        try unused.delete()
+        try boa.merge(into: citi)
 
         #expect(try allCards() == [citi])
         #expect(dinner.card == citi)

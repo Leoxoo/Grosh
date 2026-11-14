@@ -4,20 +4,28 @@ import SwiftData
 /// One dated movement of money into or out of one wallet, filed under one category.
 @Model
 final class Transaction {
-    /// Signed effect on the wallet in cents: positive adds money, negative takes it away.
-    var amountCents: Int = 0
-    /// The ``CalendarDay`` as `yyyymmdd`.
-    var dayRaw: Int = 0
+    /// Signed effect on the wallet in cents: positive adds money, negative takes it away. Changed through
+    /// ``changeCounted(_:)`` (ADR-0013).
+    private(set) var amountCents: Int = 0
+    /// The ``CalendarDay`` as `yyyymmdd`. Changed through ``changeCounted(_:)`` (ADR-0013).
+    private(set) var dayRaw: Int = 0
     var note: String = ""
-    /// The person the transaction involved ("With").
+    /// The names of the transaction's ``people`` ("With"), joined with `; ` and ordered by name. A copy kept beside
+    /// them, so a list, a search or an export reads the With without reading the ``people`` relationship one
+    /// transaction at a time. ``setPeople(_:usedAt:)`` keeps it in step. Before ADR-0009 this was the With itself, a
+    /// typed name; ``Person/migrateWithNames(in:)`` turns those into people.
     var withName: String = ""
     var eventName: String = ""
     var isExcludedFromReport: Bool = false
     /// Set on a balance adjustment: the difference between the wallet's recorded and real balance. It never
     /// needs a Card, whatever its category.
     var isBalanceAdjustment: Bool = false
-    /// Transactions sharing a link are related: the two halves of a transfer, or a Loan and its Debt Collections.
-    var linkID: UUID?
+    /// Transactions sharing a link are related: the two halves of a transfer, the parts of a Split, a Loan or Debt
+    /// and what is recorded against it, or an Expense and its paybacks into other wallets. ``linkKind`` says which.
+    /// Set through ``link(_:as:)``, ``join(_:as:)`` and ``leaveLink()``, so the two never disagree (ADR-0012).
+    private(set) var linkID: UUID?
+    /// The ``LinkKind``'s raw value, `nil` while the transaction is on no link (ADR-0012).
+    private(set) var linkKindRaw: String?
     /// When the transaction was entered; orders transactions within a day.
     var createdAt: Date = Date.now
     /// On a Loan or Debt, the ``CalendarDay`` (as `yyyymmdd`) the user is reminded of it: its due date.
@@ -34,42 +42,90 @@ final class Transaction {
     var forgivenDayRaw: Int?
     var forgivenNote: String = ""
     /// When the transaction was moved to Recently Deleted, or `nil` while it isn't there. A transaction in Recently
-    /// Deleted counts in no balance, list, search or report.
-    var deletedAt: Date?
+    /// Deleted counts in no balance, list, search or report. Changed through ``changeCounted(_:)`` (ADR-0013).
+    private(set) var deletedAt: Date?
     /// Set on a transaction that went to Recently Deleted with its wallet, as part of that one item: it is restored
     /// with the wallet, never on its own.
     var deletedWithWallet: Bool = false
 
-    var wallet: Wallet?
+    /// Changed through ``changeCounted(_:)`` (ADR-0013).
+    private(set) var wallet: Wallet?
     var category: Category?
     var card: Card?
     /// The Recurring transaction that made this one, or that the user attached it to. `nil` for an ordinary one.
     var recurring: RecurringTransaction?
     /// On a forgiven Loan or Debt, the category the forgiven amount counts under in reports.
     var forgivenCategory: Category?
+    /// The people in With (ADR-0009): any number, except on a Loan or Debt, which has exactly one. Unordered in the
+    /// store; ``orderedPeople`` lists them by name. Set them with ``setPeople(_:usedAt:)``, never directly, so
+    /// ``withName`` follows.
+    var people: [Person]? = []
+    /// On an Expense, what its Reimbursements add up to in cents: zero when it has none. Kept beside them, so a balance
+    /// reads a transaction's net (``netCents``) without reading its Reimbursements one transaction at a time.
+    /// The Reimbursement rules recount it whenever one is added, edited, removed or moved, so no caller has to. Changed
+    /// through ``changeCounted(_:)`` (ADR-0013).
+    private(set) var reimbursedCents: Int = 0
+    /// On an Expense, the money paid back against it. They go with it: to Recently Deleted and back, and for good.
+    @Relationship(deleteRule: .cascade, inverse: \Reimbursement.expense)
+    var reimbursements: [Reimbursement]? = []
+    /// On a deposit moved into an Expense, the Reimbursement it became. Restoring the deposit removes it; removing the
+    /// deposit for good leaves it on the Expense.
+    @Relationship(deleteRule: .nullify, inverse: \Reimbursement.movedFrom)
+    var movedIntoReimbursements: [Reimbursement]? = []
+    /// On an Expense, what the people in With are yet to pay back (ADR-0010). They count in no balance or report, and
+    /// go with the Expense: to Recently Deleted and back, and for good.
+    @Relationship(deleteRule: .cascade, inverse: \ExpectedReimbursement.expense)
+    var expectations: [ExpectedReimbursement]? = []
+    /// On an Expense, whether money was ever paid back into another wallet against it (ADR-0010). Only an Expense with
+    /// it set reads its paybacks to work out its net in the Total (``totalViewNetCents``), so the rest never walk a
+    /// relationship. Set when the first payback is recorded, and cleared with the Expense's link once the last one is
+    /// removed for good: one waiting in Recently Deleted still holds the Expense's wallet.
+    var hasPaybacksElsewhere: Bool = false
+    /// On a payback recorded into another wallet, the Expected reimbursement it was paid against, or `nil` when no one
+    /// was expected to pay.
+    var paidExpectation: ExpectedReimbursement?
+    /// On a payback recorded into another wallet, the Expense it paid back (ADR-0010).
+    var paidBackExpense: Transaction?
+    /// On an Expense, the money paid back into other wallets against it, Recently Deleted ones included. Read through
+    /// ``paybacksElsewhere``.
+    @Relationship(deleteRule: .nullify, inverse: \Transaction.paidBackExpense)
+    var paybacks: [Transaction]? = []
 
-    init(
-        amount: Money,
-        day: CalendarDay,
-        wallet: Wallet?,
-        category: Category?,
-        card: Card? = nil,
-        note: String = ""
-    ) {
-        self.amountCents = amount.cents
+    /// A transaction in no context yet, with no wallet, category or Card.
+    /// ``insert(cents:on:wallet:category:card:note:in:)`` is how one is made.
+    private init(amountCents: Int, day: CalendarDay, note: String) {
+        self.amountCents = amountCents
         self.dayRaw = day.rawValue
-        self.wallet = wallet
-        self.category = category
-        self.card = card
         self.note = note
     }
 
-    var amount: Money { Money(cents: amountCents, currencyCode: wallet?.currencyCode ?? Money.defaultCurrencyCode) }
-
-    var day: CalendarDay {
-        get { CalendarDay(rawValue: dayRaw) }
-        set { dayRaw = newValue.rawValue }
+    /// Makes a transaction of `cents` (in `wallet`'s currency, signed as it moves the wallet) on `day` in `context`, in
+    /// `wallet`, filed under `category` and paid with `card`. It is inserted before its relationships are set:
+    /// SwiftData relates two models only once both are in the same context. Its wallet-month is marked dirty
+    /// (``changeCounted(_:)``). Doesn't save.
+    @discardableResult
+    static func insert(
+        cents: Int,
+        on day: CalendarDay,
+        wallet: Wallet?,
+        category: Category?,
+        card: Card? = nil,
+        note: String = "",
+        in context: ModelContext
+    ) -> Transaction {
+        let transaction = Transaction(amountCents: cents, day: day, note: note)
+        context.insert(transaction)
+        transaction.changeCounted { $0.wallet = wallet }
+        transaction.category = category
+        transaction.card = card
+        return transaction
     }
+
+    var amount: Money { Money(cents: amountCents, currencyCode: wallet.currencyCodeOrDefault) }
+
+    var day: CalendarDay { CalendarDay(rawValue: dayRaw) }
+
+    var isInRecentlyDeleted: Bool { deletedAt != nil }
 
     /// On a Loan or Debt, the day the user is reminded of it (its due date), or `nil` for no reminder.
     var reminderDay: CalendarDay? {
@@ -81,5 +137,125 @@ final class Transaction {
     var estimateReminderDay: CalendarDay? {
         get { estimateReminderDayRaw.map(CalendarDay.init(rawValue:)) }
         set { estimateReminderDayRaw = newValue?.rawValue }
+    }
+}
+
+extension Transaction {
+    /// What a wallet's balance counts of a transaction: its wallet, day, amount, Reimbursed total and Recently Deleted
+    /// mark. They change only together, through ``Transaction/changeCounted(_:)`` (ADR-0013).
+    struct Counted {
+        var wallet: Wallet?
+        var day: CalendarDay
+        var amountCents: Int
+        var reimbursedCents: Int
+        var deletedAt: Date?
+
+        fileprivate func isSame(as other: Counted) -> Bool {
+            wallet === other.wallet && day == other.day && amountCents == other.amountCents
+                && reimbursedCents == other.reimbursedCents && deletedAt == other.deletedAt
+        }
+    }
+
+    /// What a wallet's balance counts of the transaction now.
+    var counted: Counted {
+        Counted(
+            wallet: wallet, day: day, amountCents: amountCents, reimbursedCents: reimbursedCents, deletedAt: deletedAt
+        )
+    }
+
+    /// The one way a transaction's wallet, day, amount, Reimbursed total or Recently Deleted mark changes (ADR-0013):
+    /// `change` edits them, and the wallet-month the transaction was counted in before is marked dirty, and the one it
+    /// is counted in after, so their saved totals are counted again. A date moved from March to May marks both months,
+    /// a move to another wallet both wallets. A change that leaves them as they were marks nothing. The marks are
+    /// inserted in the transaction's context, so they go into the same save as the change. Doesn't save.
+    ///
+    /// A rule, yet it lives here in `Model/` rather than in `Domain/`: the five fields it changes are `private(set)`, so
+    /// that the compiler refuses a write anywhere else, and Swift lets only code in this file set them (ADR-0013).
+    func changeCounted(_ change: (inout Counted) -> Void) {
+        let before = counted
+        var after = before
+        change(&after)
+        guard !after.isSame(as: before) else { return }
+        markCountedMonthDirty()
+        if wallet !== after.wallet { wallet = after.wallet }
+        if dayRaw != after.day.rawValue { dayRaw = after.day.rawValue }
+        if amountCents != after.amountCents { amountCents = after.amountCents }
+        if reimbursedCents != after.reimbursedCents { reimbursedCents = after.reimbursedCents }
+        if deletedAt != after.deletedAt { deletedAt = after.deletedAt }
+        markCountedMonthDirty()
+    }
+
+    /// Marks the wallet-month the transaction counts in as dirty, unless it is marked already. A transaction in no
+    /// wallet, or in Recently Deleted, counts in none.
+    private func markCountedMonthDirty() {
+        guard deletedAt == nil, let wallet, let context = modelContext else { return }
+        let month = CalendarMonth(day)
+        // A wallet's dirty months are few, those changed since they were last counted, so looking among them is cheap.
+        // One deleted once it was counted, but not yet saved, no longer marks it.
+        guard !(wallet.dirtyMonths ?? []).contains(where: { !$0.isDeleted && $0.month == month }) else { return }
+        DirtyWalletMonth.insert(month, of: wallet, in: context)
+    }
+}
+
+/// What a link joins (ADR-0012). Every transaction on one link has the same kind.
+nonisolated enum LinkKind: String, CaseIterable, Sendable {
+    /// The two halves of a Transfer (ADR-0002).
+    case transfer
+    /// The parts of a Split (ADR-0007).
+    case split
+    /// A Loan or Debt, its Debt Collections or Repayments, and what it writes off beside them (ADR-0003).
+    case loanOrDebt
+    /// An Expense and the money paid back into other wallets against it (ADR-0010).
+    case payback
+}
+
+extension Transaction {
+    /// What the transaction's link joins, or `nil` while it is on none (ADR-0012).
+    var linkKind: LinkKind? { linkKindRaw.flatMap(LinkKind.init(rawValue:)) }
+
+    /// Puts `transactions` on one new link of `kind`, taking each off any link it was on. Doesn't save.
+    static func link(_ transactions: some Sequence<Transaction>, as kind: LinkKind) {
+        let link = UUID()
+        for transaction in transactions {
+            transaction.linkID = link
+            transaction.linkKindRaw = kind.rawValue
+        }
+    }
+
+    /// Puts this transaction on `other`'s link, which is made first, of `kind`, when `other` is on none. Doesn't save.
+    func join(_ other: Transaction, as kind: LinkKind) {
+        if other.linkID == nil {
+            Self.link([other], as: kind)
+        }
+        linkID = other.linkID
+        linkKindRaw = other.linkKindRaw
+    }
+
+    /// Takes the transaction off its link. Doesn't save.
+    func leaveLink() {
+        linkID = nil
+        linkKindRaw = nil
+    }
+
+    static var withSeparator: String { "; " }
+
+    /// The people in With, by name.
+    var orderedPeople: [Person] {
+        Self.ordered(people ?? [])
+    }
+
+    /// `people` in the order With lists them: by name.
+    static func ordered(_ people: [Person]) -> [Person] {
+        people.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    /// How With names `people`, as ``withName`` keeps it: by name, joined with ``withSeparator``.
+    static func withName(of people: [Person]) -> String {
+        ordered(people).map(\.name).joined(separator: withSeparator)
+    }
+
+    /// Makes ``withName`` the names of the people in With again, after a name changed (ADR-0009). Doesn't save.
+    func refreshWithName() {
+        withName = Self.withName(of: people ?? [])
     }
 }

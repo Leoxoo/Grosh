@@ -6,18 +6,24 @@ import SwiftUI
 /// toolbar narrows the list to one wallet's schedules. Tap one to see what it has made, swipe one to duplicate it, and
 /// add one with the plus.
 struct RecurringTransactionsView: View {
-    @Query(filter: #Predicate<RecurringTransaction> { $0.deletedAt == nil }, sort: \RecurringTransaction.createdAt)
-    private var recurring: [RecurringTransaction]
+    @Query(RecurringTransaction.notDeleted) private var recurring: [RecurringTransaction]
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     @State private var editorMode: RecurringTransactionEditor.Mode?
-    /// The wallet the list is narrowed to, or `nil` for every wallet. Each time the tab opens it shows every wallet.
+    /// The wallet the list is narrowed to, or `nil` for every wallet. Each time the screen opens it shows every wallet.
     @State private var walletFilter: Wallet?
+    /// A save can change an estimate or a Purchase's progress, so the figures are worked out anew after each one.
+    @StoreSaves private var saves
+    /// The figures of every schedule (``RecurringFigures``), worked out once per save of the store rather than on each
+    /// draw, such as when the wallet filter or a sheet changes.
+    @State private var figures = DrawingCache<AsSaved, RecurringFigures>()
 
     private var groups: [RecurringListing.KindGroup] {
         RecurringListing.groups(of: recurring, wallet: walletFilter)
     }
 
     var body: some View {
+        let groups = self.groups
+        let figures = self.figures.value(for: AsSaved(recurring, saves: saves)) { RecurringFigures(recurring) }
         List {
             ForEach(groups) { group in
                 Section(group.kind.sectionTitle) {
@@ -25,10 +31,13 @@ struct RecurringTransactionsView: View {
                         NavigationLink {
                             RecurringTransactionDetailView(recurring: item)
                         } label: {
-                            RecurringTransactionRow(recurring: item)
+                            RecurringTransactionRow(
+                                recurring: item, startingAmount: figures.startingAmount(of: item),
+                                progress: figures.purchaseProgress(of: item)
+                            )
                         }
                         .swipeActions(edge: .trailing) {
-                            Button("Duplicate", systemImage: "doc.on.doc") {
+                            Button(Strings.Common.duplicate, systemImage: "doc.on.doc") {
                                 editorMode = .duplicate(item)
                             }
                         }
@@ -40,25 +49,25 @@ struct RecurringTransactionsView: View {
         .overlay {
             if recurring.isEmpty {
                 ContentUnavailableView {
-                    Label("No Recurring Transactions", systemImage: "repeat")
+                    Label(Strings.Recurring.noRecurring, systemImage: "repeat")
                 } description: {
-                    Text("Bills, subscriptions and income that repeat are added for you on their dates.")
+                    Text(Strings.Recurring.noRecurringDescription)
                 } actions: {
-                    Button("Add Recurring Transaction") { editorMode = .add }
+                    Button(Strings.Recurring.addRecurring) { editorMode = .add }
                 }
             } else if groups.isEmpty, let walletFilter {
                 ContentUnavailableView {
-                    Label("No Recurring Transactions", systemImage: "repeat")
+                    Label(Strings.Recurring.noRecurring, systemImage: "repeat")
                 } description: {
-                    Text("None are paid from \(walletFilter.name).")
+                    Text(Strings.Recurring.noneFromWallet(walletFilter.name))
                 }
             }
         }
-        .navigationTitle("Recurring transactions")
+        .navigationTitle(Strings.Screens.recurringTransactions)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 walletMenu
-                Button("Add Recurring Transaction", systemImage: "plus") { editorMode = .add }
+                Button(Strings.Recurring.addRecurring, systemImage: "plus") { editorMode = .add }
             }
         }
         .sheet(item: $editorMode) { mode in
@@ -69,17 +78,17 @@ struct RecurringTransactionsView: View {
     /// Narrows the list to every wallet, or to one unarchived wallet.
     private var walletMenu: some View {
         Menu {
-            Picker("Wallet", selection: $walletFilter) {
-                Text("All wallets").tag(Wallet?.none)
+            Picker(Strings.Common.wallet, selection: $walletFilter) {
+                Text(Strings.Recurring.allWallets).tag(Wallet?.none)
                 ForEach(wallets) { wallet in
                     Label(wallet.name, systemImage: wallet.symbolName).tag(Optional(wallet))
                 }
             }
             .pickerStyle(.inline)
         } label: {
-            Label("Wallet", systemImage: walletFilter == nil ? "wallet.bifold" : "wallet.bifold.fill")
+            Label(Strings.Common.wallet, systemImage: walletFilter == nil ? "wallet.bifold" : "wallet.bifold.fill")
         }
-        .accessibilityValue(walletFilter?.name ?? String(localized: "All wallets"))
+        .accessibilityValue(walletFilter?.name ?? String(localized: Strings.Recurring.allWallets))
     }
 }
 
@@ -87,6 +96,10 @@ struct RecurringTransactionsView: View {
 /// estimate while it has one, as the transactions it makes will.
 struct RecurringTransactionRow: View {
     let recurring: RecurringTransaction
+    /// What its transactions start at now, its estimate for a varying Bill (``RecurringFigures``).
+    let startingAmount: Money
+    /// A Purchase's progress, or `nil` for any other Kind.
+    let progress: PurchaseProgress?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -103,7 +116,7 @@ struct RecurringTransactionRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                if let progress = recurring.purchaseProgress {
+                if let progress {
                     Text(progress.summary)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -111,7 +124,7 @@ struct RecurringTransactionRow: View {
                 }
             }
             Spacer(minLength: 8)
-            AmountText(amount: recurring.startingAmount)
+            AmountText(amount: startingAmount)
         }
         .contentShape(Rectangle())
         .opacity(recurring.isPaused ? 0.5 : 1)
@@ -121,14 +134,14 @@ struct RecurringTransactionRow: View {
     /// The wallet and the next day it falls due, such as "Checking · Next Nov 4, 2026", or "Paused" while its wallet
     /// is archived.
     private var detail: String {
-        let wallet = recurring.wallet?.name ?? String(localized: "No wallet")
+        let wallet = recurring.wallet?.name ?? String(localized: Strings.Recurring.noWallet)
         if recurring.isPaused {
-            return String(localized: "\(wallet) · Paused")
+            return String(localized: Strings.Recurring.walletPaused(wallet))
         }
         guard let next = recurring.nextDueDay else {
-            return String(localized: "\(wallet) · Ended")
+            return String(localized: Strings.Recurring.walletEnded(wallet))
         }
         let day = next.date().formatted(.dateTime.day().month(.abbreviated).year())
-        return String(localized: "\(wallet) · Next \(day)")
+        return String(localized: Strings.Recurring.walletNext(wallet, day))
     }
 }

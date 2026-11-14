@@ -1,50 +1,59 @@
 import Foundation
 import SwiftData
 
-/// Import from MoneyLover ("Replace all data"): a MoneyLover CSV export replaces every wallet, Card and transaction.
-/// The categories are kept.
+/// Import from MoneyLover ("Replace all data"): a MoneyLover CSV export replaces every wallet, Card, Person and
+/// transaction. The categories are kept.
 enum MoneyLoverImport {
-    /// Replaces the wallets, Cards and transactions in `context` with `rows`, a MoneyLover export as
-    /// ``MoneyLoverCSV/rows(in:)`` reads it, entered at `now`:
+    /// Replaces the wallets, Cards, people and transactions in `context` with the rows of `export`, a MoneyLover export
+    /// as ``MoneyLoverCSV/read(_:currencyCode:)`` reads it, entered at `now`, its notes naming Cards by the hashtags of
+    /// `cards`:
     ///
-    /// - Each wallet is created once by name, with a $0 Starting balance on its first day.
+    /// - Each wallet is created once by name, in the currency of its first row, with a Starting balance of nothing on
+    ///   its first day.
     /// - Each row is filed under the category of its name; a name no category has becomes a new top-level category.
     /// - A card hashtag in a note becomes the row's Card (``MoneyLoverCardTag``), where the app would offer that Card:
     ///   not on a transfer row, and only in the Card's paying wallet. Elsewhere the hashtag stays in the note.
     /// - Outgoing and Incoming transfer rows link into transfers. One with no partner becomes a balance adjustment,
     ///   filed as Adjust Balance files it; one of no amount has nothing to adjust and isn't imported.
     /// - Each Debt Collection links to the earliest open Loan of its wallet and amount, each Repayment to a Debt.
+    /// - A row's With becomes one Person, created the first time its name is read and reused after, ignoring case
+    ///   (ADR-0009), and last used when its newest transaction was entered.
     /// - Within a day, rows keep the file's order.
     ///
     /// A Grosh export (``GroshCSVExport``) is restored as it was instead: each row gets the Card its `Card` column
     /// names, its note stays as it is, rows sharing a `Linked` value are linked, and a wallet's Starting balance is the
-    /// file's own row rather than a $0 one. Nothing is left unmatched.
+    /// file's own row rather than a $0 one. A With of several names, as the export joins them with `; `, becomes
+    /// several people. Nothing is left unmatched.
     ///
-    /// Saves once, at the end: the old data is deleted by the same save that adds the new. Throws without changing
-    /// anything when it can't finish, saving included, and ``MoneyLoverImportError/noTransactions`` for no rows.
-    /// Once saved, the old data can't be brought back.
+    /// Saves once, at the end: the old data is deleted by the same save that adds the new and rebuilds every saved month
+    /// total (ADR-0013). Throws without changing anything when it can't finish, saving included, and
+    /// ``MoneyLoverImportError/noTransactions`` for no rows. Once saved, the old data can't be brought back.
     @discardableResult
     static func replaceAllData(
-        with rows: [MoneyLoverRow], in context: ModelContext, now: Date = .now
+        with export: MoneyLoverExport, cards: MoneyLoverCardMapping, in context: ModelContext, now: Date = .now
     ) throws -> MoneyLoverImportSummary {
-        guard !rows.isEmpty else { throw MoneyLoverImportError.noTransactions }
-        var importer = try Importer(rows: rows, context: context, now: now)
+        guard !export.rows.isEmpty else { throw MoneyLoverImportError.noTransactions }
+        var importer = try Importer(export: export, cardMapping: cards, context: context, now: now)
         do {
-            try removeAllData(in: context)
-            let summary = try importer.run()
-            try context.save()
-            return summary
+            return try Signpost.interval("Import CSV") {
+                try removeAllData(in: context)
+                let summary = try importer.run()
+                // Everything is replaced, so every saved month total is counted again, in the same save (ADR-0013).
+                try WalletMonthTotals.rebuild(in: context)
+                try context.save()
+                return summary
+            }
         } catch {
             context.rollback()
             throw error
         }
     }
 
-    /// Deletes every transaction, Card and wallet. Categories stay. Doesn't save.
+    /// Deletes every transaction, Card, Person and wallet. Categories stay. Doesn't save.
     ///
     /// One by one, rather than as batch deletes, which take effect in the store right away, where a rollback can't
-    /// undo them. Each category, Card and wallet lets go of its transactions first: left to update those lists one
-    /// deleted transaction at a time, saving ~6,000 deletes takes several seconds rather than a fraction of one.
+    /// undo them. Each category, Card, Person and wallet lets go of its transactions first: left to update those lists
+    /// one deleted transaction at a time, saving ~6,000 deletes takes several seconds rather than a fraction of one.
     private static func removeAllData(in context: ModelContext) throws {
         for category in try context.fetch(FetchDescriptor<Category>()) {
             category.transactions = []
@@ -53,6 +62,10 @@ enum MoneyLoverImport {
         for card in try context.fetch(FetchDescriptor<Card>()) {
             card.transactions = []
             context.delete(card)
+        }
+        for person in try context.fetch(FetchDescriptor<Person>()) {
+            person.transactions = []
+            context.delete(person)
         }
         for wallet in try context.fetch(FetchDescriptor<Wallet>()) {
             wallet.transactions = []
@@ -65,9 +78,12 @@ enum MoneyLoverImport {
     }
 }
 
-/// One run of ``MoneyLoverImport/replaceAllData(with:in:now:)``, after the old data is deleted.
+/// One run of ``MoneyLoverImport/replaceAllData(with:cards:in:now:)``, after the old data is deleted.
 private struct Importer {
     let rows: [MoneyLoverRow]
+    /// Whether the file is a Grosh export, restored as it was exported.
+    let isGroshExport: Bool
+    let cardMapping: MoneyLoverCardMapping
     let context: ModelContext
     let now: Date
     /// What a transfer row with no partner is filed under as a balance adjustment, by the adjustment's reason type.
@@ -76,34 +92,41 @@ private struct Importer {
     private var wallets: [String: Wallet] = [:]
     private var walletOrder: [String] = []
     private var cards: [MoneyLoverCardTag: Card] = [:]
+    private var people = PeopleByName()
 
-    init(rows: [MoneyLoverRow], context: ModelContext, now: Date) throws {
-        self.rows = rows
+    init(export: MoneyLoverExport, cardMapping: MoneyLoverCardMapping, context: ModelContext, now: Date) throws {
+        self.rows = export.rows
+        self.isGroshExport = export.isGroshExport
+        self.cardMapping = cardMapping
         self.context = context
         self.now = now
-        adjustmentReasons = try [CategoryType.income, .expense].reduce(into: [:]) { reasons, type in
-            reasons[type] = try BalanceAdjustmentDraft.defaultReason(for: type, in: context)
-        }
+        adjustmentReasons = try BalanceAdjustmentDraft.defaultReasons(in: context)
     }
 
     /// Records every row, links the transfers and the payments, and says what was done. Doesn't save.
     mutating func run() throws -> MoneyLoverImportSummary {
         var categories = try CategoryFiler(context: context)
-        let filed = try rows.map { try categories.findOrAdd(named: $0.categoryName, for: $0.amount) }
-        let isGroshExport = rows.allSatisfy(\.isFromGroshExport)
+        // A row's sign says which type of category it is filed under when an Expense and an Income share its name.
+        let filed = try rows.map { row in
+            try categories.findOrAdd(named: row.categoryName, as: row.amount.cents < 0 ? .expense : .income)
+        }
         for row in rows where wallets[row.walletName] == nil {
             let hasStartingBalance = isGroshExport && rows.indices.contains { index in
                 rows[index].walletName == row.walletName && filed[index].lockedRole == .startingBalance
             }
             try addWallet(firstSeenIn: row, withStartingBalance: !hasStartingBalance)
         }
+        let withPeople = addPeople(splittingNames: isGroshExport)
         if isGroshExport {
-            return try restore(filedUnder: filed, categories: &categories)
+            return try restore(filedUnder: filed, with: withPeople, categories: &categories)
         }
         let paid = try addCards(for: filed)
         // `imported[i]` is `rows[i]`.
         let imported = rows.indices.map { index in
-            record(rows[index], at: index, filedUnder: filed[index], paidWith: paid[index].card, note: paid[index].note)
+            record(
+                rows[index], at: index, filedUnder: filed[index], paidWith: paid[index].card, note: paid[index].note,
+                with: withPeople[index]
+            )
         }
 
         var unmatched: [ObjectIdentifier: MoneyLoverImportSummary.UnmatchedRow.Outcome] = [:]
@@ -134,10 +157,11 @@ private struct Importer {
         )
     }
 
-    /// Adds the wallet `row` names, at the end of the order, and when `withStartingBalance`, a $0 Starting balance on
-    /// the earliest day any row of it is dated, entered before every row.
+    /// Adds the wallet `row` names, in the currency of `row`, the first of it, at the end of the order, and when
+    /// `withStartingBalance`, a Starting balance of nothing on the earliest day any row of it is dated, entered before
+    /// every row.
     private mutating func addWallet(firstSeenIn row: MoneyLoverRow, withStartingBalance: Bool) throws {
-        var draft = WalletDraft()
+        var draft = WalletDraft(currencyCode: row.amount.currencyCode)
         draft.name = row.walletName
         guard withStartingBalance else {
             wallets[row.walletName] = try Wallet.insertWithoutStartingBalance(draft, in: context)
@@ -146,10 +170,23 @@ private struct Importer {
         }
         let firstDay = rows.filter { $0.walletName == row.walletName }.map(\.day).min() ?? row.day
         wallets[row.walletName] = try Wallet.insert(
-            draft, startingBalance: Money(cents: 0), on: firstDay,
+            draft, startingBalance: Money(cents: 0, currencyCode: draft.currencyCode), on: firstDay,
             enteredAt: now.addingTimeInterval(-Double(rows.count + walletOrder.count + 1)), in: context
         )
         walletOrder.append(row.walletName)
+    }
+
+    /// Adds the people the rows' With names, each once however many rows name it, and returns for each row the people it
+    /// is with. A name is read as it is, or with `splittingNames` as several joined with `; ` (a Grosh export's way).
+    /// Doesn't save.
+    private mutating func addPeople(splittingNames: Bool) -> [[Person]] {
+        var withPeople: [[Person]] = []
+        for row in rows {
+            let names = splittingNames
+                ? row.withName.components(separatedBy: Transaction.withSeparator) : [row.withName]
+            withPeople.append(names.compactMap { people.reuseOrCreate($0, lastUsedAt: .distantPast, in: context) })
+        }
+        return withPeople
     }
 
     /// Records a Grosh export's rows as they were exported: each with the Card its `Card` column names and its note as
@@ -157,22 +194,25 @@ private struct Importer {
     /// `Forgiven` columns hold (its category found among `filer`'s, or added). Says what was done; the wallets'
     /// Starting balances, which are rows of the file, aren't counted. Doesn't save.
     private func restore(
-        filedUnder categories: [Category], categories filer: inout CategoryFiler
+        filedUnder categories: [Category], with withPeople: [[Person]], categories filer: inout CategoryFiler
     ) throws -> MoneyLoverImportSummary {
         let paid = try addNamedCards()
-        var links: [String: UUID] = [:]
+        var linked: [String: [Transaction]] = [:]
         for index in rows.indices {
             let row = rows[index]
             let transaction = record(
-                row, at: index, filedUnder: categories[index], paidWith: paid.cards[index], note: row.note
+                row, at: index, filedUnder: categories[index], paidWith: paid.cards[index], note: row.note,
+                with: withPeople[index]
             )
             if let forgiven = row.forgiven, let kind = transaction.loanOrDebtKind {
                 try markForgiven(transaction, as: forgiven, kind: kind, categories: &filer)
             }
             guard let link = row.link, !link.isEmpty else { continue }
-            let linkID = links[link] ?? UUID()
-            links[link] = linkID
-            transaction.linkID = linkID
+            linked[link, default: []].append(transaction)
+        }
+        // The file numbers each link but doesn't say what it joins: that is worked out from its rows (ADR-0012).
+        for members in linked.values {
+            Transaction.link(members, as: LinkKind(of: members))
         }
         return MoneyLoverImportSummary(
             wallets: walletOrder.map { name in
@@ -192,20 +232,18 @@ private struct Importer {
         _ transaction: Transaction, as forgiven: MoneyLoverRow.Forgiven, kind: LoanOrDebtKind,
         categories filer: inout CategoryFiler
     ) throws {
-        let sign = kind.forgivenType == .expense ? -1 : 1
         let named = try forgiven.categoryName.isEmpty
-            ? nil : filer.findOrAdd(named: forgiven.categoryName, for: Money(cents: sign))
+            ? nil : filer.findOrAdd(named: forgiven.categoryName, as: kind.forgivenType)
         let category = try named.flatMap { $0.type == kind.forgivenType ? $0 : nil }
             ?? context.otherCategory(kind.forgivenType)
         transaction.forgivenCents = forgiven.amount.cents
-        transaction.forgivenDay = forgiven.day
-        transaction.forgivenNote = forgiven.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        transaction.markForgiven(on: forgiven.day, note: forgiven.note)
         transaction.forgivenCategory = category
     }
 
     /// The Card each row of a Grosh export names in its `Card` column, `nil` for none, and how many Cards were added.
     /// Each Card is added the first time the file names it in a wallet, paid from that wallet. A Card that
-    /// ``MoneyLoverCardMapping`` names gets its kind and color; any other is a blue Credit card.
+    /// ``cardMapping`` names gets its kind and color; any other is a blue Credit card.
     private func addNamedCards() throws -> (cards: [Card?], created: Int) {
         struct Key: Hashable {
             let name: String
@@ -223,7 +261,7 @@ private struct Importer {
                 cards.append(card)
                 continue
             }
-            let tag = MoneyLoverCardMapping.tags.first { $0.cardName.lowercased() == name.lowercased() }
+            let tag = cardMapping.tags.first { $0.cardName.lowercased() == name.lowercased() }
             let card = try Card.insert(
                 CardDraft(
                     name: name, kind: tag?.kind ?? .credit, payingWallet: wallets[row.walletName],
@@ -238,7 +276,7 @@ private struct Importer {
     }
 
     /// Works out which rows are paid with a Card, from the card hashtags in their notes, and adds those Cards in the
-    /// order ``MoneyLoverCardMapping/tags`` lists them, so every Card has rows. A row only gets a Card where the app
+    /// order ``cardMapping`` lists them, so every Card has rows. A row only gets a Card where the app
     /// would offer one (``TransactionDraft/offersCard``, ``Card/pickerChoices(for:keeping:)``): never on a transfer
     /// row, linked or not, and only in the Card's paying wallet. That is ``MoneyLoverCardMapping/payingWalletName``,
     /// or when the file has no such wallet, the wallet of the first row the Card could be given on.
@@ -250,14 +288,16 @@ private struct Importer {
         let tagged = rows.indices.map { index -> (tag: MoneyLoverCardTag, noteWithoutTag: String)? in
             let row = rows[index]
             guard !categories[index].isTransferHalf, let wallet = wallets[row.walletName],
-                  let tagged = MoneyLoverCardTag.extractFirst(from: row.note)
+                  let tagged = MoneyLoverCardTag.extractFirst(from: row.note, among: cardMapping.tags)
             else { return nil }
-            let payingWallet = payingWallets[tagged.tag] ?? wallets[MoneyLoverCardMapping.payingWalletName] ?? wallet
+            let payingWallet = payingWallets[tagged.tag]
+                ?? cardMapping.payingWalletName.flatMap { wallets[$0] }
+                ?? wallet
             payingWallets[tagged.tag] = payingWallet
             return payingWallet == wallet ? tagged : nil
         }
         let used = Set(tagged.compactMap { $0?.tag })
-        for tag in MoneyLoverCardMapping.tags where used.contains(tag) {
+        for tag in cardMapping.tags where used.contains(tag) {
             cards[tag] = try Card.insert(
                 CardDraft(name: tag.cardName, kind: tag.kind, payingWallet: payingWallets[tag], color: tag.color),
                 in: context
@@ -271,20 +311,17 @@ private struct Importer {
     /// Records `row`, the `index`th of the file. The file lists a day's rows newest first, so each row is entered a
     /// second before the one above it and they keep the file's order within a day.
     private func record(
-        _ row: MoneyLoverRow, at index: Int, filedUnder category: Category, paidWith card: Card?, note: String
+        _ row: MoneyLoverRow, at index: Int, filedUnder category: Category, paidWith card: Card?, note: String,
+        with chosen: [Person]
     ) -> Transaction {
-        let transaction = Transaction(
-            amount: row.amount, day: row.day, wallet: nil, category: nil,
-            note: note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let transaction = Transaction.insert(
+            cents: row.amount.cents, on: row.day, wallet: wallets[row.walletName], category: category, card: card,
+            note: note.trimmingCharacters(in: .whitespacesAndNewlines), in: context
         )
         transaction.createdAt = now.addingTimeInterval(-Double(index))
-        transaction.withName = row.withName
         transaction.eventName = row.eventName
         transaction.isExcludedFromReport = row.isExcludedFromReport
-        context.insert(transaction)
-        transaction.wallet = wallets[row.walletName]
-        transaction.category = category
-        transaction.card = card
+        transaction.setPeople(chosen, usedAt: transaction.createdAt)
         return transaction
     }
 
@@ -305,9 +342,7 @@ private struct Importer {
             guard let index = incoming[key]?.firstIndex(where: { $0.wallet != outgoing.wallet }),
                   let partner = incoming[key]?.remove(at: index)
             else { continue }
-            let link = UUID()
-            outgoing.linkID = link
-            partner.linkID = link
+            Transaction.link([outgoing, partner], as: .transfer)
         }
         return imported.filter { $0.category?.isTransferHalf == true && $0.linkID == nil }
     }
@@ -320,14 +355,12 @@ private struct Importer {
         var open = oldestFirst.filter(\.isLoanOrDebt)
         var unlinked: [Transaction] = []
         for payment in oldestFirst {
-            guard let role = payment.category?.lockedRole, role == .debtCollection || role == .repayment else {
-                continue
-            }
+            guard payment.paidLoanOrDebtKind != nil else { continue }
             guard let index = open.firstIndex(where: { $0.isPaidBackInFull(by: payment) }) else {
                 unlinked.append(payment)
                 continue
             }
-            try open.remove(at: index).linkPaymentWithoutSaving(payment)
+            try open.remove(at: index).linkPayment(payment)
         }
         return unlinked
     }
@@ -346,10 +379,9 @@ private struct CategoryFiler {
 
     private static func key(_ name: String) -> String { name.lowercased() }
 
-    /// The category named `name` for a row of `amount`, added if there is none: when an Expense and an Income
-    /// category share the name, the one of the type the amount's sign gives. Doesn't save.
-    mutating func findOrAdd(named name: String, for amount: Money) throws -> Category {
-        let type: CategoryType = amount.cents < 0 ? .expense : .income
+    /// The category named `name`, added as a `type` category if there is none: when categories of several types share
+    /// the name, the one of `type`. Doesn't save.
+    mutating func findOrAdd(named name: String, as type: CategoryType) throws -> Category {
         let named = byName[Self.key(name), default: []]
         if let match = named.first(where: { $0.type == type }) ?? named.first {
             return match

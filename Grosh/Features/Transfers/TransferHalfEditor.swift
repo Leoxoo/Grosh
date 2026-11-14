@@ -7,86 +7,69 @@ import SwiftUI
 struct TransferHalfEditor: View {
     let transaction: Transaction
 
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
 
     @State private var draft: TransferHalfDraft
-    @State private var entry: AmountEntry
     @State private var isAskingScope = false
-    @State private var errorMessage: String?
 
     init(transaction: Transaction) {
         self.transaction = transaction
-        let draft = TransferHalfDraft(editing: transaction)
-        _draft = State(initialValue: draft)
-        _entry = State(initialValue: AmountEntry(cents: draft.amount.cents))
-    }
-
-    private var currencyCode: String { transaction.amount.currencyCode }
-
-    /// The draft with the amount the keypad comes to.
-    private var draftToSave: TransferHalfDraft {
-        var result = draft
-        result.amount = Money(cents: entry.cents ?? 0, currencyCode: currencyCode)
-        return result
+        _draft = State(initialValue: TransferHalfDraft(editing: transaction))
     }
 
     var body: some View {
         KeypadSheet(
-            title: Text(transaction.categoryName), entry: $entry, canSave: draftToSave.canSave, save: confirmSave
+            title: Text(transaction.categoryName), entry: $draft.entry, canSave: draft.canSave,
+            saving: "Saving a transfer", failureTitle: Strings.Transfers.couldntSave, saveThen: saveOrAsk
         ) { fields in
             Section {
                 wallets
                 fields.amountRow(
-                    "Amount", currencyCode: currencyCode, tint: Money(cents: transaction.category?.sign ?? 0).tint
+                    Strings.Common.amount, currencyCode: draft.currencyCode,
+                    tint: MoneyDirection(category: transaction.category).tint
                 )
-                DayStepper(title: "Date", day: $draft.day)
+                DayStepper(title: Strings.Common.date, day: $draft.day)
                 fields.noteField($draft.note)
             } footer: {
-                Text("Changing the amount or date asks whether to change the other half of the transfer too.")
+                Text(Strings.Transfers.halfFooter)
+            }
+            .confirmationDialog(
+                Strings.Transfers.updateOtherHalfQuestion,
+                isPresented: $isAskingScope,
+                titleVisibility: .visible
+            ) {
+                Button(Strings.Transfers.updateBoth) { save(.bothHalves, with: fields.saver) }
+                Button(Strings.Common.onlyThisOne) { save(.onlyThisOne, with: fields.saver) }
+                Button(Strings.Common.cancel, role: .cancel) {}
+            } message: {
+                Text(Strings.Transfers.onlyThisOneFooter)
             }
         }
-        .confirmationDialog(
-            "Update the other half of the transfer too?",
-            isPresented: $isAskingScope,
-            titleVisibility: .visible
-        ) {
-            Button("Update Both") { save(.bothHalves) }
-            Button("Only This One") { save(.onlyThisOne) }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Only This One leaves the two halves different, as when a fee was taken.")
-        }
-        .errorAlert("Couldn't Save Transfer", message: $errorMessage)
     }
 
-    /// Where the money left and where it went: this half's wallet and, while it is there, the other half's.
-    @ViewBuilder
+    /// Where the money left and where it went: this half's wallet and, while it is there, the other half's, read once
+    /// when the sheet opens.
     private var wallets: some View {
-        let wallets = try? transaction.transferWallets(in: context)
-        WalletLabel(title: "From", wallet: wallets?.from)
-        WalletLabel(title: "To", wallet: wallets?.to)
+        MadeOnce {
+            Log.store.attempt("Reading the wallets of a transfer") { try transaction.transferWallets() }
+        } content: { wallets in
+            WalletLabel(title: Strings.Common.from, wallet: wallets?.from)
+            WalletLabel(title: Strings.Common.to, wallet: wallets?.to)
+        }
     }
 
     /// Saves straight away, or first asks whether to update both halves when the amount or date changed.
-    private func confirmSave() {
-        do {
-            if try transaction.offersToUpdateOtherHalf(with: draftToSave, in: context) {
-                isAskingScope = true
-            } else {
-                save(.onlyThisOne)
-            }
-        } catch {
-            errorMessage = error.localizedDescription
+    private func saveOrAsk() throws -> AfterSaving {
+        if try transaction.offersToUpdateOtherHalf(with: draft) {
+            isAskingScope = true
+            return .stayOpen
         }
+        try transaction.update(with: draft, scope: .onlyThisOne)
+        return .close
     }
 
-    private func save(_ scope: TransferUpdateScope) {
-        do {
-            try transaction.update(with: draftToSave, scope: scope, in: context)
-            dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
+    private func save(_ scope: TransferUpdateScope, with saver: SheetSaver) {
+        saver.save("Saving a transfer") {
+            try transaction.update(with: draft, scope: scope)
         }
     }
 }

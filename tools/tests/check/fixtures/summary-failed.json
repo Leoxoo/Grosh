@@ -1,0 +1,56 @@
+{
+  "devicesAndConfigurations" : [
+    {
+      "device" : {
+        "architecture" : "arm64",
+        "deviceId" : "PRO-UDID",
+        "deviceName" : "iPhone 17 Pro",
+        "modelName" : "iPhone 17 Pro",
+        "osVersion" : "26.4",
+        "platform" : "iOS Simulator"
+      },
+      "expectedFailures" : 0,
+      "failedTests" : 2,
+      "passedTests" : 410,
+      "skippedTests" : 9,
+      "testPlanConfiguration" : {
+        "configurationId" : "1",
+        "configurationName" : "Default"
+      }
+    }
+  ],
+  "environmentDescription" : "Grosh · Built with macOS 26.4",
+  "expectedFailures" : 0,
+  "failedTests" : 2,
+  "finishTime" : 1792731698.204,
+  "passedTests" : 410,
+  "result" : "Failed",
+  "skippedTests" : 9,
+  "startTime" : 1792731651.033,
+  "statistics" : [
+
+  ],
+  "testFailures" : [
+    {
+      "failureText" : "Expectation failed: (net → -1500) == 0",
+      "targetName" : "GroshTests",
+      "testIdentifier" : 1,
+      "testIdentifierString" : "ReimbursementTests/deletingAReimbursementDoesNotDeleteItsExpense()",
+      "testIdentifierURL" : "test://com.apple.xcode/Grosh/GroshTests/ReimbursementTests/deletingAReimbursementDoesNotDeleteItsExpense()",
+      "testName" : "deletingAReimbursementDoesNotDeleteItsExpense()"
+    },
+    {
+      "failureText" : "Expectation failed: (AmountEntry(typed: \"1,5\").cents → nil) == 150",
+      "targetName" : "GroshTests",
+      "testIdentifier" : 2,
+      "testIdentifierString" : "AmountEntryTests/parsesTypedAmounts(_:)",
+      "testIdentifierURL" : "test://com.apple.xcode/Grosh/GroshTests/AmountEntryTests/parsesTypedAmounts(_:)",
+      "testName" : "parsesTypedAmounts(_:)"
+    }
+  ],
+  "title" : "Test - Grosh",
+  "topInsights" : [
+
+  ],
+  "totalTestCount" : 421
+}

@@ -8,7 +8,7 @@ struct TimeRangeChoices: View {
     let pickCustom: () -> Void
 
     var body: some View {
-        Picker("Time Range", selection: presetSelection) {
+        Picker(Strings.Common.timeRange, selection: presetSelection) {
             ForEach(TimeRange.presets, id: \.self) { range in
                 Text(range.title).tag(Optional(range))
             }
@@ -17,9 +17,9 @@ struct TimeRangeChoices: View {
 
         Button(action: pickCustom) {
             if case .custom = timeRange {
-                Label("Custom…", systemImage: "checkmark")
+                Label(Strings.Common.customEllipsis, systemImage: "checkmark")
             } else {
-                Text("Custom…")
+                Text(Strings.Common.customEllipsis)
             }
         }
     }
@@ -39,8 +39,23 @@ extension View {
     func customRangeEditor(
         _ timeRange: Binding<TimeRange>, isPresented: Binding<Bool>, latest: CalendarDay? = nil
     ) -> some View {
-        sheet(isPresented: isPresented) {
-            CustomRangeEditor(days: timeRange.wrappedValue.customRangeStart(today: .today), latest: latest) {
+        modifier(CustomRangeEditorSheet(timeRange: timeRange, isPresented: isPresented, latest: latest))
+    }
+}
+
+/// The sheet behind ``View/customRangeEditor(_:isPresented:latest:)``.
+private struct CustomRangeEditorSheet: ViewModifier {
+    let timeRange: Binding<TimeRange>
+    let isPresented: Binding<Bool>
+    let latest: CalendarDay?
+
+    @Environment(\.today) private var today
+
+    func body(content: Content) -> some View {
+        content.sheet(isPresented: isPresented) {
+            CustomRangeEditor(
+                days: timeRange.wrappedValue.customRangeStart(today: today), today: today, latest: latest
+            ) {
                 timeRange.wrappedValue = .custom($0)
             }
         }

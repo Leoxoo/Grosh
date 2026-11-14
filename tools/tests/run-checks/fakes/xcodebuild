@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Stands in for xcodebuild in tools/tests/run-checks/run.sh: the hook only asks whether it is installed.
+exit 0

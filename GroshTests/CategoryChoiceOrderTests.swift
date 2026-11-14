@@ -5,16 +5,17 @@ import Testing
 
 /// The order a category list shows its choices in, the most used lately first, and the search that narrows it.
 @MainActor
+@Suite(.namedInTheLog)
 struct CategoryChoiceOrderTests {
-    private let fixture: CategoryFixture
+    private let fixture: TestStore
     private let today = CalendarDay(year: 2026, month: 10, day: 16)
 
     init() throws {
-        fixture = try CategoryFixture()
+        fixture = try TestStore()
     }
 
     private var expenseTree: [Grosh.Category] {
-        get throws { try fixture.catalog.pickerCategories(of: .expense) }
+        get throws { try fixture.pickable(.expense) }
     }
 
     /// Records `count` expenses under `name`, dated `day` or today.
@@ -24,11 +25,7 @@ struct CategoryChoiceOrderTests {
     ) throws -> [Transaction] {
         let category = try fixture.category(name)
         return (0..<count).map { _ in
-            let transaction = Transaction(
-                amount: Money(cents: -10_00), day: day ?? today, wallet: fixture.wallet, category: category
-            )
-            fixture.context.insert(transaction)
-            return transaction
+            fixture.context.record(-10_00, on: day ?? today, in: fixture.checking, under: category)
         }
     }
 
@@ -76,7 +73,7 @@ struct CategoryChoiceOrderTests {
     @Test func deletedAndFutureTransactionsDontCount() throws {
         try spend(2, on: "Products", day: today.adding(days: 1))
         for transaction in try spend(2, on: "Products") {
-            transaction.deletedAt = .now
+            transaction.changeCounted { $0.deletedAt = .now }
         }
         try spend(1, on: "Shopping")
 

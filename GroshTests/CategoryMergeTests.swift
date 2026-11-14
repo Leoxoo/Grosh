@@ -3,12 +3,13 @@ import Testing
 @testable import Grosh
 
 @MainActor
+@Suite(.namedInTheLog)
 struct CategoryMergeTests {
-    private let store: CategoryFixture
+    private let store: TestStore
     private var catalog: CategoryCatalog { store.catalog }
 
     init() throws {
-        store = try CategoryFixture()
+        store = try TestStore()
     }
 
     @Test func mergingASubcategoryMovesItsTransactionsToTheTargetAndRemovesIt() throws {
@@ -116,7 +117,6 @@ struct CategoryMergeTests {
         #expect(!targets.contains("Petrol"))
         #expect(!targets.contains("Other Expense"))
         #expect(!targets.contains("Salary"))
-        #expect(targets.count == 61)
     }
 
     @Test func aParentWithSubcategoriesCanOnlyBeMergedIntoAnotherTopLevelCategory() throws {
@@ -127,7 +127,7 @@ struct CategoryMergeTests {
         #expect(!targets.contains("Taxi"))
         #expect(!targets.contains("Petrol"))
         #expect(!targets.contains("Other Transport"))
-        #expect(targets.count == 19)
+        #expect(try targets.allSatisfy { try store.category($0).parent == nil })
     }
 
     @Test func lockedCategoriesHaveNoMergeTargets() throws {

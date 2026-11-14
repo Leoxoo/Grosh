@@ -1,21 +1,28 @@
-import SwiftData
 import SwiftUI
 
 /// A sheet that records something against a Loan or Debt, such as Record Payment or Forgive the Rest: `form` with a
 /// draft made from the Loan or Debt as it is when the sheet opens or, when no draft can be made, why not.
 struct LoanOrDebtSheet<Draft, Form: View>: View {
     /// Shown instead of the form, such as "Can't Record Payment".
-    let unavailableTitle: LocalizedStringKey
-    let unavailableMessage: LocalizedStringKey
+    let unavailableTitle: LocalizedStringResource
+    let unavailableMessage: LocalizedStringResource
     /// Throws when the transaction isn't a Loan or Debt.
-    let makeDraft: (ModelContext) throws -> Draft
+    let makeDraft: () throws -> Draft
     @ViewBuilder let form: (Draft) -> Form
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var context
 
     var body: some View {
-        if let draft = try? makeDraft(context) {
+        MadeOnce {
+            Log.store.attempt("Making the draft for a Loan or Debt") { try makeDraft() }
+        } content: { draft in
+            content(draft)
+        }
+    }
+
+    @ViewBuilder
+    private func content(_ draft: Draft?) -> some View {
+        if let draft {
             form(draft)
         } else {
             NavigationStack {
@@ -26,7 +33,7 @@ struct LoanOrDebtSheet<Draft, Form: View>: View {
                 )
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }
+                        Button(Strings.Common.cancel) { dismiss() }
                     }
                 }
             }

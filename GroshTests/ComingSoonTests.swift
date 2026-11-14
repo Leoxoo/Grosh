@@ -7,6 +7,7 @@ import Testing
 @testable import Grosh
 
 @MainActor
+@Suite(.namedInTheLog)
 struct ComingSoonTests {
     /// The Spent and Income cards took Report this month's place, so Top spending is all Home still waits for.
     @Test func homeShowsOnlyTopSpending() {

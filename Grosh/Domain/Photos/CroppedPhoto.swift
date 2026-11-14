@@ -39,10 +39,40 @@ nonisolated enum CroppedPhoto {
     ///
     /// It draws the copy itself rather than through ``decode(_:maxPixelSide:)``: ImageIO bounds a thumbnail only by its
     /// long side and works out the short side with rounding it doesn't document, so it can't promise the exact pixel
-    /// height a sharp mark needs.
+    /// height a sharp mark needs. Like ``image(from:)``, the same data at the same size gives back the copy made
+    /// before, so a picker listing it draws it once.
     static func shrunkImage(from data: Data, height: CGFloat, scale: CGFloat) -> CGImage? {
-        guard let stored = image(from: data), stored.width > 0, stored.height > 0 else { return nil }
         let pixelHeight = max(1, Int((height * scale).rounded()))
+        let key = ShrunkKey(data: data as NSData, pixelHeight: pixelHeight)
+        if let image = shrunk.object(forKey: key) { return image }
+        guard let image = drawShrunk(from: data, pixelHeight: pixelHeight) else { return nil }
+        shrunk.setObject(image, forKey: key)
+        return image
+    }
+
+    /// The shrunk copies made lately, by their data and pixel height. The system empties it when memory runs low.
+    private nonisolated(unsafe) static let shrunk = NSCache<ShrunkKey, CGImage>()
+
+    /// A shrunk copy's data and pixel height, compared by value as `NSCache` needs.
+    private final class ShrunkKey: NSObject {
+        let data: NSData
+        let pixelHeight: Int
+
+        init(data: NSData, pixelHeight: Int) {
+            self.data = data
+            self.pixelHeight = pixelHeight
+        }
+
+        override var hash: Int { data.hash ^ pixelHeight }
+
+        override func isEqual(_ object: Any?) -> Bool {
+            guard let other = object as? ShrunkKey else { return false }
+            return pixelHeight == other.pixelHeight && data.isEqual(other.data)
+        }
+    }
+
+    private static func drawShrunk(from data: Data, pixelHeight: Int) -> CGImage? {
+        guard let stored = image(from: data), stored.width > 0, stored.height > 0 else { return nil }
         let pixelWidth = max(1, Int((CGFloat(pixelHeight) * CGFloat(stored.width) / CGFloat(stored.height)).rounded()))
         guard let context = CGContext(
             data: nil,

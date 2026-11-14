@@ -11,6 +11,10 @@ struct TransactionDay: Identifiable {
     /// What the day added to or took from the balance: every transaction counts, excluded from report or not,
     /// so the days of a period add up to its difference. Scheduled rows aren't transactions and don't count.
     var net: Money { transactions.net }
+
+    /// What the day's transactions come to as `listed`: their ``net``, or on a Card's statement what the Card was
+    /// charged.
+    func total(_ listed: ListedAmount) -> Money { transactions.total(listed) }
 }
 
 extension TransactionDay {

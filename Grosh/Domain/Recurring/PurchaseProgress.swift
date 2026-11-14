@@ -10,9 +10,9 @@ nonisolated struct PurchaseProgress: Equatable, Sendable {
     /// "$400.00 of $1,200.00 paid", or "$400.00 paid" without a total.
     var summary: String {
         guard let total else {
-            return String(localized: "\(paid.formatted()) paid")
+            return String(localized: Strings.Recurring.paid(paid.formatted()))
         }
-        return String(localized: "\(paid.formatted()) of \(total.formatted()) paid")
+        return String(localized: Strings.Recurring.paidOfTotal(paid.formatted(), total.formatted()))
     }
 }
 
@@ -21,7 +21,7 @@ extension RecurringTransaction {
     /// progress never changes the schedule. `nil` for every other Kind.
     var purchaseProgress: PurchaseProgress? {
         guard kind == .purchase else { return nil }
-        let paidCents = attachedTransactions.reduce(0) { $0 + abs($1.amountCents) }
+        let paidCents = (transactions ?? []).notDeleted.reduce(0) { $0 + abs($1.amountCents) }
         return PurchaseProgress(
             paid: Money(cents: paidCents, currencyCode: currencyCode),
             total: totalCents.map { Money(cents: $0, currencyCode: currencyCode) }

@@ -12,28 +12,34 @@ struct CategoryMergeView: View {
     private var catalog: CategoryCatalog { CategoryCatalog(context: context) }
 
     var body: some View {
+        // Counted in the store once, when the sheet opens.
+        MadeOnce {
+            Log.store.attempt("Counting a category's transactions") {
+                try context.fetchCount(source.notDeletedTransactions)
+            } ?? 0
+        } content: { transactionCount in
+            mergeSheet(transactionCount: transactionCount)
+        }
+    }
+
+    private func mergeSheet(transactionCount: Int) -> some View {
         MergeSheet(
             sourceName: source.name,
-            targets: (try? catalog.mergeTargets(for: source)) ?? [],
+            targets: Log.store.attempt("Reading the categories to merge into") {
+                try catalog.mergeTargets(for: source)
+            } ?? [],
             targetName: \.name,
-            consequences: consequences(into:),
-            emptyDescription: String(localized: "There's no other \(source.type.title) category this one can be merged into."),
+            consequences: { target in
+                MergeConsequences.text(
+                    sourceName: source.name, transactionCount: transactionCount,
+                    subcategoryCount: source.children?.count ?? 0, targetName: target?.name,
+                    unchosen: String(localized: Strings.Categories.theCategoryYouPick)
+                )
+            },
+            emptyDescription: String(localized: Strings.Categories.nothingToMergeInto(source.type.title)),
             row: { CategoryLabel(category: $0) },
             merge: { try catalog.merge(source, into: $0) },
             onMerged: onMerged
         )
-    }
-
-    private func consequences(into target: Category?) -> String {
-        let destination = target.map { "“\($0.name)”" } ?? String(localized: "the category you pick")
-        let transactions = (source.transactions ?? []).notDeleted.count
-        let subcategories = source.children?.count ?? 0
-        var text = transactions == 1
-            ? String(localized: "Its transaction moves to \(destination)")
-            : String(localized: "Its \(transactions) transactions move to \(destination)")
-        if subcategories > 0 {
-            text += String(localized: " and its \(subcategories) subcategories move under it")
-        }
-        return text + String(localized: ". Then “\(source.name)” is removed.")
     }
 }

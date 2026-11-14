@@ -11,34 +11,44 @@ struct TransactionsMenu: View {
     @Binding var grouping: TransactionGrouping
     /// Starts choosing transactions to delete.
     let startSelecting: () -> Void
+    /// The list's search text and filters, which Filters sets on iPhone and iPad, where the bar has no room for a
+    /// Filters button of its own beside the tab's title.
+    @Binding var filter: TransactionFilter
 
     @State private var isPickingCustomRange = false
     @State private var isTransferring = false
     @State private var isAdjustingBalance = false
+    @State private var isFiltering = false
 
     var body: some View {
-        Menu("More", systemImage: "ellipsis.circle") {
+        Menu(Strings.Transactions.more, systemImage: "ellipsis.circle") {
+            #if os(iOS)
+            Section {
+                TransactionFilterButton(filter: $filter, isPresented: $isFiltering)
+            }
+            #endif
+
             Section {
                 Menu {
                     TimeRangeChoices(timeRange: $timeRange) { isPickingCustomRange = true }
                 } label: {
-                    Label("Time Range", systemImage: "calendar")
+                    Label(Strings.Common.timeRange, systemImage: "calendar")
                     Text(timeRange.title)
                 }
 
-                Toggle("View by Category", systemImage: "square.grid.2x2", isOn: viewsByCategory)
+                Toggle(Strings.Transactions.viewByCategory, systemImage: "square.grid.2x2", isOn: viewsByCategory)
             }
 
             Section {
-                Button("Select", systemImage: "checkmark.circle", action: startSelecting)
+                Button(Strings.Transactions.select, systemImage: "checkmark.circle", action: startSelecting)
             }
 
             Section {
-                Button("Transfer", systemImage: "arrow.left.arrow.right") { isTransferring = true }
+                Button(Strings.Transfers.transfer, systemImage: "arrow.left.arrow.right") { isTransferring = true }
             }
 
             Section {
-                Button("Adjust Balance", systemImage: "plusminus") { isAdjustingBalance = true }
+                Button(Strings.BalanceAdjustment.adjustBalance, systemImage: "plusminus") { isAdjustingBalance = true }
             }
         }
         .customRangeEditor($timeRange, isPresented: $isPickingCustomRange)
@@ -48,6 +58,7 @@ struct TransactionsMenu: View {
         .sheet(isPresented: $isAdjustingBalance) {
             AdjustBalanceEditor(viewedWallet: viewedWallet)
         }
+        .transactionFilterSheet(isPresented: $isFiltering, filter: $filter)
     }
 
     private var viewsByCategory: Binding<Bool> {

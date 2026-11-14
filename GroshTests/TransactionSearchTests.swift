@@ -4,13 +4,14 @@ import Testing
 
 /// Search: note text, category name and amount, across all time.
 @MainActor
+@Suite(.namedInTheLog)
 struct TransactionSearchTests {
-    private let fixture: CategoryFixture
+    private let fixture: TestStore
     private var context: ModelContext { fixture.context }
-    private var checking: Wallet { fixture.wallet }
+    private var checking: Wallet { fixture.checking }
 
     init() throws {
-        fixture = try CategoryFixture()
+        fixture = try TestStore()
     }
 
     @discardableResult
@@ -21,11 +22,7 @@ struct TransactionSearchTests {
         in wallet: Wallet? = nil,
         on day: CalendarDay = CalendarDay(year: 2026, month: 10, day: 1)
     ) -> Transaction {
-        let transaction = Transaction(amount: Money(cents: cents), day: day, wallet: nil, category: nil, note: note)
-        context.insert(transaction)
-        transaction.wallet = wallet ?? checking
-        transaction.category = category
-        return transaction
+        context.record(cents, on: day, in: wallet ?? checking, under: category, note: note)
     }
 
     private func search(_ text: String, in transactions: [Transaction]) -> [String] {
@@ -83,23 +80,45 @@ struct TransactionSearchTests {
     }
 
     @Test func searchLooksAcrossAllTimeAndEveryWalletArchivedOnesIncluded() throws {
-        let today = CalendarDay(year: 2026, month: 10, day: 9)
-        let oldBank = Wallet(name: "Old bank")
-        context.insert(oldBank)
-        let brokerage = Wallet(name: "Brokerage")
-        context.insert(brokerage)
-        brokerage.includeInTotal = false
+        let today = TestStore.today
+        let oldBank = context.addWallet("Old bank")
+        let brokerage = context.addWallet("Brokerage", includeInTotal: false)
         let all = [
             record(-5_00, "monthly fee", in: oldBank, on: CalendarDay(year: 2021, month: 3, day: 2)),
             record(-1_00, "trading fee", in: brokerage, on: CalendarDay(year: 2026, month: 9, day: 12)),
             record(-2_00, "atm fee", on: today),
             record(-40_00, "groceries", on: today),
         ]
-        try oldBank.archive()
+        try oldBank.archive(today: today)
 
-        let listed = TransactionFilter(searchText: "fee")
-            .listed(from: all, selection: .total, on: Period.month(CalendarMonth(today)).days(today: today))
+        let listed = TransactionListing(
+            all, showing: .total, on: Period.month(CalendarMonth(today)).days(today: today),
+            filter: TransactionFilter(searchText: "fee")
+        ).transactions
 
         #expect(Set(listed.map(\.note)) == ["monthly fee", "trading fee", "atm fee"])
+    }
+
+    // MARK: Pickers
+
+    @Test func aPickerListsItsCandidatesNewestFirstNarrowedBySearch() {
+        let older = record(-4_50, "coffee", on: CalendarDay(year: 2026, month: 9, day: 1))
+        let newer = record(-3_00, "coffee", on: CalendarDay(year: 2026, month: 10, day: 2))
+        let lunch = record(-12_00, "lunch")
+        let candidates = PickerCandidates([older, lunch, newer])
+
+        #expect(candidates.transactions == [newer, lunch, older])
+        let listing = TransactionListing.picking(candidates, filter: TransactionFilter(searchText: "coffee"))
+        #expect(listing.transactions == [newer, older])
+    }
+
+    @Test func aPickersRowsShowTheirWalletOnlyWhenTheCandidatesComeFromMoreThanOne() {
+        let cash = context.addWallet("Cash")
+        let inChecking = [record(-4_50, "coffee"), record(-12_00, "lunch")]
+        let inBoth = inChecking + [record(-2_00, "bus", in: cash)]
+
+        #expect(!TransactionListing.picking(PickerCandidates(inChecking), filter: TransactionFilter()).mixesWallets)
+        #expect(TransactionListing.picking(PickerCandidates(inBoth), filter: TransactionFilter()).mixesWallets)
+        #expect(!TransactionListing.picking(PickerCandidates(inBoth), filter: TransactionFilter(wallet: cash)).mixesWallets)
     }
 }

@@ -2,6 +2,7 @@ import Testing
 @testable import Grosh
 
 /// The ‹ › day steppers next to a transaction's date.
+@Suite(.namedInTheLog)
 struct CalendarDayStepTests {
     @Test(arguments: [
         (CalendarDay(year: 2026, month: 10, day: 9), 1, CalendarDay(year: 2026, month: 10, day: 10)),

@@ -1,0 +1,206 @@
+#!/usr/bin/env bash
+#
+# Builds Grosh, runs its tests on an iPhone simulator and prints only what failed: one line per failing test or build
+# error, then one summary line. How to run it and read it: docs/agents/testing.md.
+#
+#   tools/check                   the unit tests (GroshTests)
+#   tools/check --ui              the unit tests and the UI tests (GroshUITests)
+#   tools/check --only <Suite>    one suite, by its type name, such as ReimbursementTests
+#
+# Exit status: 0 every test passed; 1 a test failed, no test ran, or Grosh logged errors (tools/check-logs);
+# 2 the build failed or the tests could not run; 3 xcodebuild is not installed, so nothing ran; 64 bad arguments.
+#
+# The full xcodebuild log and the .xcresult bundle go to $GROSH_CHECK_RESULT_DIR when it is set, otherwise to a new
+# temporary folder. Runs on one Mac take turns: a run started while another is going waits for it, and says so. A
+# simulator that is down is booted for the run, and shut down again once tools/check-logs has read its log.
+
+set -u -o pipefail
+
+usage() {
+    cat <<'EOF'
+Usage: tools/check [--ui] [--only <Suite>]...
+  --ui            also run the UI tests (GroshUITests)
+  --only <Suite>  run one suite, by its type name (ReimbursementTests), or one test in it
+                  (ReimbursementTests/deletingAReimbursementDoesNotDeleteItsExpense()); repeat it for more
+EOF
+}
+
+ui=0
+only=()
+while [ $# -gt 0 ]; do
+    case $1 in
+        --ui) ui=1 ;;
+        --only=?*) only+=("${1#--only=}") ;;
+        --only)
+            case ${2:-} in
+                '' | -*)
+                    echo "tools/check: --only needs a suite name" >&2
+                    usage >&2
+                    exit 64
+                    ;;
+            esac
+            only+=("$2")
+            shift
+            ;;
+        -h | --help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "tools/check: unknown argument: $1" >&2
+            usage >&2
+            exit 64
+            ;;
+    esac
+    shift
+done
+
+if ! command -v xcodebuild >/dev/null 2>&1; then
+    echo "tools/check: xcodebuild is not installed, so nothing ran. The tests need Xcode on a Mac." >&2
+    exit 3
+fi
+if ! version=$(xcodebuild -version 2>&1); then
+    echo "tools/check: xcodebuild cannot run, so nothing ran: ${version%%$'\n'*}" >&2
+    exit 3
+fi
+
+result_dir=${GROSH_CHECK_RESULT_DIR:-}
+case $result_dir in
+    '' | /*) ;;
+    *) result_dir=$PWD/$result_dir ;;
+esac
+
+root=$(cd "$(dirname "$0")/.." && pwd -P) || exit 2
+cd "$root" || exit 2
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "tools/check needs python3, which comes with Xcode's command line tools."
+    exit 2
+fi
+
+# -E and -s keep the user's Python settings and packages out; unlike -I, they keep tools/ on the helper's sys.path.
+helper() { python3 -E -s tools/check_helper.py "$@"; }
+
+if ! chosen=$(helper simulator Grosh.xcodeproj/project.pbxproj); then
+    [ -n "$chosen" ] && printf '%s\n' "$chosen"
+    exit 2
+fi
+IFS=$'\t' read -r udid state simulator <<<"$chosen"
+echo "Simulator: $simulator"
+
+tmp=${TMPDIR:-/tmp}
+tmp=${tmp%/}
+if [ ! -d "$tmp" ] || [ ! -w "$tmp" ]; then
+    echo "tools/check cannot keep its results or take its lock: $tmp is not a folder it can write to"
+    exit 2
+fi
+if [ -n "$result_dir" ]; then
+    if ! mkdir -p "$result_dir" || ! result_dir=$(cd "$result_dir" && pwd -P); then
+        echo "tools/check cannot keep its results in GROSH_CHECK_RESULT_DIR=$GROSH_CHECK_RESULT_DIR"
+        exit 2
+    fi
+elif ! result_dir=$(mktemp -d "$tmp/grosh-check.XXXXXX"); then
+    echo "tools/check cannot make a temporary folder in $tmp"
+    exit 2
+fi
+bundle=$result_dir/Grosh.xcresult
+log=$result_dir/xcodebuild.log
+
+# One run at a time on this Mac: each xcodebuild boots simulators of its own, and runs from several worktrees at once
+# slow every one of them down. The lock is a folder, as mkdir either makes it or fails, holding the owner's pid and
+# repository; the owner removes it on the way out, and a lock whose owner is gone is taken over.
+lock=$tmp/grosh-tools-check.lock
+holding_lock=0
+booted_here=0
+xcodebuild_pid=
+
+clean_up() {
+    if [ "$booted_here" = 1 ]; then
+        xcrun simctl shutdown "$udid" >/dev/null 2>&1
+        booted_here=0
+    fi
+    if [ "$holding_lock" = 1 ]; then
+        rm -rf "$lock"
+    fi
+}
+
+stop() {
+    if [ -n "$xcodebuild_pid" ]; then
+        kill -TERM "$xcodebuild_pid" 2>/dev/null
+        wait "$xcodebuild_pid" 2>/dev/null
+    fi
+    exit "$1"
+}
+
+trap clean_up EXIT
+trap 'stop 129' HUP
+trap 'stop 130' INT
+trap 'stop 143' TERM
+
+noted_owner=
+noted_at=$SECONDS
+until mkdir "$lock" 2>/dev/null; do
+    owner=$(cat "$lock/pid" 2>/dev/null)
+    if [ -n "$owner" ] && ! ps -p "$owner" >/dev/null 2>&1; then
+        if [ "$(cat "$lock/pid" 2>/dev/null)" = "$owner" ]; then
+            rm -rf "$lock"
+        fi
+        continue
+    fi
+    if { [ -n "$owner" ] && [ "$owner" != "$noted_owner" ]; } || [ $((SECONDS - noted_at)) -ge 30 ]; then
+        echo "Waiting for another tools/check run (pid ${owner:-?}, $(cat "$lock/dir" 2>/dev/null))"
+        noted_owner=$owner
+        noted_at=$SECONDS
+    fi
+    sleep 1
+done
+holding_lock=1
+printf '%s\n' "$root" >"$lock/dir"
+printf '%s\n' "$$" >"$lock/pid"
+
+tests=()
+if [ ${#only[@]} -eq 0 ]; then
+    tests+=(-only-testing:GroshTests)
+    if [ "$ui" = 1 ]; then
+        tests+=(-only-testing:GroshUITests)
+    fi
+else
+    for name in "${only[@]}"; do
+        case $name in
+            GroshTests | GroshTests/* | GroshUITests | GroshUITests/*) tests+=("-only-testing:$name") ;;
+            *)
+                tests+=("-only-testing:GroshTests/$name")
+                if [ "$ui" = 1 ]; then
+                    tests+=("-only-testing:GroshUITests/$name")
+                fi
+                ;;
+        esac
+    done
+fi
+
+# check-logs reads the log of the simulator the tests ran on, which has to be booted when it does. xcodebuild leaves alone
+# a simulator that was booted already, so one that is down is booted here, and shut down again by clean_up.
+if [ "$state" != booted ]; then
+    if boot_error=$(xcrun simctl bootstatus "$udid" -b 2>&1 >/dev/null); then
+        booted_here=1
+    else
+        echo "tools/check cannot boot $simulator, so nothing ran: ${boot_error%%$'\n'*}"
+        exit 2
+    fi
+fi
+
+# xcodebuild refuses to write over an earlier run's bundle in GROSH_CHECK_RESULT_DIR.
+rm -rf "$bundle"
+since=$(date +%s)
+started=$SECONDS
+xcodebuild -project Grosh.xcodeproj -scheme Grosh -testPlan Grosh \
+    -destination "platform=iOS Simulator,id=$udid" -resultBundlePath "$bundle" \
+    -collect-test-diagnostics never "${tests[@]}" test >"$log" 2>&1 &
+xcodebuild_pid=$!
+wait "$xcodebuild_pid"
+status=$?
+xcodebuild_pid=
+elapsed=$((SECONDS - started))
+
+helper report "$bundle" "$log" "$status" "$elapsed" "$ui" "${#only[@]}" "$result_dir" "$root" "$since" "$udid"
+exit $?

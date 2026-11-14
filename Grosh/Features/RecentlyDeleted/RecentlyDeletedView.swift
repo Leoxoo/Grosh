@@ -11,11 +11,13 @@ struct RecentlyDeletedView: View {
     @Query(RecentlyDeleted.deletedTransactions) private var transactions: [Transaction]
 
     @Environment(\.modelContext) private var context
+    @Environment(\.today) private var today
     @State private var pendingRemoval: PendingRemoval?
     @State private var errorMessage: String?
 
     var body: some View {
         let bin = RecentlyDeleted(wallets: wallets, transactions: transactions, recurring: recurring)
+        // Days left run from the moment an item was deleted, not from a calendar day, so this reads the clock.
         let now = Date.now
 
         List {
@@ -33,27 +35,15 @@ struct RecentlyDeletedView: View {
                             }
                         } label: {
                             DeletedWalletRow(wallet: wallet, transactionCount: deletedWithIt.count, now: now)
-                                .swipeActions(edge: .trailing) {
-                                    Button("Delete Forever", systemImage: "trash", role: .destructive) {
-                                        pendingRemoval = .wallet(wallet)
-                                    }
-                                    Button("Restore", systemImage: "arrow.uturn.backward") {
-                                        perform { try wallet.restore() }
-                                    }
-                                    .tint(.blue)
-                                }
-                                .contextMenu {
-                                    Button("Restore", systemImage: "arrow.uturn.backward") {
-                                        perform { try wallet.restore() }
-                                    }
-                                    Button("Delete Forever", systemImage: "trash", role: .destructive) {
-                                        pendingRemoval = .wallet(wallet)
-                                    }
+                                .recentlyDeletedActions(canRestore: true) {
+                                    Log.store.perform("Changing Recently Deleted", errorMessage: &errorMessage) { try wallet.restore(today: today) }
+                                } deleteForever: {
+                                    pendingRemoval = .wallet(wallet)
                                 }
                         }
                     }
                 } header: {
-                    Text("Wallets")
+                    Text(Strings.Screens.wallets)
                 } footer: {
                     if bin.recurring.isEmpty && bin.transactions.isEmpty {
                         RecentlyDeletedFooter()
@@ -64,30 +54,16 @@ struct RecentlyDeletedView: View {
             if !bin.recurring.isEmpty {
                 Section {
                     ForEach(bin.recurring) { schedule in
-                        DeletedRecurringRow(recurring: schedule, now: now)
-                            .swipeActions(edge: .trailing) {
-                                Button("Delete Forever", systemImage: "trash", role: .destructive) {
-                                    pendingRemoval = .recurring(schedule)
-                                }
-                                if schedule.restoreBlocker == nil {
-                                    Button("Restore", systemImage: "arrow.uturn.backward") {
-                                        perform { try schedule.restore() }
-                                    }
-                                    .tint(.blue)
-                                }
-                            }
-                            .contextMenu {
-                                Button("Restore", systemImage: "arrow.uturn.backward") {
-                                    perform { try schedule.restore() }
-                                }
-                                .disabled(schedule.restoreBlocker != nil)
-                                Button("Delete Forever", systemImage: "trash", role: .destructive) {
-                                    pendingRemoval = .recurring(schedule)
-                                }
+                        let blocker = schedule.restoreBlocker
+                        DeletedRecurringRow(recurring: schedule, blocker: blocker, now: now)
+                            .recentlyDeletedActions(canRestore: blocker == nil) {
+                                Log.store.perform("Changing Recently Deleted", errorMessage: &errorMessage) { try schedule.restore(today: today) }
+                            } deleteForever: {
+                                pendingRemoval = .recurring(schedule)
                             }
                     }
                 } header: {
-                    Text("Recurring transactions")
+                    Text(Strings.Screens.recurringTransactions)
                 } footer: {
                     if bin.transactions.isEmpty {
                         RecentlyDeletedFooter()
@@ -98,30 +74,16 @@ struct RecentlyDeletedView: View {
             if !bin.transactions.isEmpty {
                 Section {
                     ForEach(bin.transactions) { transaction in
-                        DeletedTransactionRow(transaction: transaction, now: now)
-                            .swipeActions(edge: .trailing) {
-                                Button("Delete Forever", systemImage: "trash", role: .destructive) {
-                                    pendingRemoval = .transaction(transaction)
-                                }
-                                if transaction.restoreBlocker == nil {
-                                    Button("Restore", systemImage: "arrow.uturn.backward") {
-                                        perform { try transaction.restore() }
-                                    }
-                                    .tint(.blue)
-                                }
-                            }
-                            .contextMenu {
-                                Button("Restore", systemImage: "arrow.uturn.backward") {
-                                    perform { try transaction.restore() }
-                                }
-                                .disabled(transaction.restoreBlocker != nil)
-                                Button("Delete Forever", systemImage: "trash", role: .destructive) {
-                                    pendingRemoval = .transaction(transaction)
-                                }
+                        let blocker = transaction.restoreBlocker
+                        DeletedTransactionRow(transaction: transaction, blocker: blocker, now: now)
+                            .recentlyDeletedActions(canRestore: blocker == nil) {
+                                Log.store.perform("Changing Recently Deleted", errorMessage: &errorMessage) { try transaction.restore() }
+                            } deleteForever: {
+                                pendingRemoval = .transaction(transaction)
                             }
                     }
                 } header: {
-                    Text("Transactions")
+                    Text(Strings.Common.transactions)
                 } footer: {
                     RecentlyDeletedFooter()
                 }
@@ -130,16 +92,16 @@ struct RecentlyDeletedView: View {
         .overlay {
             if bin.isEmpty {
                 ContentUnavailableView(
-                    "Nothing Recently Deleted",
+                    Strings.RecentlyDeleted.nothingRecentlyDeleted,
                     systemImage: "trash",
-                    description: Text("Deleted wallets, recurring transactions and transactions wait here for \(RecentlyDeleted.keptDays) days before they're removed for good.")
+                    description: Text(Strings.RecentlyDeleted.emptyDescription(RecentlyDeleted.keptDays))
                 )
             }
         }
-        .navigationTitle("Recently Deleted")
+        .navigationTitle(Strings.Screens.recentlyDeleted)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Empty Bin", role: .destructive) { pendingRemoval = .everything }
+                Button(Strings.RecentlyDeleted.emptyBin, role: .destructive) { pendingRemoval = .everything }
                     .disabled(bin.isEmpty)
             }
         }
@@ -150,30 +112,42 @@ struct RecentlyDeletedView: View {
             presenting: pendingRemoval
         ) { removal in
             Button(removal.buttonTitle, role: .destructive) { remove(removal) }
-            Button("Cancel", role: .cancel) {}
+            Button(Strings.Common.cancel, role: .cancel) {}
         } message: { removal in
             Text(removal.message)
         }
-        .errorAlert("Couldn't Change Recently Deleted", message: $errorMessage)
+        .errorAlert(Strings.RecentlyDeleted.couldntChange, message: $errorMessage)
     }
 
     private func remove(_ removal: PendingRemoval) {
-        perform {
+        Log.store.perform("Changing Recently Deleted", errorMessage: &errorMessage) {
             switch removal {
-            case .wallet(let wallet): try wallet.deleteForever(in: context)
-            case .recurring(let schedule): try schedule.deleteForever(in: context)
-            case .transaction(let transaction): try transaction.deleteForever(in: context)
+            case .wallet(let wallet): try wallet.deleteForever()
+            case .recurring(let schedule): try schedule.deleteForever()
+            case .transaction(let transaction): try transaction.deleteForever()
             case .everything: try RecentlyDeleted.empty(in: context)
             }
         }
     }
+}
 
-    /// Runs a change, or shows why it was refused.
-    private func perform(_ change: () throws -> Void) {
-        do {
-            try change()
-        } catch {
-            errorMessage = error.localizedDescription
+extension View {
+    /// An item's Restore and Delete Forever, as a trailing swipe and a long-press menu. While the item can't be
+    /// restored, the swipe leaves Restore out and the menu greys it.
+    fileprivate func recentlyDeletedActions(
+        canRestore: Bool, restore: @escaping () -> Void, deleteForever: @escaping () -> Void
+    ) -> some View {
+        swipeActions(edge: .trailing) {
+            Button(Strings.RecentlyDeleted.deleteForever, systemImage: "trash", role: .destructive, action: deleteForever)
+            if canRestore {
+                Button(Strings.Common.restore, systemImage: "arrow.uturn.backward", action: restore)
+                    .tint(.restoreAction)
+            }
+        }
+        .contextMenu {
+            Button(Strings.Common.restore, systemImage: "arrow.uturn.backward", action: restore)
+                .disabled(!canRestore)
+            Button(Strings.RecentlyDeleted.deleteForever, systemImage: "trash", role: .destructive, action: deleteForever)
         }
     }
 }
@@ -181,7 +155,7 @@ struct RecentlyDeletedView: View {
 /// How long items wait, and how to restore or delete one.
 private struct RecentlyDeletedFooter: View {
     var body: some View {
-        Text("Items are removed for good after \(RecentlyDeleted.keptDays) days. Swipe an item to restore it or delete it forever.")
+        Text(Strings.RecentlyDeleted.footer(RecentlyDeleted.keptDays))
     }
 }
 
@@ -194,26 +168,26 @@ private enum PendingRemoval {
 
     var title: String {
         switch self {
-        case .wallet: String(localized: "Delete this wallet forever?")
-        case .recurring: String(localized: "Delete this recurring transaction forever?")
-        case .transaction: String(localized: "Delete this transaction forever?")
-        case .everything: String(localized: "Empty Recently Deleted?")
+        case .wallet: String(localized: Strings.RecentlyDeleted.deleteWalletForever)
+        case .recurring: String(localized: Strings.RecentlyDeleted.deleteRecurringForever)
+        case .transaction: String(localized: Strings.RecentlyDeleted.deleteTransactionForever)
+        case .everything: String(localized: Strings.RecentlyDeleted.emptyQuestion)
         }
     }
 
     var message: String {
         switch self {
-        case .wallet: String(localized: "The wallet and its transactions and recurring transactions will be removed for good. This can't be undone.")
-        case .recurring: String(localized: "The recurring transaction will be removed for good. Its transactions stay in your wallets. This can't be undone.")
-        case .transaction: String(localized: "The transaction will be removed for good. This can't be undone.")
-        case .everything: String(localized: "Every wallet, recurring transaction and transaction in Recently Deleted will be removed for good. This can't be undone.")
+        case .wallet: String(localized: Strings.RecentlyDeleted.walletRemovalMessage)
+        case .recurring: String(localized: Strings.RecentlyDeleted.recurringRemovalMessage)
+        case .transaction: String(localized: Strings.RecentlyDeleted.transactionRemovalMessage)
+        case .everything: String(localized: Strings.RecentlyDeleted.everythingRemovalMessage)
         }
     }
 
     var buttonTitle: String {
         switch self {
-        case .wallet, .recurring, .transaction: String(localized: "Delete Forever")
-        case .everything: String(localized: "Empty Bin")
+        case .wallet, .recurring, .transaction: String(localized: Strings.RecentlyDeleted.deleteForever)
+        case .everything: String(localized: Strings.RecentlyDeleted.emptyBin)
         }
     }
 }
@@ -221,7 +195,6 @@ private enum PendingRemoval {
 /// A deleted wallet: its icon and name, how many transactions went with it, and the days it has left.
 private struct DeletedWalletRow: View {
     let wallet: Wallet
-    /// How many transactions were deleted with it.
     let transactionCount: Int
     let now: Date
 
@@ -242,9 +215,7 @@ private struct DeletedWalletRow: View {
     }
 
     private var transactionSummary: String {
-        transactionCount == 1
-            ? String(localized: "1 transaction")
-            : String(localized: "\(transactionCount) transactions")
+        String(localized: Strings.RecentlyDeleted.transactionCount(transactionCount))
     }
 }
 
@@ -252,21 +223,13 @@ private struct DeletedWalletRow: View {
 /// Recently Deleted too, that the wallet has to be restored first.
 private struct DeletedTransactionRow: View {
     let transaction: Transaction
+    let blocker: RecentlyDeletedError?
     let now: Date
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             TransactionRow(transaction: transaction, showsDay: true)
-            HStack {
-                if transaction.restoreBlocker == .walletIsDeleted {
-                    Text("Restore its wallet first")
-                        .foregroundStyle(.orange)
-                }
-                Spacer()
-                DaysLeftText(deletedAt: transaction.deletedAt, now: now)
-            }
-            .font(.caption)
-            .padding(.leading, 44)
+            DeletedItemFooter(blocker: blocker, deletedAt: transaction.deletedAt, now: now)
         }
     }
 }
@@ -275,6 +238,7 @@ private struct DeletedTransactionRow: View {
 /// wallet is in Recently Deleted too, that the wallet has to be restored first.
 private struct DeletedRecurringRow: View {
     let recurring: RecurringTransaction
+    let blocker: RecentlyDeletedError?
     let now: Date
 
     var body: some View {
@@ -290,18 +254,31 @@ private struct DeletedRecurringRow: View {
                         .lineLimit(1)
                 }
             }
-            HStack {
-                if recurring.restoreBlocker == .walletIsDeleted {
-                    Text("Restore its wallet first")
-                        .foregroundStyle(.orange)
-                }
-                Spacer()
-                DaysLeftText(deletedAt: recurring.deletedAt, now: now)
-            }
-            .font(.caption)
-            .padding(.leading, 44)
+            DeletedItemFooter(blocker: blocker, deletedAt: recurring.deletedAt, now: now)
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// The line under a deleted transaction or Recurring transaction, lined up with its name: that its wallet has to be
+/// restored first, while it is in Recently Deleted too, and the days it has left.
+private struct DeletedItemFooter: View {
+    let blocker: RecentlyDeletedError?
+    let deletedAt: Date?
+    let now: Date
+
+    var body: some View {
+        HStack {
+            if blocker == .walletIsDeleted {
+                Text(Strings.RecentlyDeleted.restoreWalletFirst)
+                    .foregroundStyle(.attention)
+            }
+            Spacer()
+            DaysLeftText(deletedAt: deletedAt, now: now)
+        }
+        .font(.caption)
+        // Past the category icon and its spacing, under the name.
+        .padding(.leading, 44)
     }
 }
 
@@ -311,11 +288,11 @@ private struct DaysLeftText: View {
     let now: Date
 
     var body: some View {
-        let days = deletedAt.map { RecentlyDeleted.daysLeft(since: $0, now: now) } ?? RecentlyDeleted.keptDays
-        Text(days == 1 ? String(localized: "1 day left") : String(localized: "\(days) days left"))
+        let days = RecentlyDeleted.daysLeft(since: deletedAt, now: now)
+        Text(Strings.RecentlyDeleted.daysLeft(days))
             .font(.caption)
             .monospacedDigit()
-            .foregroundStyle(days <= 3 ? .red : .secondary)
+            .foregroundStyle(RecentlyDeleted.isEndingSoon(daysLeft: days) ? .urgent : .secondary)
     }
 }
 
@@ -323,5 +300,5 @@ private struct DaysLeftText: View {
     NavigationStack {
         RecentlyDeletedView()
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
+    .modelContainer(try! StoreOpening.open(inMemory: true))
 }

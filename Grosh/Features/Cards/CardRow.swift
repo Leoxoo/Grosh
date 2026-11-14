@@ -4,8 +4,8 @@ import SwiftUI
 extension CardKind {
     var title: String {
         switch self {
-        case .debit: String(localized: "Debit")
-        case .credit: String(localized: "Credit")
+        case .debit: String(localized: Strings.Cards.debit)
+        case .credit: String(localized: Strings.Cards.credit)
         }
     }
 }
@@ -15,18 +15,6 @@ extension Card {
     var displayName: String {
         guard let lastFourDigits else { return name }
         return "\(name) ••\(lastFourDigits)"
-    }
-
-    /// The Card's image, decoded for drawing, or `nil` when it has none.
-    var image: CGImage? {
-        imageData.flatMap(CroppedPhoto.image(from:))
-    }
-
-    /// A day of the month as people say it: "1st", "22nd", "31st".
-    static func ordinalDay(_ day: Int) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .ordinal
-        return formatter.string(from: day as NSNumber) ?? "\(day)"
     }
 }
 
@@ -56,7 +44,7 @@ struct CardRow: View {
             parts.append(wallet.name)
         }
         if let statementDay = card.statementDay {
-            parts.append(String(localized: "Statement on the \(Card.ordinalDay(statementDay))"))
+            parts.append(String(localized: Strings.Cards.statementOnThe(CalendarDay.ordinal(statementDay))))
         }
         return parts.joined(separator: " · ")
     }

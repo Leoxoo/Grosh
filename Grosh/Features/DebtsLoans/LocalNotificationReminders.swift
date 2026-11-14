@@ -2,12 +2,17 @@ import SwiftData
 import SwiftUI
 import UserNotifications
 
-/// Schedules Loan, Debt and Estimated-amount reminders as local notifications, at 09:00 on each reminder day or right
-/// away.
+/// Schedules Loan, Debt, Estimated-amount and Owes me reminders as local notifications, at 09:00 on each reminder day
+/// or right away.
 struct LocalNotificationReminders: ReminderScheduler {
     func requestPermission() async -> Bool {
         let options: UNAuthorizationOptions = [.alert, .sound]
-        return (try? await UNUserNotificationCenter.current().requestAuthorization(options: options)) ?? false
+        do {
+            return try await UNUserNotificationCenter.current().requestAuthorization(options: options)
+        } catch {
+            Log.reminders.failed("Asking to send notifications", error)
+            return false
+        }
     }
 
     func replacePending<Reminder: PendingReminder>(_ reminders: [Reminder]) async {
@@ -25,13 +30,45 @@ struct LocalNotificationReminders: ReminderScheduler {
             content.title = reminder.title
             content.body = reminder.body
             content.sound = .default
+            if let category = Reminder.categoryIdentifier {
+                content.categoryIdentifier = category
+            }
+            if let textThem = reminder.textThem {
+                do {
+                    content.userInfo = try textThem.userInfo()
+                } catch {
+                    Log.reminders.failed("Writing a reminder's Text them details", error)
+                }
+            }
             let request = UNNotificationRequest(
                 identifier: "\(prefix)\(index)",
                 content: content,
                 trigger: reminder.trigger
             )
-            try? await center.add(request)
+            do {
+                try await center.add(request)
+            } catch {
+                Log.reminders.failed("Scheduling a reminder", error)
+            }
         }
+    }
+}
+
+extension LocalNotificationReminders {
+    /// The identifier of the "Text them" notification action.
+    nonisolated static let textThemAction = "grosh.text-them"
+
+    /// Gives the reminders that name a Person (Owes me, Loan and Debt) a "Text them" action, which opens the Messages
+    /// compose sheet for that Person (``ReminderActionHandler``). The action only opens the app; the user taps Send, and
+    /// nothing is sent without it. Done once at launch, before any notification can arrive.
+    static func registerActions(on center: UNUserNotificationCenter = .current()) {
+        let textThem = UNNotificationAction(
+            identifier: textThemAction, title: String(localized: Strings.People.textThem), options: [.foreground]
+        )
+        let categories = [ExpectedReimbursementReminder.categoryIdentifier, DebtReminder.categoryIdentifier]
+            .compactMap { $0 }
+            .map { UNNotificationCategory(identifier: $0, actions: [textThem], intentIdentifiers: [], options: []) }
+        center.setNotificationCategories(Set(categories))
     }
 }
 
@@ -52,19 +89,21 @@ private extension PendingReminder {
 /// settlement or a confirmed amount changes what should be pending, they are replaced. The first reminder asks to send
 /// notifications.
 private struct ReminderSync<Source: ReminderSource>: ViewModifier {
-    @Query private var transactions: [Transaction]
+    @Query private var records: [Source.Record]
+    @Environment(\.today) private var today
     /// What the last sync handed over, so a reminder set for today after 09:00 arrives once.
     @State private var earlier: [Source.Reminder]?
 
     init(_ source: Source.Type) {
-        _transactions = Query(Source.transactions)
+        _records = Query(Source.records)
     }
 
     func body(content: Content) -> some View {
-        let source = Source(transactions)
-        let reminders = source.reminders(from: .today)
+        let source = Source(records)
+        let reminders = source.reminders(from: today)
         content
             .task(id: reminders) {
+                // The moment, not just the day: once 09:00 has passed, a reminder for today arrives right away.
                 await source.reschedule(at: .now, after: earlier, using: LocalNotificationReminders())
                 earlier = reminders
             }
@@ -72,6 +111,13 @@ private struct ReminderSync<Source: ReminderSource>: ViewModifier {
 }
 
 extension View {
+    /// Keeps the Owes me reminders scheduled as local notifications in step with the store: whenever an expectation is
+    /// made, paid, closed, forgiven, removed or has its reminder changed, or its Expense goes to Recently Deleted or
+    /// comes back. Use once, at the app's top level.
+    func syncsExpectedReimbursementReminders() -> some View {
+        modifier(ReminderSync(ExpectedReimbursements.self))
+    }
+
     /// Keeps the Loan and Debt reminders scheduled as local notifications in step with the store. Use once, at the
     /// app's top level.
     func syncsDebtReminders() -> some View {

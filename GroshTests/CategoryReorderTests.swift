@@ -6,11 +6,12 @@ import Testing
 /// Reordering categories in Account → Categories: the top-level categories of a type among themselves, and a parent's
 /// subcategories within it.
 @MainActor
+@Suite(.namedInTheLog)
 struct CategoryReorderTests {
-    private let fixture: CategoryFixture
+    private let fixture: TestStore
 
     init() throws {
-        fixture = try CategoryFixture()
+        fixture = try TestStore()
     }
 
     private func expenseParents() throws -> [Grosh.Category] {

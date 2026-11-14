@@ -1,34 +1,73 @@
 import SwiftData
 import SwiftUI
 
-/// Home's Month graph: the month strip, with a link to the Report, then one card with a Spent tab and an Income tab. The tab shown draws the
-/// running total of the month the strip picks beside the Average of the months before it, or the same month last year
-/// while the "vs last year" switch, which both tabs share, is on. A month the strip no longer offers, once the only
-/// transaction that counted in it is gone, gives way to this month. Its amounts show even while the Total is hidden.
-/// It reads only what the month picked needs from the store (``MonthGraphHistory``). Use inside a `List`.
+/// Home's Month graph: the month strip, with a link to the Report, then one card with a Spent tab and an Income tab. The
+/// tab shown draws the running total of the month the strip picks beside the Average of the months before it, or the
+/// same month last year while the "vs last year" switch, which both tabs share, is on. A month the strip no longer
+/// offers, once the only transaction that counted in it is gone, gives way to this month. Its amounts show even while
+/// the Total is hidden, and are in the Total's currency (``WalletSelection/currencyCode(among:)``), as the Report's
+/// are. It reads only what the month picked needs from the store (``MonthGraphHistory``). Use inside a `List`.
 struct HomeMonthGraph: View {
-    /// Remembers across launches whether both tabs compare their month with Last year.
-    static let comparesWithLastYearKey = "home.monthGraph.comparesWithLastYear"
-
     let today: CalendarDay
     /// The month the card shows, picked in the strip. Home holds it, since the Report opens on it.
     @Binding var period: Period
     /// Whether the Report is open, which "See reports" turns on. Home presents the Report, outside this list row.
     @Binding var isShowingReport: Bool
+    /// The Total's currency (``WalletSelection/currencyCode(among:)``), from the wallets Home already reads for the Total.
+    let currencyCode: String
 
-    @Query(MonthGraphHistory.earliestCounted) private var earliest: [Transaction]
-    @Query(MonthGraphHistory.forgiven) private var forgiven: [Transaction]
-    /// The tab the card shows.
     @State private var side = SpentOrIncome.spent
-    @AppStorage(Self.comparesWithLastYearKey) private var comparesWithLastYear = false
+    @AppStorage(AppSettings.comparesWithLastYear) private var comparesWithLastYear
 
     var body: some View {
-        let firstDay = MonthGraphHistory.firstDay(earliest: earliest, forgiven: forgiven)
-        let months = MonthGraph.months(from: firstDay, today: today)
+        OtherIncomeReader { otherIncome in
+            HomeMonthGraphContent(
+                today: today, period: $period, isShowingReport: $isShowingReport,
+                currencyCode: currencyCode, otherIncome: otherIncome,
+                side: $side, comparesWithLastYear: $comparesWithLastYear
+            )
+        }
+    }
+}
+
+/// The strip and the card of ``HomeMonthGraph``, counting in `currencyCode`, the Total's, from its first counted day
+/// in that currency.
+private struct HomeMonthGraphContent: View {
+    let today: CalendarDay
+    @Binding var period: Period
+    @Binding var isShowingReport: Bool
+    let currencyCode: String
+    /// What an Expense paid back beyond its amount counts its extra under.
+    let otherIncome: Category
+    @Binding var side: SpentOrIncome
+    @Binding var comparesWithLastYear: Bool
+
+    @Query private var earliest: [Transaction]
+    @Query(MonthGraphHistory.forgiven) private var forgiven: [Transaction]
+
+    init(
+        today: CalendarDay, period: Binding<Period>, isShowingReport: Binding<Bool>, currencyCode: String,
+        otherIncome: Category, side: Binding<SpentOrIncome>, comparesWithLastYear: Binding<Bool>
+    ) {
+        self.today = today
+        _period = period
+        _isShowingReport = isShowingReport
+        self.currencyCode = currencyCode
+        self.otherIncome = otherIncome
+        _side = side
+        _comparesWithLastYear = comparesWithLastYear
+        _earliest = Query(MonthGraphHistory.earliestCounted(currencyCode: currencyCode))
+    }
+
+    var body: some View {
+        let firstDay = MonthGraphHistory.firstDay(
+            earliest: earliest, forgiven: forgiven, currencyCode: currencyCode, otherIncome: otherIncome
+        )
+        let months = TimeRange.month.pastPeriods(from: firstDay, today: today)
         Section {
             HStack {
                 Spacer()
-                Button("See reports") { isShowingReport = true }
+                Button(Strings.Home.seeReports) { isShowingReport = true }
                     .font(.subheadline)
             }
             .listRowBackground(Color.clear)
@@ -41,8 +80,8 @@ struct HomeMonthGraph: View {
                 }
         }
         HomeMonthGraphCard(
-            month: month, firstDay: firstDay, forgiven: forgiven, today: today, side: $side,
-            comparesWithLastYear: $comparesWithLastYear
+            month: month, firstDay: firstDay, forgiven: forgiven, today: today, currencyCode: currencyCode,
+            otherIncome: otherIncome, side: $side, comparesWithLastYear: $comparesWithLastYear
         )
     }
 
@@ -67,41 +106,57 @@ private struct HomeMonthGraphCard: View {
     /// Every forgiven Loan and Debt, which count on the day they were forgiven, whatever month that is.
     let forgiven: [Transaction]
     let today: CalendarDay
+    let currencyCode: String
+    let otherIncome: Category
     @Binding var side: SpentOrIncome
     @Binding var comparesWithLastYear: Bool
 
     @Query private var transactions: [Transaction]
     @Query private var recurringTransactions: [RecurringTransaction]
+    /// A save can change a varying Bill's estimate, so the schedules' starting amounts are read anew after each one,
+    /// once for both tabs, rather than on every draw.
+    @StoreSaves private var saves
+    @State private var schedules = DrawingCache<AsSaved, RecurringSchedules>()
 
     init(
         month: CalendarMonth, firstDay: CalendarDay?, forgiven: [Transaction], today: CalendarDay,
-        side: Binding<SpentOrIncome>, comparesWithLastYear: Binding<Bool>
+        currencyCode: String, otherIncome: Category, side: Binding<SpentOrIncome>, comparesWithLastYear: Binding<Bool>
     ) {
         self.month = month
         self.firstDay = firstDay
         self.forgiven = forgiven
         self.today = today
+        self.currencyCode = currencyCode
+        self.otherIncome = otherIncome
         _side = side
         _comparesWithLastYear = comparesWithLastYear
         _transactions = Query(MonthGraphHistory.transactions(for: month))
     }
 
     var body: some View {
-        // What counts is worked out once for both tabs.
-        let counted = (transactions + forgiven).compactMap(\.countedAmount)
+        // What counts, and what each schedule starts at, is worked out once for both tabs.
+        let history = MonthGraphHistory.history(
+            read: transactions, forgiven: forgiven, firstDay: firstDay, currencyCode: currencyCode,
+            otherIncome: otherIncome
+        )
+        let recurring = schedules.value(for: AsSaved(recurringTransactions, saves: saves)) {
+            RecurringSchedules(recurringTransactions)
+        }
         MonthGraphCard(
-            spent: graph(for: .spent, of: counted),
-            income: graph(for: .income, of: counted),
+            spent: graph(for: .spent, in: history, recurring: recurring),
+            income: graph(for: .income, in: history, recurring: recurring),
             side: $side,
             comparesWithLastYear: $comparesWithLastYear
         )
     }
 
     /// The graph of `side`'s tab for the month, compared as the "vs last year" switch is set.
-    private func graph(for side: SpentOrIncome, of counted: [CountedAmount]) -> MonthGraph {
-        MonthGraph(
-            side, of: counted, countingFrom: firstDay, recurring: recurringTransactions, in: .month(month),
-            today: today, comparingWith: comparesWithLastYear ? .lastYear : .average
+    private func graph(
+        for side: SpentOrIncome, in history: CountedHistory, recurring: RecurringSchedules
+    ) -> MonthGraph {
+        history.graph(
+            side, of: month, recurring: recurring, today: today,
+            comparingWith: MonthGraphComparison(comparesWithLastYear: comparesWithLastYear)
         )
     }
 }
@@ -112,7 +167,6 @@ private struct HomeMonthGraphCard: View {
 struct MonthGraphCard: View {
     let spent: MonthGraph
     let income: MonthGraph
-    /// The tab shown.
     @Binding var side: SpentOrIncome
     /// Whether the "vs last year" switch, which both tabs share, is on.
     @Binding var comparesWithLastYear: Bool
@@ -138,7 +192,6 @@ struct MonthGraphCard: View {
         }
     }
 
-    /// The graph of the tab shown.
     private var graph: MonthGraph {
         side == .spent ? spent : income
     }
@@ -165,7 +218,9 @@ struct MonthGraphCard: View {
                     .foregroundStyle(tabGraph.side.color)
                     .contentTransition(.numericText())
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(0.5)
+                    // Keeps Spent's and Income's totals apart when they shrink to fit.
+                    .padding(.horizontal, 4)
                 Capsule()
                     .fill(isShown ? tabGraph.side.color : Color.secondary.opacity(0.3))
                     .frame(height: 3)
@@ -183,22 +238,28 @@ extension SpentOrIncome {
     /// The tab's name on Home.
     var title: String {
         switch self {
-        case .spent: String(localized: "Spent")
-        case .income: String(localized: "Income")
+        case .spent: String(localized: Strings.Common.spent)
+        case .income: String(localized: Strings.Common.income)
         }
-    }
-
-    /// The color amounts going out (Spent) or coming in (Income) have everywhere in the app.
-    var color: Color {
-        Money(cents: self == .spent ? -1 : 1).tint
     }
 }
 
 #Preview {
-    List {
-        HomeMonthGraph(
-            today: .today, period: .constant(.month(CalendarMonth(.today))), isShowingReport: .constant(false)
-        )
+    HomeMonthGraphPreview()
+        .modelContainer(try! StoreOpening.open(inMemory: true))
+}
+
+/// Home's Month graph on the month of the day the preview shows.
+private struct HomeMonthGraphPreview: View {
+    @Environment(\.today) private var today
+    @Query(Wallet.unarchived) private var wallets: [Wallet]
+
+    var body: some View {
+        List {
+            HomeMonthGraph(
+                today: today, period: .constant(.month(CalendarMonth(today))), isShowingReport: .constant(false),
+                currencyCode: WalletSelection.total.currencyCode(among: wallets)
+            )
+        }
     }
-    .modelContainer(try! GroshStore.makeSeededContainer(inMemory: true))
 }

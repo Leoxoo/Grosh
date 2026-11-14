@@ -1,6 +1,6 @@
 import Foundation
 
-/// A hashtag the user's MoneyLover notes name a Card with, and the Card it becomes on import
+/// A hashtag someone's MoneyLover notes name a Card with, and the Card it becomes on import
 /// (``MoneyLoverCardMapping``).
 nonisolated struct MoneyLoverCardTag: Hashable, Sendable {
     /// Lowercase, with its `#`.
@@ -15,7 +15,7 @@ extension MoneyLoverCardTag {
     /// spaces tidied. A longer hashtag (`#chasefreedom`) isn't `#chase`. Every other hashtag, another card's included,
     /// stays in the note. `nil` for a note without a card hashtag.
     static func extractFirst(
-        from note: String, among tags: [MoneyLoverCardTag] = MoneyLoverCardMapping.tags
+        from note: String, among tags: [MoneyLoverCardTag]
     ) -> (tag: MoneyLoverCardTag, noteWithoutTag: String)? {
         for match in note.matches(of: #/\#\w+/#) {
             let text = note[match.range].lowercased()

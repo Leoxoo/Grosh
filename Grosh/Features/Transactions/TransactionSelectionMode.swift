@@ -17,7 +17,6 @@ private struct TransactionSelectionMode: ViewModifier {
     @Binding var chosen: Set<Transaction>
     let title: String
 
-    @Environment(\.modelContext) private var context
     @State private var deletePrompt: TransactionDeletePrompt?
     @State private var errorMessage: String?
 
@@ -27,20 +26,20 @@ private struct TransactionSelectionMode: ViewModifier {
             .toolbar {
                 if isSelecting {
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { stopSelecting() }
+                        Button(Strings.Common.done) { stopSelecting() }
                     }
                     ToolbarItem(placement: .destructiveAction) {
-                        Button("Delete", systemImage: "trash", role: .destructive) { confirmDeletingChosen() }
+                        Button(Strings.Common.delete, systemImage: "trash", role: .destructive) { confirmDeletingChosen() }
                             .disabled(chosen.isEmpty)
                     }
                 }
             }
             .transactionDeleteDialog($deletePrompt, didDelete: stopSelecting)
-            .errorAlert("Couldn't Delete Transactions", message: $errorMessage)
+            .errorAlert(Strings.Transactions.couldntDeleteSeveral, message: $errorMessage)
     }
 
     private var selectionTitle: String {
-        chosen.isEmpty ? String(localized: "Select Transactions") : String(localized: "\(chosen.count) Selected")
+        chosen.isEmpty ? String(localized: Strings.Transactions.selectTransactions) : String(localized: Strings.Transactions.selectedCount(chosen.count))
     }
 
     private func stopSelecting() {
@@ -49,10 +48,8 @@ private struct TransactionSelectionMode: ViewModifier {
     }
 
     private func confirmDeletingChosen() {
-        do {
-            deletePrompt = try TransactionDeletePrompt(for: Array(chosen).inListOrder(), in: context)
-        } catch {
-            errorMessage = error.localizedDescription
+        Log.store.perform("Reading what deleting transactions takes", errorMessage: &errorMessage) {
+            deletePrompt = try TransactionDeletePrompt(for: Array(chosen).inListOrder())
         }
     }
 }

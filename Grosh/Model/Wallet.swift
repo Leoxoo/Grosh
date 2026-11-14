@@ -1,13 +1,17 @@
 import Foundation
 import SwiftData
 
-/// A place the user's money is held. Its balance is always derived from its transactions, never stored.
+/// A place the user's money is held. Its balance is always derived from its transactions; the saved month totals are
+/// only a copy of them (ADR-0013).
 @Model
 final class Wallet {
+    /// The symbol a wallet starts with: a wallet.
+    nonisolated static let defaultSymbolName = "wallet.bifold.fill"
+
     var name: String = ""
-    var symbolName: String = "wallet.bifold.fill"
+    var symbolName: String = Wallet.defaultSymbolName
     var colorName: String = PaletteColor.green.rawValue
-    var currencyCode: String = "USD"
+    var currencyCode: String = Money.defaultCurrencyCode
     var includeInTotal: Bool = true
     var isArchived: Bool = false
     var sortOrder: Int = 0
@@ -24,7 +28,17 @@ final class Wallet {
     @Relationship(deleteRule: .nullify, inverse: \RecurringTransaction.wallet)
     var recurringTransactions: [RecurringTransaction]? = []
 
-    init(name: String, symbolName: String = "wallet.bifold.fill", color: PaletteColor = .green, sortOrder: Int = 0) {
+    /// The wallet's saved month totals, which go with it (ADR-0013).
+    @Relationship(deleteRule: .cascade, inverse: \WalletMonthTotal.wallet)
+    var monthTotals: [WalletMonthTotal]? = []
+
+    /// The wallet's months marked dirty since they were last counted (ADR-0013).
+    @Relationship(deleteRule: .cascade, inverse: \DirtyWalletMonth.wallet)
+    var dirtyMonths: [DirtyWalletMonth]? = []
+
+    init(
+        name: String, symbolName: String = Wallet.defaultSymbolName, color: PaletteColor = .green, sortOrder: Int = 0
+    ) {
         self.name = name
         self.symbolName = symbolName
         self.color = color
@@ -35,4 +49,12 @@ final class Wallet {
         get { PaletteColor(storedName: colorName) }
         set { colorName = newValue.rawValue }
     }
+
+    var isInRecentlyDeleted: Bool { deletedAt != nil }
+}
+
+nonisolated extension Optional where Wrapped == Wallet {
+    /// The currency of the wallet, or the default one while there is no wallet: what an amount in it, or in a draft
+    /// that has no wallet yet, is in.
+    var currencyCodeOrDefault: String { self?.currencyCode ?? Money.defaultCurrencyCode }
 }

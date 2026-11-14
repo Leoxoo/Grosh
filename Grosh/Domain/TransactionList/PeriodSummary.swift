@@ -14,20 +14,27 @@ struct PeriodSummary: Equatable {
 
 extension PeriodSummary {
     /// The summary of `period` for a set of transactions, such as every transaction of the selected wallet.
-    /// `transactions` must reach back before the period, since the Opening balance is built from them.
+    /// `transactions` must reach back before the period, since the Opening balance is built from them. Both are in
+    /// the currency of the transactions' wallet; for the Total of wallets in different currencies, the first one's.
     init(of transactions: some Sequence<some DatedAmount>, in period: Period, today: CalendarDay) {
         let days = period.days(today: today)
         var opening = 0
         var ending = 0
+        var wallet: Wallet?
         for transaction in transactions {
+            if wallet == nil { wallet = transaction.wallet }
             let day = CalendarDay(rawValue: transaction.dayRaw)
             if let first = days.first, day < first {
-                opening += transaction.amountCents
+                opening += transaction.netCents
             }
             if days.last.map({ day <= $0 }) ?? true {
-                ending += transaction.amountCents
+                ending += transaction.netCents
             }
         }
-        self.init(openingBalance: Money(cents: opening), endingBalance: Money(cents: ending))
+        let currencyCode = wallet.currencyCodeOrDefault
+        self.init(
+            openingBalance: Money(cents: opening, currencyCode: currencyCode),
+            endingBalance: Money(cents: ending, currencyCode: currencyCode)
+        )
     }
 }

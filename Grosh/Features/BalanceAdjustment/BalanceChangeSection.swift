@@ -5,26 +5,28 @@ import SwiftUI
 struct BalanceChangeSection: View {
     let transaction: Transaction
 
+    @NotDeletedTransactions private var transactions: [Transaction]
+
     var body: some View {
-        if let change = transaction.balanceChange {
+        if let change = transaction.balanceChange(in: $transactions) {
             Section {
-                LabeledContent("Balance") {
+                LabeledContent(Strings.Common.balance) {
                     HStack(spacing: 6) {
                         Text(change.recorded.formatted())
                             .foregroundStyle(.secondary)
                         Image(systemName: "arrow.right")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .accessibilityLabel("to")
+                            .accessibilityLabel(Strings.BalanceAdjustment.changedTo)
                         Text(change.actual.formatted())
                     }
                     .monospacedDigit()
                 }
                 .accessibilityElement(children: .combine)
             } header: {
-                Text("Balance adjustment")
+                Text(Strings.BalanceAdjustment.balanceAdjustment)
             } footer: {
-                Text("What the wallet's transactions added up to, and its actual balance after this adjustment.")
+                Text(Strings.BalanceAdjustment.balanceChangeFooter)
             }
         }
     }

@@ -10,22 +10,34 @@ struct NetIncomeDetailsView: View {
     @Binding var timeRange: TimeRange
     @Binding var period: Period
 
-    @Query(Transaction.notDeleted) private var transactions: [Transaction]
+    @Environment(\.today) private var today
 
     var body: some View {
-        let today = CalendarDay.today
-        let counted = transactions.counted(in: walletSelection, during: period, today: today)
-        let rows = stepRows(counted: counted, today: today)
+        CountedHistoryReader(selection: walletSelection) { history in
+            content(history)
+        }
+    }
+
+    @ViewBuilder
+    private func content(_ history: CountedHistory) -> some View {
+        let counted = history.during(period, today: today)
+        let rows = StepRow.rows(
+            of: counted, currencyCode: history.currencyCode, for: timeRange,
+            over: history.days(of: period, today: today), today: today
+        )
         List {
             Section {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Net income")
+                    Text(Strings.Screens.netIncome)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    AmountText(amount: PeriodTotals(of: counted).netIncome, showsPlusSign: true)
+                    AmountText(
+                        amount: PeriodTotals(of: counted, currencyCode: history.currencyCode).netIncome,
+                        showsPlusSign: true
+                    )
                         .font(.largeTitle.bold())
                         .contentTransition(.numericText())
-                    StepColumns(steps: rows)
+                    StepColumns(steps: rows, currencyCode: history.currencyCode)
                 }
                 .padding(.vertical, 4)
             }
@@ -44,19 +56,13 @@ struct NetIncomeDetailsView: View {
         }
         .roundedSectionsListStyle()
         .reportPeriodControls(
-            walletSelection: $walletSelection, timeRange: $timeRange, period: $period, transactions: transactions,
+            walletSelection: $walletSelection, timeRange: $timeRange, period: $period, history: history,
             showsWalletSelector: false
         )
-        .navigationTitle("Net income")
+        .navigationTitle(Strings.Screens.netIncome)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-    }
-
-    /// The Steps of the period as shown, each with its title and totals: what counts in each.
-    private func stepRows(counted: [CountedAmount], today: CalendarDay) -> [StepRow] {
-        let days = transactions.reportDays(of: period, in: walletSelection, today: today)
-        return StepRow.rows(of: counted, for: timeRange, over: days, today: today)
     }
 }
 
@@ -70,10 +76,10 @@ private struct StepTotalsRow: View {
             Text(title)
                 .font(.headline)
             HStack(alignment: .top, spacing: 8) {
-                SummaryFigure(title: Text("Income"), value: Text(totals.income.formatted()).monospacedDigit())
-                SummaryFigure(title: Text("Spent"), value: Text(totals.spent.formatted()).monospacedDigit())
+                SummaryFigure(title: Text(Strings.Common.income), value: Text(totals.income.formatted()).monospacedDigit())
+                SummaryFigure(title: Text(Strings.Common.spent), value: Text(totals.spent.formatted()).monospacedDigit())
                 SummaryFigure(
-                    title: Text("Net income"),
+                    title: Text(Strings.Screens.netIncome),
                     value: AmountText(amount: totals.netIncome, showsPlusSign: true, showsColor: false)
                 )
             }
@@ -86,29 +92,19 @@ private struct StepTotalsRow: View {
 /// rows below the chart list them with their totals.
 private struct StepColumns: View {
     let steps: [StepRow]
+    let currencyCode: String
 
     var body: some View {
         Chart {
             ForEach(steps) { row in
-                BarMark(x: .value("Step", row.title), y: .value("Income", row.totals.income.cents))
+                BarMark(x: .value(Strings.Common.step, row.title), y: .value(Strings.Common.income, row.totals.income.cents))
                     .foregroundStyle(SpentOrIncome.income.color)
-                BarMark(x: .value("Step", row.title), y: .value("Spent", -row.totals.spent.cents))
+                BarMark(x: .value(Strings.Common.step, row.title), y: .value(Strings.Common.spent, -row.totals.spent.cents))
                     .foregroundStyle(SpentOrIncome.spent.color)
             }
-            RuleMark(y: .value("Zero", 0))
+            RuleMark(y: .value(Strings.Common.zero, 0))
                 .foregroundStyle(.secondary.opacity(0.4))
         }
-        .chartYAxis {
-            AxisMarks(position: .leading) { value in
-                AxisValueLabel {
-                    if let cents = value.as(Int.self) {
-                        Text(Money(cents: cents).formatted())
-                            .font(.caption2)
-                    }
-                }
-            }
-        }
-        .frame(height: 260)
-        .accessibilityHidden(true)
+        .stepBarAxes(currencyCode: currencyCode)
     }
 }

@@ -10,14 +10,14 @@ enum LoanOrDebtAction: Hashable, Identifiable {
 
 /// The transaction detail's section for a Loan or Debt: its story (what was lent or borrowed, paid back and
 /// forgiven), what is outstanding, Record Payment, Forgive the Rest and the reminder, or that it is settled, or
-/// forgiven with Un-forgive. Shows nothing for any other transaction. Use inside a `List`, with
-/// ``SwiftUI/View/loanOrDebtSheets(for:action:)`` on the screen to present what `action` opens.
+/// forgiven with Un-forgive. Shows nothing for any other transaction. Use inside a `List`, with the screen presenting
+/// ``LoanOrDebtAction/sheet(for:)`` for what `action` opens.
 struct LoanOrDebtSection: View {
     let transaction: Transaction
     @Binding var action: LoanOrDebtAction?
 
     /// Every Loan, Debt and payment, so the section is current as soon as a payment is recorded.
-    @Query(DebtsAndLoans.transactions) private var debtLoanTransactions: [Transaction]
+    @Query(DebtsAndLoans.records) private var debtLoanTransactions: [Transaction]
     @State private var errorMessage: String?
 
     var body: some View {
@@ -29,22 +29,22 @@ struct LoanOrDebtSection: View {
                     ))
                     .monospacedDigit()
                 }
-                LabeledContent("Outstanding") {
+                LabeledContent(Strings.DebtsLoans.outstanding) {
                     Text(loanOrDebt.outstanding.formatted())
                         .monospacedDigit()
                         .foregroundStyle(loanOrDebt.isSettled ? .secondary : .primary)
                 }
                 if let forgiveness = loanOrDebt.forgiveness {
                     ForgivenRows(forgiveness: forgiveness)
-                    Button("Un-forgive", systemImage: "arrow.uturn.backward") { unforgive() }
+                    Button(Strings.DebtsLoans.unforgive, systemImage: "arrow.uturn.backward") { unforgive() }
                 }
                 if !loanOrDebt.isSettled {
-                    Button("Record Payment", systemImage: "plus.circle") { action = .recordPayment }
-                    Button("Forgive the Rest", systemImage: "hand.raised") { action = .forgive }
+                    Button(Strings.DebtsLoans.recordPayment, systemImage: "plus.circle") { action = .recordPayment }
+                    Button(Strings.DebtsLoans.forgiveTheRest, systemImage: "hand.raised") { action = .forgive }
                     ReminderField(day: reminderDay)
                 } else if loanOrDebt.forgiveness == nil {
-                    Label("Settled", systemImage: "checkmark.seal.fill")
-                        .foregroundStyle(.green)
+                    Label(Strings.Common.settled, systemImage: "checkmark.seal.fill")
+                        .foregroundStyle(.settled)
                 }
             } header: {
                 Text(loanOrDebt.kind.name)
@@ -55,15 +55,13 @@ struct LoanOrDebtSection: View {
                     Text(loanOrDebt.kind.paymentsFooter)
                 }
             }
-            .errorAlert("Couldn't Change Loan or Debt", message: $errorMessage)
+            .errorAlert(Strings.DebtsLoans.couldntChange, message: $errorMessage)
         }
     }
 
     private func unforgive() {
-        do {
+        Log.store.perform("Un-forgiving a Loan or Debt", errorMessage: &errorMessage) {
             try transaction.unforgive()
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 
@@ -72,10 +70,8 @@ struct LoanOrDebtSection: View {
         Binding {
             transaction.reminderDay
         } set: { day in
-            do {
+            Log.reminders.perform("Setting a Loan or Debt reminder", errorMessage: &errorMessage) {
                 try transaction.setReminder(day)
-            } catch {
-                errorMessage = error.localizedDescription
             }
         }
     }
@@ -87,32 +83,31 @@ private struct ForgivenRows: View {
 
     var body: some View {
         LabeledContent {
-            Text(forgiveness.day.date().formatted(date: .abbreviated, time: .omitted))
+            Text(forgiveness.day.shortText)
         } label: {
-            Label("Forgiven", systemImage: "hand.raised.fill")
-                .foregroundStyle(.green)
+            Label(Strings.Common.forgiven, systemImage: "hand.raised.fill")
+                .foregroundStyle(.settled)
         }
-        LabeledContent("Counts As") {
+        LabeledContent(Strings.DebtsLoans.countsAs) {
             HStack(spacing: 6) {
                 CategoryIcon(category: forgiveness.category, size: 20)
-                Text(forgiveness.category?.name ?? String(localized: "Uncategorized"))
+                Text(forgiveness.category?.name ?? String(localized: Strings.Common.uncategorized))
             }
         }
         if !forgiveness.note.isEmpty {
-            LabeledContent("Note", value: forgiveness.note)
+            LabeledContent(Strings.Common.note, value: forgiveness.note)
         }
     }
 }
 
-extension View {
-    /// Presents Record Payment or Forgive the Rest for `transaction` while `action` says which. Attach to the screen,
-    /// outside its `List`, so presenting doesn't depend on the list's rows.
-    func loanOrDebtSheets(for transaction: Transaction, action: Binding<LoanOrDebtAction?>) -> some View {
-        sheet(item: action) { action in
-            switch action {
-            case .recordPayment: RecordPaymentEditor(original: transaction)
-            case .forgive: ForgiveEditor(original: transaction)
-            }
+extension LoanOrDebtAction {
+    /// The sheet this opens for `transaction`: Record Payment or Forgive the Rest. Present it from the screen, outside
+    /// its `List`, so presenting doesn't depend on the list's rows.
+    @ViewBuilder
+    func sheet(for transaction: Transaction) -> some View {
+        switch self {
+        case .recordPayment: RecordPaymentEditor(original: transaction)
+        case .forgive: ForgiveEditor(original: transaction)
         }
     }
 }

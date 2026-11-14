@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// Why a Recurring transaction can't be saved yet.
-nonisolated enum RecurringRuleError: Error, Equatable {
+nonisolated enum RecurringRuleError: RuleRefusal, Equatable {
     case missingName
     case missingWallet
     /// The amount must be above zero, unless a varying Bill has an estimate to start from. The category sets the sign.
@@ -14,24 +14,27 @@ nonisolated enum RecurringRuleError: Error, Equatable {
     case untilBeforeStart
     /// An end "after N times" needs at least one occurrence.
     case noOccurrences
+    /// A Purchase's total price can't be worked out, as when it divides by zero.
+    case invalidTotal
 }
 
 extension RecurringRuleError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .missingName: String(localized: "Give the recurring transaction a name.")
-        case .missingWallet: String(localized: "Choose a wallet.")
-        case .missingAmount: String(localized: "Enter an amount above zero.")
-        case .missingCategory: String(localized: "Choose a category.")
-        case .cardNotInWallet: String(localized: "Choose a Card paid from this wallet.")
-        case .untilBeforeStart: String(localized: "The last day can't be before the start date.")
-        case .noOccurrences: String(localized: "Repeat at least once.")
+        case .missingName: String(localized: Strings.Recurring.missingName)
+        case .missingWallet: String(localized: Strings.Common.chooseAWallet)
+        case .missingAmount: String(localized: Strings.Common.enterAmountAboveZero)
+        case .missingCategory: String(localized: Strings.Common.chooseACategory)
+        case .cardNotInWallet: String(localized: Strings.Recurring.cardNotInWallet)
+        case .untilBeforeStart: String(localized: Strings.Recurring.untilBeforeStart)
+        case .noOccurrences: String(localized: Strings.Recurring.noOccurrences)
+        case .invalidTotal: String(localized: Strings.Common.enterAmountAboveZero)
         }
     }
 }
 
 /// Why a Recurring transaction can't make one now, with Add the Transaction.
-nonisolated enum AddTransactionNowError: Error, Equatable {
+nonisolated enum AddTransactionNowError: RuleRefusal, Equatable {
     /// A paused or deleted schedule makes nothing.
     case inactive
     /// A transaction needs a wallet and a category, which the schedule can lose when they are deleted.
@@ -41,24 +44,25 @@ nonisolated enum AddTransactionNowError: Error, Equatable {
 extension AddTransactionNowError: LocalizedError {
     var errorDescription: String? {
         switch self {
-        case .inactive: String(localized: "A paused or deleted recurring transaction can't add a transaction.")
-        case .incomplete: String(localized: "Choose a wallet and a category in Edit first.")
+        case .inactive: String(localized: Strings.Recurring.inactive)
+        case .incomplete: String(localized: Strings.Recurring.incomplete)
         }
     }
 }
 
 /// The editable fields of a Recurring transaction, as its form holds them before the rules check and save them.
-struct RecurringDraft {
+nonisolated struct RecurringDraft {
     var name = ""
-    /// Entered positive; the category sets the sign.
-    var amount = Money(cents: 0)
-    /// A Purchase's total price, or `nil` for none. A Kind change keeps it, as it keeps the icon.
-    var total: Money?
-    /// Expense or Income. Switching it drops a category of the other type.
+    /// The amount as typed, entered positive; the category sets the sign.
+    var entry = AmountEntry()
+    /// A Purchase's total price as typed. Left empty, or zero, it is no total. A Kind change keeps it, as it keeps the
+    /// icon.
+    var totalEntry = AmountEntry()
+    /// Expense or Income. Switching it drops a category of the other type, and a name that only followed it.
     var type: CategoryType = .expense {
         didSet {
             if category?.type != type {
-                category = nil
+                pickedCategory = nil
             }
         }
     }
@@ -71,6 +75,21 @@ struct RecurringDraft {
         }
     }
     var category: Category?
+    /// The category as the form picks it. A Recurring transaction is named after its category until the user types a
+    /// name of their own, and a new one (Add or Duplicate) takes the category's default Kind, which the user can change.
+    var pickedCategory: Category? {
+        get { category }
+        set {
+            let old = category
+            category = newValue
+            if name.isEmpty || name == old?.name {
+                name = newValue?.name ?? ""
+            }
+            if isNew, let newValue {
+                kind = newValue.defaultKind
+            }
+        }
+    }
     var card: Card?
     /// The sort of Recurring transaction it is. A new one starts with its category's default Kind.
     var kind: RecurringKind = .regular {
@@ -87,9 +106,8 @@ struct RecurringDraft {
     var amountVaries = false
     /// For a varying Bill, how many days after an occurrence the user is reminded to enter its real amount.
     var remindAfterDays = 2
-    /// The average a varying Bill's transactions would start at, from its category's history. It stands in for an
-    /// amount left empty. The form sets it, and it is never saved.
-    var estimateCents: Int?
+    /// The estimate last given with ``setEstimate(_:for:)``, and what it was read for.
+    private var estimate: (request: EstimateRequest, cents: Int?)?
     /// Whether each transaction it makes would start Estimated: a Bill whose amount varies, as on the model.
     var estimatesAmount: Bool { kind.estimates(amountVaries: amountVaries) }
     var note = ""
@@ -120,19 +138,20 @@ struct RecurringDraft {
     var untilDay: CalendarDay
     /// The number of occurrences, for an end "after N times".
     var occurrenceCount = 12
+    /// Where the schedule being edited started when the form opened, or `nil` for a new one.
+    private var savedStart: CalendarDay?
 
     init(startDay: CalendarDay) {
         self.startDay = startDay
         untilDay = startDay.adding(days: 365)
     }
 
-    /// The Recurring transaction's current fields, ready to edit.
     init(editing recurring: RecurringTransaction) {
         let schedule = recurring.schedule
         self.init(startDay: schedule.start)
         name = recurring.name
-        amount = Money(cents: recurring.amountCents, currencyCode: recurring.currencyCode)
-        total = recurring.totalCents.map { Money(cents: $0, currencyCode: recurring.currencyCode) }
+        entry = AmountEntry(cents: recurring.amountCents)
+        totalEntry = AmountEntry(cents: recurring.totalCents ?? 0)
         type = recurring.category?.type ?? .expense
         wallet = recurring.wallet
         category = recurring.category
@@ -146,6 +165,34 @@ struct RecurringDraft {
         customRule = schedule.rule
         monthlyDay = schedule.monthlyDay
         end = schedule.end
+        savedStart = schedule.start
+    }
+
+    /// What a varying Bill's estimate is read for: its category's history in its wallet's currency (``AmountEstimate``).
+    struct EstimateRequest: Equatable {
+        let category: Category
+        let currencyCode: String
+    }
+
+    /// The estimate the draft needs now, or `nil` when its amount doesn't vary or it has no category yet. The draft
+    /// reads nothing from the store: whoever holds it has ``AmountEstimate/give(to:)`` read the estimate and give
+    /// it whenever this changes.
+    var neededEstimate: EstimateRequest? {
+        guard estimatesAmount, let category else { return nil }
+        return EstimateRequest(category: category, currencyCode: currencyCode)
+    }
+
+    /// Gives the draft the estimate read for `request`: `cents`, or `nil` when the category has no history to average.
+    mutating func setEstimate(_ cents: Int?, for request: EstimateRequest) {
+        estimate = (request, cents)
+    }
+
+    /// The average a varying Bill's transactions would start at, or `nil` when there is none or the amount doesn't
+    /// vary. It stands in for an amount left empty, and is never saved. An estimate given for another category,
+    /// currency or Kind than the draft now has counts as none.
+    var estimateCents: Int? {
+        guard let request = neededEstimate, let estimate, estimate.request == request else { return nil }
+        return estimate.cents
     }
 
     /// A new Recurring transaction like `recurring`, starting `today` ("Duplicate"). It copies every field and the Kind's
@@ -153,6 +200,7 @@ struct RecurringDraft {
     /// Purchase's progress starts over.
     init(duplicating recurring: RecurringTransaction, on today: CalendarDay) {
         self.init(editing: recurring)
+        savedStart = nil
         startDay = today
         // A last day already past can't end a schedule that starts today, so the copy gets a year, as a new one does.
         if endKind == .until, untilDay < today {
@@ -161,6 +209,22 @@ struct RecurringDraft {
     }
 
     var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// The amounts are in the wallet's currency.
+    var currencyCode: String { wallet.currencyCodeOrDefault }
+
+    /// A Purchase's total price, or `nil` for none: a total left empty or typed as zero is none.
+    var total: Money? {
+        guard let cents = totalEntry.cents, cents > 0 else { return nil }
+        return Money(cents: cents, currencyCode: currencyCode)
+    }
+
+    /// Whether it saves a new Recurring transaction, as Add and Duplicate do, rather than changing one.
+    var isNew: Bool { savedStart == nil }
+
+    /// Whether saving offers the occurrences that have already come due: for a new schedule, or one whose start day has
+    /// moved.
+    var offersPastOccurrences: Bool { savedStart != startDay }
 
     /// The repeat the form has picked.
     var rule: RepeatRule { preset.rule ?? customRule }
@@ -189,13 +253,13 @@ struct RecurringDraft {
         RepeatSchedule(start: startDay, rule: rule, end: end, monthlyDay: monthlyDay)
     }
 
-    /// Checks the draft against the Recurring transaction rules before anything is saved.
     func validate() throws {
         guard !trimmedName.isEmpty else { throw RecurringRuleError.missingName }
         guard wallet != nil else { throw RecurringRuleError.missingWallet }
         // A varying Bill may leave its amount empty when there is an estimate to start its transactions from.
         let startsFromEstimate = estimatesAmount && estimateCents != nil
         guard amount.cents > 0 || startsFromEstimate else { throw RecurringRuleError.missingAmount }
+        guard totalEntry.cents != nil else { throw RecurringRuleError.invalidTotal }
         guard category != nil else { throw RecurringRuleError.missingCategory }
         guard card == nil || card?.payingWallet === wallet else { throw RecurringRuleError.cardNotInWallet }
         switch end {
@@ -207,17 +271,15 @@ struct RecurringDraft {
             guard count >= 1 else { throw RecurringRuleError.noOccurrences }
         }
     }
-
-    /// Whether every required field is filled, so Save can be enabled.
-    var canSave: Bool { (try? validate()) != nil }
 }
 
 extension RecurringTransaction {
-    /// Adds a Recurring transaction and saves it. Occurrences dated `today` or earlier are not made here: they are
-    /// dealt with as the editor's start-date prompt picks them, see ``unenteredOccurrences(through:)``. Saves.
+    /// Adds a Recurring transaction. Occurrences dated `today` or earlier are not made here: they are skipped, and the
+    /// editor's start-date prompt offers them (``unenteredOccurrences(through:)``). Saves.
     @discardableResult
+    @MainActor
     static func create(
-        _ draft: RecurringDraft, today: CalendarDay = .today, in context: ModelContext
+        _ draft: RecurringDraft, today: CalendarDay, in context: ModelContext
     ) throws -> RecurringTransaction {
         try draft.validate()
         let recurring = RecurringTransaction()
@@ -228,23 +290,24 @@ extension RecurringTransaction {
         return recurring
     }
 
-    /// Saves an edited draft. Edits change only the occurrences still to come: nothing already made is touched.
-    /// Nothing changes when the draft breaks a rule. Saves.
-    func update(with draft: RecurringDraft, today: CalendarDay = .today) throws {
+    /// Edits change only the occurrences still to come: nothing already made is touched. Saves.
+    @MainActor
+    func update(with draft: RecurringDraft, today: CalendarDay) throws {
         try draft.validate()
+        let context = try storeContext()
         // What fell due under the old schedule is made under it first, before the edit reshapes what is still to come.
-        if let context = modelContext {
-            makeDueTransactions(through: today, in: context)
-        }
+        try makeDueTransactions(through: today)
         apply(draft)
         skipOccurrences(through: today)
-        try modelContext?.save()
+        try context.save()
     }
 
     /// Moves the schedule to Recently Deleted, after making what has fallen due by `today` so no due day is lost. The
     /// transactions it made stay as ordinary transactions: they lose their link to it. Saves.
-    func delete(today: CalendarDay = .today, at now: Date = .now, in context: ModelContext) throws {
-        makeDueTransactions(through: today, in: context)
+    @MainActor
+    func delete(today: CalendarDay, at now: Date = .now) throws {
+        let context = try storeContext()
+        try makeDueTransactions(through: today)
         deletedAt = now
         for transaction in transactions ?? [] {
             transaction.recurring = nil
@@ -255,66 +318,54 @@ extension RecurringTransaction {
     /// Makes a transaction for each occurrence that has come due by `today` and hasn't been dealt with yet, then
     /// marks them dealt with, so each occurrence is made once however often this runs. A schedule that is deleted or
     /// paused makes none.
-    func makeDueTransactions(through today: CalendarDay, in context: ModelContext) {
+    func makeDueTransactions(through today: CalendarDay) throws {
         guard isActive, wallet != nil, category != nil else { return }
         let due = schedule.occurrences(after: handledThrough, through: today)
         guard !due.isEmpty else { return }
-        let history = estimateHistory
+        let estimate = currentEstimateCents()
         for day in due {
-            makeTransaction(on: day, history: history, in: context)
+            try makeTransaction(on: day, estimateCents: estimate)
         }
         if let last = due.last {
             handledThrough = last
         }
     }
 
-    /// The estimate a varying Bill's transactions start at now: the average ``AmountEstimate`` gives over `history`
-    /// for its category and wallet currency. `nil` for other Kinds, and when there is nothing to average.
-    func estimateCents(among history: [Transaction]) -> Int? {
+    /// The estimate a varying Bill's transactions start at now: the average ``AmountEstimate`` gives for its category
+    /// and wallet currency, read from the store. `nil` for other Kinds, and when there is nothing to average.
+    func currentEstimateCents() -> Int? {
         guard estimatesAmount, let category = self.category, let wallet = self.wallet else { return nil }
-        return AmountEstimate.cents(among: history, for: category, currencyCode: wallet.currencyCode)
+        return AmountEstimate.cents(for: category, currencyCode: wallet.currencyCode)
     }
 
-    /// What each transaction it makes now is for, signed by its category: the estimate when there is one, otherwise the
-    /// typed amount. Making a transaction and showing the schedule both use it, so a varying Bill's rows show the amount
-    /// its transactions will hold.
-    func startingAmount(among history: [Transaction]) -> Money {
-        Money(
-            cents: (estimateCents(among: history) ?? amountCents) * (category?.sign ?? -1),
-            currencyCode: currencyCode
-        )
+    /// What each transaction it makes is for, signed by its category: `estimateCents` (``currentEstimateCents()``)
+    /// when there is one, otherwise the typed amount. Making a transaction and showing the schedule both use it, so a
+    /// varying Bill's rows show the amount its transactions will hold.
+    func startingAmount(estimateCents: Int?) -> Money {
+        Money(cents: (estimateCents ?? amountCents) * (category?.sign ?? -1), currencyCode: currencyCode)
     }
 
-    /// What its transactions start at now, as ``startingAmount(among:)`` works it out from ``estimateHistory``.
-    var startingAmount: Money { startingAmount(among: estimateHistory) }
-
-    /// The transactions a varying Bill's estimate is averaged over: those filed under its category or its
-    /// subcategories (``AmountEstimate/history(for:)``). Other Kinds read nothing.
-    var estimateHistory: [Transaction] {
-        guard estimatesAmount, let category else { return [] }
-        return AmountEstimate.history(for: category)
+    /// What its transactions start at now, a varying Bill's estimate read from the store. A screen showing many
+    /// schedules reads them once through ``RecurringSchedules``.
+    func currentStartingAmount() -> Money {
+        startingAmount(estimateCents: currentEstimateCents())
     }
 
     /// Makes the transaction for the occurrence on `day`, attached to this schedule, and inserts it. A Bill whose amount
-    /// varies starts Estimated, at the average of `history`. Nothing is made without a wallet and a category, which the
-    /// schedule can lose when they are deleted.
+    /// varies starts Estimated, at `estimateCents` (``currentEstimateCents()``). Nothing is made without a wallet and a
+    /// category, which the schedule can lose when they are deleted.
     @discardableResult
-    func makeTransaction(on day: CalendarDay, history: [Transaction], in context: ModelContext) -> Transaction? {
+    func makeTransaction(on day: CalendarDay, estimateCents: Int?) throws -> Transaction? {
         guard let wallet = self.wallet, let category = self.category else { return nil }
-        let transaction = Transaction(
-            amount: startingAmount(among: history),
-            day: day,
-            wallet: wallet,
-            category: category,
-            card: card,
-            note: note
+        let transaction = Transaction.insert(
+            cents: startingAmount(estimateCents: estimateCents).cents, on: day, wallet: wallet, category: category,
+            card: card, note: note, in: try storeContext()
         )
         transaction.recurring = self
         if estimatesAmount {
             transaction.isEstimated = true
             transaction.estimateReminderDay = day.adding(days: remindAfterDays)
         }
-        context.insert(transaction)
         return transaction
     }
 
@@ -328,10 +379,11 @@ extension RecurringTransaction {
 
     /// Makes a transaction on each of `days`, the occurrences the user picked from the start-date prompt, and saves.
     /// Nothing is made for an empty list.
-    func makeTransactions(on days: [CalendarDay], in context: ModelContext) throws {
-        let history = estimateHistory
+    func makeTransactions(on days: [CalendarDay]) throws {
+        let context = try storeContext()
+        let estimate = currentEstimateCents()
         for day in days {
-            makeTransaction(on: day, history: history, in: context)
+            try makeTransaction(on: day, estimateCents: estimate)
         }
         try context.save()
     }
@@ -350,9 +402,11 @@ extension RecurringTransaction {
     /// Makes one transaction now, dated `today`, from the schedule's values, and attaches it. Unlike an occurrence it
     /// consumes or skips nothing: the next occurrence still falls on its day. Throws its ``addBlocker`` rather than
     /// saving nothing. Saves.
-    func addTransactionNow(today: CalendarDay = .today, in context: ModelContext) throws {
+    @MainActor
+    func addTransactionNow(today: CalendarDay) throws {
         if let addBlocker { throw addBlocker }
-        makeTransaction(on: today, history: estimateHistory, in: context)
+        let context = try storeContext()
+        try makeTransaction(on: today, estimateCents: currentEstimateCents())
         try context.save()
     }
 
@@ -375,11 +429,18 @@ extension RecurringTransaction {
             .inListOrder()
     }
 
+    /// Every Recurring transaction outside Recently Deleted, in the order they were added: what Account → Recurring
+    /// transactions lists.
+    static var notDeleted: FetchDescriptor<RecurringTransaction> {
+        FetchDescriptor(predicate: #Predicate { $0.deletedAt == nil }, sortBy: [SortDescriptor(\.createdAt)])
+    }
+
     /// Makes the transactions that have come due by `today`, for every Recurring transaction, and saves. The app runs
     /// this when it opens or comes back to the foreground, so the due days missed while it was closed are made then.
-    static func catchUp(through today: CalendarDay = .today, in context: ModelContext) throws {
+    @MainActor
+    static func catchUp(through today: CalendarDay, in context: ModelContext) throws {
         for recurring in try context.fetch(FetchDescriptor<RecurringTransaction>()) {
-            recurring.makeDueTransactions(through: today, in: context)
+            try recurring.makeDueTransactions(through: today)
         }
         if context.hasChanges {
             try context.save()

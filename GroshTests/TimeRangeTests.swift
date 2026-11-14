@@ -4,15 +4,12 @@ import Testing
 
 /// The time ranges of the Transactions tab's "…" menu: which periods the strip steps through for each, which days
 /// each period covers, and what the strip calls them.
+@Suite(.namedInTheLog)
 struct TimeRangeTests {
     /// A Friday.
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
     private let monday = 2
     private let unitedStates = Locale(identifier: "en_US")
-
-    private func day(_ year: Int, _ month: Int, _ day: Int) -> CalendarDay {
-        CalendarDay(year: year, month: month, day: day)
-    }
 
     // MARK: Day
 

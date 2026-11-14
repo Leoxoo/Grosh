@@ -7,12 +7,14 @@ struct RecordPaymentEditor: View {
     /// The Loan or Debt being paid.
     let original: Transaction
 
+    @Environment(\.today) private var today
+
     var body: some View {
         LoanOrDebtSheet(
-            unavailableTitle: "Can't Record Payment",
-            unavailableMessage: "Only a Loan or a Debt can be paid back."
-        ) { context in
-            try DebtPaymentDraft(settling: original, on: .today, in: context)
+            unavailableTitle: Strings.DebtsLoans.cantRecordPayment,
+            unavailableMessage: Strings.DebtsLoans.onlyLoanOrDebtPaidBack
+        ) {
+            try DebtPaymentDraft(settling: original, on: today)
         } form: { draft in
             RecordPaymentForm(startingDraft: draft)
         }
@@ -21,80 +23,55 @@ struct RecordPaymentEditor: View {
 
 /// The form behind ``RecordPaymentEditor``, holding the draft from the moment the sheet opens.
 private struct RecordPaymentForm: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
     @State private var draft: DebtPaymentDraft
-    @State private var entry: AmountEntry
-    @State private var errorMessage: String?
 
     init(startingDraft: DebtPaymentDraft) {
         _draft = State(initialValue: startingDraft)
-        _entry = State(initialValue: AmountEntry(cents: startingDraft.amount.cents))
     }
 
     private var loanOrDebt: LoanOrDebt { draft.loanOrDebt }
-    private var currencyCode: String { loanOrDebt.owed.currencyCode }
-
-    /// The draft with the amount the keypad comes to.
-    private var draftToSave: DebtPaymentDraft {
-        var result = draft
-        result.amount = Money(cents: entry.cents ?? 0, currencyCode: currencyCode)
-        return result
-    }
 
     var body: some View {
         KeypadSheet(
-            title: Text("Record Payment"),
-            entry: $entry,
-            canSave: draftToSave.canSave,
-            save: save
+            title: Text(Strings.DebtsLoans.recordPayment),
+            entry: $draft.entry,
+            canSave: draft.canSave,
+            saving: "Recording a payment",
+            failureTitle: Strings.DebtsLoans.couldntRecordPayment,
+            save: { try DebtPayment.record(draft, in: context) }
         ) { fields in
             paymentSection(fields)
-            if draftToSave.overpaid.cents > 0 {
-                overpaymentSection
+            if draft.overpaid.cents > 0 {
+                overpaymentSection(draft.signedOverpaid)
             }
         }
-        .errorAlert("Couldn't Record Payment", message: $errorMessage)
     }
 
     private func paymentSection(_ fields: KeypadSheetFields) -> some View {
         Section {
             LoanOrDebtWithRow(loanOrDebt: loanOrDebt)
-            LabeledContent("Outstanding") {
+            LabeledContent(Strings.DebtsLoans.outstanding) {
                 Text(loanOrDebt.outstanding.formatted())
                     .monospacedDigit()
             }
-            fields.amountRow("Amount", currencyCode: currencyCode, tint: Money(cents: loanOrDebt.kind.paymentSign).tint)
-            DayStepper(title: "Date", day: $draft.day)
+            fields.amountRow(Strings.Common.amount, currencyCode: draft.currencyCode, tint: loanOrDebt.kind.paymentDirection.tint)
+            DayStepper(title: Strings.Common.date, day: $draft.day)
             fields.noteField($draft.note)
         } footer: {
             Text(loanOrDebt.kind.recordPaymentFooter)
         }
     }
 
-    private var overpaymentSection: some View {
+    private func overpaymentSection(_ overpaid: Money) -> some View {
         Section {
-            LabeledContent("Above Outstanding") {
-                AmountText(
-                    amount: Money(
-                        cents: draftToSave.overpaid.cents * loanOrDebt.kind.paymentSign, currencyCode: currencyCode
-                    ),
-                    showsPlusSign: true
-                )
+            LabeledContent(Strings.DebtsLoans.aboveOutstanding) {
+                AmountText(amount: overpaid, showsPlusSign: true)
             }
-            CategoryPicker(title: "Category", type: draft.overpaymentType, selection: $draft.overpaymentCategory)
+            CategoryPicker(title: Strings.Common.category, type: draft.overpaymentType, selection: $draft.overpaymentCategory)
         } footer: {
             Text(loanOrDebt.kind.overpaymentFooter)
-        }
-    }
-
-    private func save() {
-        do {
-            try DebtPayment.record(draftToSave, in: context)
-            dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 }

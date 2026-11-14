@@ -6,15 +6,12 @@ import Testing
 /// The Transactions tab viewed by category: the period's transactions grouped under the category each is filed
 /// under, with each category's total.
 @MainActor
+@Suite(.namedInTheLog)
 struct TransactionCategoryGroupTests {
-    private let store: CategoryFixture
+    private let store: TestStore
 
     init() throws {
-        store = try CategoryFixture()
-    }
-
-    private func day(_ month: Int, _ day: Int) -> CalendarDay {
-        CalendarDay(year: 2026, month: month, day: day)
+        store = try TestStore()
     }
 
     /// Records a transaction entered `enteredAt` seconds into the test's clock.
@@ -22,21 +19,16 @@ struct TransactionCategoryGroupTests {
     private func record(
         _ note: String, _ cents: Int, under category: Grosh.Category?, on day: CalendarDay, enteredAt seconds: Double = 0
     ) -> Transaction {
-        let transaction = Transaction(amount: Money(cents: cents), day: day, wallet: nil, category: nil, note: note)
-        store.context.insert(transaction)
-        transaction.wallet = store.wallet
-        transaction.category = category
-        transaction.createdAt = Date(timeIntervalSinceReferenceDate: 800_000_000 + seconds)
-        return transaction
+        store.context.record(cents, on: day, in: store.checking, under: category, note: note, enteredAt: seconds)
     }
 
     @Test func transactionsAreGroupedUnderTheirCategoryWithItsTotal() throws {
         let cafe = try store.category("Café")
         let restaurants = try store.category("Restaurants")
         let transactions = [
-            record("latte", -4_50, under: cafe, on: day(10, 1)),
-            record("dinner", -60_00, under: restaurants, on: day(10, 2)),
-            record("espresso", -3_00, under: cafe, on: day(10, 3)),
+            record("latte", -4_50, under: cafe, on: day(2026, 10, 1)),
+            record("dinner", -60_00, under: restaurants, on: day(2026, 10, 2)),
+            record("espresso", -3_00, under: cafe, on: day(2026, 10, 3)),
         ]
 
         let groups = TransactionCategoryGroup.groups(of: transactions)
@@ -51,10 +43,10 @@ struct TransactionCategoryGroupTests {
         let rentals = try store.category("Rentals")
         let cafe = try store.category("Café")
         let transactions = [
-            record("coffee", -4_50, under: cafe, on: day(10, 1)),
-            record("tips", 40_00, under: tips, on: day(10, 1)),
-            record("rent", -900_00, under: rentals, on: day(10, 1)),
-            record("pay", 3_000_00, under: salary, on: day(10, 1)),
+            record("coffee", -4_50, under: cafe, on: day(2026, 10, 1)),
+            record("tips", 40_00, under: tips, on: day(2026, 10, 1)),
+            record("rent", -900_00, under: rentals, on: day(2026, 10, 1)),
+            record("pay", 3_000_00, under: salary, on: day(2026, 10, 1)),
         ]
 
         let groups = TransactionCategoryGroup.groups(of: transactions)
@@ -65,9 +57,9 @@ struct TransactionCategoryGroupTests {
     @Test func withinACategoryTransactionsAreInListOrder() throws {
         let cafe = try store.category("Café")
         let transactions = [
-            record("Monday latte", -4_50, under: cafe, on: day(10, 5), enteredAt: 1),
-            record("Wednesday espresso", -3_00, under: cafe, on: day(10, 7), enteredAt: 2),
-            record("second Monday coffee", -2_00, under: cafe, on: day(10, 5), enteredAt: 3),
+            record("Monday latte", -4_50, under: cafe, on: day(2026, 10, 5), enteredAt: 1),
+            record("Wednesday espresso", -3_00, under: cafe, on: day(2026, 10, 7), enteredAt: 2),
+            record("second Monday coffee", -2_00, under: cafe, on: day(2026, 10, 5), enteredAt: 3),
         ]
 
         let groups = TransactionCategoryGroup.groups(of: transactions)
@@ -80,9 +72,9 @@ struct TransactionCategoryGroupTests {
     @Test func transactionsFiledUnderNoCategoryShareOneGroup() throws {
         let cafe = try store.category("Café")
         let transactions = [
-            record("mystery", -10_00, under: nil, on: day(10, 1)),
-            record("latte", -4_50, under: cafe, on: day(10, 1)),
-            record("another mystery", -5_00, under: nil, on: day(10, 2)),
+            record("mystery", -10_00, under: nil, on: day(2026, 10, 1)),
+            record("latte", -4_50, under: cafe, on: day(2026, 10, 1)),
+            record("another mystery", -5_00, under: nil, on: day(2026, 10, 2)),
         ]
 
         let groups = TransactionCategoryGroup.groups(of: transactions)
@@ -94,11 +86,11 @@ struct TransactionCategoryGroupTests {
     @Test func theCategoryTotalsAddUpToThePeriodsDifferenceExcludedTransactionsIncluded() throws {
         let salary = try store.category("Salary", .income)
         let cafe = try store.category("Café")
-        let refund = record("refund", 20_00, under: cafe, on: day(10, 3))
+        let refund = record("refund", 20_00, under: cafe, on: day(2026, 10, 3))
         refund.isExcludedFromReport = true
         let transactions = [
-            record("pay", 3_000_00, under: salary, on: day(10, 1)),
-            record("latte", -4_50, under: cafe, on: day(10, 2)),
+            record("pay", 3_000_00, under: salary, on: day(2026, 10, 1)),
+            record("latte", -4_50, under: cafe, on: day(2026, 10, 2)),
             refund,
         ]
 

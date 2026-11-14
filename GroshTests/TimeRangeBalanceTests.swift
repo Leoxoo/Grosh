@@ -4,18 +4,18 @@ import Testing
 
 /// The Opening and Ending balances at the top of the Transactions tab, for every time range of the "…" menu.
 @MainActor
+@Suite(.namedInTheLog)
 struct TimeRangeBalanceTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
     /// A Friday.
-    private let today = CalendarDay(year: 2026, month: 10, day: 9)
+    private let today = TestStore.today
     private let monday = 2
     private let checking: Wallet
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
-        checking = Wallet(name: "Checking")
-        container.mainContext.insert(checking)
+        container = try TestStore.makeContainer()
+        checking = container.mainContext.addWallet("Checking")
         record(1_000_00, on: day(2026, 7, 1))
         record(-100_00, on: day(2026, 9, 30))
         record(-50_00, on: day(2026, 10, 5))
@@ -24,14 +24,8 @@ struct TimeRangeBalanceTests {
         record(5_00, on: day(2027, 1, 1))
     }
 
-    private func day(_ year: Int, _ month: Int, _ day: Int) -> CalendarDay {
-        CalendarDay(year: year, month: month, day: day)
-    }
-
     private func record(_ cents: Int, on day: CalendarDay) {
-        let transaction = Transaction(amount: Money(cents: cents), day: day, wallet: nil, category: nil)
-        context.insert(transaction)
-        transaction.wallet = checking
+        context.record(cents, on: day, in: checking)
     }
 
     private var transactions: [Transaction] { checking.transactions ?? [] }
@@ -41,7 +35,7 @@ struct TimeRangeBalanceTests {
     }
 
     private func summaries(_ range: TimeRange) -> [PeriodSummary] {
-        range.periods(from: day(2026, 7, 1), today: today, firstWeekday: monday).map(summary(of:))
+        range.periods(from: day(2026, 7, 1), today: today, firstWeekday: monday).map { summary(of: $0) }
     }
 
     @Test(arguments: [TimeRange.day, .week, .month, .quarter, .year, .all])

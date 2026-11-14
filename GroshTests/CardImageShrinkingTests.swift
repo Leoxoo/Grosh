@@ -7,11 +7,12 @@ import Testing
 /// A Card image shrunk for the Card picker: a copy exactly as many pixels as the small card it is drawn as, so it needs
 /// no resizing and stays sharp on the screen it is made for.
 @MainActor
+@Suite(.namedInTheLog)
 struct CardImageShrinkingTests {
     private let container: ModelContainer
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
+        container = try TestStore.makeContainer()
     }
 
     /// A Card with an image saved as the Card editor saves one: a photo cropped to a credit card, 960 by 605 pixels.

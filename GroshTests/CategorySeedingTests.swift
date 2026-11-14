@@ -3,12 +3,13 @@ import Testing
 @testable import Grosh
 
 @MainActor
+@Suite(.namedInTheLog)
 struct CategorySeedingTests {
     private let container: ModelContainer
     private var context: ModelContext { container.mainContext }
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
+        container = try TestStore.makeContainer()
     }
 
     private func allCategories() throws -> [Grosh.Category] {
@@ -23,9 +24,9 @@ struct CategorySeedingTests {
         try CategorySeeder.seedIfNeeded(in: context)
 
         let categories = try allCategories()
-        #expect(categories.count == 83)
+        #expect(categories.count == 84)
         #expect(categories.filter { $0.type == .expense }.count == 64)
-        #expect(categories.filter { $0.type == .income }.count == 14)
+        #expect(categories.filter { $0.type == .income }.count == 15)
         #expect(categories.filter { $0.type == .debtLoan }.count == 4)
     }
 
@@ -49,12 +50,12 @@ struct CategorySeedingTests {
         let locked = try allCategories().filter(\.isLocked).map(\.name)
         #expect(Set(locked) == [
             "Outgoing transfer", "Incoming transfer", "Other Income", "Other Expense",
-            "Starting balance", "Loan", "Debt", "Debt Collection", "Repayment",
+            "Starting balance", "Loan", "Debt", "Debt Collection", "Repayment", "Reimbursement",
         ])
     }
 
     @Test func aSeededStoreHasEveryCategoryTheAppDependsOn() throws {
-        let seeded = try GroshStore.makeSeededContainer(inMemory: true)
+        let seeded = TestStore.checked(try StoreOpening.open(inMemory: true))
 
         for role in LockedRole.allCases {
             #expect(try seeded.mainContext.lockedCategory(role).lockedRole == role)
@@ -65,23 +66,23 @@ struct CategorySeedingTests {
         try CategorySeeder.seedIfNeeded(in: context)
         try CategorySeeder.seedIfNeeded(in: context)
 
-        #expect(try allCategories().count == 83)
+        #expect(try allCategories().count == 84)
     }
 
     /// A store upgraded from an older build keeps its categories, but their icons and locked roles came back empty.
     @Test func anUpgradedStoreGetsItsIconsAndLockedCategoriesBack() throws {
         try CategorySeeder.seedIfNeeded(in: context)
         for category in try allCategories() {
-            category.symbolName = "questionmark"
+            category.symbolName = Category.placeholderSymbolName
             category.lockedRole = nil
         }
         try context.save()
 
         try CategorySeeder.restoreMissingDefaults(in: context)
 
-        #expect(try allCategories().count == 83)
+        #expect(try allCategories().count == 84)
         #expect(try category(named: "Food & Beverage")?.symbolName == "fork.knife")
-        #expect(try allCategories().allSatisfy { $0.symbolName != "questionmark" })
+        #expect(try allCategories().allSatisfy { $0.symbolName != Category.placeholderSymbolName })
         for role in LockedRole.allCases {
             #expect(try context.lockedCategory(role).lockedRole == role)
         }
@@ -110,7 +111,7 @@ struct CategorySeedingTests {
         let restored = try context.lockedCategory(.otherIncome)
         #expect(restored.name == "Other Income")
         #expect(restored.type == .income)
-        #expect(try allCategories().count == 83)
+        #expect(try allCategories().count == 84)
     }
 
     /// Running the repair on a complete store changes nothing.
@@ -119,8 +120,8 @@ struct CategorySeedingTests {
 
         try CategorySeeder.restoreMissingDefaults(in: context)
 
-        #expect(try allCategories().count == 83)
-        #expect(try allCategories().filter(\.isLocked).count == 9)
+        #expect(try allCategories().count == 84)
+        #expect(try allCategories().filter(\.isLocked).count == 10)
         #expect(try category(named: "Food & Beverage")?.symbolName == "fork.knife")
     }
 
@@ -129,7 +130,7 @@ struct CategorySeedingTests {
         try CategorySeeder.seedIfNeeded(in: context)
         for category in try allCategories() {
             category.type = .expense
-            category.symbolName = "questionmark"
+            category.symbolName = Category.placeholderSymbolName
             category.lockedRole = nil
         }
         try context.save()
@@ -137,9 +138,22 @@ struct CategorySeedingTests {
         try CategorySeeder.restoreMissingDefaults(in: context)
 
         #expect(try allCategories().filter { $0.type == .expense }.count == 64)
-        #expect(try allCategories().filter { $0.type == .income }.count == 14)
+        #expect(try allCategories().filter { $0.type == .income }.count == 15)
         #expect(try allCategories().filter { $0.type == .debtLoan }.count == 4)
         #expect(try context.lockedCategory(.otherIncome).type == .income)
+    }
+
+    /// The upgrade repair is for a store that lost every locked role. One with its locked categories never had the
+    /// broken upgrade, or was repaired already, so a placeholder icon on it is left alone.
+    @Test func aStoreWithItsLockedCategoriesIsNotRepairedAgain() throws {
+        try CategorySeeder.seedIfNeeded(in: context)
+        let products = try #require(try category(named: "Products"))
+        products.symbolName = Category.placeholderSymbolName
+        try context.save()
+
+        try CategorySeeder.restoreMissingDefaults(in: context)
+
+        #expect(products.symbolName == Category.placeholderSymbolName)
     }
 
     /// A store that still has Income categories is left alone, so a type the user changed is kept.
@@ -153,5 +167,4 @@ struct CategorySeedingTests {
 
         #expect(salary.type == .expense)
     }
-
 }

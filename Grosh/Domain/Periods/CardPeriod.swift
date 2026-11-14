@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 /// The span of days a Card's transactions are shown in when the user taps the Card: a statement period for a Credit
 /// card with a statement date, a calendar month for any other Card.
@@ -95,25 +96,77 @@ extension Card {
     func period(containing day: CalendarDay) -> CardPeriod {
         CardPeriod(containing: day, statementDay: kind == .credit ? statementDay : nil)
     }
+}
 
+/// What a Card's statement screen shows for one period: the periods ‹ › step through, the transactions paid with the
+/// Card in the period, and its lead-in transactions.
+nonisolated struct CardStatement {
     /// The periods ‹ › step through, oldest first: from the one holding the Card's first transaction through the one
     /// holding `today`, or its last transaction when that is dated later.
-    func periods(today: CalendarDay) -> ClosedRange<CardPeriod> {
-        let days = (transactions ?? []).notDeleted.map(\.day)
-        return period(containing: min(days.min() ?? today, today))...period(containing: max(days.max() ?? today, today))
-    }
-
-    /// The transactions paid with this Card in `period`. Their `net` is the period's total: every one counts,
+    let periods: ClosedRange<CardPeriod>
+    /// The transactions paid with the Card in the period. Their `net` is the period's total: every one counts,
     /// excluded from report or not, as on the card's statement.
-    func transactions(in period: CardPeriod) -> [Transaction] {
-        (transactions ?? []).notDeleted.filter { period.contains($0.day) }
-    }
+    let transactions: [Transaction]
+    /// The lead-in transactions: those paid with the Card in the two days before a statement period begins, since
+    /// entries aren't always dated exactly as on the statement. They belong to the previous statement and never count
+    /// in this one's total unless the user adds one for the moment. None for a calendar month.
+    let leadIns: [Transaction]
 
-    /// The lead-in transactions of `period`: those paid with this Card in the two days before a statement period
-    /// begins, since entries aren't always dated exactly as on the statement. They belong to the previous statement
-    /// and never count in this one's total unless the user adds one for the moment. None for a calendar month.
-    func leadInTransactions(in period: CardPeriod) -> [Transaction] {
-        guard let days = period.leadInDays else { return [] }
-        return (transactions ?? []).notDeleted.filter { days.contains($0.day) }
+    /// The statement of `card` for `period` on `today`, from what its ``Reads`` found in the store: `paid`, `earliest`
+    /// and `latest`.
+    init(
+        of card: Card, for period: CardPeriod, paid: [Transaction], earliest: [Transaction], latest: [Transaction],
+        today: CalendarDay
+    ) {
+        let leadInDays = period.leadInDays
+        var transactions: [Transaction] = []
+        var leadIns: [Transaction] = []
+        for transaction in paid {
+            let day = transaction.day
+            if period.contains(day) {
+                transactions.append(transaction)
+            } else if leadInDays?.contains(day) == true {
+                leadIns.append(transaction)
+            }
+        }
+        let first = min(earliest.first?.day ?? today, today)
+        let last = max(latest.first?.day ?? today, today)
+        periods = card.period(containing: first)...card.period(containing: last)
+        self.transactions = transactions
+        self.leadIns = leadIns
+    }
+}
+
+extension CardStatement {
+    /// What the statement screen reads from the store for one period, found by the store rather than by walking every
+    /// transaction the Card paid for, which run into thousands for a main Card.
+    struct Reads {
+        /// The Card's transactions outside Recently Deleted on the period's days and its lead-in days, if it has any.
+        let paid: FetchDescriptor<Transaction>
+        /// The Card's earliest transaction outside Recently Deleted, by day: where its statements' ‹ stops.
+        let earliest: FetchDescriptor<Transaction>
+        /// The Card's latest transaction outside Recently Deleted, by day: where its statements' › stops.
+        let latest: FetchDescriptor<Transaction>
+
+        init(card: Card, for period: CardPeriod) {
+            let id = card.persistentModelID
+            let firstRaw = (period.leadInDays?.first ?? period.firstDay).rawValue
+            let lastRaw = period.lastDay.rawValue
+            paid = FetchDescriptor(predicate: #Predicate { transaction in
+                transaction.card?.persistentModelID == id && transaction.deletedAt == nil
+                    && transaction.dayRaw >= firstRaw && transaction.dayRaw <= lastRaw
+            })
+            earliest = Self.end(of: id, order: .forward)
+            latest = Self.end(of: id, order: .reverse)
+        }
+
+        private static func end(of card: PersistentIdentifier, order: SortOrder) -> FetchDescriptor<Transaction> {
+            var descriptor = FetchDescriptor<Transaction>(
+                predicate: #Predicate { $0.card?.persistentModelID == card && $0.deletedAt == nil },
+                sortBy: [SortDescriptor(\.dayRaw, order: order)]
+            )
+            descriptor.fetchLimit = 1
+            return descriptor
+        }
     }
 }

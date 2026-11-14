@@ -7,6 +7,13 @@ extension CategoryCatalog {
     /// How many days back, today included, a category's transactions count toward how much it is used lately.
     static let recentUseDays = 30
 
+    /// The transactions outside Recently Deleted dated from ``recentUseDays`` days before `today` on: what
+    /// ``byRecentUse(_:transactions:today:)`` counts, read from the store without the rest.
+    static func recentTransactions(through today: CalendarDay) -> FetchDescriptor<Transaction> {
+        let firstDay = today.adding(days: -(recentUseDays - 1)).rawValue
+        return FetchDescriptor(predicate: #Predicate { $0.dayRaw >= firstDay && $0.deletedAt == nil })
+    }
+
     /// `categories`, given in tree order, as a category list offers them: the parents used most lately first, each
     /// followed by its subcategories in their usual order, so a subcategory is always found in the same place within
     /// its parent. A parent goes by its own transactions and its subcategories' together. Used lately means dated in

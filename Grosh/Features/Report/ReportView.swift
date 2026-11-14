@@ -5,7 +5,7 @@ import SwiftUI
 /// ending balances, its Net income and its Category report. It starts on the Total, This month's time range, and the
 /// period Home's strip was showing. Its period never reaches past today.
 struct ReportView: View {
-    @Query(Transaction.notDeleted) private var transactions: [Transaction]
+    @NotDeletedTransactions private var transactions: [Transaction]
     @State private var walletSelection = WalletSelection.total
     /// How long each period of the strip is, chosen with the calendar button.
     @State private var timeRange = TimeRange.month
@@ -13,6 +13,7 @@ struct ReportView: View {
     /// The screens pushed onto the Report, such as a side's details opened from a Category report tile.
     @State private var path = NavigationPath()
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.today) private var today
 
     /// The Report opens on `period`, the period Home's strip was showing.
     init(startingOn period: Period) {
@@ -20,38 +21,47 @@ struct ReportView: View {
     }
 
     var body: some View {
-        let today = CalendarDay.today
-        let selected = transactions.filter(walletSelection.includes)
-        let counted = transactions.counted(in: walletSelection, during: period, today: today)
-        let summary = PeriodSummary(of: selected, in: period, today: today)
+        CountedHistoryReader(selection: walletSelection) { history in
+            content(history)
+        }
+        .onAppear { Signpost.opening("Open Report") }
+    }
+
+    @ViewBuilder
+    private func content(_ history: CountedHistory) -> some View {
+        let counted = history.during(period, today: today)
+        // The same ledger entries of the selection the Transactions tab adds its Opening and Ending balances up from.
+        let summary = PeriodSummary(
+            of: TransactionFilter().transactions(in: walletSelection, from: $transactions), in: period, today: today
+        )
         NavigationStack(path: $path) {
             List {
                 Section {
-                    LabeledContent("Opening balance") {
+                    LabeledContent(Strings.Common.openingBalance) {
                         Text(summary.openingBalance.formatted()).monospacedDigit()
                     }
-                    LabeledContent("Ending balance") {
+                    LabeledContent(Strings.Common.endingBalance) {
                         Text(summary.endingBalance.formatted()).monospacedDigit()
                     }
                 }
 
                 Section {
-                    NetIncomeCard(totals: PeriodTotals(of: counted))
+                    NetIncomeCard(totals: PeriodTotals(of: counted, currencyCode: history.currencyCode))
                 }
 
                 Section {
                     CategoryReportCard(
-                        income: CategoryBreakdown(side: .income, of: counted),
-                        spent: CategoryBreakdown(side: .spent, of: counted),
+                        income: CategoryBreakdown(side: .income, of: counted, currencyCode: history.currencyCode),
+                        spent: CategoryBreakdown(side: .spent, of: counted, currencyCode: history.currencyCode),
                         onOpen: { path.append(ReportScreen.details(.side($0))) }
                     )
                 }
             }
             .roundedSectionsListStyle()
             .reportPeriodControls(
-                walletSelection: $walletSelection, timeRange: $timeRange, period: $period, transactions: transactions
+                walletSelection: $walletSelection, timeRange: $timeRange, period: $period, history: history
             )
-            .navigationTitle("Report")
+            .navigationTitle(Strings.Screens.report)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -60,7 +70,7 @@ struct ReportView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    Button(Strings.Common.close) { dismiss() }
                 }
             }
         }

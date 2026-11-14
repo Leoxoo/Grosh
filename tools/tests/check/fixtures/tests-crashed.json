@@ -1,0 +1,56 @@
+{
+  "devices" : [
+    {
+      "architecture" : "arm64",
+      "deviceId" : "PRO-UDID",
+      "deviceName" : "iPhone 17 Pro",
+      "modelName" : "iPhone 17 Pro",
+      "osVersion" : "26.4",
+      "platform" : "iOS Simulator"
+    }
+  ],
+  "testNodes" : [
+    {
+      "children" : [
+        {
+          "children" : [
+            {
+              "children" : [
+                {
+                  "children" : [
+                    {
+                      "name" : "Test crashed with signal trap.",
+                      "nodeType" : "Failure Message",
+                      "result" : "Failed"
+                    }
+                  ],
+                  "duration" : "0,031s",
+                  "durationInSeconds" : 0.031,
+                  "name" : "deletingAReimbursementDoesNotDeleteItsExpense()",
+                  "nodeIdentifier" : "ReimbursementTests/deletingAReimbursementDoesNotDeleteItsExpense()",
+                  "nodeType" : "Test Case",
+                  "result" : "Failed"
+                }
+              ],
+              "name" : "ReimbursementTests",
+              "nodeType" : "Test Suite",
+              "result" : "Failed"
+            }
+          ],
+          "name" : "GroshTests",
+          "nodeType" : "Unit test bundle",
+          "result" : "Failed"
+        }
+      ],
+      "name" : "Grosh",
+      "nodeType" : "Test Plan",
+      "result" : "Failed"
+    }
+  ],
+  "testPlanConfigurations" : [
+    {
+      "configurationId" : "1",
+      "configurationName" : "Default"
+    }
+  ]
+}

@@ -6,16 +6,16 @@ extension CropShape {
     /// The label of the field that picks the photo.
     var title: String {
         switch self {
-        case .appIcon: String(localized: "Icon")
-        case .creditCard: String(localized: "Image")
+        case .appIcon: String(localized: Strings.Common.icon)
+        case .creditCard: String(localized: Strings.Photos.image)
         }
     }
 
     /// The crop screen's title.
     var cropTitle: String {
         switch self {
-        case .appIcon: String(localized: "Crop Icon")
-        case .creditCard: String(localized: "Crop Image")
+        case .appIcon: String(localized: Strings.Photos.cropIcon)
+        case .creditCard: String(localized: Strings.Photos.cropImage)
         }
     }
 }
@@ -33,14 +33,16 @@ struct PhotoField: View {
     var body: some View {
         LabeledContent {
             HStack(spacing: 12) {
+                // The picker's label is a Sendable closure, so it reads a copy rather than the main-actor binding.
+                let hasPhoto = data != nil
                 if let data, let image = CroppedPhoto.image(from: data) {
                     CroppedPhotoImage(image: image, shape: shape, height: 32)
                 }
                 PhotosPicker(selection: $pickerItem, matching: .images) {
-                    Text(data == nil ? "Choose Photo" : "Replace")
+                    Text(hasPhoto ? Strings.Photos.replace : Strings.Photos.choosePhoto)
                 }
                 if data != nil {
-                    Button("Remove", role: .destructive) {
+                    Button(Strings.Common.remove, role: .destructive) {
                         data = nil
                     }
                 }
@@ -58,7 +60,7 @@ struct PhotoField: View {
                 data = cropped
             }
         }
-        .errorAlert("Couldn't Use Photo", message: $errorMessage)
+        .errorAlert(Strings.Photos.couldntUse, message: $errorMessage)
     }
 
     /// Reads the chosen photo and opens the crop screen with it.
@@ -67,11 +69,12 @@ struct PhotoField: View {
         do {
             guard let photoData = try await item.loadTransferable(type: Data.self) else { return }
             guard let image = CroppedPhoto.decode(photoData) else {
-                errorMessage = String(localized: "That photo can't be read.")
+                errorMessage = String(localized: Strings.Photos.unreadable)
                 return
             }
             pickedPhoto = PickedPhoto(image: image)
         } catch {
+            Log.store.failed("Loading the chosen photo", error, expected: true)
             errorMessage = error.localizedDescription
         }
     }

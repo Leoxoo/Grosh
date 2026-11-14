@@ -2,7 +2,7 @@ import SwiftUI
 
 /// A form row for a transaction's date: a date picker between ‹ and › buttons that step one day back or forward.
 struct DayStepper: View {
-    let title: LocalizedStringKey
+    let title: LocalizedStringResource
     @Binding var day: CalendarDay
 
     var body: some View {
@@ -14,7 +14,7 @@ struct DayStepper: View {
                     Image(systemName: "chevron.left")
                         .frame(minWidth: 28, minHeight: 28)
                 }
-                .accessibilityLabel("Previous Day")
+                .accessibilityLabel(Strings.Common.previousDay)
 
                 DayPicker(title: title, day: $day)
                     .labelsHidden()
@@ -25,7 +25,7 @@ struct DayStepper: View {
                     Image(systemName: "chevron.right")
                         .frame(minWidth: 28, minHeight: 28)
                 }
-                .accessibilityLabel("Next Day")
+                .accessibilityLabel(Strings.Common.nextDay)
             }
             .buttonStyle(.borderless)
         }
