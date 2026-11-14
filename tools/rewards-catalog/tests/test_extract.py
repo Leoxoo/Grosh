@@ -1219,6 +1219,60 @@ class QuoteRepairTests(unittest.TestCase):
         self.assertEqual(extract.recheck_rejected(self.GOLD, candidate, self.TILES), 0)
 
 
+class ListedCategoriesTests(unittest.TestCase):
+    """A rule over "N categories" reads its categories and cap from the page (read_list)."""
+
+    PAGE = "\n".join([
+        "Gold Card",
+        "Earn 4X Membership Rewards\u00ae points on the top 2 categories where your business spends the most each billing cycle from 6 categories:",
+        "Purchases at U.S. media providers for advertising in select media (online, TV, radio)**",
+        "U.S. purchases made from electronic goods retailers and software & cloud system providers",
+        "U.S. purchases at restaurants, including takeout and delivery",
+        "U.S. purchases at gas stations",
+        "Transit purchases including trains, taxicabs, rideshare services, ferries, tolls, parking, buses, and subways",
+        "Monthly wireless telephone service charges made directly from a wireless telephone service provider in the U.S.**",
+        "While your top 2 categories may change each billing cycle based on where your business spent the most, you will earn 4X points on the first $150,000 in combined purchases from these categories each calendar year (then 1X thereafter). Only the top 2 categories from this list each billing cycle will count towards the $150,000 cap.\u2021",
+    ])
+    GOLD = {**CARD, "name": "Gold Card"}
+
+    def proposal(self):
+        return rule(categories=["phone-internet"], selection="top-spend", picks=2, hasOtherChoices=True, rate=4, unit="per-dollar",
+                    quote=self.PAGE.splitlines()[1])
+
+    def test_the_lines_under_the_quote_give_the_categories_and_the_next_paragraph_the_cap(self):
+        page_norm = normalize(self.PAGE)
+        read = extract.read_list(self.proposal(), self.PAGE, page_norm, {})
+        self.assertEqual(read["categories"], ["dining", "gas", "transit", "phone-internet"])
+        self.assertEqual((read["hasOtherChoices"], read["capAmount"], read["capPeriod"]), (True, 150000.0, "year"))
+        self.assertTrue(read["quote"].startswith("While your top 2 categories"))
+        self.assertIsNone(validate_rule(read, page_norm))
+
+    def test_an_example_in_parentheses_is_not_a_category(self):
+        read = extract.read_list(self.proposal(), self.PAGE, normalize(self.PAGE), {})
+        self.assertNotIn("online-shopping", read["categories"])  # "advertising ... (online, TV, radio)"
+
+    def test_every_listed_line_named_means_nothing_else_is_on_offer(self):
+        page = "Gold Card\nEarn 3% cash back on the top 2 categories each billing cycle from 3 categories:\nGas stations\nRestaurants\nGrocery stores"
+        proposal = rule(categories=["gas"], selection="top-spend", picks=2, hasOtherChoices=True, quote=page.splitlines()[1])
+        read = extract.read_list(proposal, page, normalize(page), {})
+        self.assertEqual((read["categories"], read["hasOtherChoices"], read["capAmount"]), (["gas", "dining", "groceries"], False, None))
+
+    def test_a_rule_that_is_not_a_list_is_left_alone(self):
+        fixed = rule()
+        self.assertEqual(extract.read_list(fixed, self.PAGE, normalize(self.PAGE), {}), fixed)
+        no_list = rule(selection="top-spend", picks=1, categories=["gas", "dining"], hasOtherChoices=False, quote=TOP)
+        self.assertEqual(extract.read_list(no_list, PAGE, PAGE_NORM, {}), no_list)
+
+    def test_a_saved_rule_with_too_few_categories_is_read_again_without_the_model(self):
+        stored = extract.candidate_rule(self.proposal(), "https://x.test/gold", "h", "page")
+        stored["capUnknown"] = True
+        candidate = {**extract._empty_candidate(self.GOLD, "m", "11", "h", "ok"), "rules": [stored]}
+        self.assertEqual(extract.recheck_rejected(self.GOLD, candidate, self.PAGE), 1)
+        (read,) = candidate["rules"]
+        self.assertEqual((read["categories"], read["capAmount"], read["capUnknown"]), (["dining", "gas", "transit", "phone-internet"], 150000.0, False))
+        self.assertEqual(extract.recheck_rejected(self.GOLD, candidate, self.PAGE), 0)
+
+
 class VouchedRuleTests(unittest.TestCase):
     def test_a_vouched_rule_only_needs_its_shape(self):
         said = rule(categories=["travel"], rate=3, quote="Earn 5% cash back on dining.")  # the quote doesn't say it

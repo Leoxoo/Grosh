@@ -1395,6 +1395,58 @@ def _covered(sentence: str, rules: list[dict]) -> bool:
     return all(any(name in rule["categories"] for rule in stated) for name in named)
 
 
+LIST_ITEMS_MAX = 10
+_DOLLARS = re.compile(r"\$\s?(\d[\d,]*(?:\.\d+)?)")
+
+
+def read_list(proposal, text: str, page_norm: str, rows: dict[str, str]):
+    """A top-spend or choose rule whose quote says the categories are a list of N ("... on the top 2 categories where your
+    business spends the most each billing cycle from 6 categories:"), read from the page: the N lines under the quote
+    (the page's bullets) give the rule's categories, and the sentence after them gives its cap. The model names one or
+    two of the list and leaves the cap, which is in a paragraph apart from the quote.
+
+    A line gives a category only when its words, outside parentheses (those are examples: "advertising in select media
+    (online, TV, radio)" is not online shopping), name exactly one catalog category. The others are left for the reviewer, and
+    hasOtherChoices says the list has more than the rule names. The cap comes from the first sentence in the next three
+    lines that states a dollar amount and a period after it and that makes the whole rule pass the checks as its quote; the
+    sentence replaces the quote, so the evidence is still the page's own words."""
+    if not isinstance(proposal, dict) or proposal.get("selection") not in ("choose", "top-spend") or not isinstance(proposal.get("quote"), str):
+        return proposal
+    quote = normalize(proposal["quote"])
+    listed = _FROM_N.search(quote)
+    if not listed or not 2 <= _count(listed.group(1)) <= LIST_ITEMS_MAX:
+        return proposal
+    count = _count(listed.group(1))
+    lines = [line for line in text.splitlines() if normalize(line)]
+    at = next((number for number, line in enumerate(lines) if quote in normalize(line)), None)
+    if at is None or len(lines) < at + 1 + count:
+        return proposal
+    found, matched = [], 0
+    for item in lines[at + 1 : at + 1 + count]:
+        words = normalize(re.sub(r"\([^)]*\)", " ", item))
+        named = [name for name, group in CATEGORIES.items() if name != "everything-else" and mentions(words, group)]
+        if len(named) == 1:
+            matched += 1
+            if named[0] not in found:
+                found.append(named[0])
+    if found:
+        proposal = {**proposal, "categories": found, "hasOtherChoices": matched < count}
+    if proposal.get("capAmount") is None:
+        for sentence in (s for line in lines[at + 1 + count : at + 4 + count] for s in re.split(r"(?<=[.!?])\s+(?=[A-Z])", line)):
+            amount = _DOLLARS.search(sentence)
+            if not amount:
+                continue
+            after = normalize(sentence[amount.end():])
+            periods = [(after.find(word), period) for period, words in PERIOD_WORDS.items() for word in words if word in after]
+            if not periods:
+                continue
+            capped = {**proposal, "quote": sentence.strip(), "capAmount": float(amount.group(1).replace(",", "")), "capPeriod": min(periods)[1]}
+            capped.pop("capUnknown", None)
+            if validate_rule(capped, page_norm, rows) is None:
+                return capped
+    return proposal
+
+
 def judge(proposal, text: str, page_norm: str, rows: dict[str, str], page: "CardPage") -> tuple:
     """(the proposal, why it can't be kept or None). When the quote isn't on the page word for word because the model
     skipped part of a tile, the page's own words replace it first (repair_quote); then every check runs."""
@@ -1403,6 +1455,7 @@ def judge(proposal, text: str, page_norm: str, rows: dict[str, str], page: "Card
         repaired = repair_quote(quote, text)
         if repaired:
             proposal = {**proposal, "quote": repaired}
+    proposal = read_list(proposal, text, page_norm, rows)
     return proposal, validate_rule(proposal, page_norm, rows) or page.other_card_problem(proposal["quote"])
 
 
@@ -1531,11 +1584,21 @@ def _missing_warning(still_missing: list[str]) -> list[str]:
 def recheck_rejected(card: dict, candidate: dict, text: str) -> int:
     """Run a candidate's rejected proposals through the checks again, without asking the model, and keep the ones that
     now pass: the checks improve (a quote that skipped a heading is repaired, a top-2 rule is retyped) and a saved
-    extraction shouldn't need the model again to benefit. Changes `candidate` in place and returns how many rules were
-    gained. A decision already made stays with its rule: a rule's key is its content, and these are new rules."""
+    extraction shouldn't need the model again to benefit. A top-spend or choose rule is read again too: its list of
+    categories and its cap come from the page (read_list). Changes `candidate` in place and returns how many rules were
+    gained or changed. A decision already made stays with its rule: a rule's key is its content, and these are new rules."""
     page_norm, rows = normalize(text), tier_rows(text)
     page = CardPage(card, text)
     accepted = {_merge_key(rule): rule for rule in candidate["rules"]}
+    read_again = 0
+    for key, rule in list(accepted.items()):  # a list the extraction named too few of is read from the page now
+        if rule["selection"] in ("choose", "top-spend") and rule["verified"] == "page":
+            proposal = {**{f: rule.get(f) for f in RULE_SCHEMA["required"] if f != "quote"}, "quote": rule["evidence"]["quote"]}
+            read = read_list(proposal, text, page_norm, rows)
+            if read != proposal and validate_rule(read, page_norm, rows) is None:
+                del accepted[key]
+                read_again += 1
+                merge_rule(accepted, candidate_rule({**read, "capUnknown": False}, rule["evidence"]["url"], rule["evidence"]["pageHash"], "page"))
     before, still_rejected = len(accepted), []
     for entry in candidate["rejected"]:
         if "rule" not in entry:
@@ -1547,7 +1610,7 @@ def recheck_rejected(card: dict, candidate: dict, text: str) -> int:
                 still_rejected.append({"rule": proposal, "reason": reason})
             else:
                 merge_rule(accepted, candidate_rule(proposal, card["sourceUrl"], candidate.get("pageHash"), "page"))
-    gained = len(accepted) - before
+    gained = len(accepted) - before + read_again
     candidate["rejected"] = still_rejected
     if gained:
         candidate["rules"] = _in_order(without_covered(list(accepted.values())))
