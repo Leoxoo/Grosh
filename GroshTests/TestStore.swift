@@ -3,7 +3,9 @@ import SwiftData
 import Testing
 @testable import Grosh
 
-/// An in-memory store seeded with the default category tree and one wallet, Checking, seen on ``today``.
+/// An in-memory store seeded with the default category tree and one wallet, Checking, seen on ``today``. Each save
+/// counts the saved month totals it made dirty, as the app's store does, and once the test ends its totals are checked
+/// against a full count of its transactions (``SavedTotalsCheck``, ADR-0013).
 @MainActor
 struct TestStore {
     /// The day most suites are seen on. The Month graph suites have a day of their own, ``MonthGraphFixture/today``.
@@ -14,8 +16,10 @@ struct TestStore {
     var context: ModelContext { container.mainContext }
     var catalog: CategoryCatalog { CategoryCatalog(context: context) }
 
-    init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
+    /// `countingEachSave: false` makes a store whose saves count nothing (``checked(_:countingEachSave:)``), for the
+    /// suite that reads the dirty marks themselves.
+    init(countingEachSave: Bool = true) throws {
+        container = try Self.makeContainer(countingEachSave: countingEachSave)
         try CategorySeeder.seedIfNeeded(in: container.mainContext)
         checking = container.mainContext.addWallet("Checking")
     }
@@ -131,6 +135,27 @@ struct TestStore {
         draft.category = try category("Restaurants")
         draft.people = people
         return try Transaction.create(draft, in: context)
+    }
+}
+
+// MARK: - Making a store
+
+extension TestStore {
+    /// An empty in-memory store, the one every suite starts from (``checked(_:countingEachSave:)``).
+    static func makeContainer(countingEachSave: Bool = true) throws -> ModelContainer {
+        checked(try GroshStore.makeContainer(inMemory: true), countingEachSave: countingEachSave)
+    }
+
+    /// `container`, each save of its main context counting the saved month totals it made dirty, as the app's store
+    /// does, and its totals checked against a full count of its transactions once the test ends (``SavedTotalsCheck``,
+    /// ADR-0013). Every store a test makes goes through here, so no change that marks no month passes unseen.
+    /// `countingEachSave: false` saves it where nothing counts them, as another context or an older app does: its
+    /// dirty months wait to be counted, and the check leaves them out.
+    @discardableResult
+    static func checked(_ container: ModelContainer, countingEachSave: Bool = true) -> ModelContainer {
+        if countingEachSave { WalletMonthTotals.countInEachSave(of: container.mainContext) }
+        SavedTotalsCheck.stores?.add(container)
+        return container
     }
 }
 

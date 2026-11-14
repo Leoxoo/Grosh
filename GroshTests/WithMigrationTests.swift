@@ -75,7 +75,7 @@ struct WithMigrationTests {
 
     @Test func aTransactionInRecentlyDeletedKeepsItsWithToo() throws {
         let deleted = try legacy("Olga")
-        deleted.deletedAt = .now
+        deleted.changeCounted { $0.deletedAt = .now }
 
         try Person.migrateWithNames(in: context)
 

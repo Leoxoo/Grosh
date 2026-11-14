@@ -69,7 +69,7 @@ struct AmountEstimateTests {
         record(1_000, under: utilities, on: day(2026, 9, 1))
         record(90_000, under: utilities, on: day(2026, 9, 2)) { $0.isEstimated = true }
         record(90_000, under: utilities, on: day(2026, 9, 3)) { $0.isExcludedFromReport = true }
-        record(90_000, under: utilities, on: day(2026, 9, 4)) { $0.deletedAt = Date.now }
+        record(90_000, under: utilities, on: day(2026, 9, 4)) { made in made.changeCounted { $0.deletedAt = Date.now } }
 
         #expect(try store.estimate(for: utilities) == 1_000)
     }

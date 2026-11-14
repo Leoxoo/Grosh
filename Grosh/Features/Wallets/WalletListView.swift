@@ -5,8 +5,8 @@ import SwiftUI
 struct WalletListView: View {
     @Query(Wallet.unarchived) private var wallets: [Wallet]
     @Query(Wallet.archived) private var archivedWallets: [Wallet]
-    /// What the wallets' balances add up.
-    @NotDeletedTransactions private var transactions: [Transaction]
+    /// The wallets' balances, from the saved month totals.
+    @SavedWalletBalances private var balances
     @Environment(\.today) private var today
     @State private var editorMode: EditorMode<Wallet>?
     @State private var errorMessage: String?
@@ -14,7 +14,6 @@ struct WalletListView: View {
     @State private var deleting: Wallet?
 
     var body: some View {
-        let balances = WalletBalances($transactions, asOf: today)
         List {
             Section {
                 ForEach(wallets) { wallet in

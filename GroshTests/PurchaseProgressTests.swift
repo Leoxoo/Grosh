@@ -76,7 +76,7 @@ struct PurchaseProgressTests {
     @Test func aPaymentInRecentlyDeletedDoesNotCountAsPaid() throws {
         let recurring = try RecurringTransaction.create(laptop(total: 120_000), today: today, in: context)
         let payment = try attachPayment(30_000, dated: day(2026, 9, 1), to: recurring)
-        payment.deletedAt = Date.now
+        payment.changeCounted { $0.deletedAt = Date.now }
 
         #expect(try #require(recurring.purchaseProgress).paid.cents == 0)
     }

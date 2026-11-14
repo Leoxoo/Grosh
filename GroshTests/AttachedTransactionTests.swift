@@ -94,7 +94,7 @@ struct AttachedTransactionTests {
         let transaction = entered(on: day(2026, 10, 1), cents: -1599)
         try recurring.attach(transaction)
 
-        transaction.deletedAt = .now
+        transaction.changeCounted { $0.deletedAt = .now }
         #expect(recurring.attachedTransactions.isEmpty)
         #expect(!transaction.isAttachable)
 
@@ -109,7 +109,7 @@ struct AttachedTransactionTests {
         let held = entered(on: day(2026, 10, 2), cents: -600)
         let deleted = entered(on: day(2026, 10, 3), cents: -700)
         try schedule.attach(held)
-        deleted.deletedAt = .now
+        deleted.changeCounted { $0.deletedAt = .now }
 
         #expect(free.isAttachable)
         #expect(!held.isAttachable)
@@ -120,7 +120,7 @@ struct AttachedTransactionTests {
         let recurring = try store.netflix(starting: day(2026, 10, 12))
         let other = try store.netflix(starting: day(2026, 10, 12))
         let deleted = entered(on: day(2026, 10, 1), cents: -500)
-        deleted.deletedAt = .now
+        deleted.changeCounted { $0.deletedAt = .now }
         let held = entered(on: day(2026, 10, 2), cents: -600)
         try other.attach(held)
 

@@ -84,7 +84,8 @@ extension Transaction {
     /// Adds its Reimbursements up again into ``reimbursedCents``, after one is added, edited, removed or moved to
     /// another transaction. Only the Reimbursement rules below change them, so they are the only callers. Doesn't save.
     fileprivate func recountReimbursements() {
-        reimbursedCents = (reimbursements ?? []).reduce(0) { $0 + $1.amountCents }
+        let total = (reimbursements ?? []).reduce(0) { $0 + $1.amountCents }
+        changeCounted { $0.reimbursedCents = total }
     }
 
     /// What the transaction adds to or takes from its wallet in cents: its amount plus its Reimbursements. Balances, lists

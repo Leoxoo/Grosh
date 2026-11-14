@@ -6,6 +6,8 @@ import Testing
 /// `end <Suite>/<test>`, and its suite `begin <Suite>` and `end <Suite>`, in subsystem `Leoxo.GroshTests`, category
 /// `Tests`. Every suite carries it, `@Suite(.namedInTheLog)`, and a new one should too: a message logged in a suite
 /// without it carries only its time.
+///
+/// Around each test it also checks the saved month totals of every ``TestStore`` the test made (``SavedTotalsCheck``).
 struct NamedInTheLogTrait: SuiteTrait, TestTrait, TestScoping {
     var isRecursive: Bool { true }
 
@@ -20,7 +22,11 @@ struct NamedInTheLogTrait: SuiteTrait, TestTrait, TestScoping {
         let name = test.id.nameComponents.joined(separator: "/")
         testNames.notice("begin \(name, privacy: .public)")
         defer { testNames.notice("end \(name, privacy: .public)") }
-        try await function()
+        if test.isSuite {
+            try await function()
+        } else {
+            try await SavedTotalsCheck.around(function)
+        }
     }
 }
 

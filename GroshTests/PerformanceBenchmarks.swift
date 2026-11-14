@@ -113,6 +113,9 @@ struct PerformanceBenchmarks {
             home.settle()
             transactions.settle()
             samples.append(milliseconds(ContinuousClock.now - start))
+            // Out of every balance first, as Recently Deleted takes it, so its month's saved total is counted again
+            // (ADR-0013).
+            added.changeCounted { $0.deletedAt = .now }
             context.delete(added)
             try context.save()
             home.settle()

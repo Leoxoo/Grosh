@@ -15,8 +15,8 @@ struct HomeView: View {
 /// The screen behind ``HomeView``, holding the month its Month graph shows from the moment Home opens.
 private struct HomeContent: View {
     @Query(Wallet.unarchived) private var wallets: [Wallet]
-    /// What the Total and the wallets' balances add up.
-    @NotDeletedTransactions private var transactions: [Transaction]
+    /// The Total's and the wallets' balances, from the saved month totals, so Home never reads every transaction.
+    @SavedWalletBalances private var balances
     @AppStorage(AppSettings.isTotalHidden) private var isTotalHidden
     @Environment(\.today) private var today
     /// The month Home's Month graph shows, which the Report opens on.
@@ -29,7 +29,6 @@ private struct HomeContent: View {
     }
 
     var body: some View {
-        let balances = WalletBalances($transactions, asOf: today)
         NavigationStack {
             List {
                 Section {

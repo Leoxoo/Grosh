@@ -217,7 +217,7 @@ struct RecurringTransactionTests {
         let recurring = try RecurringTransaction.create(netflix(starting: day(2026, 9, 1)), today: today, in: context)
         try recurring.makeTransactions(on: [day(2026, 9, 1)])
         let made = try #require(recurring.transactions?.first)
-        made.deletedAt = .now
+        made.changeCounted { $0.deletedAt = .now }
 
         #expect(recurring.unenteredOccurrences(through: today) == [day(2026, 10, 1)])
     }

@@ -13,7 +13,7 @@ struct TransactionDayTests {
     private let checking: Wallet
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
+        container = try TestStore.makeContainer()
         checking = container.mainContext.addWallet("Checking")
     }
 
@@ -75,7 +75,7 @@ struct TransactionOrderAcrossLaunchesTests {
     private func openStore() throws -> ModelContainer {
         try FileManager.default.createDirectory(at: storeURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         let configuration = ModelConfiguration(schema: GroshStore.schema, url: storeURL, cloudKitDatabase: .none)
-        return try ModelContainer(for: GroshStore.schema, configurations: configuration)
+        return TestStore.checked(try ModelContainer(for: GroshStore.schema, configurations: configuration))
     }
 
     /// The notes of every transaction in list order, as the store has them now.

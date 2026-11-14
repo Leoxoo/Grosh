@@ -10,7 +10,7 @@ struct WalletManagementTests {
     private let today = TestStore.today
 
     init() throws {
-        container = try GroshStore.makeContainer(inMemory: true)
+        container = try TestStore.makeContainer()
         try CategorySeeder.seedIfNeeded(in: container.mainContext)
     }
 

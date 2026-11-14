@@ -16,18 +16,24 @@ struct GroshApp: App {
         reminderActions = ReminderActionHandler.install(inbox: textThemInbox, context: container.mainContext)
     }
 
-    /// The user's store or, when a UI test asks for it, the 16k store in its place (UITestStore).
+    /// The user's store or, when a UI test asks for it, the 16k store in its place (UITestStore). A Debug build then
+    /// checks the saved month totals against a full count of the transactions once, and logs an error when they differ
+    /// (ADR-0013).
     private static func openStore() -> ModelContainer {
+        let container: ModelContainer
         do {
             #if DEBUG
-            if let uiTestStore = try UITestStore.containerIfAsked() {
-                return uiTestStore
-            }
+            container = try UITestStore.containerIfAsked() ?? StoreOpening.open()
+            #else
+            container = try StoreOpening.open()
             #endif
-            return try StoreOpening.open()
         } catch {
             fatalError("Couldn't open the Grosh store: \(error)")
         }
+        #if DEBUG
+        WalletMonthTotals.logMismatches(in: container.mainContext)
+        #endif
+        return container
     }
 
     var body: some Scene {

@@ -25,9 +25,11 @@ extension Transaction {
     }
 
     private func apply(_ draft: TransactionDraft) throws {
-        amountCents = draft.amount.cents * draft.sign
-        day = draft.day
-        wallet = draft.wallet
+        changeCounted {
+            $0.amountCents = draft.amount.cents * draft.sign
+            $0.day = draft.day
+            $0.wallet = draft.wallet
+        }
         category = draft.category
         card = draft.offersCard ? draft.card : nil
         note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)

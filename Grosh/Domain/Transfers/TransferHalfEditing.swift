@@ -48,12 +48,16 @@ extension Transaction {
         let context = try storeContext()
         let changesAmount = draft.amount.cents != abs(amountCents)
         let changesDay = draft.day != day
-        amountCents = draft.amount.cents * (category?.sign ?? 1)
-        day = draft.day
+        changeCounted {
+            $0.amountCents = draft.amount.cents * (category?.sign ?? 1)
+            $0.day = draft.day
+        }
         note = draft.note.trimmingCharacters(in: .whitespacesAndNewlines)
         if scope == .bothHalves, let other = try otherHalf() {
-            if changesAmount { other.amountCents = -amountCents }
-            if changesDay { other.day = day }
+            other.changeCounted { half in
+                if changesAmount { half.amountCents = -amountCents }
+                if changesDay { half.day = day }
+            }
         }
         try context.save()
     }
