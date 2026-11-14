@@ -87,8 +87,8 @@ struct CardRewardsSection: View {
                 }
             }
 
-            ForEach(page.quarters) { quarter in
-                QuarterSection(quarter: quarter, today: today)
+            if !page.quarters.isEmpty {
+                QuartersSection(quarters: page.quarters, today: today)
             }
         }
         .sheet(isPresented: $isLinking) {
@@ -178,48 +178,70 @@ private struct EarnedRateDetailView: View {
     }
 }
 
-/// A rotating quarter in a section of its own: its dates in the accent color and the days left, or when it starts, its
-/// rate, each Reward category and merchant it covers, and its spending limit.
-private struct QuarterSection: View {
-    let quarter: QuarterRate
+/// The rotating quarters in one row that scrolls sideways: the current one first, the coming ones to its right.
+private struct QuartersSection: View {
+    let quarters: [QuarterRate]
     let today: CalendarDay
 
     var body: some View {
         Section {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(CardRateText.dayRange(from: quarter.from, to: quarter.to))
-                        .font(.headline)
-                        .foregroundStyle(quarter.isCurrent ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-                    Text(quarter.isCurrent
-                        ? Strings.Rewards.daysLeft(quarter.daysLeft(from: today))
-                        : Strings.Rewards.datesFrom(CardRateText.day(quarter.from)))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+            ScrollView(.horizontal) {
+                HStack(spacing: 12) {
+                    ForEach(quarters) { quarter in
+                        QuarterCard(quarter: quarter, today: today)
+                            .containerRelativeFrame(.horizontal) { width, _ in quarters.count > 1 ? width * 0.82 : width }
+                    }
                 }
+                .scrollTargetLayout()
+            }
+            .scrollTargetBehavior(.viewAligned)
+            .scrollIndicators(.hidden)
+            .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+        } header: {
+            Text(Strings.Rewards.quarterlyBonus)
+        } footer: {
+            if quarters.contains(where: \.needsActivation) {
+                Text(Strings.Rewards.activateWithBank)
+            }
+        }
+    }
+}
+
+/// One quarter, compact: its dates (in the accent color while current) and the days left or when it starts, its rate,
+/// the Reward categories and merchants it covers, and its spending limit.
+private struct QuarterCard: View {
+    let quarter: QuarterRate
+    let today: CalendarDay
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(CardRateText.dayRange(from: quarter.from, to: quarter.to))
+                    .font(.headline)
+                    .foregroundStyle(quarter.isCurrent ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                 Spacer()
                 Text(CardRateText.percent(quarter.rate.effectiveRate))
                     .font(.title3.weight(.semibold))
                     .monospacedDigit()
             }
-            ForEach(quarter.rewards) { reward in
-                Label(reward.name, systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(quarter.isCurrent ? .primary : .secondary)
-            }
-            ForEach(quarter.merchants, id: \.self) { merchant in
-                Label(merchant, systemImage: "checkmark.circle")
+            Text(quarter.isCurrent
+                ? Strings.Rewards.daysLeft(quarter.daysLeft(from: today))
+                : Strings.Rewards.datesFrom(CardRateText.day(quarter.from)))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Text((quarter.rewards.map(\.name) + quarter.merchants).joined(separator: " · "))
+                .font(.subheadline)
+                .lineLimit(2)
+            if let cap = quarter.rate.cap.flatMap({ CardRateText.cap($0, currencyCode: $0.currencyCode ?? "USD") }) {
+                Text(cap)
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-            if let cap = quarter.rate.cap.flatMap({ CardRateText.cap(amountOf: $0, currencyCode: $0.currencyCode ?? "USD") }) {
-                LabeledContent(Strings.Rewards.spendingLimit, value: cap)
-            }
-        } header: {
-            Text(quarter.isCurrent ? Strings.Rewards.quarterlyBonus : Strings.Rewards.nextQuarter)
-        } footer: {
-            if quarter.needsActivation {
-                Text(Strings.Rewards.activateWithBank)
-            }
         }
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(.fill.tertiary, in: .rect(cornerRadius: 14))
+        .accessibilityElement(children: .combine)
     }
 }
 
