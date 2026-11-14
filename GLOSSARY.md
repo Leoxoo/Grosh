@@ -251,6 +251,49 @@ A period's total divided by the days it covers: through today in the current per
 On the Income and Spent details the same line reads "Expected by week end", "quarter end" or "year end".
 Today's total on a Month graph tab plus what the Recurring transactions still have due through the period's last day: what the month ends at if nothing unscheduled is spent or earned. The graph's projection is not a Scheduled row: it takes every Occurrence left in the month, and changes no balance, report or transaction.
 
+### Rewards
+
+**Reward category**:
+The kind of purchase a card's rate is for, in the words banks use: Dining, Groceries, Gas, Transit, Everything else and the rest of a fixed list shared by every user. The user can add their own when a card earns on something the list lacks, such as Pet stores; only rates the user enters earn on those.
+_Avoid_: Category (that is the user's), catalog category (that is the fixed list as the catalog uses it)
+
+**Rewards as**:
+The Reward category one of the user's Expense categories counts as, such as Café → Dining. A category nobody mapped counts as Everything else, and a subcategory follows its parent's until the user sets its own.
+_Avoid_: Mapping, link
+
+**Custom card**:
+A Card whose rates the user entered themselves because it isn't in the catalog, such as a card from another country.
+
+**Edited rate**:
+A rate the user changed, added or removed on a Card linked to the catalog. It takes the catalog's place for that Card alone, while the catalog's other rates keep updating, and can be reset to the catalog's.
+_Avoid_: Override, correction
+
+**Change catalog card**:
+Linking a Card to a different catalog entry after the bank changed the card's product (an upgrade or downgrade on the same account). The Card keeps its name, image, wallet, Statement date and every transaction; what was set for the old entry (its Edited rates, Activated quarters and Your choice) is removed once the user confirms.
+_Avoid_: Upgrade, replace card
+
+**Catalog suggestion**:
+What the app sends the developer, with the user's one-time permission, when the user enters a Custom card, an Edited rate or a Reward category of their own: the card and the rates as the user entered them, and never transactions, amounts or the user's own names for things.
+_Avoid_: Report, log, feedback
+
+**Activated**:
+The user's mark that they activated a rotating quarter's bonus on a Card. Until then the quarter's rate is shown but not earned.
+
+**Your choice**:
+The Reward category the user picked for a rate whose category the cardholder chooses (Customized Cash) or that goes to the top-spend category (Custom Cash). A top-spend rate with no choice goes to the Reward category the Card was used most for in the statement period so far, or the calendar month when the Card has no Statement date.
+
+**Effective rate**:
+What a Card earns on a purchase as a share of what was spent: a cash back rate as it is, a points or miles rate times its Point value. Rates are compared and sorted by it everywhere.
+_Avoid_: Value, return
+
+**Multiplier**:
+How a points or miles Card states what it earns: points per dollar, written 3×. A cash back Card has none; its rate is already an Effective rate.
+_Avoid_: Points rate
+
+**Point value**:
+What one point or mile of a Card is worth in cents, 1¢ unless the user changes it.
+_Avoid_: Redemption rate, cents per point
+
 ### Feedback
 
 **Keypad**:
