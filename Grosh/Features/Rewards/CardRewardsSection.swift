@@ -240,6 +240,8 @@ private struct QuarterCard: View {
                 Divider()
                 row(merchant, systemImage: "checkmark.circle", style: .secondary)
             }
+            // The limit sits at the bottom of every card, however many categories a shorter one lists.
+            Spacer(minLength: 0)
             if let cap = quarter.rate.cap.flatMap({ CardRateText.cap(amountOf: $0, currencyCode: $0.currencyCode ?? "USD") }) {
                 Divider()
                 LabeledContent(Strings.Rewards.spendingLimit, value: cap)
