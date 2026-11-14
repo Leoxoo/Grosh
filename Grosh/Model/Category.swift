@@ -33,6 +33,9 @@ final class Category {
     var sortOrder: Int = 0
     /// The ``RecurringKind`` the user set, or `nil` while the category has none of its own. See ``defaultKind``.
     var ownKindRaw: String?
+    /// The Reward category the user set (``RewardCategory/id``, an ``OwnRewardCategory``'s key), or `nil` while the
+    /// category has none of its own. See ``rewardsAs``.
+    var ownRewardsAs: String?
 
     var parent: Category?
 

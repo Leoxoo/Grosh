@@ -45,6 +45,28 @@
         }
       }
     },
+    "Its %lld Edited rates are removed. The Card keeps its name, image, wallet, statement date and transactions." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Its %lld Edited rate is removed. The Card keeps its name, image, wallet, statement date and transactions."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Its %lld Edited rates are removed. The Card keeps its name, image, wallet, statement date and transactions."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Remind me %lld days later" : {
       "localizations" : {
         "en" : {

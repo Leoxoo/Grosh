@@ -3,11 +3,13 @@ import Foundation
 /// The editable fields of a category, as the Add/Edit form holds them before ``CategoryCatalog`` checks and saves them.
 nonisolated struct CategoryDraft {
     var name: String
-    /// Expense or Income. Switching it drops the parent, which can't hold a category of the other type.
+    /// Expense or Income. Switching it drops the parent, which can't hold a category of the other type, and the
+    /// Rewards as, which only an Expense category has.
     var type: CategoryType {
         didSet {
             if type != oldValue {
                 parent = nil
+                ownRewardsAs = nil
             }
         }
     }
@@ -17,6 +19,9 @@ nonisolated struct CategoryDraft {
     var parent: Category?
     /// The Kind the category sets for its Recurring transactions, or `nil` to follow its parent's.
     var ownKind: RecurringKind?
+    /// The Reward category the category counts as (``RewardCategory/id``), or `nil` to follow its parent's, or for a
+    /// top-level one, Everything else. Only an Expense category keeps one.
+    var ownRewardsAs: String?
 
     init(
         name: String = "",
@@ -24,7 +29,8 @@ nonisolated struct CategoryDraft {
         symbolName: String = Category.placeholderSymbolName,
         color: PaletteColor = .gray,
         parent: Category? = nil,
-        ownKind: RecurringKind? = nil
+        ownKind: RecurringKind? = nil,
+        ownRewardsAs: String? = nil
     ) {
         self.name = name
         self.type = type
@@ -32,6 +38,7 @@ nonisolated struct CategoryDraft {
         self.color = color
         self.parent = parent
         self.ownKind = ownKind
+        self.ownRewardsAs = ownRewardsAs
     }
 
     init(_ category: Category) {
@@ -41,7 +48,8 @@ nonisolated struct CategoryDraft {
             symbolName: category.symbolName,
             color: category.color,
             parent: category.parent,
-            ownKind: category.ownKind
+            ownKind: category.ownKind,
+            ownRewardsAs: category.ownRewardsAs
         )
     }
 
@@ -49,6 +57,9 @@ nonisolated struct CategoryDraft {
     static func new(_ type: CategoryType) -> CategoryDraft {
         CategoryDraft(type: type, symbolName: "tag.fill", color: .blue)
     }
+
+    /// The Rewards as a category saved from this draft keeps: none unless it is an Expense category.
+    var storedRewardsAs: String? { type == .expense ? ownRewardsAs : nil }
 
     var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 

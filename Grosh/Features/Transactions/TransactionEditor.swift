@@ -118,7 +118,7 @@ private struct TransactionForm: View {
                 .disabled(draft.isLockedByPayments)
                 .accessibilityIdentifier("TransactionEditor.category")
             if draft.offersCard {
-                CardPicker(title: Strings.Common.card, wallet: draft.wallet, selection: $draft.card)
+                CardPicker(title: Strings.Common.card, wallet: draft.wallet, category: draft.category, selection: $draft.card)
                     .accessibilityIdentifier("TransactionEditor.card")
             }
             fields.noteField($draft.note)
