@@ -5,7 +5,7 @@
 
 reads catalog-seed.json (the cards), cache/candidates/ (each card's rules), review-decisions.json (what
 a person accepted) and card-options.json (whether a card's bonuses add up), and writes rewards-catalog.json
-beside this script.
+beside this script, and a copy to Grosh/Resources/rewards-catalog.json, the file the app bundles.
 """
 
 import json
@@ -20,6 +20,8 @@ import fetch  # noqa: E402
 import review  # noqa: E402
 
 OUT = fetch.DATA / "rewards-catalog.json"
+# The file the app bundles (RewardsCatalog.bundled): a copy of OUT, which nothing else keeps current, so publish writes both.
+APP_FILE = Path(__file__).resolve().parents[3] / "Grosh" / "Resources" / "rewards-catalog.json"
 SEED = fetch.SEED
 # Raised when the file's shape changes in a way an older app can't read (a field renamed or retyped).
 # Adding a field doesn't need it: the app's reader ignores fields it doesn't know.
@@ -79,7 +81,8 @@ def catalog(cards: list[dict], candidates: dict[str, dict], decisions: dict, pre
 
 # Where publish reads and writes: the seed, the candidates, the decisions, the card options and the catalog. ui.Paths has the same
 # fields, for the web page's own (test) folders.
-PATHS = SimpleNamespace(seed=SEED, candidates=extract.CANDIDATES, decisions=review.DECISIONS, options=review.OPTIONS, catalog=OUT)
+PATHS = SimpleNamespace(seed=SEED, candidates=extract.CANDIDATES, decisions=review.DECISIONS, options=review.OPTIONS, catalog=OUT,
+                  app_copy=APP_FILE)
 
 
 def publish(paths=PATHS, today: str = "") -> dict:
@@ -90,6 +93,8 @@ def publish(paths=PATHS, today: str = "") -> dict:
     document = catalog(cards, found, review.load_decisions(paths.decisions), fetch.read_json(paths.catalog, None),
                        today or date.today().isoformat(), review.load_options(paths.options))
     fetch.write_json(paths.catalog, document)
+    if getattr(paths, "app_copy", None):  # the app bundles this copy: without it a published catalog never reaches a build
+        fetch.write_json(paths.app_copy, document)
     return document
 
 

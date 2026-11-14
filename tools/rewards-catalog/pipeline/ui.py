@@ -64,6 +64,7 @@ class Paths:
     options: Path = review.OPTIONS  # committed: what a person turned on for a whole card (bonuses add up)
     url_overrides: Path = fetch.INPUTS / "url-overrides.json"  # committed: {card id: the page to read for it}, applied by build_seed.py
     catalog: Path = publish.OUT  # committed: the accepted rules, as the app reads them
+    app_copy: Path = publish.APP_FILE  # committed: the copy of the catalog the app bundles
 
     @property
     def candidates(self) -> Path:

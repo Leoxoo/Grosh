@@ -270,7 +270,7 @@ Passing the checks means a rule is supported by its page, not that it is right, 
 python3 tools/rewards-catalog/pipeline/publish.py        # or Publish catalog in the page's Run panel
 ```
 
-Reads `catalog-seed.json`, `cache/candidates/`, `review-decisions.json` and `card-options.json`, and writes `data/rewards-catalog.json`: the one file the app bundles (#163). It is committed, so a pull request shows exactly which rules ship.
+Reads `catalog-seed.json`, `cache/candidates/`, `review-decisions.json` and `card-options.json`, and writes `data/rewards-catalog.json`, and the same bytes to `Grosh/Resources/rewards-catalog.json`: the file the app bundles (#163; `RewardsCatalog.bundled`). Both are committed, so a pull request shows exactly which rules ship. Until 2026-11-14 only the first was written and the bundled copy was updated by hand, so a published catalog never reached a build.
 
 - **Only accepted rules** (`review.accepted_rules`). Rejected rules and rules still waiting are left out.
 - **A card with no accepted rule is left out**, not listed with an empty rule list. Its facts are CardPin's and nobody has checked them, and we ship only what we re-verified. So every card in the file is verified, `verified` isn't written, and `verifiedAt` is the latest day one of its rules was accepted. No decisions exist yet, so the file would hold no cards; it isn't committed until it has some.

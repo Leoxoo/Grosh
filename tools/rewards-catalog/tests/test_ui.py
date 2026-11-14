@@ -58,7 +58,8 @@ class AppCase(unittest.TestCase):
         root = Path(tmp.name)
         self.paths = ui.Paths(seed=root / "seed.json", state=root / "state.json", cache=root / "cache", manual=root / "manual.json",
                               decisions=root / "review-decisions.json", options=root / "card-options.json",
-                              catalog=root / "rewards-catalog.json", url_overrides=root / "url-overrides.json")
+                              catalog=root / "rewards-catalog.json", url_overrides=root / "url-overrides.json",
+                              app_copy=root / "app" / "rewards-catalog.json")
         self.cards = [card("bank-a", "Savor Rewards"), card("bank-b", "Other Card"), card("zed-c", "Zed Card", "Zed")]
         self.paths.seed.write_text(json.dumps({"cards": self.cards}))
         self.state: dict = {}
@@ -1000,6 +1001,8 @@ class ReviewTests(AppCase):
         (published,) = json.loads(self.paths.catalog.read_text())["cards"]
         self.assertEqual([r["evidence"]["quote"] for r in published["rules"]], [RULE["quote"]])
         self.assertEqual(ui.Paths().catalog.parent, fetch.DATA)  # committed, not in cache/
+        self.assertEqual(self.paths.app_copy.read_text(), self.paths.catalog.read_text())  # the app bundles this copy
+        self.assertEqual(ui.Paths().app_copy.parts[-3:], ("Grosh", "Resources", "rewards-catalog.json"))
 
     def test_a_card_option_is_saved_shown_in_the_card_and_published(self):
         facts = {"isBusiness": False, "rewardProgram": None, "baseEarnRate": 1, "discontinued": False}
