@@ -80,7 +80,7 @@ fetch.py --missing            # never fetched, or saved text missing: resumes an
 fetch.py --retry              # last fetch failed or found the page gone
 ```
 
-A card whose `sourceUrl` or `calendarUrl` changed since it was fetched is picked up by `--missing` and `--retry` too; `--missing` also picks up a card whose `calendar.txt` isn't saved, and `--retry` one whose calendar page failed. A wrong or moved page URL is fixed in `url-overrides.json` (`{card id: url}`); `build_seed.py` applies it, so rebuilding the seed keeps the fix.
+A card whose `sourceUrl` or `calendarUrl` changed since it was fetched is picked up by `--missing` and `--retry` too; `--missing` also picks up a card whose `calendar.txt` isn't saved, and `--retry` one whose calendar page failed. A wrong or moved page URL is fixed in `url-overrides.json` (`{card id: url}`); `build_seed.py` applies it, so rebuilding the seed keeps the fix. The web page's **Change…** beside a card's address does it: it writes `url-overrides.json` and the seed's card, and **Save and fetch** reads the new page.
 
 ### Fetch status after retries (2026-10-20, 166 cards)
 

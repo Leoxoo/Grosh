@@ -58,7 +58,7 @@ class AppCase(unittest.TestCase):
         root = Path(tmp.name)
         self.paths = ui.Paths(seed=root / "seed.json", state=root / "state.json", cache=root / "cache", manual=root / "manual.json",
                               decisions=root / "review-decisions.json", options=root / "card-options.json",
-                              catalog=root / "rewards-catalog.json")
+                              catalog=root / "rewards-catalog.json", url_overrides=root / "url-overrides.json")
         self.cards = [card("bank-a", "Savor Rewards"), card("bank-b", "Other Card"), card("zed-c", "Zed Card", "Zed")]
         self.paths.seed.write_text(json.dumps({"cards": self.cards}))
         self.state: dict = {}
@@ -877,6 +877,25 @@ class AskAndStatsTests(AppCase):
         self.assertEqual(ui.format_stats({"calls": 0}), "")
         self.assertEqual(ui.format_stats({"calls": 2, "seconds": 3.5, "promptTokens": 10, "cachedTokens": 0, "replyTokens": 5, "reasoningTokens": 2}),
                          "2 calls, 3.5s, 10 prompt tokens, 5 reply tokens (2 reasoning)")
+
+
+class PageAddressTests(AppCase):
+    def test_a_card_can_be_pointed_at_another_page_and_it_is_kept_for_the_next_seed(self):
+        self.paths.url_overrides.write_text(json.dumps({"zed-c": "https://x.test/zed"}))
+        status, payload = self.app.handle("POST", "/api/card-url", {}, {"cardId": "bank-a", "url": "  https://new.test/cards/savor  "})
+        self.assertEqual((status, payload), (200, {"sourceUrl": "https://new.test/cards/savor"}))
+        self.assertEqual(json.loads(self.paths.url_overrides.read_text()), {"bank-a": "https://new.test/cards/savor", "zed-c": "https://x.test/zed"})
+        card = self.app.card("bank-a")
+        self.assertEqual((card["sourceUrl"], card["sourceHost"]), ("https://new.test/cards/savor", "new.test"))
+        self.assertEqual(self.app.card("bank-b")["sourceUrl"], self.cards[1]["sourceUrl"])  # the others are as they were
+
+    def test_an_address_that_is_not_a_web_page_is_refused(self):
+        for url in ("savor", "ftp://x.test/a", "https://", "https://x.test/a b", "", None, 5):
+            status, payload = self.app.handle("POST", "/api/card-url", {}, {"cardId": "bank-a", "url": url})
+            self.assertEqual(status, 400, url)
+            self.assertIn("web address", payload["error"])
+        self.assertFalse(self.paths.url_overrides.exists())
+        self.assertEqual(self.app.handle("POST", "/api/card-url", {}, {"cardId": "nope", "url": "https://x.test/"})[0], 404)
 
 
 class ReviewTests(AppCase):

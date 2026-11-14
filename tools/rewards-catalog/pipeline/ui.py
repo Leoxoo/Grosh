@@ -62,6 +62,7 @@ class Paths:
     manual: Path = extract.MANUAL_RULES
     decisions: Path = review.DECISIONS  # committed: a person's accept or reject on each rule
     options: Path = review.OPTIONS  # committed: what a person turned on for a whole card (bonuses add up)
+    url_overrides: Path = fetch.INPUTS / "url-overrides.json"  # committed: {card id: the page to read for it}, applied by build_seed.py
     catalog: Path = publish.OUT  # committed: the accepted rules, as the app reads them
 
     @property
@@ -431,6 +432,25 @@ class App:
             "manual": fetch.read_json(self.paths.manual, {}).get(card_id), "page": page,
             "options": review.load_options(self.paths.options).get(card_id, {}),
         }
+
+    def set_card_url(self, body: dict) -> dict:
+        """Point a card at another page: the address is saved in url-overrides.json (so rebuilding the seed keeps it) and in
+        the seed's card, which the fetcher reads. Fetch the card next to read it."""
+        card = self.card(str(body.get("cardId")))
+        url = body.get("url")
+        parts = urlparse(url.strip()) if isinstance(url, str) else None
+        if not parts or parts.scheme not in ("http", "https") or not parts.netloc or len(url) > 2000 or any(c.isspace() for c in url.strip()):
+            raise Problem("The page address must be one web address starting with http:// or https://")
+        url = url.strip()
+        overrides = fetch.read_json(self.paths.url_overrides, {})
+        overrides[card["id"]] = url
+        fetch.write_json(self.paths.url_overrides, overrides)
+        seed = fetch.read_json(self.paths.seed, {"cards": []})
+        for entry in seed["cards"]:
+            if entry["id"] == card["id"]:
+                entry["sourceUrl"], entry["sourceHost"] = url, parts.netloc
+        fetch.write_json(self.paths.seed, seed)
+        return {"sourceUrl": url}
 
     def set_card_option(self, body: dict) -> dict:
         """Turn a card option (review.CARD_OPTIONS) on or off; returns the card's options."""
@@ -859,6 +879,8 @@ class App:
                 return self.decide(body)
             if path == "/api/publish":
                 return self.publish_catalog()
+            if path == "/api/card-url":
+                return self.set_card_url(body)
             if path == "/api/card-options":
                 return self.set_card_option(body)
             if path == "/api/test-model":

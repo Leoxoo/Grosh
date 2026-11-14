@@ -727,6 +727,33 @@ function fixForm(r, save, cancel) {
     h("div", { class: "row" }, h("button", { type: "button", class: "primary", text: "Save and accept", onclick: submit(false) }), h("button", { type: "button", text: "Cancel", onclick: cancel })));
 }
 
+// The page a card is read from, with a way to point it at another (url-overrides.json and the seed), then fetch it.
+function pageAddress(id, c) {
+  const area = h("div", {}), busy = state.job && state.job.state === "running";
+  const link = /^https?:\/\//.test(c.sourceUrl) ? h("a", { href: c.sourceUrl, target: "_blank", rel: "noopener noreferrer", text: c.sourceUrl }) : c.sourceUrl;
+  const change = () => {
+    if (area.childNodes.length) return fill(area);
+    const input = h("input", { type: "url", value: c.sourceUrl, style: "width: 100%" }), error = h("div", {});
+    const save = (fetchAfter) => async (e) => {
+      e.target.disabled = true; fill(error);
+      try {
+        await api("POST", "/api/card-url", { cardId: id, url: input.value });
+        await loadOverview();
+        if (fetchAfter) { await jobFor("fetch", id); }
+        await openCard(id, true);
+      } catch (err) { fill(error, h("div", { class: "result bad", text: err.message })); e.target.disabled = false; }
+    };
+    fill(area, h("div", { class: "fix" },
+      h("label", {}, "The page to read for this card", input),
+      h("div", { class: "small muted", text: "Saved in url-overrides.json, so rebuilding the seed keeps it. Paste the card's own page: the address that opens it in your browser." }),
+      error,
+      h("div", { class: "row" }, h("button", { type: "button", class: "primary", disabled: busy, text: "Save and fetch", onclick: save(true) }),
+        h("button", { type: "button", text: "Save only", onclick: save(false) }), h("button", { type: "button", text: "Cancel", onclick: () => fill(area) }))));
+    input.focus();
+  };
+  return [h("p", { class: "small" }, link, " ", h("button", { type: "button", text: "Change…", title: "Read another page for this card", onclick: change })), area];
+}
+
 // A rule a person adds (the model missed it) or uses although the checks rejected it: every field of a rule, and its quote.
 // The server checks it like any proposal; when the checks don't back it, it says why and offers to use it anyway.
 const RULE_DEFAULTS = { categories: [], selection: "fixed", picks: null, hasOtherChoices: false, rate: "", unit: "percent", capAmount: null, capPeriod: null,
@@ -841,7 +868,7 @@ async function openCard(id, quiet) {
       h("div", {}, h("strong", { style: "font-size: 17px", text: c.name }), h("div", { class: "small muted", text: `${c.issuer} · ${c.network} · ${c.rewardKind}${c.annualFee ? " · $" + c.annualFee + " annual fee" : " · no annual fee"}` })),
       h("button", { type: "button", text: "Close", onclick: () => { state.open = null; drawer.hidden = true; renderRows(); } })),
     c.needsInfo ? h("div", { class: "result", style: "background: var(--warn-bg); color: var(--warn)", text: "Needs info (needs-info.json): " + c.needsInfo }) : null,
-    h("p", { class: "small" }, /^https?:\/\//.test(c.sourceUrl) ? h("a", { href: c.sourceUrl, target: "_blank", rel: "noopener noreferrer", text: c.sourceUrl }) : c.sourceUrl),
+    pageAddress(id, c),
     h("div", { class: "row" },
       h("button", { type: "button", disabled: busy, text: "Fetch this page", onclick: () => jobFor("fetch", id) }),
       d.manual
