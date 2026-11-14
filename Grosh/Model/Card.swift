@@ -37,6 +37,10 @@ final class Card {
     /// Whether a Custom card earns cash back or points (``RewardKind``); `nil` for cash back. A linked Card earns what
     /// its entry does.
     var ownRewardKindRaw: String?
+    /// The rotating quarters the user marked Activated, by each quarter's first day (`yyyy-MM-dd`), comma-separated.
+    var activatedQuartersRaw: String?
+    /// Your choice per rate of the linked entry, as JSON (``Card/yourChoices``).
+    var yourChoicesData: Data?
 
     var payingWallet: Wallet?
 

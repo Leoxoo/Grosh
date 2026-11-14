@@ -6,8 +6,9 @@ import SwiftUI
 /// wallet, in the order they were added, or "None"; the current selection stays visible even when it was archived
 /// since (editing a past transaction). Once an Expense's category is picked, they are listed best first for what that
 /// category earns, each with a second line saying what (``CardEarning``), and the row says what the picked Card earns;
-/// picking the category never picks a Card. Clear the selection when the transaction's wallet changes. A filter picks
-/// from a menu of every Card, archived ones included, or none.
+/// picking the category never picks a Card. What each earns is worked out for the transaction's own day. Clear the
+/// selection when the transaction's wallet changes. A filter picks from a menu of every Card, archived ones included, or
+/// none.
 struct CardPicker: View {
     let title: LocalizedStringResource
     @Binding var selection: Card?
@@ -21,19 +22,27 @@ struct CardPicker: View {
     @Environment(\.displayScale) private var displayScale
     @Environment(\.rewardsCatalog) private var catalog
     @Environment(\.today) private var today
+    @Environment(\.modelContext) private var context
+    @StoreSaves private var saves
+    /// The Cards with what each earns, kept until what they were worked out from changes or the store saves
+    /// (``CardChoicesKey``), so a top-spend Card's spending isn't fetched again on every keystroke in the form.
+    @State private var keptChoices = DrawingCache<CardChoicesKey, [CardEarning]>()
 
     private enum Offered {
-        /// The Cards paid from a wallet, ordered for what a purchase in the category earns when there is one.
-        case paidFrom(Wallet?, category: Category?)
+        /// The Cards paid from a wallet, ordered for what a purchase in the category on the day earns when there is one.
+        case paidFrom(Wallet?, category: Category?, day: CalendarDay?)
         case every
     }
 
     /// A transaction's Card: the unarchived Cards paid from `wallet`, or "None". With the transaction's `category`,
-    /// best first for what it earns.
-    init(title: LocalizedStringResource, wallet: Wallet?, category: Category? = nil, selection: Binding<Card?>) {
+    /// best first for what it earns on `day`, the transaction's own (today when not given).
+    init(
+        title: LocalizedStringResource, wallet: Wallet?, category: Category? = nil, day: CalendarDay? = nil,
+        selection: Binding<Card?>
+    ) {
         self.title = title
         _selection = selection
-        offered = .paidFrom(wallet, category: category)
+        offered = .paidFrom(wallet, category: category, day: day)
         noneTitle = Strings.Common.none
     }
 
@@ -47,10 +56,15 @@ struct CardPicker: View {
 
     var body: some View {
         switch offered {
-        case .paidFrom(let wallet, let category):
-            let choices = transactionChoices(wallet: wallet, category: category)
+        case .paidFrom(let wallet, let category, let day):
+            let choices = keptChoices.value(for: key(wallet: wallet, category: category, day: day ?? today)) {
+                CardChoicesKey.choices(
+                    wallet: wallet, category: category, selection: selection, day: day ?? today, catalog: catalog,
+                    own: ownRewardCategories, context: context
+                )
+            }
             NavigationLink {
-                CardChoiceList(title: title, wallet: wallet, category: category, selection: $selection)
+                CardChoiceList(title: title, wallet: wallet, category: category, day: day ?? today, selection: $selection)
             } label: {
                 LabeledContent(title) {
                     if let selection {
@@ -93,14 +107,14 @@ struct CardPicker: View {
 
     /// A filter's Cards: every one, archived ones included.
     private var choices: [CardEarning] {
-        listedCards.map { CardEarning(card: $0, rate: nil) }
+        listedCards.map { CardEarning(card: $0, earning: nil) }
     }
 
-    /// A transaction's Cards, with what each earns, worked out once per draw.
-    private func transactionChoices(wallet: Wallet?, category: Category?) -> [CardEarning] {
-        CardEarning.ordered(
-            Card.pickerChoices(for: wallet, keeping: selection), for: category, in: catalog,
-            own: ownRewardCategories.map(RewardCategory.init), on: today
+    private func key(wallet: Wallet?, category: Category?, day: CalendarDay) -> CardChoicesKey {
+        CardChoicesKey(
+            wallet: wallet?.persistentModelID, category: category?.persistentModelID,
+            selection: selection?.persistentModelID, day: day, own: ownRewardCategories.map(\.persistentModelID),
+            saves: saves
         )
     }
 
@@ -116,20 +130,31 @@ private struct CardChoiceList: View {
     let title: LocalizedStringResource
     let wallet: Wallet?
     let category: Category?
+    let day: CalendarDay
     @Binding var selection: Card?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.displayScale) private var displayScale
     @Environment(\.rewardsCatalog) private var catalog
-    @Environment(\.today) private var today
     @Query(RewardCategories.ownInOrder) private var ownRewardCategories: [OwnRewardCategory]
+    @Environment(\.modelContext) private var context
+    @StoreSaves private var saves
+    @State private var keptChoices = DrawingCache<CardChoicesKey, [CardEarning]>()
 
     var body: some View {
-        // Worked out here, once per draw, rather than handed over by the form, which redraws as the list goes back.
-        let choices = CardEarning.ordered(
-            Card.pickerChoices(for: wallet, keeping: selection), for: category, in: catalog,
-            own: ownRewardCategories.map(RewardCategory.init), on: today
+        // Worked out here rather than handed over by the form, which redraws as the list goes back, and kept until what
+        // it was worked out from changes or the store saves.
+        let key = CardChoicesKey(
+            wallet: wallet?.persistentModelID, category: category?.persistentModelID,
+            selection: selection?.persistentModelID, day: day, own: ownRewardCategories.map(\.persistentModelID),
+            saves: saves
         )
+        let choices = keptChoices.value(for: key) {
+            CardChoicesKey.choices(
+                wallet: wallet, category: category, selection: selection, day: day, catalog: catalog,
+                own: ownRewardCategories, context: context
+            )
+        }
         List {
             Section {
                 row(nil, detail: nil)
@@ -169,5 +194,30 @@ private struct CardChoiceList: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(card == selection ? .isSelected : [])
+    }
+}
+
+/// What a transaction's Card choices were worked out from: a ``DrawingCache`` key, so they are worked out again when the
+/// wallet, category, picked Card, day or the user's own Reward categories change, or the store saves (an Activated
+/// quarter, Your choice, a rate or a transaction).
+private struct CardChoicesKey: Equatable {
+    let wallet: PersistentIdentifier?
+    let category: PersistentIdentifier?
+    let selection: PersistentIdentifier?
+    let day: CalendarDay
+    let own: [PersistentIdentifier]
+    let saves: Int
+
+    /// The Cards offered on `wallet`'s transactions, with what a purchase in `category` on `day` earns with each.
+    @MainActor
+    static func choices(
+        wallet: Wallet?, category: Category?, selection: Card?, day: CalendarDay, catalog: RewardsCatalog,
+        own: [OwnRewardCategory], context: ModelContext
+    ) -> [CardEarning] {
+        CardEarning.ordered(
+            Card.pickerChoices(for: wallet, keeping: selection), for: category, in: catalog,
+            own: own.map(RewardCategory.init), on: day,
+            spending: { CardTopSpend.spendingOrNone(of: $0, on: day, in: context) }
+        )
     }
 }

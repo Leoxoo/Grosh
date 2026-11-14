@@ -52,6 +52,10 @@ nonisolated struct CardRewards {
     let rewardKind: RewardKind
     /// A Custom card's rates, or a linked Card's Edited rates and removals.
     let enteredRates: [EnteredRate]
+    /// The rotating quarters the user marked Activated, by first day.
+    let activatedQuarters: Set<String>
+    /// Your choice per rate, by ``CatalogRule/choiceKey``.
+    let yourChoices: [String: [String]]
 
     @MainActor
     init(of card: Card, in catalog: RewardsCatalog) {
@@ -65,6 +69,8 @@ nonisolated struct CardRewards {
         pointValueCents = card.pointValueCents
         rewardKind = entry?.rewardKind ?? card.ownRewardKind ?? .cashback
         enteredRates = card.enteredRates
+        activatedQuarters = card.activatedQuarters
+        yourChoices = card.yourChoices
     }
 
     /// The rates the Card earns on `today`, one per Reward category, best Effective rate first and Everything else
@@ -77,13 +83,6 @@ nonisolated struct CardRewards {
             guard let entered = row.entered, !entered.isRemoval, !entered.applies(on: today) else { return row.shown }
             return row.catalog
         }, own: own)
-    }
-
-    /// What a purchase counting as `reward` earns with the Card on `today`: its rate for that Reward category, else its
-    /// rate for Everything else, else `nil` for a Card with no rates that cover it.
-    func earning(for reward: String, on today: CalendarDay, own: [RewardCategory] = []) -> CardRate? {
-        let rates = rates(on: today, own: own)
-        return rates.first { $0.reward.id == reward } ?? rates.first { $0.reward == .everythingElse }
     }
 
     /// Every Reward category the Card has a rate for, the catalog's today or one the user entered whatever its dates,
@@ -147,7 +146,7 @@ nonisolated struct CardRewards {
 
     /// A rule's rate on `reward`: points or miles per dollar are worth the Point value each, and a rate in percent is
     /// already an Effective rate, whatever kind of card states it.
-    private func rate(of rule: CatalogRule, on reward: RewardCategory) -> CardRate {
+    func rate(of rule: CatalogRule, on reward: RewardCategory) -> CardRate {
         let perDollar = rule.unit == "per-dollar"
         return CardRate(
             reward: reward, multiplier: perDollar ? rule.rate : nil,
@@ -181,9 +180,23 @@ nonisolated struct CardRewards {
               rule.needs.isEmpty, rule.firstMonths == nil, !rule.requires.contains("preferred-rewards-tier")
         else { return false }
         guard let today else { return true }
-        if let from = rule.validFrom.flatMap(CalendarDay.init(isoDate:)), today < from { return false }
-        if let to = rule.validTo.flatMap(CalendarDay.init(isoDate:)), to < today { return false }
+        return rule.isInDates(on: today)
+    }
+}
+
+nonisolated extension CatalogRule {
+    /// Whether `day` is between the rule's dates, where it has them.
+    func isInDates(on day: CalendarDay) -> Bool {
+        if let from = validFrom.flatMap(CalendarDay.init(isoDate:)), day < from { return false }
+        if let to = validTo.flatMap(CalendarDay.init(isoDate:)), to < day { return false }
         return true
+    }
+
+    /// Whether the app can tell from a purchase's category and day alone that it earns this rule, where its selection
+    /// allows: not limited to a way of paying, not a Preferred Rewards tier boost, and not for the first months after
+    /// the account was opened, which the app doesn't know.
+    var isEarnableByCategory: Bool {
+        paysWith == nil && tier == nil && firstMonths == nil && !requires.contains("preferred-rewards-tier")
     }
 }
 
