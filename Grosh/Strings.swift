@@ -77,7 +77,7 @@ nonisolated enum Strings {
         static let nothingRecordedInPeriod: LocalizedStringResource = "Nothing was recorded in this period."
         static let addWalletFirst: LocalizedStringResource = "Add a wallet first, in Account → Wallets."
         static let onlyThisOne: LocalizedStringResource = "Only This One"
-        static let searchPrompt: LocalizedStringResource = "Note, category or amount"
+        static let searchPrompt: LocalizedStringResource = "Note, category, Card or amount"
         static let timeRange: LocalizedStringResource = "Time Range"
         static let custom: LocalizedStringResource = "Custom"
         static let customEllipsis: LocalizedStringResource = "Custom…"
@@ -399,6 +399,25 @@ nonisolated enum Strings {
         static let couldntChange: LocalizedStringResource = "Couldn't Change Reward Categories"
         static func deleteRewardCategoryMessage(_ name: String) -> LocalizedStringResource { "The categories that count as \(name) go back to Everything else." }
         static let rewards: LocalizedStringResource = "Rewards"
+        static let notAnOption: LocalizedStringResource = "Choose one of this rate's categories."
+        static let tooManyChoices: LocalizedStringResource = "This rate is earned on fewer categories."
+        static func activateFor(_ rate: String) -> LocalizedStringResource { "Activate for \(rate)" }
+        static let activated: LocalizedStringResource = "Activated"
+        static let earning: LocalizedStringResource = "Earning"
+        static func alsoAt(_ merchants: String) -> LocalizedStringResource { "Also at \(merchants)" }
+        static func topCategoryNone(_ rate: String) -> LocalizedStringResource { "\(rate) on your top category" }
+        static let yourChoice: LocalizedStringResource = "Your Choice"
+        static let topCategoryAutomatic: LocalizedStringResource = "Top category, worked out for you"
+        static let topCategoryFooter: LocalizedStringResource = "The card earns this on the category you spent most on this statement period, or this month for a card with no statement date. Pick one to use it instead."
+        static func yourChoiceFooter(_ picks: Int) -> LocalizedStringResource { "The card earns this on the category you chose with your bank. Pick up to \(picks)." }
+        static func activateToEarn(_ rate: String) -> LocalizedStringResource { "Activate to earn \(rate)" }
+        static func quarter(_ rate: String, _ categories: String, _ months: String) -> LocalizedStringResource { "\(rate) \(categories) · \(months)" }
+        static func yourChoiceIs(_ rate: String, _ categories: String) -> LocalizedStringResource { "\(rate) · \(categories) (Your choice)" }
+        static func yourChoiceNotSet(_ rate: String) -> LocalizedStringResource { "\(rate) · Your choice: Not set" }
+        static func topCategory(_ rate: String, _ category: String) -> LocalizedStringResource { "\(rate) on your top category (\(category) so far)" }
+        static func onRotatingCategories(_ rate: String) -> LocalizedStringResource { "\(rate) on rotating categories" }
+        static func paidWith(_ rate: String, _ way: String) -> LocalizedStringResource { "\(rate) with \(way)" }
+        static func atMerchants(_ rate: String, _ merchants: String) -> LocalizedStringResource { "\(rate) at \(merchants)" }
         static let rateOutOfRange: LocalizedStringResource = "Enter a rate above 0."
         static let capOutOfRange: LocalizedStringResource = "Enter a cap above 0, or turn the cap off."
         static let datesOutOfOrder: LocalizedStringResource = "The first day comes before the last."

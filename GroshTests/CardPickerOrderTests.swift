@@ -26,7 +26,7 @@ struct CardPickerOrderTests {
     }
 
     private func ordered(_ cards: [Card], for category: Grosh.Category?) -> [CardEarning] {
-        CardEarning.ordered(cards, for: category, in: catalog, own: [], on: TestStore.today)
+        CardEarning.ordered(cards, for: category, in: catalog, own: [], on: TestStore.today, spending: { _ in [:] })
     }
 
     @Test func cardsAreOrderedByWhatTheCategoryEarnsWithUnratedCardsAfterInTheirOrder() throws {
@@ -39,8 +39,8 @@ struct CardPickerOrderTests {
 
         let order = ordered([plain, savory, miles, voyager, custom], for: try store.category("Restaurants"))
         #expect(order.map(\.card.name) == ["Voyager", "Savory", "Local", "Miles", "Debit"])
-        #expect(order.map { $0.rate?.effectiveRate } == [4.5, 3, 3, 2, nil])
-        #expect(order.map { $0.rate?.reward.id } == ["dining", "dining", "dining", "everything-else", nil])
+        #expect(order.map { $0.earning?.effectiveRate } == [4.5, 3, 3, 2, nil])
+        #expect(order.map { $0.earning?.reward.id } == ["dining", "dining", "dining", "everything-else", nil])
     }
 
     @Test func noCategoryLeavesTheCardsAsTheyAre() throws {
@@ -48,10 +48,10 @@ struct CardPickerOrderTests {
         let savory = try linked("Savory", to: "test-savory-cash")
         let order = ordered([plain, savory], for: nil)
         #expect(order.map(\.card) == [plain, savory])
-        #expect(order.allSatisfy { $0.rate == nil })
+        #expect(order.allSatisfy { $0.earning == nil })
         let income = ordered([plain, savory], for: try store.category("Salary", .income))
         #expect(income.map(\.card) == [plain, savory])
-        #expect(income.allSatisfy { $0.rate == nil })
+        #expect(income.allSatisfy { $0.earning == nil })
     }
 
     @Test func theSecondLineSaysWhatTheCardEarns() throws {

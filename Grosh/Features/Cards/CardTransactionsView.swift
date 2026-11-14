@@ -91,7 +91,7 @@ private struct CardPeriodList: View {
         let added = leadIns.filter { addedLeadIns.contains($0) }
 
         List {
-            CardRewardsSection(card: card)
+            CardRewardsSection(card: card, today: today)
 
             Section {
                 CardPeriodStepper(

@@ -22,6 +22,23 @@ nonisolated enum CardRateText {
         amount.formatted(.currency(code: "USD").precision(.fractionLength(0...2)))
     }
 
+    /// A quarter's months as "Oct–Dec".
+    static func months(from: CalendarDay, to: CalendarDay) -> String {
+        let month = Date.FormatStyle().month(.abbreviated)
+        return "\(from.date().formatted(month))–\(to.date().formatted(month))"
+    }
+
+    /// A rate earned only paid a certain way or at certain merchants: "2% with Apple Pay", "5% Online shopping at
+    /// Amazon".
+    static func condition(of rate: CardRate) -> LocalizedStringResource {
+        let percent = self.percent(rate.effectiveRate)
+        let on = rate.reward == .everythingElse ? percent : "\(percent) \(rate.reward.name)"
+        if let paysWith = rate.rule?.paysWith {
+            return Strings.Rewards.paidWith(on, paysWith)
+        }
+        return Strings.Rewards.atMerchants(on, (rate.rule?.merchants ?? []).formatted(.list(type: .or)))
+    }
+
     /// `day` as the user's calendar writes a date.
     static func day(_ day: CalendarDay) -> String {
         day.date().formatted(date: .abbreviated, time: .omitted)

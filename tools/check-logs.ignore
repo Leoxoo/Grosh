@@ -122,5 +122,9 @@
   {
     "pattern": "<compose failure \\[shared UUID\\]>",
     "reason": "log show prints this in place of a message whose text lives in the simulator runtime's shared system libraries when it cannot read them, as on GitHub's xcode-27 image with iOS 27.2. Only system libraries' messages are kept there; Grosh's own messages are in its app binary and still read in full."
+  },
+  {
+    "pattern": "(XCTAS Error: XCTAutomationSupportErrorWrappedAccessibilityError: |Replying with error from attributes request: Error Domain=com\\.apple\\.dt\\.xctest\\.automation-support\\.error Code=11 \")Accessibility error kAXErrorInvalidUIElement from AXUIElementCopyMultipleAttributeValues",
+    "reason": "XCTest's automation support in the app logs this when the UI test's first query after a pushed list goes back (picking a Card) reaches one of that list's cells the accessibility tree already let go. XCTest retries and the query gets its answer; the app logs nothing."
   }
 ]

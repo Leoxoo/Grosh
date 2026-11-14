@@ -227,6 +227,9 @@ extension Card {
             }
             let kept = entry == nil ? enteredRates.filter { !$0.isRemoval } : catalogCardID == nil ? enteredRates : []
             try keepEnteredRates(kept)
+            // Activated quarters and Your choice belong to the old entry's rules (ADR-0014).
+            activatedQuartersRaw = nil
+            yourChoicesData = nil
         }
         catalogCardID = entry?.id
         let snapshot = entry.flatMap(Self.snapshot(of:))
