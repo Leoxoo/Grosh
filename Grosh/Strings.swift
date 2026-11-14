@@ -312,6 +312,7 @@ nonisolated enum Strings {
         static let missingPayingWallet: LocalizedStringResource = "Choose the wallet this Card is paid from."
         static let statementDayOutOfRange: LocalizedStringResource = "A statement date is a day from 1 to 31."
         static let invalidLastFourDigits: LocalizedStringResource = "Enter all 4 last digits, or leave them blank."
+        static let pointValueOutOfRange: LocalizedStringResource = "A point is worth more than 0¢."
         static let mergeIntoItself: LocalizedStringResource = "Choose another Card to merge into."
         static let mergeIntoAnotherWallet: LocalizedStringResource = "Choose a Card paid from the same wallet."
         static let mergeIntoArchived: LocalizedStringResource = "Unarchive that Card before merging into it."
@@ -361,6 +362,81 @@ nonisolated enum Strings {
         static func statementOnThe(_ day: String) -> LocalizedStringResource { "Statement on the \(day)" }
         static func includesFromPreviousStatement(_ count: Int) -> LocalizedStringResource { "Includes \(count) from the previous statement" }
         static func previousStatementFooter(_ days: Int) -> LocalizedStringResource { "From the \(days) days before this statement, as entries aren't always dated as on the statement. They're not in its total; tap + to add one for now." }
+    }
+
+    /// Reward categories, what the user's categories count as, and what each Card earns.
+    enum Rewards {
+        static let dining: LocalizedStringResource = "Dining"
+        static let groceries: LocalizedStringResource = "Groceries"
+        static let gas: LocalizedStringResource = "Gas"
+        static let evCharging: LocalizedStringResource = "EV charging"
+        static let travel: LocalizedStringResource = "Travel"
+        static let airlines: LocalizedStringResource = "Airlines"
+        static let hotels: LocalizedStringResource = "Hotels"
+        static let transit: LocalizedStringResource = "Transit"
+        static let streaming: LocalizedStringResource = "Streaming"
+        static let entertainment: LocalizedStringResource = "Entertainment"
+        static let drugstores: LocalizedStringResource = "Drugstores"
+        static let onlineShopping: LocalizedStringResource = "Online shopping"
+        static let homeImprovement: LocalizedStringResource = "Home improvement"
+        static let fitness: LocalizedStringResource = "Fitness"
+        static let phoneInternet: LocalizedStringResource = "Phone & internet"
+        static let utilities: LocalizedStringResource = "Utilities"
+        static let wholesaleClubs: LocalizedStringResource = "Wholesale clubs"
+        static let departmentStores: LocalizedStringResource = "Department stores"
+        static let everythingElse: LocalizedStringResource = "Everything else"
+        static let nameRequired: LocalizedStringResource = "Give the Reward category a name."
+        static let nameTaken: LocalizedStringResource = "Another Reward category already has this name."
+        static let rewardsAs: LocalizedStringResource = "Rewards as"
+        static let rewardsAsFooter: LocalizedStringResource = "The kind of purchase a card's rate is for that this category counts as, so Grosh can tell what each Card earns on it."
+        static let rewardCategories: LocalizedStringResource = "Reward Categories"
+        static let rewardCategoriesFooter: LocalizedStringResource = "Each of your Expense categories counts as one Reward category, the kind of purchase a card's rate is for. Tap a category to change what it counts as."
+        static let addRewardCategory: LocalizedStringResource = "Add Reward Category"
+        static let renameRewardCategory: LocalizedStringResource = "Rename Reward Category"
+        static let deleteRewardCategory: LocalizedStringResource = "Delete Reward Category"
+        static let ownRewardCategoryFooter: LocalizedStringResource = "Add one when a card earns on something the list lacks, such as Pet stores. Only rates you enter earn on it."
+        static let noCategoriesCountAsIt: LocalizedStringResource = "No categories"
+        static let couldntChange: LocalizedStringResource = "Couldn't Change Reward Categories"
+        static func deleteRewardCategoryMessage(_ name: String) -> LocalizedStringResource { "The categories that count as \(name) go back to Everything else." }
+        static let rewards: LocalizedStringResource = "Rewards"
+        static let addRewards: LocalizedStringResource = "Add rewards"
+        static let customCard: LocalizedStringResource = "Custom card"
+        static let customCardDescription: LocalizedStringResource = "A card that isn't in the list. You enter it yourself."
+        static let searchCatalog: LocalizedStringResource = "Search cards and banks"
+        static let chooseCatalogCard: LocalizedStringResource = "Choose Catalog Card"
+        static let catalogFooter: LocalizedStringResource = "What each card earns comes from its bank's own pages, checked before it ships in Grosh."
+        static let noLongerInCatalog: LocalizedStringResource = "No longer in the catalog"
+        static let noLongerInCatalogFooter: LocalizedStringResource = "This card is no longer in Grosh's catalog, so these are the rates it last had."
+        static let rewardsCard: LocalizedStringResource = "Rewards card"
+        static let changeCatalogCard: LocalizedStringResource = "Change Catalog Card"
+        static let unlink: LocalizedStringResource = "Unlink"
+        static let pointValue: LocalizedStringResource = "Point value"
+        static let pointValueFooter: LocalizedStringResource = "What one point or mile is worth, in cents. Rates are compared by what they're worth."
+        static let linkFooter: LocalizedStringResource = "Choose the card this is to see what it earns on each kind of purchase."
+        static let noAnnualFee: LocalizedStringResource = "No annual fee"
+        static let change: LocalizedStringResource = "Change"
+        static let changeCatalogCardMessage: LocalizedStringResource = "The Card keeps its name, image, wallet, statement date and transactions."
+        static let effectiveRate: LocalizedStringResource = "Effective rate"
+        static let cap: LocalizedStringResource = "Cap"
+        static let dates: LocalizedStringResource = "Dates"
+        static let needsActivation: LocalizedStringResource = "Needs activation"
+        static let bookThroughIssuer: LocalizedStringResource = "Only when booked through the bank"
+        static let capUnknown: LocalizedStringResource = "Capped; the bank doesn't say how much"
+        static let conditions: LocalizedStringResource = "Conditions"
+        static let fromTheBank: LocalizedStringResource = "In the bank's words"
+        static let source: LocalizedStringResource = "Source"
+        static func multiplier(_ rate: String) -> LocalizedStringResource { "\(rate)×" }
+        static func annualFee(_ amount: String) -> LocalizedStringResource { "\(amount) annual fee" }
+        static func changeTo(_ name: String) -> LocalizedStringResource { "Change to \(name)?" }
+        static func pointsWorth(_ rate: String, _ cents: String) -> LocalizedStringResource { "\(rate)× at \(cents)¢ each" }
+        static func capPerMonth(_ amount: String) -> LocalizedStringResource { "Up to \(amount) a month" }
+        static func capPerQuarter(_ amount: String) -> LocalizedStringResource { "Up to \(amount) a quarter" }
+        static func capPerYear(_ amount: String) -> LocalizedStringResource { "Up to \(amount) a year" }
+        static func capPerStatement(_ amount: String) -> LocalizedStringResource { "Up to \(amount) a statement" }
+        static func capTotal(_ amount: String) -> LocalizedStringResource { "Up to \(amount)" }
+        static func datesBetween(_ from: String, _ to: String) -> LocalizedStringResource { "\(from) to \(to)" }
+        static func datesFrom(_ from: String) -> LocalizedStringResource { "From \(from)" }
+        static func datesUntil(_ to: String) -> LocalizedStringResource { "Until \(to)" }
     }
 
     /// Categories: adding, editing, hiding, merging and picking them.

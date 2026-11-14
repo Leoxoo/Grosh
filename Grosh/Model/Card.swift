@@ -25,6 +25,13 @@ final class Card {
     var statementDay: Int?
     var isArchived: Bool = false
     var sortOrder: Int = 0
+    /// The rewards catalog entry the Card is linked to (``CatalogCard/id``), or `nil` for none. Its rates come from the
+    /// catalog the app ships (ADR-0014).
+    var catalogCardID: String?
+    /// The linked entry as the Card last saw it, as JSON: what its rates are when a newer catalog no longer has it.
+    var catalogSnapshot: Data?
+    /// What one point or mile of a points or miles Card is worth, in cents.
+    var pointValueCents: Double = 1
 
     var payingWallet: Wallet?
 

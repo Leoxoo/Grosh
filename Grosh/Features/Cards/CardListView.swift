@@ -1,8 +1,8 @@
 import SwiftData
 import SwiftUI
 
-/// Account → Cards: every Card in the order it was added. Tap to see its transactions by statement period or month,
-/// swipe to archive.
+/// Account → Cards: every Card in the order it was added, and the Reward categories. Tap a Card to see what it earns and
+/// its transactions by statement period or month; swipe to archive.
 struct CardListView: View {
     @Query(Card.unarchived) private var cards: [Card]
     @Query(Card.archived) private var archivedCards: [Card]
@@ -42,6 +42,14 @@ struct CardListView: View {
                     Text(Strings.Cards.archivedSectionFooter)
                 }
             }
+
+            Section {
+                NavigationLink {
+                    RewardCategoriesView()
+                } label: {
+                    Label(Strings.Rewards.rewardCategories, systemImage: "tag")
+                }
+            }
         }
         .overlay {
             if cards.isEmpty && archivedCards.isEmpty {
@@ -61,7 +69,11 @@ struct CardListView: View {
             }
         }
         .sheet(item: $editorMode) { mode in
-            CardEditor(mode: mode)
+            if mode.isAdding {
+                AddCardSheet()
+            } else {
+                CardEditor(mode: mode)
+            }
         }
         .sheet(item: $mergeSource) { card in
             CardMergeView(source: card)
