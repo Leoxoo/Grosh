@@ -445,6 +445,13 @@ struct CardRateDetailView: View {
                 if let cap = rate.cap.flatMap({ CardRateText.cap($0, currencyCode: $0.currencyCode ?? currencyCode) }) {
                     LabeledContent(Strings.Rewards.cap, value: cap)
                 }
+                if let after = rate.afterCap {
+                    LabeledContent(Strings.Rewards.afterTheCap) {
+                        Text(CardRateText.rate(effective: after.effectiveRate, multiplier: after.multiplier)
+                            + (after.multiplier == nil ? "" : " · " + CardRateText.percent(after.effectiveRate)))
+                            .monospacedDigit()
+                    }
+                }
                 if let dates = CardRateText.dates(from: rate.validFrom, to: rate.validTo) {
                     LabeledContent(Strings.Rewards.dates, value: dates)
                 }

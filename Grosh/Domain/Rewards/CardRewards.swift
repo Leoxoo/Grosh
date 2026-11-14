@@ -18,8 +18,18 @@ nonisolated struct CardRate: Identifiable, Hashable, Sendable {
     let rule: CatalogRule?
     /// Whether it is an Edited rate: one the user entered on a linked Card in place of the catalog's.
     let isEdited: Bool
+    /// What the Card earns on the category once this rate's cap is reached: the catalog's next best rate for it, such as
+    /// 1× after 2× on the first $50,000 a year. `nil` without a cap, or with nothing lower to fall back on.
+    var afterCap: AfterCap?
 
     var id: String { reward.id }
+}
+
+/// The rate a capped rate falls back to once its cap is reached.
+nonisolated struct AfterCap: Hashable, Sendable {
+    let effectiveRate: Double
+    let multiplier: Double?
+    let rule: CatalogRule?
 }
 
 /// A Reward category a Card has a rate for, as the rate editor lists it: the catalog's rate today, what the user
@@ -115,17 +125,22 @@ nonisolated struct CardRewards {
     /// merchants, rules that need an answer from the cardholder and tier boosts are left out, and so are rules not in
     /// their dates on `today`.
     func catalogRates(on today: CalendarDay) -> [String: CardRate] {
-        var best: [String: CardRate] = [:]
+        var all: [String: [CardRate]] = [:]
         for rule in entry?.rules ?? [] where Self.isShown(rule, on: today) {
             for id in rule.categories {
                 guard let reward = RewardCategory.fixed(id) else { continue }
-                let rate = rate(of: rule, on: reward)
-                if rate.effectiveRate > best[id]?.effectiveRate ?? -1 {
-                    best[id] = rate
-                }
+                all[id, default: []].append(rate(of: rule, on: reward))
             }
         }
-        return best
+        return all.compactMapValues { rates in
+            let ranked = rates.sorted { $0.effectiveRate > $1.effectiveRate }
+            guard var best = ranked.first else { return nil }
+            // A capped rate falls back to the next best one for the category once its cap is reached.
+            if best.cap?.amount != nil, let next = ranked.dropFirst().first(where: { $0.effectiveRate < best.effectiveRate }) {
+                best.afterCap = AfterCap(effectiveRate: next.effectiveRate, multiplier: next.multiplier, rule: next.rule)
+            }
+            return best
+        }
     }
 
     /// Best Effective rate first and Everything else last; equal rates in list order.

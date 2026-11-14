@@ -9,12 +9,14 @@ nonisolated struct CardEarning: Identifiable {
 
     var id: ObjectIdentifier { ObjectIdentifier(card) }
 
-    /// The picker's second line: "3% · Dining" for cash back, "3× · 3% · Dining" for points or miles.
+    /// The picker's second line: "3% · Dining" for cash back, "3× · 3% · Dining" for points or miles, with what a capped
+    /// rate falls back to: "(then 1× after $50,000)".
     var detail: String? {
         guard let earning else { return nil }
         let multiplier = earning.multiplier.map { String(localized: Strings.Rewards.multiplier(CardRateText.number($0))) }
-        return [multiplier, CardRateText.percent(earning.effectiveRate), earning.reward.name]
+        let line = [multiplier, CardRateText.percent(earning.effectiveRate), earning.reward.name]
             .compactMap(\.self).joined(separator: " · ")
+        return CardRateText.afterCap(of: earning).map { "\(line) (\($0))" } ?? line
     }
 
     /// `cards`, the ones the picker offers in the user's order, best first for what a purchase in `category` earns on

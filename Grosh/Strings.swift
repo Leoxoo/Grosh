@@ -422,6 +422,9 @@ nonisolated enum Strings {
         static func yourChoiceNotSet(_ rate: String) -> LocalizedStringResource { "\(rate) · Your choice: Not set" }
         static func topCategory(_ rate: String, _ category: String) -> LocalizedStringResource { "\(rate) on your top category (\(category) so far)" }
         static func topCategories(_ rate: String, _ picks: Int, _ categories: String) -> LocalizedStringResource { "\(rate) on your top \(picks) categories (\(categories) so far)" }
+        static func thenAfterCap(_ cap: String, _ rate: String) -> LocalizedStringResource { "\(cap), then \(rate)" }
+        static func thenAfterAmount(_ rate: String, _ amount: String) -> LocalizedStringResource { "then \(rate) after \(amount)" }
+        static let afterTheCap: LocalizedStringResource = "After the cap"
         static func topCategoriesNone(_ rate: String, _ picks: Int) -> LocalizedStringResource { "\(rate) on your top \(picks) categories" }
         static func topCategoriesAutomatic(_ picks: Int) -> LocalizedStringResource { "Top \(picks) categories, worked out for you" }
         static func topCategoriesFooter(_ picks: Int) -> LocalizedStringResource { "The card earns this on the \(picks) categories you spend most on this statement period, or this month for a card with no statement date. Pick up to \(picks) to use them instead." }

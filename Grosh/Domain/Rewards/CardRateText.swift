@@ -57,7 +57,26 @@ nonisolated enum CardRateText {
                 return part.quarter.map { "\(share) \(months(from: $0.from, to: $0.to))" } ?? share
             }.joined(separator: " + ")
         }
+        if let part = earning.parts.first, let after = part.rate.afterCap, let cap = part.rate.cap,
+           let upTo = self.cap(cap, currencyCode: cap.currencyCode ?? "USD") {
+            return String(localized: Strings.Rewards.thenAfterCap(upTo, rate(effective: after.effectiveRate, multiplier: after.multiplier)))
+        }
         return earning.parts.first?.quarter.map { String(localized: Strings.Rewards.quarterBonus(months(from: $0.from, to: $0.to))) }
+    }
+
+    /// What a capped rate falls back to, for the picker: "then 1× after $50,000"; `nil` for a rate with no cap to pass.
+    static func afterCap(of earning: PurchaseEarning) -> String? {
+        guard earning.parts.count == 1, let part = earning.parts.first, let after = part.rate.afterCap,
+              let cap = part.rate.cap, let amount = cap.amount
+        else { return nil }
+        return String(localized: Strings.Rewards.thenAfterAmount(
+            rate(effective: after.effectiveRate, multiplier: after.multiplier), money(amount, currencyCode: cap.currencyCode ?? "USD")
+        ))
+    }
+
+    /// A rate as a card states it: "1×" for points or miles, else "1%".
+    static func rate(effective: Double, multiplier: Double?) -> String {
+        multiplier.map { String(localized: Strings.Rewards.multiplier(number($0))) } ?? percent(effective)
     }
 
     /// What one rate in a purchase's earning is: the Base rate, a quarter ("Oct–Dec quarter"), or its Reward category.

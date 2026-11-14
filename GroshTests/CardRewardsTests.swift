@@ -39,6 +39,29 @@ struct CardRewardsTests {
         #expect(CardRewards(of: card, in: catalog).entry?.issuer == "Test Bank")
     }
 
+    @Test func aCappedRateSaysWhatItEarnsAfterItsCap() throws {
+        let capped = RewardsCatalogFixture.card("test-blue-plus", "Blue Plus", issuer: "Test Bank", kind: "points", rules: [
+            RewardsCatalogFixture.rule(["everything-else"], 2, unit: "per-dollar", capAmount: 50000, capPeriod: "year"),
+            RewardsCatalogFixture.rule(["everything-else"], 1, unit: "per-dollar"),
+        ])
+        let catalog = try RewardsCatalogFixture.catalog(cards: [capped])
+        var draft = CardDraft.new(from: try #require(catalog.cards.first))
+        draft.payingWallet = store.checking
+        let card = try Card.create(draft, in: store.context)
+        let shown = rates(card, in: catalog)
+        #expect(shown.map(\.effectiveRate) == [2])
+        let after = try #require(shown.first?.afterCap)
+        #expect(after.effectiveRate == 1)
+        #expect(after.multiplier == 1)
+        let earned = try #require(CardRewards(of: card, in: catalog).page(on: TestStore.today).earned.first)
+        #expect(CardRateText.breakdown(of: earned) == "Up to $50,000 a year, then 1×")
+        try RewardCategories(context: store.context).setRewardsAs(of: try store.category("Education"), to: nil)
+        let order = CardEarning.ordered(
+            [card], for: try store.category("Education"), in: catalog, own: [], on: TestStore.today, spending: { _ in [:] }
+        )
+        #expect(order.first?.detail == "2× · 2% · Everything else (then 1× after $50,000)")
+    }
+
     @Test func aCardShowsItsFixedRatesBestFirstAndEverythingElseLast() throws {
         let shown = rates(try linkedCard("test-savory-cash"))
         #expect(shown.map(\.reward.id) == ["dining", "groceries", "everything-else"])
