@@ -207,41 +207,55 @@ private struct QuartersSection: View {
     }
 }
 
-/// One quarter, compact: its dates (in the accent color while current) and the days left or when it starts, its rate,
-/// the Reward categories and merchants it covers, and its spending limit.
+/// One quarter as a card: its dates (in the accent color while current) with the days left or when it starts and its
+/// rate, then each Reward category it covers with a check, each merchant with an outlined check, and its spending limit.
 private struct QuarterCard: View {
     let quarter: QuarterRate
     let today: CalendarDay
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
-                Text(CardRateText.dayRange(from: quarter.from, to: quarter.to))
-                    .font(.headline)
-                    .foregroundStyle(quarter.isCurrent ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(CardRateText.dayRange(from: quarter.from, to: quarter.to))
+                        .font(.headline)
+                        .foregroundStyle(quarter.isCurrent ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                    Text(quarter.isCurrent
+                        ? Strings.Rewards.daysLeft(quarter.daysLeft(from: today))
+                        : Strings.Rewards.datesFrom(CardRateText.day(quarter.from)))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 Text(CardRateText.percent(quarter.rate.effectiveRate))
                     .font(.title3.weight(.semibold))
                     .monospacedDigit()
             }
-            Text(quarter.isCurrent
-                ? Strings.Rewards.daysLeft(quarter.daysLeft(from: today))
-                : Strings.Rewards.datesFrom(CardRateText.day(quarter.from)))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            Text((quarter.rewards.map(\.name) + quarter.merchants).joined(separator: " · "))
-                .font(.subheadline)
-                .lineLimit(2)
-            if let cap = quarter.rate.cap.flatMap({ CardRateText.cap($0, currencyCode: $0.currencyCode ?? "USD") }) {
-                Text(cap)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            .padding(.vertical, 10)
+            ForEach(quarter.rewards) { reward in
+                Divider()
+                row(reward.name, systemImage: "checkmark.circle.fill", style: quarter.isCurrent ? .primary : .secondary)
+            }
+            ForEach(quarter.merchants, id: \.self) { merchant in
+                Divider()
+                row(merchant, systemImage: "checkmark.circle", style: .secondary)
+            }
+            if let cap = quarter.rate.cap.flatMap({ CardRateText.cap(amountOf: $0, currencyCode: $0.currencyCode ?? "USD") }) {
+                Divider()
+                LabeledContent(Strings.Rewards.spendingLimit, value: cap)
+                    .padding(.vertical, 10)
             }
         }
-        .padding(12)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(.fill.tertiary, in: .rect(cornerRadius: 14))
-        .accessibilityElement(children: .combine)
+        .background(.fill.tertiary, in: .rect(cornerRadius: 16))
+    }
+
+    private func row(_ title: String, systemImage: String, style: HierarchicalShapeStyle) -> some View {
+        Label(title, systemImage: systemImage)
+            .foregroundStyle(style)
+            .padding(.vertical, 10)
     }
 }
 

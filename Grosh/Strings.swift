@@ -402,6 +402,7 @@ nonisolated enum Strings {
         static let notAnOption: LocalizedStringResource = "Choose one of this rate's categories."
         static let tooManyChoices: LocalizedStringResource = "This rate is earned on fewer categories."
         static let quarterlyBonus: LocalizedStringResource = "Quarterly Bonus"
+        static let spendingLimit: LocalizedStringResource = "Spending limit"
         static let activateWithBank: LocalizedStringResource = "Grosh counts this bonus as earned. Your bank may ask you to activate it each quarter."
         static let howItAddsUp: LocalizedStringResource = "How It Adds Up"
         static let addsUpFooter: LocalizedStringResource = "This card's bonuses add up: a purchase earns the base rate plus what each bonus covering it adds."
