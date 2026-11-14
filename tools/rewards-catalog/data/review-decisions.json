@@ -1,0 +1,46 @@
+{
+  "chase-freedom-flex": {
+    "0c5c80d281a308c5": {
+      "decidedAt": "2026-11-13",
+      "decision": "accept",
+      "quote": "Earn 3% on drugstore purchases.",
+      "rule": "3% on drugstores"
+    },
+    "0ccf44614d87586f": {
+      "decidedAt": "2026-11-13",
+      "decision": "accept",
+      "quote": "OCT-DEC\n2026\nCURRENT Quarter\nGrocery Stores\n(excluding Walmart® and Target®)*Opens offer details overlay\nDining\nAmerican Red Cross®*Opens offer details overlay",
+      "rule": "5% in rotating bonus categories from 2026-10-01 to 2026-12-31: groceries, dining (also at American Red Cross®), up to $1,500 per quarter"
+    },
+    "0f13fb92505511da": {
+      "decidedAt": "2026-11-13",
+      "decision": "reject",
+      "quote": "Earn 5% cash back on up to $1,500 in rotating categories each quarter you activate.",
+      "rule": "5% in rotating bonus categories, up to $1,500 per quarter"
+    },
+    "2d80d051bd940a74": {
+      "decidedAt": "2026-11-13",
+      "decision": "accept",
+      "quote": "Earn 3% on dining at restaurants, including takeout and eligible delivery services.",
+      "rule": "3% on dining"
+    },
+    "36fea253ef333d5b": {
+      "decidedAt": "2026-11-13",
+      "decision": "accept",
+      "quote": "Earn 1% on all other purchases.",
+      "rule": "1% on everything else"
+    },
+    "4aa3e0ff3d81b14a": {
+      "decidedAt": "2026-11-13",
+      "decision": "accept",
+      "quote": "Earn 5% on travel purchased through Chase Travel℠.",
+      "rule": "5% on travel"
+    },
+    "a581ff4862fc7def": {
+      "decidedAt": "2026-11-13",
+      "decision": "accept",
+      "quote": "JAN-MAR\n2027\nNEXT Quarter\nGrocery Stores\n(excluding Walmart® and Target®)*Opens offer details overlay\nTop Streaming Services",
+      "rule": "5% in rotating bonus categories from 2027-01-01 to 2027-03-31: groceries, streaming, up to $1,500 per quarter"
+    }
+  }
+}

@@ -1,5 +1,201 @@
 {
-  "cards": [],
+  "cards": [
+    {
+      "annualFee": 0,
+      "baseEarnRate": 1,
+      "bonusesStack": true,
+      "cardConditions": [
+        "5% Cash Back quarterly bonus categories may include individual select merchants in addition to bonus rewards categories.",
+        "For a purchase to qualify for the 5% bonus Cash Back, the merchant must submit charges to your credit card by the last day of the relevant calendar quarter."
+      ],
+      "discontinued": false,
+      "id": "chase-freedom-flex",
+      "isBusiness": false,
+      "issuer": "Chase",
+      "name": "Freedom Flex",
+      "network": "Mastercard",
+      "rewardKind": "points",
+      "rewardProgram": "CHASE",
+      "rules": [
+        {
+          "capAmount": 1500,
+          "capPeriod": "quarter",
+          "capUnknown": false,
+          "categories": [
+            "dining",
+            "groceries"
+          ],
+          "conditions": [
+            "After $1,500 is spent on combined purchases in the quarterly bonus categories each quarter, you go back to earning 1% Cash Back rewards for each $1 spent, with no maximum.",
+            "Grocery Stores (excluding Walmart® and Target®)",
+            "You must activate your 5% Bonus Cash Back each quarter by the activation deadline."
+          ],
+          "evidence": {
+            "quote": "OCT-DEC\n2026\nCURRENT Quarter\nGrocery Stores\n(excluding Walmart® and Target®)*Opens offer details overlay\nDining\nAmerican Red Cross®*Opens offer details overlay",
+            "url": "https://creditcards.chase.com/cash-back-credit-cards/freedom/flex"
+          },
+          "firstMonths": null,
+          "hasOtherChoices": false,
+          "merchants": [
+            "American Red Cross®"
+          ],
+          "needs": [],
+          "paysWith": null,
+          "picks": null,
+          "rate": 5,
+          "requires": [
+            "activation"
+          ],
+          "selection": "rotating",
+          "tier": null,
+          "unit": "percent",
+          "validFrom": "2026-10-01",
+          "validTo": "2026-12-31"
+        },
+        {
+          "capAmount": 1500,
+          "capPeriod": "quarter",
+          "capUnknown": false,
+          "categories": [
+            "groceries",
+            "streaming"
+          ],
+          "conditions": [
+            "After $1,500 is spent on combined purchases in the quarterly bonus categories each quarter, you go back to earning 1% Cash Back rewards for each $1 spent, with no maximum.",
+            "Grocery Stores (excluding Walmart® and Target®)",
+            "You must activate your 5% Bonus Cash Back each quarter by the activation deadline."
+          ],
+          "evidence": {
+            "quote": "JAN-MAR\n2027\nNEXT Quarter\nGrocery Stores\n(excluding Walmart® and Target®)*Opens offer details overlay\nTop Streaming Services",
+            "url": "https://creditcards.chase.com/cash-back-credit-cards/freedom/flex"
+          },
+          "firstMonths": null,
+          "hasOtherChoices": false,
+          "merchants": [],
+          "needs": [],
+          "paysWith": null,
+          "picks": null,
+          "rate": 5,
+          "requires": [
+            "activation"
+          ],
+          "selection": "rotating",
+          "tier": null,
+          "unit": "percent",
+          "validFrom": "2027-01-01",
+          "validTo": "2027-03-31"
+        },
+        {
+          "capAmount": null,
+          "capPeriod": null,
+          "capUnknown": false,
+          "categories": [
+            "dining"
+          ],
+          "conditions": [],
+          "evidence": {
+            "quote": "Earn 3% on dining at restaurants, including takeout and eligible delivery services.",
+            "url": "https://creditcards.chase.com/cash-back-credit-cards/freedom/flex"
+          },
+          "firstMonths": null,
+          "hasOtherChoices": false,
+          "merchants": [],
+          "needs": [],
+          "paysWith": null,
+          "picks": null,
+          "rate": 3,
+          "requires": [],
+          "selection": "fixed",
+          "tier": null,
+          "unit": "percent",
+          "validFrom": null,
+          "validTo": null
+        },
+        {
+          "capAmount": null,
+          "capPeriod": null,
+          "capUnknown": false,
+          "categories": [
+            "drugstores"
+          ],
+          "conditions": [],
+          "evidence": {
+            "quote": "Earn 3% on drugstore purchases.",
+            "url": "https://creditcards.chase.com/cash-back-credit-cards/freedom/flex"
+          },
+          "firstMonths": null,
+          "hasOtherChoices": false,
+          "merchants": [],
+          "needs": [],
+          "paysWith": null,
+          "picks": null,
+          "rate": 3,
+          "requires": [],
+          "selection": "fixed",
+          "tier": null,
+          "unit": "percent",
+          "validFrom": null,
+          "validTo": null
+        },
+        {
+          "capAmount": null,
+          "capPeriod": null,
+          "capUnknown": false,
+          "categories": [
+            "everything-else"
+          ],
+          "conditions": [],
+          "evidence": {
+            "quote": "Earn 1% on all other purchases.",
+            "url": "https://creditcards.chase.com/cash-back-credit-cards/freedom/flex"
+          },
+          "firstMonths": null,
+          "hasOtherChoices": false,
+          "merchants": [],
+          "needs": [],
+          "paysWith": null,
+          "picks": null,
+          "rate": 1,
+          "requires": [],
+          "selection": "fixed",
+          "tier": null,
+          "unit": "percent",
+          "validFrom": null,
+          "validTo": null
+        },
+        {
+          "capAmount": null,
+          "capPeriod": null,
+          "capUnknown": false,
+          "categories": [
+            "travel"
+          ],
+          "conditions": [],
+          "evidence": {
+            "quote": "Earn 5% on travel purchased through Chase Travel℠.",
+            "url": "https://creditcards.chase.com/cash-back-credit-cards/freedom/flex"
+          },
+          "firstMonths": null,
+          "hasOtherChoices": false,
+          "merchants": [],
+          "needs": [],
+          "paysWith": null,
+          "picks": null,
+          "rate": 5,
+          "requires": [
+            "issuer-booking"
+          ],
+          "selection": "fixed",
+          "tier": null,
+          "unit": "percent",
+          "validFrom": null,
+          "validTo": null
+        }
+      ],
+      "sourceUrl": "https://creditcards.chase.com/cash-back-credit-cards/freedom/flex",
+      "verifiedAt": "2026-11-13"
+    }
+  ],
   "formatVersion": 1,
-  "publishedAt": null
+  "publishedAt": "2026-11-13"
 }
