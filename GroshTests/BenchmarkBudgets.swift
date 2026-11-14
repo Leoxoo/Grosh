@@ -22,6 +22,7 @@ enum BenchmarkBudgets {
         "launch: open store + startup work": 23,
         "launch: open store + startup work + first frame of Home": 666,
         "open Account": 45,
+        "open Cards": 40,
         "open Debts & Loans": 74,
         "open Home": 174,
         "open Home (cold store)": 592,

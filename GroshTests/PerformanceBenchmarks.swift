@@ -66,7 +66,11 @@ struct PerformanceBenchmarks {
         time("open Recurring") { _ = Hosted(NavigationStack { RecurringTransactionsView() }, container: container) }
         time("open Debts & Loans") { _ = Hosted(NavigationStack { DebtsLoansView() }, container: container) }
         time("open Recently Deleted") { _ = Hosted(NavigationStack { RecentlyDeletedView() }, container: container) }
+        time("open Cards") { _ = Hosted(NavigationStack { CardListView() }, container: container) }
         let card = try #require(try container.mainContext.fetch(FetchDescriptor<Card>()).first { $0.imageData != nil })
+        // Linked to an entry the shipped catalog doesn't have, so its page reads the rates the Card last saw (ADR-0013).
+        try card.link(to: try #require(RewardsCatalogFixture.catalog().cards.first))
+        defer { try? card.link(to: nil) }
         time("open a Card's transactions") {
             _ = Hosted(NavigationStack { CardTransactionsView(card: card) }, container: container)
         }

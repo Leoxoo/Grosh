@@ -6,7 +6,7 @@ import SwiftData
 enum GroshStore {
     static let schema = Schema([
         Wallet.self, Category.self, Card.self, Transaction.self, Reimbursement.self, RecurringTransaction.self,
-        Person.self, ExpectedReimbursement.self,
+        Person.self, ExpectedReimbursement.self, OwnRewardCategory.self, StoreMilestone.self,
     ])
 
     static func makeContainer(inMemory: Bool = false) throws -> ModelContainer {

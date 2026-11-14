@@ -15,6 +15,11 @@ nonisolated struct CardDraft {
     var statementDayChoice: Int
     /// The Card's cropped image as JPEG data. Set it with ``setImage(_:)``, which also sets the color.
     var imageData: Data?
+    /// The rewards catalog entry the Card is linked to, or `nil` for none. Changing it to another entry is Change
+    /// catalog card: the Card keeps its name, image, wallet, Statement date and transactions.
+    var catalogCard: CatalogCard?
+    /// What one point or mile is worth, in cents, for a points or miles Card. 1¢ unless the user changes it.
+    var pointValueCents: Double = 1
 
     init(
         name: String, kind: CardKind, payingWallet: Wallet?, color: PaletteColor = .blue, lastFourDigits: String? = nil,
@@ -42,6 +47,8 @@ nonisolated enum CardRuleError: RuleRefusal, Equatable {
     case invalidLastFourDigits
     /// Merging needs a different Card to move the transactions to.
     case mergeIntoItself
+    /// A Point value is a number of cents above zero.
+    case pointValueOutOfRange
     /// A Card only merges into a Card paid from the same wallet, so its transactions keep a Card their wallet offers.
     case mergeIntoAnotherWallet
     /// An archived Card is out of the pickers; unarchive it before merging into it.
@@ -59,6 +66,7 @@ extension CardRuleError: LocalizedError {
         case .missingPayingWallet: String(localized: Strings.Cards.missingPayingWallet)
         case .statementDayOutOfRange: String(localized: Strings.Cards.statementDayOutOfRange)
         case .invalidLastFourDigits: String(localized: Strings.Cards.invalidLastFourDigits)
+        case .pointValueOutOfRange: String(localized: Strings.Cards.pointValueOutOfRange)
         case .mergeIntoItself: String(localized: Strings.Cards.mergeIntoItself)
         case .mergeIntoAnotherWallet: String(localized: Strings.Cards.mergeIntoAnotherWallet)
         case .mergeIntoArchived: String(localized: Strings.Cards.mergeIntoArchived)
@@ -69,7 +77,10 @@ extension CardRuleError: LocalizedError {
 }
 
 nonisolated extension CardDraft {
-    init(_ card: Card) {
+    /// The Card as its editor starts: its linked entry from `catalog`, or as the Card last saw it when `catalog` no
+    /// longer has it.
+    @MainActor
+    init(_ card: Card, catalog: RewardsCatalog) {
         self.init(
             name: card.name,
             kind: card.kind,
@@ -79,10 +90,23 @@ nonisolated extension CardDraft {
             statementDay: card.statementDay,
             imageData: card.imageData
         )
+        catalogCard = CardRewards(of: card, in: catalog).entry
+        pointValueCents = card.pointValueCents
     }
 
     /// A new Card, as Add Card starts it: a Credit card with no name yet.
     static var new: CardDraft { CardDraft(name: "", kind: .credit, payingWallet: nil) }
+
+    /// A new Card linked to `entry`, as Add Card starts it once the user picks that entry: named as the catalog names
+    /// it.
+    static func new(from entry: CatalogCard) -> CardDraft {
+        var draft = CardDraft(name: entry.name, kind: .credit, payingWallet: nil)
+        draft.catalogCard = entry
+        return draft
+    }
+
+    /// Whether the Card has a Point value: one linked to a points or miles entry.
+    var offersPointValue: Bool { catalogCard?.rewardKind.earnsPoints == true }
 
     /// Whether the Card can have a statement date: only a Credit card has a statement; a Debit card spends straight
     /// from its wallet.
@@ -132,6 +156,7 @@ nonisolated extension CardDraft {
         if let statementDay {
             guard (1...31).contains(statementDay) else { throw CardRuleError.statementDayOutOfRange }
         }
+        guard pointValueCents.isFinite, pointValueCents > 0 else { throw CardRuleError.pointValueOutOfRange }
     }
 }
 
@@ -172,6 +197,57 @@ extension Card {
         lastFourDigits = draft.storedLastFourDigits
         statementDay = draft.statementDay
         imageData = draft.imageData
+        pointValueCents = draft.pointValueCents
+        keepLink(to: draft.catalogCard)
+    }
+
+    // MARK: Rewards catalog
+
+    /// Links the Card to `entry`, or unlinks it with `nil`, and keeps the entry as the Card sees it now. Linking to
+    /// another entry is Change catalog card: the Card keeps its name, image, wallet, Statement date and transactions.
+    /// Saves.
+    func link(to entry: CatalogCard?) throws {
+        keepLink(to: entry)
+        try saveToStore()
+    }
+
+    private func keepLink(to entry: CatalogCard?) {
+        catalogCardID = entry?.id
+        let snapshot = entry.flatMap(Self.snapshot(of:))
+        if catalogSnapshot != snapshot {
+            catalogSnapshot = snapshot
+        }
+    }
+
+    /// The linked entry as the Card last saw it, or `nil` when it was never linked or the entry can't be read. Decoded
+    /// on each read: ``CardRewards`` reads it only for a Card whose entry the catalog no longer has.
+    var lastCatalogEntry: CatalogCard? {
+        catalogSnapshot.flatMap { snapshot in
+            Log.store.attempt("Reading a Card's last rewards catalog entry") {
+                try JSONDecoder().decode(CatalogCard.self, from: snapshot)
+            }
+        }
+    }
+
+    private static func snapshot(of entry: CatalogCard) -> Data? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return Log.store.attempt("Keeping a Card's rewards catalog entry") { try encoder.encode(entry) }
+    }
+
+    /// Keeps, on each linked Card whose entry `catalog` has, that entry as it is now, so the Card still has its rates
+    /// should a newer catalog no longer have it (ADR-0013). Run when the store opens; changes nothing on Cards that
+    /// already have it. Saves when it changed something.
+    static func keepCatalogEntries(from catalog: RewardsCatalog, in context: ModelContext) throws {
+        let linked = try context.fetch(FetchDescriptor<Card>(predicate: #Predicate { $0.catalogCardID != nil }))
+        for card in linked {
+            if let id = card.catalogCardID, let entry = catalog.card(id) {
+                card.keepLink(to: entry)
+            }
+        }
+        if context.hasChanges {
+            try context.save()
+        }
     }
 
     /// The order Cards are listed in everywhere: the order they were added.
