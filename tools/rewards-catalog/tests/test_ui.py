@@ -943,6 +943,33 @@ class ReviewTests(AppCase):
         accepted = review.accepted_rules(self.app.candidate("bank-a"), review.load_decisions(self.paths.decisions))
         self.assertEqual([r["categories"] for r in accepted], [["entertainment"]])
 
+    def test_a_rule_can_be_added_by_hand_and_a_rejected_one_used_anyway(self):
+        self.give_page("bank-b")  # a page, and no extraction at all: the model missed everything
+        rule = {"categories": ["dining"], "rate": 3, "unit": "percent", "quote": "Earn 4% on gas."}
+        status, payload = self.app.handle("POST", "/api/review", {}, {"cardId": "bank-b", "decision": "add", "rule": rule})
+        self.assertEqual((status, payload.get("canVouch")), (400, True))  # the checks say why, and offer to use it anyway
+        status, payload = self.app.handle("POST", "/api/review", {}, {"cardId": "bank-b", "decision": "add", "rule": rule, "vouch": True})
+        self.assertEqual(status, 200)
+        (row,) = payload["rules"]
+        self.assertEqual((row["added"], row["decision"], row["rule"]["verified"]), (True, "accept", "override"))
+        self.assertEqual({r["id"]: r["review"] for r in self.app.overview()["cards"]}["bank-b"], {"waiting": 0, "accept": 1, "reject": 0})
+        self.assertEqual(len(self.app.card_detail("bank-b")["review"]["rules"]), 1)
+        status, payload = self.app.handle("GET", "/api/review", {}, {})
+        self.assertEqual([c["cardId"] for c in payload["cards"]], ["bank-b"])
+        status, payload = self.app.handle("POST", "/api/review", {}, {"cardId": "bank-b", "key": row["key"], "decision": "undo"})
+        self.assertEqual((status, payload["rules"]), (200, []))
+
+    def test_the_saved_rejections_can_be_checked_again_without_the_model(self):
+        self.give_page("bank-a")
+        candidate = extract.manual_candidate(self.cards[0], {"rules": []}, None, None)
+        candidate["rejected"] = [{"rule": {**RULE, "quote": "Earn unlimited 3% cash back on dining services."}, "reason": "old"}]  # not on the page
+        fetch.write_json(self.paths.candidates / "bank-a.json", candidate)
+        self.assertEqual(self.app.recheck_card("bank-a"), {"gained": 0, "rejected": 1})
+        candidate["rejected"] = [{"rule": RULE, "reason": "old"}]
+        fetch.write_json(self.paths.candidates / "bank-a.json", candidate)
+        self.assertEqual(self.app.recheck_card("bank-a"), {"gained": 1, "rejected": 0})
+        self.assertEqual(len(self.app.candidate("bank-a")["rules"]), 1)
+
     def test_publish_writes_the_accepted_rules_to_the_catalog_file(self):
         facts = {"isBusiness": False, "rewardProgram": None, "baseEarnRate": 1, "discontinued": False}
         self.paths.seed.write_text(json.dumps({"cards": [dict(c, **facts) for c in self.cards]}))

@@ -55,6 +55,23 @@ class CatalogTests(unittest.TestCase):
             "merchants": [], "evidence": {"quote": "Earn unlimited 3% cash back on dining.", "url": URL},  # no page hash, no "verified"
         }])
 
+    def test_a_rule_a_person_added_is_published_even_for_a_card_with_no_candidate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "decisions.json"
+            review.add_rule(SAVOR, None, {"categories": ["dining"], "rate": 3, "unit": "percent", "quote": "Earn 3% on dining."}, None,
+                            False, path, "2026-11-14")
+            doc = publish.catalog([SAVOR], {}, review.load_decisions(path), None, "2026-11-15")
+        (card,) = doc["cards"]
+        self.assertEqual((card["verifiedAt"], [r["categories"] for r in card["rules"]]), ("2026-11-14", [["dining"]]))
+
+    def test_a_fixed_rule_is_published_as_fixed_with_the_day_it_was_accepted(self):
+        cand = candidate(self.dining)
+        key = review.rule_key("bank-savor", self.dining)
+        edited = {**self.dining, "rate": 4}
+        decisions = {"bank-savor": {key: {"decision": "accept", "decidedAt": "2026-11-03", "edited": edited}}}
+        (card,) = publish.catalog([SAVOR], {"bank-savor": cand}, decisions, None, "2026-11-15")["cards"]
+        self.assertEqual(([r["rate"] for r in card["rules"]], card["verifiedAt"]), ([4], "2026-11-03"))
+
     def test_an_accepted_quarter_stays_published_when_its_calendar_rewords_it_as_it_begins(self):
         def quarter(said: str) -> dict:
             made = extract.candidate_rule({**PROPOSAL, "categories": ["dining"], "selection": "rotating", "rate": 5, "validFrom": "2027-01-01",
