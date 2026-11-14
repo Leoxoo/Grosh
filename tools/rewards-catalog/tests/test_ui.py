@@ -58,7 +58,8 @@ class AppCase(unittest.TestCase):
         root = Path(tmp.name)
         self.paths = ui.Paths(seed=root / "seed.json", state=root / "state.json", cache=root / "cache", manual=root / "manual.json",
                               decisions=root / "review-decisions.json", options=root / "card-options.json",
-                              catalog=root / "rewards-catalog.json")
+                              catalog=root / "rewards-catalog.json", url_overrides=root / "url-overrides.json",
+                              app_copy=root / "app" / "rewards-catalog.json")
         self.cards = [card("bank-a", "Savor Rewards"), card("bank-b", "Other Card"), card("zed-c", "Zed Card", "Zed")]
         self.paths.seed.write_text(json.dumps({"cards": self.cards}))
         self.state: dict = {}
@@ -879,6 +880,25 @@ class AskAndStatsTests(AppCase):
                          "2 calls, 3.5s, 10 prompt tokens, 5 reply tokens (2 reasoning)")
 
 
+class PageAddressTests(AppCase):
+    def test_a_card_can_be_pointed_at_another_page_and_it_is_kept_for_the_next_seed(self):
+        self.paths.url_overrides.write_text(json.dumps({"zed-c": "https://x.test/zed"}))
+        status, payload = self.app.handle("POST", "/api/card-url", {}, {"cardId": "bank-a", "url": "  https://new.test/cards/savor  "})
+        self.assertEqual((status, payload), (200, {"sourceUrl": "https://new.test/cards/savor"}))
+        self.assertEqual(json.loads(self.paths.url_overrides.read_text()), {"bank-a": "https://new.test/cards/savor", "zed-c": "https://x.test/zed"})
+        card = self.app.card("bank-a")
+        self.assertEqual((card["sourceUrl"], card["sourceHost"]), ("https://new.test/cards/savor", "new.test"))
+        self.assertEqual(self.app.card("bank-b")["sourceUrl"], self.cards[1]["sourceUrl"])  # the others are as they were
+
+    def test_an_address_that_is_not_a_web_page_is_refused(self):
+        for url in ("savor", "ftp://x.test/a", "https://", "https://x.test/a b", "", None, 5):
+            status, payload = self.app.handle("POST", "/api/card-url", {}, {"cardId": "bank-a", "url": url})
+            self.assertEqual(status, 400, url)
+            self.assertIn("web address", payload["error"])
+        self.assertFalse(self.paths.url_overrides.exists())
+        self.assertEqual(self.app.handle("POST", "/api/card-url", {}, {"cardId": "nope", "url": "https://x.test/"})[0], 404)
+
+
 class ReviewTests(AppCase):
     def extracted(self) -> None:
         self.give_page("bank-a")
@@ -943,6 +963,33 @@ class ReviewTests(AppCase):
         accepted = review.accepted_rules(self.app.candidate("bank-a"), review.load_decisions(self.paths.decisions))
         self.assertEqual([r["categories"] for r in accepted], [["entertainment"]])
 
+    def test_a_rule_can_be_added_by_hand_and_a_rejected_one_used_anyway(self):
+        self.give_page("bank-b")  # a page, and no extraction at all: the model missed everything
+        rule = {"categories": ["dining"], "rate": 3, "unit": "percent", "quote": "Earn 4% on gas."}
+        status, payload = self.app.handle("POST", "/api/review", {}, {"cardId": "bank-b", "decision": "add", "rule": rule})
+        self.assertEqual((status, payload.get("canVouch")), (400, True))  # the checks say why, and offer to use it anyway
+        status, payload = self.app.handle("POST", "/api/review", {}, {"cardId": "bank-b", "decision": "add", "rule": rule, "vouch": True})
+        self.assertEqual(status, 200)
+        (row,) = payload["rules"]
+        self.assertEqual((row["added"], row["decision"], row["rule"]["verified"]), (True, "accept", "override"))
+        self.assertEqual({r["id"]: r["review"] for r in self.app.overview()["cards"]}["bank-b"], {"waiting": 0, "accept": 1, "reject": 0})
+        self.assertEqual(len(self.app.card_detail("bank-b")["review"]["rules"]), 1)
+        status, payload = self.app.handle("GET", "/api/review", {}, {})
+        self.assertEqual([c["cardId"] for c in payload["cards"]], ["bank-b"])
+        status, payload = self.app.handle("POST", "/api/review", {}, {"cardId": "bank-b", "key": row["key"], "decision": "undo"})
+        self.assertEqual((status, payload["rules"]), (200, []))
+
+    def test_the_saved_rejections_can_be_checked_again_without_the_model(self):
+        self.give_page("bank-a")
+        candidate = extract.manual_candidate(self.cards[0], {"rules": []}, None, None)
+        candidate["rejected"] = [{"rule": {**RULE, "quote": "Earn unlimited 3% cash back on dining services."}, "reason": "old"}]  # not on the page
+        fetch.write_json(self.paths.candidates / "bank-a.json", candidate)
+        self.assertEqual(self.app.recheck_card("bank-a"), {"gained": 0, "rejected": 1})
+        candidate["rejected"] = [{"rule": RULE, "reason": "old"}]
+        fetch.write_json(self.paths.candidates / "bank-a.json", candidate)
+        self.assertEqual(self.app.recheck_card("bank-a"), {"gained": 1, "rejected": 0})
+        self.assertEqual(len(self.app.candidate("bank-a")["rules"]), 1)
+
     def test_publish_writes_the_accepted_rules_to_the_catalog_file(self):
         facts = {"isBusiness": False, "rewardProgram": None, "baseEarnRate": 1, "discontinued": False}
         self.paths.seed.write_text(json.dumps({"cards": [dict(c, **facts) for c in self.cards]}))
@@ -954,6 +1001,8 @@ class ReviewTests(AppCase):
         (published,) = json.loads(self.paths.catalog.read_text())["cards"]
         self.assertEqual([r["evidence"]["quote"] for r in published["rules"]], [RULE["quote"]])
         self.assertEqual(ui.Paths().catalog.parent, fetch.DATA)  # committed, not in cache/
+        self.assertEqual(self.paths.app_copy.read_text(), self.paths.catalog.read_text())  # the app bundles this copy
+        self.assertEqual(ui.Paths().app_copy.parts[-3:], ("Grosh", "Resources", "rewards-catalog.json"))
 
     def test_a_card_option_is_saved_shown_in_the_card_and_published(self):
         facts = {"isBusiness": False, "rewardProgram": None, "baseEarnRate": 1, "discontinued": False}

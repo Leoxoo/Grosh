@@ -71,7 +71,7 @@
   .fields { display: grid; grid-template-columns: max-content 1fr; gap: 5px 14px; margin: 10px 0 0; font-size: 13px; }
   .fields dt { color: var(--muted); } .fields dd { margin: 0; }
   .said { margin: 10px 0 0; font-size: 12px; color: var(--muted); } .rule .said + blockquote { margin-top: 3px; }
-  .rule blockquote { margin: 8px 0 0; padding-left: 10px; border-left: 3px solid var(--line); color: var(--muted); font-size: 13px; }
+  .rule blockquote { margin: 8px 0 0; padding-left: 10px; border-left: 3px solid var(--line); color: var(--muted); font-size: 13px; white-space: pre-line; }
   .rule ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
   .rule.rejected { border-color: var(--bad); }
   .rule.accepted { border-color: var(--ok); }
@@ -81,6 +81,8 @@
   .fix { display: grid; gap: 10px; margin-top: 10px; padding: 10px 12px; background: var(--bg); border-radius: 8px; }
   .fix .cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 10px; font-size: 13px; }
   .fix .cats label, .fix .reqs label { display: flex; gap: 6px; align-items: center; font-weight: 400; }
+  .fix > label { display: grid; gap: 4px; font-weight: 600; font-size: 13px; }
+  .fix textarea { width: 100%; min-height: 70px; font: 13px/1.4 var(--mono); }
   .fix .reqs { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
   pre { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; overflow: auto; font: 12px/1.5 var(--mono); white-space: pre-wrap; word-break: break-word; margin: 6px 0; }
   details > summary { cursor: pointer; color: var(--muted); }
@@ -268,7 +270,7 @@ async function api(method, path, body) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({ error: "The server sent something that isn't JSON." }));
-  if (!res.ok) throw new Error(data.error || res.statusText);
+  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { canVouch: !!data.canVouch });
   return data;
 }
 
@@ -663,11 +665,13 @@ function reviewRule(cardId, x) {
     await openCard(cardId, true); loadOverview();
   };
   const press = (decision) => async (e) => { e.target.disabled = true; try { await send({ decision }); } catch (err) { alert(err.message); e.target.disabled = false; } };
-  const fix = () => fill(fixArea, fixArea.childNodes.length ? null : fixForm(r, (changes) => send({ decision: "edit", changes }), () => fill(fixArea)));
+  const fix = () => fill(fixArea, fixArea.childNodes.length ? null : fixForm(r, (changes, vouch) => send({ decision: "edit", changes, vouch }), () => fill(fixArea)));
   return h("div", { class: "rule" + (x.decision === "accept" ? " accepted" : x.decision === "reject" ? " rejected" : "") },
     h("div", { class: "head" }, h("span", { class: "rate", text: rateText(r) }), h("span", { class: "kind", text: ruleKind(r) })),
     h("div", { class: "small", style: "margin-top: 4px" },
       decided ? chip(decided.chip, decided.kind) : chip("waiting for review", "info"), " ",
+      x.added ? [chip(x.overrides ? "used anyway" : "added by you", "info"), " "] : null,
+      x.overrides ? [h("span", { title: "The checks said: " + x.overrides }, chip("checks said: " + x.overrides, "warn")), " "] : null,
       x.edited ? [h("span", { title: "Extracted as: " + JSON.stringify({ categories: x.original.categories, rate: x.original.rate, unit: x.original.unit, capAmount: x.original.capAmount, requires: x.original.requires }) }, chip("fixed by you", "info")), " "] : null,
       x.warnings.map((w) => [chip(w, "warn"), " "])),
     ruleFields(r),
@@ -680,7 +684,7 @@ function reviewRule(cardId, x) {
       Object.entries(DECISION).map(([value, d]) => h("button", { type: "button", class: value === "accept" && !x.decision ? "primary" : value === "reject" ? "danger" : "",
         disabled: x.decision === value && !x.edited, text: d.button, onclick: press(value) })),
       r.verified === "calendar" ? null : h("button", { type: "button", text: "Fix…", title: "Change its category, rate, cap or requirements; the quote must still back it", onclick: fix }),
-      x.decision ? h("button", { type: "button", text: "Undo", onclick: press("undo") }) : null),
+      x.decision || x.added ? h("button", { type: "button", text: x.added ? "Remove" : "Undo", title: x.added ? "Takes the rule you added away" : "", onclick: press("undo") }) : null),
     fixArea);
 }
 
@@ -697,8 +701,8 @@ function fixForm(r, save, cancel) {
   const paysWith = h("input", { type: "text", value: r.paysWith || "", placeholder: "PayPal, Apple Pay", style: "width: 160px" });
   const merchants = h("input", { type: "text", value: (r.merchants || []).join(", "), placeholder: "Amazon, Costco", style: "width: 240px" });
   unit.value = r.unit; capPeriod.value = r.capPeriod || ""; tier.value = r.tier || "";
-  const submit = async (e) => {
-    e.target.disabled = true; fill(error);
+  const submit = (vouch) => async (e) => {
+    const button = e.target; button.disabled = true; fill(error);
     const cap = capAmount.value === "" ? null : +capAmount.value;
     try {
       await save({
@@ -706,17 +710,144 @@ function fixForm(r, save, cancel) {
         capAmount: cap, capPeriod: cap == null ? null : capPeriod.value || null,
         requires: reqs.filter((b) => b.checked).map((b) => b.value), tier: tier.value || null,
         paysWith: paysWith.value.trim() || null, merchants: merchants.value.split(",").map((m) => m.trim()).filter(Boolean),
-      });
-    } catch (err) { fill(error, h("div", { class: "result bad", text: err.message })); e.target.disabled = false; }
+      }, vouch);
+    } catch (err) {
+      fill(error, h("div", { class: "result bad", text: err.message }),
+        err.canVouch ? h("div", { class: "row" }, h("button", { type: "button", class: "danger", text: "Use it anyway", title: "You've checked the page: saves it as written, marked as used against the checks", onclick: submit(true) })) : null);
+      button.disabled = false;
+    }
   };
   return h("div", { class: "fix" },
-    h("div", { class: "small muted", text: r.selection === "fixed" ? "A fixed rate has one category, or none if it's for a way of paying or named merchants." : `This rule is "${r.selection}": tick every category it offers.` }),
+    h("div", { class: "small muted", text: r.selection === "fixed" ? "A fixed rate has one category, or none if it's for a way of paying or named merchants. Tick several and it becomes one rule per category." : `This rule is "${r.selection}": tick every category it offers.` }),
     h("div", { class: "cats" }, cat.categories.map((c, i) => h("label", { title: c.help }, cats[i], c.label))),
     h("div", { class: "row" }, h("label", {}, "Rate ", rate), h("label", {}, "Unit ", unit), h("label", {}, "Cap $ ", capAmount), h("label", {}, "per ", capPeriod), h("label", {}, "Tier ", tier)),
     h("div", { class: "reqs" }, "Requires: ", cat.requires.map((q, i) => h("label", {}, reqs[i], q)), h("label", {}, "paying with ", paysWith)),
     h("div", { class: "row" }, h("label", {}, "Only at ", merchants)),
     error,
-    h("div", { class: "row" }, h("button", { type: "button", class: "primary", text: "Save and accept", onclick: submit }), h("button", { type: "button", text: "Cancel", onclick: cancel })));
+    h("div", { class: "row" }, h("button", { type: "button", class: "primary", text: "Save and accept", onclick: submit(false) }), h("button", { type: "button", text: "Cancel", onclick: cancel })));
+}
+
+// The page a card is read from, with a way to point it at another (url-overrides.json and the seed), then fetch it.
+function pageAddress(id, c) {
+  const area = h("div", {}), busy = state.job && state.job.state === "running";
+  const link = /^https?:\/\//.test(c.sourceUrl) ? h("a", { href: c.sourceUrl, target: "_blank", rel: "noopener noreferrer", text: c.sourceUrl }) : c.sourceUrl;
+  const change = () => {
+    if (area.childNodes.length) return fill(area);
+    const input = h("input", { type: "url", value: c.sourceUrl, style: "width: 100%" }), error = h("div", {});
+    const save = (fetchAfter) => async (e) => {
+      e.target.disabled = true; fill(error);
+      try {
+        await api("POST", "/api/card-url", { cardId: id, url: input.value });
+        await loadOverview();
+        if (fetchAfter) { await jobFor("fetch", id); }
+        await openCard(id, true);
+      } catch (err) { fill(error, h("div", { class: "result bad", text: err.message })); e.target.disabled = false; }
+    };
+    fill(area, h("div", { class: "fix" },
+      h("label", {}, "The page to read for this card", input),
+      h("div", { class: "small muted", text: "Saved in url-overrides.json, so rebuilding the seed keeps it. Paste the card's own page: the address that opens it in your browser." }),
+      error,
+      h("div", { class: "row" }, h("button", { type: "button", class: "primary", disabled: busy, text: "Save and fetch", onclick: save(true) }),
+        h("button", { type: "button", text: "Save only", onclick: save(false) }), h("button", { type: "button", text: "Cancel", onclick: () => fill(area) }))));
+    input.focus();
+  };
+  return [h("p", { class: "small" }, link, " ", h("button", { type: "button", text: "Change…", title: "Read another page for this card", onclick: change })), area];
+}
+
+// A rule a person adds (the model missed it) or uses although the checks rejected it: every field of a rule, and its quote.
+// The server checks it like any proposal; when the checks don't back it, it says why and offers to use it anyway.
+const RULE_DEFAULTS = { categories: [], selection: "fixed", picks: null, hasOtherChoices: false, rate: "", unit: "percent", capAmount: null, capPeriod: null,
+  requires: [], paysWith: null, merchants: [], validFrom: null, validTo: null, firstMonths: null, tier: null, quote: "", conditions: [] };
+function ruleForm(initial, pageLines, save, cancel, note) {
+  const r = { ...RULE_DEFAULTS, ...initial }, cat = state.overview.catalog, error = h("div", {});
+  const cats = cat.categories.map((c) => h("input", { type: "checkbox", value: c.id, checked: r.categories.includes(c.id) }));
+  const reqs = cat.requires.map((q) => h("input", { type: "checkbox", value: q, checked: r.requires.includes(q) }));
+  const selection = h("select", {}, [["fixed", "Fixed: one category, or a way of paying or merchants"], ["choose", "You choose the categories"],
+    ["top-spend", "The card picks your top-spend categories"], ["rotating", "Rotating bonus categories"]].map(([v, t]) => h("option", { value: v, text: t })));
+  const picks = h("input", { type: "number", step: "1", min: "1", value: r.picks ?? "", style: "width: 70px" });
+  const other = h("input", { type: "checkbox", checked: !!r.hasOtherChoices });
+  const rate = h("input", { type: "number", step: "0.01", min: "0", value: r.rate, style: "width: 90px" });
+  const unit = h("select", {}, h("option", { value: "percent", text: "% cash back" }), h("option", { value: "per-dollar", text: "points or miles per $1" }));
+  const capAmount = h("input", { type: "number", step: "1", min: "0", value: r.capAmount ?? "", placeholder: "no cap", style: "width: 110px" });
+  const capPeriod = h("select", {}, h("option", { value: "", text: "—" }), cat.periods.map((p) => h("option", { value: p, text: p === "cycle" ? "billing cycle" : p })));
+  const tier = h("select", {}, h("option", { value: "", text: "no tier" }), cat.tiers.map((t) => h("option", { value: t, text: t.replace("-", " ") })));
+  const paysWith = h("input", { type: "text", value: r.paysWith || "", placeholder: "PayPal, Apple Pay", style: "width: 160px" });
+  const merchants = h("input", { type: "text", value: (r.merchants || []).join(", "), placeholder: "Amazon, Costco", style: "width: 240px" });
+  const validFrom = h("input", { type: "date", value: r.validFrom || "" }), validTo = h("input", { type: "date", value: r.validTo || "" });
+  const firstMonths = h("input", { type: "number", step: "1", min: "1", value: r.firstMonths ?? "", placeholder: "always", style: "width: 80px" });
+  const conditions = h("textarea", { placeholder: "One sentence per line, copied from the page: exclusions and limits on this rate" }); conditions.value = (r.conditions || []).join("\n");
+  const quote = h("textarea", { placeholder: "Copy the sentence that states this rate from the page" }); quote.value = r.quote || "";
+  const pick = h("select", {}, h("option", { value: "", text: "Insert a rate sentence from the page…" }),
+    pageLines.map((l, i) => h("option", { value: String(i), text: l.length > 110 ? l.slice(0, 110) + "…" : l })));
+  pick.onchange = () => { if (pick.value !== "") { quote.value = pageLines[+pick.value]; pick.value = ""; } };
+  selection.value = r.selection; unit.value = r.unit; capPeriod.value = r.capPeriod || ""; tier.value = r.tier || "";
+  const fields = () => {
+    const num = (el) => (el.value === "" ? null : +el.value), cap = num(capAmount), lines = (t) => t.split("\n").map((x) => x.trim()).filter(Boolean);
+    return { categories: cats.filter((b) => b.checked).map((b) => b.value), selection: selection.value,
+      picks: selection.value === "choose" || selection.value === "top-spend" ? num(picks) : null,
+      hasOtherChoices: selection.value === "choose" || selection.value === "top-spend" ? other.checked : false,
+      rate: +rate.value, unit: unit.value, capAmount: cap, capPeriod: cap == null ? null : capPeriod.value || null,
+      requires: reqs.filter((b) => b.checked).map((b) => b.value), tier: tier.value || null,
+      paysWith: paysWith.value.trim() || null, merchants: merchants.value.split(",").map((m) => m.trim()).filter(Boolean),
+      validFrom: validFrom.value || null, validTo: validTo.value || null, firstMonths: num(firstMonths),
+      conditions: lines(conditions.value), quote: quote.value.trim() };
+  };
+  const submit = (vouch) => async (e) => {
+    const button = e.target; button.disabled = true; fill(error);
+    try { await save(fields(), vouch); }
+    catch (err) {
+      fill(error, h("div", { class: "result bad", text: err.message }),
+        err.canVouch ? h("div", { class: "row" }, h("button", { type: "button", class: "danger", text: "Use it anyway", title: "Saves it as written; it will be marked as used against the checks", onclick: submit(true) })) : null);
+      button.disabled = false;
+    }
+  };
+  return h("div", { class: "fix" },
+    note ? h("div", { class: "small muted", text: note }) : null,
+    h("div", { class: "row" }, h("label", {}, "Kind ", selection)),
+    h("div", { class: "cats" }, cat.categories.map((c, i) => h("label", { title: c.help }, cats[i], c.label))),
+    h("div", { class: "row" }, h("label", {}, "Picks ", picks), h("label", { style: "display: flex; flex-direction: row; gap: 6px; align-items: center" }, other, "the page lists more choices than these"), h("span", { class: "small muted", text: "(only for the kinds where you or the card pick)" })),
+    h("div", { class: "row" }, h("label", {}, "Rate ", rate), h("label", {}, "Unit ", unit), h("label", {}, "Cap $ ", capAmount), h("label", {}, "per ", capPeriod), h("label", {}, "Tier ", tier)),
+    h("div", { class: "reqs" }, "Requires: ", cat.requires.map((q, i) => h("label", {}, reqs[i], q)), h("label", {}, "paying with ", paysWith)),
+    h("div", { class: "row" }, h("label", {}, "Only at ", merchants)),
+    h("div", { class: "row" }, h("label", {}, "From ", validFrom), h("label", {}, "to ", validTo), h("label", {}, "First months ", firstMonths)),
+    h("label", {}, "Conditions", conditions),
+    h("label", {}, "The page says", quote), pageLines.length ? pick : null,
+    error,
+    h("div", { class: "row" }, h("button", { type: "button", class: "primary", text: "Add and accept", onclick: submit(false) }), h("button", { type: "button", text: "Cancel", onclick: cancel })));
+}
+// "Add a rule" for a rule the model missed, and, beside each proposal the checks rejected, "Use anyway…".
+function addRule(cardId, d, initial, area, note) {
+  const lines = (d.page && d.page.rateLines) || [];
+  const close = () => fill(area);
+  fill(area, ruleForm(initial || {}, lines, async (rule, vouch) => {
+    await api("POST", "/api/review", { cardId, decision: "add", rule, vouch });
+    await openCard(cardId, true); loadOverview();
+  }, close, note));
+  area.scrollIntoView({ block: "nearest" });
+}
+// What the checks threw out: each proposal with why, to use anyway if the page does say it, and a re-check that
+// needs no model, since the checks improve and a saved extraction shouldn't need a new run to benefit.
+function rejectedList(cardId, d) {
+  const cand = d.candidate, busy = state.job && state.job.state === "running";
+  if (!cand || !cand.rejected.length) return h("p", { class: "small muted", text: "The checks rejected nothing." });
+  const recheck = h("button", { type: "button", text: "Re-check without the model", title: "Runs these proposals through the checks again as they are now; what passes becomes a rule to review",
+    onclick: async (e) => {
+      e.target.disabled = true;
+      try { const r = await api("POST", `/api/card/${encodeURIComponent(cardId)}/recheck`, {}); await openCard(cardId, true); loadOverview();
+            if (!r.gained) alert("Nothing more passes the checks."); }
+      catch (err) { alert(err.message); e.target.disabled = false; } } });
+  return [h("h3", { text: `Rejected by the checks (${cand.rejected.length})` }),
+    h("p", { class: "small muted", style: "margin-top: 0", text: "The model proposed these and the page doesn't back them, as the checks read it. If the page does say it, use it anyway: you fill in what it says, and it is kept as your decision." }),
+    h("div", { class: "row", style: "margin-bottom: 8px" }, recheck),
+    cand.rejected.map((x) => {
+      const area = h("div", {});
+      return h("div", { class: "rule rejected" }, h("div", { class: "what", text: x.reason }),
+        h("blockquote", { text: x.rule ? (x.rule.quote || JSON.stringify(x.rule)) : x.cardCondition }),
+        x.rule ? h("div", { class: "actions" }, h("span", { class: "small muted", text: x.rule.rate != null ? `${num(x.rule.rate)}${unitText(x.rule)} · ${(x.rule.categories || []).map((id) => term(id).label).join(", ") || "no category"}` : "" }),
+          h("button", { type: "button", disabled: busy, text: "Use anyway…", title: "Opens the rule as proposed, for you to correct and add",
+            onclick: () => (area.childNodes.length ? fill(area) : addRule(cardId, d, x.rule, area, "As the model proposed it. Fix what it got wrong; if the checks still don't back it you can use it anyway."))})) : null,
+        area);
+    })];
 }
 
 async function openCard(id, quiet) {
@@ -727,7 +858,7 @@ async function openCard(id, quiet) {
   try { d = await api("GET", "/api/card/" + encodeURIComponent(id)); } catch (e) { drawer.replaceChildren(h("p", { text: e.message })); return; }
   const c = d.card, cand = d.candidate, rv = d.review, busy = state.job && state.job.state === "running";
   const scroll = drawer.scrollTop;
-  const tryOut = h("div", {});
+  const tryOut = h("div", {}), addArea = h("div", {});
   const tryBtn = h("button", { type: "button", disabled: !d.page, text: "Try the model on this page", onclick: async () => {
     tryBtn.disabled = true; tryOut.replaceChildren(h("p", { class: "muted", text: "Asking the model about the first part of the page… nothing is saved." }));
     try { renderTry(tryOut, await api("POST", `/api/card/${encodeURIComponent(id)}/try`, {})); } catch (e) { tryOut.replaceChildren(h("div", { class: "result bad", text: e.message })); }
@@ -737,7 +868,7 @@ async function openCard(id, quiet) {
       h("div", {}, h("strong", { style: "font-size: 17px", text: c.name }), h("div", { class: "small muted", text: `${c.issuer} · ${c.network} · ${c.rewardKind}${c.annualFee ? " · $" + c.annualFee + " annual fee" : " · no annual fee"}` })),
       h("button", { type: "button", text: "Close", onclick: () => { state.open = null; drawer.hidden = true; renderRows(); } })),
     c.needsInfo ? h("div", { class: "result", style: "background: var(--warn-bg); color: var(--warn)", text: "Needs info (needs-info.json): " + c.needsInfo }) : null,
-    h("p", { class: "small" }, /^https?:\/\//.test(c.sourceUrl) ? h("a", { href: c.sourceUrl, target: "_blank", rel: "noopener noreferrer", text: c.sourceUrl }) : c.sourceUrl),
+    pageAddress(id, c),
     h("div", { class: "row" },
       h("button", { type: "button", disabled: busy, text: "Fetch this page", onclick: () => jobFor("fetch", id) }),
       d.manual
@@ -747,23 +878,26 @@ async function openCard(id, quiet) {
     h("div", { id: "cardJob" }),
     d.manual ? h("p", { class: "small muted", text: "This card's rules are typed in by hand (manual-rules.json), so extracting never asks the model: it only re-checks them against the page. Fix a rule below, or take the card out of manual-rules.json to have the model read the page." }) : null,
     tryOut,
+    cand && cand.note ? h("div", { class: "result", style: "background: var(--warn-bg); color: var(--warn)", text: cand.note }) : null,
     h("h3", { text: "In the app" }),
     rv && rv.rules.length ? appPreview(rv) : h("p", { class: "muted small", text: cand ? "No rules found on this page." : "Not extracted yet: fetch the page, then extract its rules." }),
     rv && rv.rules.length ? stackingBox(id, d, rv) : null,
     rv && rv.cardConditions.length ? [h("h3", { text: "Applies to the whole card" }), h("ul", { class: "small" }, rv.cardConditions.map((t) => h("li", { text: t })))] : null,
-    rv && rv.rules.length ? [
+    rv ? [
       h("h3", { text: `Review · ${rv.counts.waiting} waiting · ${rv.counts.accept} accepted · ${rv.counts.reject} rejected` }),
-      h("p", { class: "small muted", style: "margin-top: 0", text: "Passing the checks means a rule's quote is on the page, not that the rule is right. Read each quote, then accept, reject, or fix what the rule says. Decisions are saved in review-decisions.json (committed); if a new extraction changes a rule, it waits again." }),
+      rv.rules.length ? h("p", { class: "small muted", style: "margin-top: 0", text: "Passing the checks means a rule's quote is on the page, not that the rule is right. Read each quote, then accept, reject, or fix what the rule says. Decisions are saved in review-decisions.json (committed); if a new extraction changes a rule, it waits again." }) : null,
       rv.warnings.length ? h("div", { class: "result", style: "background: var(--warn-bg); color: var(--warn)", text: "Worth a look (every rate is on the page, but they can't all be right):\n" + rv.warnings.join("\n") }) : null,
       rv.rules.map((x) => reviewRule(id, x)),
+      h("div", { class: "row", style: "margin: 6px 0" }, h("button", { type: "button", text: "Add a rule…", title: "For a rate the model missed: you say what the page says",
+        onclick: () => (addArea.childNodes.length ? fill(addArea) : addRule(id, d, null, addArea, "Copy the sentence that states the rate from the page, then say what it means. The same checks run; if they don't back it, you can still use it."))})),
+      addArea,
+      rejectedList(id, d),
     ] : null,
     cand ? h("details", {}, h("summary", { text: "Extraction details" }),
       h("p", { class: "small" }, chip(cand.status, extractKind[cand.status] ?? ""), ` ${cand.model || ""}${cand.promptVersion ? " · prompt " + cand.promptVersion : ""}`),
       cand.stats && cand.stats.calls ? h("p", { class: "small muted", text: `Cost: ${cand.stats.calls} model call${cand.stats.calls === 1 ? "" : "s"}, ${cand.stats.seconds}s, ${cand.stats.promptTokens.toLocaleString()} prompt tokens${cand.stats.cachedTokens ? " (" + cand.stats.cachedTokens.toLocaleString() + " cached)" : ""}, ${cand.stats.replyTokens.toLocaleString()} reply tokens${cand.stats.reasoningTokens ? " (" + cand.stats.reasoningTokens.toLocaleString() + " reasoning)" : ""}` }) : null,
       cand.errors && cand.errors.length ? h("div", { class: "result bad", text: "The model call failed:\n\n" + cand.errors.join("\n\n") }) : null,
-      cand.rejected.length ? [h("p", { class: "small", text: `Proposals the checks rejected (${cand.rejected.length}):` }), cand.rejected.map((x) =>
-        h("div", { class: "rule rejected" }, h("div", { class: "what", text: x.reason }),
-          h("blockquote", { text: x.rule ? (x.rule.quote || JSON.stringify(x.rule)) : x.cardCondition })))] : h("p", { class: "small muted", text: "The checks rejected nothing." })) : null,
+      null) : null,
     h("details", {}, h("summary", { text: "Page" }),
       d.fetch ? h("p", { class: "small" }, chip(d.fetch.lastStatus, fetchKind[d.fetch.lastStatus] ?? "warn"), ` ${(d.fetch.textChars || 0).toLocaleString()} characters · changed ${d.fetch.changedAt || "-"}${d.fetch.embedded ? " · text comes from the page's embedded data" : ""}`)
               : h("p", { class: "muted small", text: "Not fetched yet." }),

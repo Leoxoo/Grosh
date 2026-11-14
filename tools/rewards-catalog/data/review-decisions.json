@@ -1,4 +1,201 @@
 {
+  "american-express-blue-business-cash": {
+    "0343f81063c8648b": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members earn 2% cash back on all eligible purchases on up to $50,000 per calendar year, then 1% on eligible purchases thereafter.",
+      "rule": "2% on everything else, up to $50,000 per year"
+    },
+    "8325077dcb780394": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members earn 2% cash back on all eligible purchases on up to $50,000 per calendar year, then 1% on eligible purchases thereafter.",
+      "rule": "1% on everything else"
+    }
+  },
+  "american-express-blue-business-plus": {
+    "a8fdb03d3b281e78": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Earn 2X points on the first $50,000 in eligible purchases per calendar year and 1X points thereafter, with no category restrictions and no annual fee.",
+      "rule": "2x on everything else, up to $50,000 per year"
+    },
+    "b4d594b263ccf49f": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Earn 2X points on the first $50,000 in eligible purchases per calendar year and 1X points thereafter, with no category restrictions and no annual fee.",
+      "rule": "1x on everything else"
+    }
+  },
+  "american-express-blue-cash-everyday": {
+    "3b3323aae1e0506f": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members can earn 3% cash back on eligible U.S. online retail purchases, on up to $6,000 per year in purchases (then 1%).‡",
+      "rule": "3% on online shopping, up to $6,000 per year"
+    },
+    "4dd80624a3eaab89": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members can earn 1% cash back on other eligible purchases.‡",
+      "rule": "1% on everything else"
+    },
+    "64ff78b51523ef7f": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members can earn 3% cash back on eligible purchases at U.S. supermarkets, on up to $6,000 per year in purchases (then 1%).‡",
+      "rule": "3% on groceries, up to $6,000 per year"
+    },
+    "aaba560d26dd3392": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "3% cash back on gas at U.S. gas stations on up to $6,000 per year in purchases (then 1%)‡",
+      "rule": "3% on gas, up to $6,000 per year"
+    }
+  },
+  "american-express-blue-cash-preferred": {
+    "078c07b9844bf44f": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members can earn 1% cash back on other eligible purchases.‡",
+      "rule": "1% on everything else"
+    },
+    "3af5901f6c107fda": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members can earn 6% cash back on eligible purchases at U.S. supermarkets, on up to $6,000 per year in purchases (then 1%).‡",
+      "rule": "6% on groceries, up to $6,000 per year"
+    },
+    "5028ef538882d0a5": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members can earn 3% cash back on eligible purchases at U.S. gas stations.‡",
+      "rule": "3% on gas"
+    },
+    "6ad50b55a63f3f1b": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members can earn 3% cash back on transit (e.g., taxis/rideshare, parking, tolls, trains, buses and more).‡",
+      "rule": "3% on transit"
+    },
+    "822847fb1d80e129": {
+      "decidedAt": "2026-11-14",
+      "decision": "reject",
+      "quote": "Card Members can earn 6% cash back on eligible purchases at U.S. supermarkets, on up to $6,000 per year in purchases (then 1%).‡",
+      "rule": "1% on groceries"
+    },
+    "8c058b30f9c9b9f6": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members can earn 6% cash back on select U.S. streaming subscriptions to stream your favorite shows, movies, and more.‡",
+      "rule": "6% on streaming"
+    }
+  },
+  "american-express-business-gold": {
+    "81cc991a8770d78e": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "1X\nPOINTS\nOn All Other Eligible Purchases\nMade using the Business Gold Card.‡",
+      "rule": "1x on everything else"
+    },
+    "c97b45edd09b91df": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "While your top 2 categories may change each billing cycle based on where your business spent the most, you will earn 4X points on the first $150,000 in combined purchases from these categories each calendar year (then 1X thereafter).",
+      "rule": "4x on the top-spend category each billing cycle, from: dining, gas, transit, phone & internet (and others), up to $150,000 per year"
+    },
+    "f8d8444e5dd3c4b7": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "3X\nPOINTS\nOn Flights & Pre-Paid Hotels‡\nBooked on AmexTravel.com.‡",
+      "rule": "3x on travel"
+    }
+  },
+  "american-express-business-green": {
+    "a9cbfaf99b2e5fd4": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "With the Business Green Rewards Card, you can earn 2X Membership Rewards® points on prepaid hotels and other eligible travel, such as prepaid car rentals, cruises and flights, when you book through AmexTravel.com or on the Amex Travel App™.",
+      "rule": "2x on travel"
+    },
+    "afc837516856f549": {
+      "added": {
+        "capAmount": null,
+        "capPeriod": null,
+        "capUnknown": false,
+        "categories": [
+          "everything-else"
+        ],
+        "conditions": [
+          "On Other Eligible Purchases"
+        ],
+        "evidence": {
+          "pageHash": "bd2a149ca6fc3ed8cd094bc242aa55174ed5c6dc879828c937dc522947627586",
+          "quote": "On Other Eligible Purchases\nmade using your Business Green Rewards Card.",
+          "url": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-business-green-card-amex/"
+        },
+        "firstMonths": null,
+        "hasOtherChoices": false,
+        "merchants": [],
+        "needs": [],
+        "paysWith": null,
+        "picks": null,
+        "rate": 1,
+        "requires": [],
+        "selection": "fixed",
+        "tier": null,
+        "unit": "per-dollar",
+        "validFrom": null,
+        "validTo": null,
+        "verified": "override"
+      },
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "overrides": "rate 1 is not in the quote",
+      "quote": "On Other Eligible Purchases\nmade using your Business Green Rewards Card.",
+      "rule": "1x on everything else"
+    }
+  },
+  "american-express-delta-skymiles-blue": {
+    "297d5a50d4255e98": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Earn 1 mile per dollar for purchases you make with your Card",
+      "rule": "1x on everything else"
+    },
+    "77e66044596a73cf": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Earn 2 miles for every dollar spent on eligible purchases made directly with Delta.",
+      "rule": "2x at Delta"
+    },
+    "b6bd6e9a349f6959": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Earn 2X Miles at Restaurants",
+      "rule": "2x on dining"
+    }
+  },
+  "bank-of-america-customized-cash-rewards": {
+    "0569d530cb013697": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Earn 3% and 2% cash back on up to $2,500 in combined purchases each quarter in the choice category, and at grocery stores and wholesale clubs, then earn unlimited 1% thereafter.",
+      "rule": "3% in the category the cardholder chooses: gas, online shopping, dining, travel, drugstores (and others), up to $2,500 per quarter"
+    },
+    "49afd6cd1f803e29": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "1% unlimited cash back on all other purchases",
+      "rule": "1% on everything else"
+    },
+    "f19cfcec5a2cfa2b": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Earn 3% and 2% cash back on up to $2,500 in combined purchases each quarter in the choice category, and at grocery stores and wholesale clubs, then earn unlimited 1% thereafter.",
+      "rule": "2% on groceries, up to $2,500 per quarter"
+    }
+  },
   "chase-freedom-flex": {
     "0c5c80d281a308c5": {
       "decidedAt": "2026-11-13",
@@ -41,6 +238,54 @@
       "decision": "accept",
       "quote": "JAN-MAR\n2027\nNEXT Quarter\nGrocery Stores\n(excluding Walmart® and Target®)*Opens offer details overlay\nTop Streaming Services",
       "rule": "5% in rotating bonus categories from 2027-01-01 to 2027-03-31: groceries, streaming, up to $1,500 per quarter"
+    }
+  },
+  "citi-custom-cash": {
+    "7a78090e4832c980": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Customers will earn 5% cash back on purchases in the top eligible spend category each billing cycle, up to the first $500 spent.",
+      "rule": "5% on the top-spend category each billing cycle, from: dining, gas, groceries, travel, transit, streaming, drugstores (and others), up to $500 per billing cycle"
+    },
+    "90f3d64a0116fdee": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Cardmembers will also earn unlimited 1% cash back on all other purchases.",
+      "rule": "1% on everything else"
+    }
+  },
+  "discover-discover-it": {
+    "272a6b7ec46982f7": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Plus, earn 1% cash back on all other purchases.",
+      "rule": "1% on everything else"
+    },
+    "50f85abcc8723827": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Earn 5% Cashback Bonus at Restaurants, Entertainment and Utilities, now to December 31, 2026, on up to $1,500 in purchases when you activate.",
+      "rule": "5% in rotating bonus categories from 2026-10-01 to 2026-12-31: dining, entertainment, utilities, up to $1,500 per quarter"
+    },
+    "8a3e912d563793fc": {
+      "decidedAt": "2026-11-14",
+      "decision": "reject",
+      "quote": "Earn 5% cash back on everyday purchases at different places you shop each quarter, up to the quarterly maximum when you activate.",
+      "rule": "5% in rotating bonus categories"
+    }
+  },
+  "goldman-sachs-apple-card": {
+    "111dc25b43058d0f": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "When you use the card, you’ll get 1% Daily Cash back on every purchase.",
+      "rule": "1% on everything else"
+    },
+    "69969b5b586d226b": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Get 2% Daily Cash back when you use Apple Card with Apple Pay.",
+      "rule": "2% when paying with Apple Pay"
     }
   }
 }

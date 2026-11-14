@@ -162,7 +162,7 @@ TIER_BOOST = "preferred-rewards-tier"
 # What a rate can require beyond the purchase itself, and the words that must back the tag up.
 REQUIRES = {
     "activation": ("activate", "activation", "enroll"),
-    "issuer-booking": ("booked through", "booked with", "book through", "book with", "booking through",
+    "issuer-booking": ("booked through", "booked with", "booked on", "book through", "book with", "booking through",
                        "purchased through", "portal"),
     TIER_BOOST: ("preferred rewards", "rewards bonus", "reward bonus"),  # the bonus: a tier table's row
 }
@@ -287,6 +287,44 @@ def _alnum_words(text: str) -> list[str]:
     return re.sub(r"[^a-z0-9]+", " ", normalize(text)).split()
 
 
+REPAIR_LINES = 5  # a quote that skips a heading may span this many page lines
+REPAIR_SKIPPED_WORDS = 12  # and leave out this many of the page's words in all
+
+
+def repair_quote(quote: str, text: str) -> str | None:
+    """The page's own words for a quote that isn't on the page word for word because it skips something between its
+    parts, or None. Pages lay a rate out as a tile, one part a line ("3X" / "POINTS" / "On Flights & Pre-Paid Hotels" /
+    "Booked on AmexTravel.com."), and the model quotes the parts it needs and leaves the heading out. If every word of
+    the quote is on the page in order, starting at a line's first word and ending at a line's last, within a few lines
+    and skipping few words, the quote is those whole lines: the evidence stays the page's, and what was skipped is
+    shown to the reviewer instead of hidden. The checks then run on it as on any quote."""
+    words = normalize(quote).split() if isinstance(quote, str) else []
+    if len(words) < 3:
+        return None
+    lines = [line.strip() for line in text.splitlines() if normalize(line)]
+    tokens = [normalize(line).split() for line in lines]
+    best: tuple[int, int, int] | None = None  # (skipped words, first line, last line)
+    for start, first in enumerate(tokens):
+        if first[0] != words[0]:
+            continue
+        flat = [(number, word) for number in range(start, min(start + REPAIR_LINES, len(tokens))) for word in tokens[number]]
+        at, skipped = 0, 0
+        for word in words:
+            while at < len(flat) and flat[at][1] != word:
+                at, skipped = at + 1, skipped + 1
+            if at == len(flat):
+                break
+            at += 1
+        else:
+            end = flat[at - 1][0]
+            if tokens[end][-1] == words[-1] and skipped <= REPAIR_SKIPPED_WORDS and (best is None or skipped < best[0]):
+                best = (skipped, start, end)
+    if best is None:
+        return None
+    repaired = "\n".join(lines[best[1] : best[2] + 1])
+    return repaired if len(repaired) <= MAX_QUOTE_CHARS and normalize(repaired) in normalize(text) else None
+
+
 def name_on_page(name: str, page_text: str) -> bool:
     """Whether the card's name appears on its page, as a phrase or with every word of it present."""
     words = _alnum_words(name)
@@ -372,6 +410,8 @@ def _category_fits(category: str, quote_norm: str, boost: bool = False) -> bool:
         # "Get 2% back on every purchase" is a base rate without saying "all other purchases":
         # it fits if it names no other category.
         return not any(mentions(quote_norm, words) for name, words in CATEGORIES.items() if name != category)
+    if category == "travel" and mentions(quote_norm, CATEGORIES["airlines"]) and mentions(quote_norm, CATEGORIES["hotels"]):
+        return True  # "flights and hotels booked through ..." is travel in general, without the word
     return mentions(quote_norm, CATEGORIES[category])
 
 
@@ -414,12 +454,31 @@ def check_condition(condition, page_norm: str | None) -> str | None:
     return None
 
 
-def validate_rule(rule, page_norm: str | None = None, rows: dict[str, str] | None = None) -> str | None:
+def _dates_problem(rule: dict) -> str | None:
+    """Why the dates and the first-months length can't be stored, whatever the quote says, or None."""
+    first = rule.get("firstMonths")
+    if first is not None and (isinstance(first, bool) or not isinstance(first, int) or not 1 <= first <= 60):
+        return "firstMonths must be a whole number of months from 1 to 60"
+    for label in ("validFrom", "validTo"):
+        value = rule.get(label)
+        if value is not None:
+            try:
+                date.fromisoformat(value)
+            except (TypeError, ValueError):
+                return f"{label} {value!r} is not a date like 2026-10-01"
+    if rule.get("validFrom") and rule.get("validTo") and rule["validFrom"] > rule["validTo"]:
+        return "validFrom is after validTo"
+    return None
+
+
+def validate_rule(rule, page_norm: str | None = None, rows: dict[str, str] | None = None, vouched: bool = False) -> str | None:
     """Why a proposed rule can't be kept, or None if every check holds. Nothing here trusts the model.
 
     With `page_norm` (the normalized page text) the quote and conditions must be on that page. Without
     it, only the checks that don't need the page run: used for hand-entered rules. `rows` (tier_rows of the
-    page) tells a rate in a tier table's boost row from the base rate."""
+    page) tells a rate in a tier table's boost row from the base rate. `vouched` is a person saying the rule is right
+    although the checks don't back it: only the rule's shape is checked (it can be stored and published), not whether
+    the quote says what the rule says."""
     if not isinstance(rule, dict):
         return "not an object"
     categories, selection, picks = rule.get("categories"), rule.get("selection"), rule.get("picks")
@@ -496,6 +555,8 @@ def validate_rule(rule, page_norm: str | None = None, rows: dict[str, str] | Non
         if problem:
             return problem  # a rule with a made-up condition is dropped whole: its rate would overstate
 
+    if vouched:
+        return _dates_problem(rule)
     quote_norm = normalize(quote)
     if page_norm is not None and quote_norm not in page_norm:
         return "quote is not on the page word for word"
@@ -1089,6 +1150,35 @@ def _retype_rotating(proposal):
     return proposal
 
 
+_NUMBER_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+_TOP_N = re.compile(r"\btop (\d+|two|three|four|five) (?:eligible )?categor")
+_FROM_N = re.compile(r"\bfrom (\d+|two|three|four|five|six|seven|eight|nine|ten) (?:eligible )?categories")
+
+
+def _count(word: str) -> int:
+    return int(word) if word.isdigit() else _NUMBER_WORDS[word]
+
+
+def _retype_top_spend(proposal):
+    """A "fixed" rule whose quote says the card picks the top N categories by spending ("Earn 4X points on the top 2
+    categories where your business spends the most each billing cycle from 6 categories:") is a top-spend rule that was
+    mislabeled: the model reads one of the listed categories as the rule's. It keeps the categories it named, picks is
+    N, and when the quote says the list has more categories than the rule names, hasOtherChoices is true: the rest are
+    for the reviewer to add. Rules that rotate, or say who chooses, are left alone."""
+    if not isinstance(proposal, dict) or proposal.get("selection") != "fixed" or not isinstance(proposal.get("quote"), str):
+        return proposal
+    if proposal.get("paysWith") or proposal.get("merchants") or proposal.get("categories") in (None, [], ["everything-else"]):
+        return proposal
+    quote = normalize(proposal["quote"])
+    top = _TOP_N.search(quote)
+    if not top or mentions(quote, ROTATING_WORDS) or not mentions(quote, SELECTION_WORDS["top-spend"]):
+        return proposal
+    categories = proposal["categories"]
+    listed = _FROM_N.search(quote)
+    return {**proposal, "selection": "top-spend", "picks": _count(top.group(1)),
+            "hasOtherChoices": bool(listed and _count(listed.group(1)) > len(categories))}
+
+
 def split_fixed(proposal) -> list:
     """Tidy-ups of what the model proposed that change nothing about its meaning: a rotating rule mislabeled
     as choose or top-spend is retyped, and a "fixed" rule that lists several categories says the rate applies to each, so it becomes one rule
@@ -1105,6 +1195,8 @@ def split_fixed(proposal) -> list:
         # "Choose 3 of these 3" leaves nothing to choose: every listed category earns the rate. (Categories
         # the model saw but the catalog lacks, such as entertainment, stay out, as in any fixed rule.)
         proposal = {**proposal, "selection": "fixed", "picks": None, "hasOtherChoices": False}
+    proposal = _retype_top_spend(proposal)
+    categories = proposal.get("categories") if isinstance(proposal, dict) else None
     if isinstance(proposal, dict) and proposal.get("selection") == "fixed" and isinstance(categories, list) and len(categories) > 1:
         return [
             {**proposal, "categories": [category], "conditions": _conditions_about(proposal.get("conditions"), category)}
@@ -1303,6 +1395,79 @@ def _covered(sentence: str, rules: list[dict]) -> bool:
     return all(any(name in rule["categories"] for rule in stated) for name in named)
 
 
+LIST_ITEMS_MAX = 10
+_DOLLARS = re.compile(r"\$\s?(\d[\d,]*(?:\.\d+)?)")
+
+
+def read_list(proposal, text: str, page_norm: str, rows: dict[str, str]):
+    """A top-spend or choose rule whose quote says the categories are a list of N ("... on the top 2 categories where your
+    business spends the most each billing cycle from 6 categories:"), read from the page: the N lines under the quote
+    (the page's bullets) give the rule's categories, and the sentence after them gives its cap. The model names one or
+    two of the list and leaves the cap, which is in a paragraph apart from the quote.
+
+    A line gives a category only when its words, outside parentheses (those are examples: "advertising in select media
+    (online, TV, radio)" is not online shopping), name exactly one catalog category. The others are left for the reviewer, and
+    hasOtherChoices says the list has more than the rule names. The cap comes from the first sentence in the next three
+    lines that states a dollar amount and a period after it and that makes the whole rule pass the checks as its quote; the
+    sentence replaces the quote, so the evidence is still the page's own words."""
+    if not isinstance(proposal, dict) or proposal.get("selection") not in ("choose", "top-spend") or not isinstance(proposal.get("quote"), str):
+        return proposal
+    quote = normalize(proposal["quote"])
+    listed = _FROM_N.search(quote)
+    if not listed or not 2 <= _count(listed.group(1)) <= LIST_ITEMS_MAX:
+        return proposal
+    count = _count(listed.group(1))
+    lines = [line for line in text.splitlines() if normalize(line)]
+    at = next((number for number, line in enumerate(lines) if quote in normalize(line)), None)
+    if at is None or len(lines) < at + 1 + count:
+        return proposal
+    found, matched = [], 0
+    for item in lines[at + 1 : at + 1 + count]:
+        words = normalize(re.sub(r"\([^)]*\)", " ", item))
+        named = [name for name, group in CATEGORIES.items() if name != "everything-else" and mentions(words, group)]
+        if len(named) == 1:
+            matched += 1
+            if named[0] not in found:
+                found.append(named[0])
+    if found:
+        proposal = {**proposal, "categories": found, "hasOtherChoices": matched < count}
+    if proposal.get("capAmount") is None:
+        for sentence in (s for line in lines[at + 1 + count : at + 4 + count] for s in re.split(r"(?<=[.!?])\s+(?=[A-Z])", line)):
+            amount = _DOLLARS.search(sentence)
+            if not amount:
+                continue
+            after = normalize(sentence[amount.end():])
+            periods = [(after.find(word), period) for period, words in PERIOD_WORDS.items() for word in words if word in after]
+            if not periods:
+                continue
+            capped = {**proposal, "quote": sentence.strip(), "capAmount": float(amount.group(1).replace(",", "")), "capPeriod": min(periods)[1]}
+            capped.pop("capUnknown", None)
+            if validate_rule(capped, page_norm, rows) is None:
+                return capped
+    return proposal
+
+
+def judge(proposal, text: str, page_norm: str, rows: dict[str, str], page: "CardPage") -> tuple:
+    """(the proposal, why it can't be kept or None). When the quote isn't on the page word for word because the model
+    skipped part of a tile, the page's own words replace it first (repair_quote); then every check runs."""
+    quote = proposal.get("quote") if isinstance(proposal, dict) else None
+    if isinstance(quote, str) and quote.strip() and normalize(quote) not in page_norm:
+        repaired = repair_quote(quote, text)
+        if repaired:
+            proposal = {**proposal, "quote": repaired}
+    proposal = read_list(proposal, text, page_norm, rows)
+    return proposal, validate_rule(proposal, page_norm, rows) or page.other_card_problem(proposal["quote"])
+
+
+def merge_rule(accepted: dict[tuple, dict], rule: dict) -> None:
+    """Keep a rule once. The same rule seen again (the model words a quote a little differently in each part of a page)
+    may carry a condition or requirement the first time lacked."""
+    entry = accepted.setdefault(_merge_key(rule), rule)
+    entry["conditions"] += [c for c in rule["conditions"] if c not in entry["conditions"]]
+    entry["requires"] += [q for q in rule["requires"] if q not in entry["requires"]]
+    entry["needs"] = needs_of(entry)
+
+
 def extract_card(
     card: dict, text: str, page_hash: str, complete, model: str, max_chars: int = CHUNK_CHARS, progress=None,
     follow_up: bool = True, today: str | None = None, calendar: str | None = None,
@@ -1342,17 +1507,11 @@ def extract_card(
     def take(reply) -> None:
         proposals, card_conditions = reply
         for proposal in (split for raw in proposals for split in split_fixed(raw)):
-            reason = validate_rule(proposal, page_norm, rows) or page.other_card_problem(proposal["quote"])
+            proposal, reason = judge(proposal, text, page_norm, rows, page)
             if reason:
                 candidate["rejected"].append({"rule": proposal, "reason": reason})
                 continue
-            rule = candidate_rule(proposal, card["sourceUrl"], page_hash, "page")
-            entry = accepted.setdefault(_merge_key(rule), rule)
-            # The same rule seen again (the model words a quote a little differently in each part of a page) may carry a
-            # condition or requirement the first time lacked.
-            entry["conditions"] += [c for c in rule["conditions"] if c not in entry["conditions"]]
-            entry["requires"] += [q for q in rule["requires"] if q not in entry["requires"]]
-            entry["needs"] = needs_of(entry)
+            merge_rule(accepted, candidate_rule(proposal, card["sourceUrl"], page_hash, "page"))
         for condition in card_conditions:
             problem = check_condition(condition, page_norm) or (
                 None if len(candidate["cardConditions"]) < MAX_CARD_CONDITIONS else "too many card conditions"
@@ -1380,8 +1539,7 @@ def extract_card(
                 if retry is not None:
                     take(retry)
 
-    # Another card's rates are no loss, and a boost's tier cell or "up to N% more" is no rate the model can add alone.
-    this_cards = [s for s in rate_sentences(text) if not page.other_card_problem(s) and not _only_a_boost(s, rows)]
+    this_cards = _this_cards_sentences(text, page, rows)
     # The longest first: a sentence carries the cap and terms its heading leaves out, and once it is a rule the
     # heading is covered and needn't use up a follow-up (or give the rule again without its cap).
     candidate["followUps"] = 0
@@ -1401,18 +1559,67 @@ def extract_card(
 
     candidate["rules"] = _in_order(without_covered(list(accepted.values())))
     candidate["needs"] = _needs(candidate["rules"])
-    candidate["warnings"] = card_warnings(candidate["rules"])
-    if still_missing:
-        # The page states these rates and the result doesn't have them: an "ok" that isn't complete must say so.
-        candidate["warnings"].append(
-            f"{len(still_missing)} rate sentence(s) on the page aren't in the result, e.g. {still_missing[0][:120]!r}"
-        )
+    candidate["warnings"] = card_warnings(candidate["rules"]) + _missing_warning(still_missing)
     if failures:
         candidate["status"] = "failed"
         candidate["errors"] = errors
     elif not accepted:
         candidate["status"] = "no-rules"
     return candidate
+
+
+def _this_cards_sentences(text: str, page: "CardPage", rows: dict[str, str]) -> list[str]:
+    """The page's rate sentences that are this card's. Another card's rates are no loss, and a boost's tier cell or
+    "up to N% more" is no rate the model can add alone."""
+    return [s for s in rate_sentences(text) if not page.other_card_problem(s) and not _only_a_boost(s, rows)]
+
+
+def _missing_warning(still_missing: list[str]) -> list[str]:
+    """The page states these rates and the result doesn't have them: an "ok" that isn't complete must say so."""
+    if not still_missing:
+        return []
+    return [f"{len(still_missing)} rate sentence(s) on the page aren't in the result, e.g. {still_missing[0][:120]!r}"]
+
+
+def recheck_rejected(card: dict, candidate: dict, text: str) -> int:
+    """Run a candidate's rejected proposals through the checks again, without asking the model, and keep the ones that
+    now pass: the checks improve (a quote that skipped a heading is repaired, a top-2 rule is retyped) and a saved
+    extraction shouldn't need the model again to benefit. A top-spend or choose rule is read again too: its list of
+    categories and its cap come from the page (read_list). Changes `candidate` in place and returns how many rules were
+    gained or changed. A decision already made stays with its rule: a rule's key is its content, and these are new rules."""
+    page_norm, rows = normalize(text), tier_rows(text)
+    page = CardPage(card, text)
+    accepted = {_merge_key(rule): rule for rule in candidate["rules"]}
+    read_again = 0
+    for key, rule in list(accepted.items()):  # a list the extraction named too few of is read from the page now
+        if rule["selection"] in ("choose", "top-spend") and rule["verified"] == "page":
+            proposal = {**{f: rule.get(f) for f in RULE_SCHEMA["required"] if f != "quote"}, "quote": rule["evidence"]["quote"]}
+            read = read_list(proposal, text, page_norm, rows)
+            if read != proposal and validate_rule(read, page_norm, rows) is None:
+                del accepted[key]
+                read_again += 1
+                merge_rule(accepted, candidate_rule({**read, "capUnknown": False}, rule["evidence"]["url"], rule["evidence"]["pageHash"], "page"))
+    before, still_rejected = len(accepted), []
+    for entry in candidate["rejected"]:
+        if "rule" not in entry:
+            still_rejected.append(entry)
+            continue
+        for proposal in split_fixed(entry["rule"]):
+            proposal, reason = judge(proposal, text, page_norm, rows, page)
+            if reason:
+                still_rejected.append({"rule": proposal, "reason": reason})
+            else:
+                merge_rule(accepted, candidate_rule(proposal, card["sourceUrl"], candidate.get("pageHash"), "page"))
+    gained = len(accepted) - before + read_again
+    candidate["rejected"] = still_rejected
+    if gained:
+        candidate["rules"] = _in_order(without_covered(list(accepted.values())))
+        candidate["needs"] = _needs(candidate["rules"])
+        candidate["warnings"] = card_warnings(candidate["rules"]) + _missing_warning(
+            [s for s in _this_cards_sentences(text, page, rows) if not _covered(s, candidate["rules"])])
+        if candidate.get("status") == "no-rules":
+            candidate["status"] = "ok"
+    return gained
 
 
 def manual_candidate(card: dict, entry: dict, text: str | None, page_hash: str | None) -> dict:
@@ -1444,8 +1651,23 @@ def manual_candidate(card: dict, entry: dict, text: str | None, page_hash: str |
     return candidate
 
 
-def up_to_date(path: Path, page_hash: str, model: str) -> bool:
+def redirected_candidate(card: dict, entry: dict, page_hash: str | None, model: str) -> dict | None:
+    """The candidate for a card whose page sent the reader up to a listing (fetch.redirected_up), or None. It is
+    "wrong-page" with a note saying where it ended up, and the model isn't asked: the page's rates are other cards'."""
+    final = fetch.redirected_up(entry)
+    if final is None:
+        return None
+    candidate = _empty_candidate(card, model, PROMPT_VERSION, page_hash, "wrong-page")
+    candidate["note"] = f"The page redirected to {final}, a page above this card's own: its rates are other cards'. Find the card's own page and set it in url-overrides.json."
+    return candidate
+
+
+def up_to_date(path: Path, page_hash: str, model: str, entry: dict | None = None) -> bool:
+    """Whether a card's saved candidate is for this page, model and prompt. A card whose page redirected up to a listing
+    is up to date only once its candidate says "wrong-page" (redirected_candidate), whatever the model."""
     previous = fetch.read_json(path, None)
+    if entry and fetch.redirected_up(entry):
+        return bool(previous and previous.get("status") == "wrong-page" and previous.get("pageHash") == page_hash)
     return bool(
         previous
         and previous.get("status") != "failed"
@@ -1533,6 +1755,13 @@ def process_cards(
             emit({"event": "card-start", **base, "kind": "hand-entered"})
             candidate = manual_candidate(card, manual[card["id"]], text, page_hash)
         else:
+            redirected = redirected_candidate(card, state.get(card["id"], {}), page_hash, client.model)
+            if redirected:
+                emit({"event": "card-start", **base, "kind": "redirected"})
+                fetch.write_json(path, redirected)
+                counts["wrong-page"] = counts.get("wrong-page", 0) + 1
+                emit({"event": "card", **base, "status": "wrong-page", "rules": 0, "rejected": 0, "errors": [], "warnings": [redirected["note"]]})
+                continue
             if not force and up_to_date(path, page_hash, client.model):
                 counts["up-to-date"] = counts.get("up-to-date", 0) + 1
                 emit({"event": "card", **base, "status": "up-to-date", "rules": None, "rejected": None, "errors": []})

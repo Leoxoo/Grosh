@@ -5,7 +5,7 @@
 
 reads catalog-seed.json (the cards), cache/candidates/ (each card's rules), review-decisions.json (what
 a person accepted) and card-options.json (whether a card's bonuses add up), and writes rewards-catalog.json
-beside this script.
+beside this script, and a copy to Grosh/Resources/rewards-catalog.json, the file the app bundles.
 """
 
 import json
@@ -20,6 +20,8 @@ import fetch  # noqa: E402
 import review  # noqa: E402
 
 OUT = fetch.DATA / "rewards-catalog.json"
+# The file the app bundles (RewardsCatalog.bundled): a copy of OUT, which nothing else keeps current, so publish writes both.
+APP_FILE = Path(__file__).resolve().parents[3] / "Grosh" / "Resources" / "rewards-catalog.json"
 SEED = fetch.SEED
 # Raised when the file's shape changes in a way an older app can't read (a field renamed or retyped).
 # Adding a field doesn't need it: the app's reader ignores fields it doesn't know.
@@ -57,19 +59,20 @@ def catalog(cards: list[dict], candidates: dict[str, dict], decisions: dict, pre
     published = []
     for card in sorted(cards, key=lambda c: c["id"]):
         candidate = candidates.get(card["id"])
-        if candidate is None and card["id"] in before:
+        added = any("added" in entry for entry in decisions.get(card["id"], {}).values())
+        if candidate is None and card["id"] in before and not added:
             published.append(before[card["id"]])
             continue
-        rules = review.accepted_rules(candidate, decisions) if candidate else []
-        if not rules:  # nobody has checked this card, so its seed facts aren't ours to ship
+        shown = candidate or review.empty_candidate(card["id"])
+        entries = review.accepted_entries(shown, decisions)
+        if not entries:  # nobody has checked this card, so its seed facts aren't ours to ship
             continue
-        card_decisions = decisions[card["id"]]
         published.append({
             **{field: card[field] for field in CARD_FIELDS},
-            "verifiedAt": max(card_decisions[review.rule_key(card["id"], r)]["decidedAt"] for r in rules),
-            "cardConditions": sorted(candidate.get("cardConditions", [])),
+            "verifiedAt": max(day for _, day in entries),
+            "cardConditions": sorted(shown.get("cardConditions") or before.get(card["id"], {}).get("cardConditions", [])),
             **{name: bool((options or {}).get(card["id"], {}).get(name)) for name in review.CARD_OPTIONS},
-            "rules": sorted((published_rule(r) for r in rules), key=lambda r: json.dumps(r, sort_keys=True)),
+            "rules": sorted((published_rule(r) for r, _ in entries), key=lambda r: json.dumps(r, sort_keys=True)),
         })
     # The date says when the catalog last changed, so a rerun that changes nothing else keeps it.
     unchanged = previous and previous.get("formatVersion") == FORMAT_VERSION and previous.get("cards") == published
@@ -78,7 +81,8 @@ def catalog(cards: list[dict], candidates: dict[str, dict], decisions: dict, pre
 
 # Where publish reads and writes: the seed, the candidates, the decisions, the card options and the catalog. ui.Paths has the same
 # fields, for the web page's own (test) folders.
-PATHS = SimpleNamespace(seed=SEED, candidates=extract.CANDIDATES, decisions=review.DECISIONS, options=review.OPTIONS, catalog=OUT)
+PATHS = SimpleNamespace(seed=SEED, candidates=extract.CANDIDATES, decisions=review.DECISIONS, options=review.OPTIONS, catalog=OUT,
+                  app_copy=APP_FILE)
 
 
 def publish(paths=PATHS, today: str = "") -> dict:
@@ -89,6 +93,8 @@ def publish(paths=PATHS, today: str = "") -> dict:
     document = catalog(cards, found, review.load_decisions(paths.decisions), fetch.read_json(paths.catalog, None),
                        today or date.today().isoformat(), review.load_options(paths.options))
     fetch.write_json(paths.catalog, document)
+    if getattr(paths, "app_copy", None):  # the app bundles this copy: without it a published catalog never reaches a build
+        fetch.write_json(paths.app_copy, document)
     return document
 
 

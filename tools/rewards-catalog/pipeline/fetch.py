@@ -548,6 +548,21 @@ def write_json(path: Path, value) -> None:
     path.write_text(json_text(value), encoding="utf-8")
 
 
+def redirected_up(entry: dict) -> str | None:
+    """Where a card's page ended up when its address sent the reader up to a parent page on the same site: Amex's
+    /card/amex-everyday-preferred/ lands on /us/credit-cards/, a listing of every card. Such a page isn't this card's, and
+    the rates on it are other cards' (a card the issuer no longer sells is redirected this way). None when the page
+    stayed where it was asked for, or went somewhere else that is no parent of it (a renamed address, another host)."""
+    url, final = entry.get("url"), entry.get("finalUrl")
+    if not url or not final:
+        return None
+    asked, ended = urlparse(url), urlparse(final)
+    wanted = [part for part in asked.path.lower().split("/") if part]
+    got = [part for part in ended.path.lower().split("/") if part]
+    same_site = asked.netloc.lower().removeprefix("www.") == ended.netloc.lower().removeprefix("www.")
+    return final if same_site and len(got) < len(wanted) and wanted[: len(got)] == got else None
+
+
 def pages_hash(entry: dict) -> str | None:
     """What a card's text hashes to, for telling whether it needs extracting: its page's hash, joined with its calendar
     page's when it has one, so either page changing is the card changing."""
