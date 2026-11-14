@@ -369,7 +369,7 @@ class App:
             hand_entered = card["id"] in manual
             pending = (
                 False if hand_entered or not page
-                else not extract.up_to_date(self.paths.candidates / f"{card['id']}.json", fetch.pages_hash(entry), settings["model"])
+                else not extract.up_to_date(self.paths.candidates / f"{card['id']}.json", fetch.pages_hash(entry), settings["model"], entry)
             )
             rows.append({
                 "id": card["id"], "name": card["name"], "issuer": card["issuer"], "kind": card["rewardKind"],
@@ -627,7 +627,7 @@ class App:
         return [c for c in with_pages if c["id"] in manual or not self._extracted(c, state, model)], "cards that need extracting"
 
     def _extracted(self, card: dict, state: dict, model: str) -> bool:
-        return extract.up_to_date(self.paths.candidates / f"{card['id']}.json", fetch.pages_hash(state[card["id"]]), model)
+        return extract.up_to_date(self.paths.candidates / f"{card['id']}.json", fetch.pages_hash(state[card["id"]]), model, state[card["id"]])
 
     def start_job(self, body: dict) -> dict:
         kinds = {  # each kind of job: its name in the log, the `which` it takes, and what runs it

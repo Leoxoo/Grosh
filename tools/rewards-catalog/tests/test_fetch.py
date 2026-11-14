@@ -138,6 +138,24 @@ class RobotsTests(unittest.TestCase):
         self.assertFalse(self.allowed(OSError("down")))
 
 
+class RedirectedUpTests(unittest.TestCase):
+    def ends_at(self, asked: str, final: str):
+        return fetch.redirected_up({"url": asked, "finalUrl": final})
+
+    def test_a_card_page_sent_up_to_a_listing_is_found(self):
+        listing = "https://www.americanexpress.com/us/credit-cards/"
+        self.assertEqual(self.ends_at("https://www.americanexpress.com/us/credit-cards/card/amex-everyday-preferred/", listing), listing)
+        self.assertTrue(self.ends_at("https://www.usbank.com/business-banking/business-credit-cards/x.html", "https://usbank.com/business-banking/business-credit-cards"))
+
+    def test_a_page_that_stayed_or_moved_sideways_is_not(self):
+        card = "https://www.capitalone.com/credit-cards/bjs/"
+        self.assertIsNone(self.ends_at(card, card))
+        self.assertIsNone(self.ends_at(card, "https://www.capitalone.com/credit-cards/bjs-wholesale-club/"))  # renamed
+        self.assertIsNone(self.ends_at(card, "https://other.example/credit-cards/"))  # another site
+        self.assertIsNone(self.ends_at(card, "https://www.capitalone.com/credit-cards/bjs/extra/"))  # deeper
+        self.assertIsNone(fetch.redirected_up({"url": card}))  # never fetched
+
+
 class FetchPageTests(unittest.TestCase):
     URL = "https://x.test/card"
 

@@ -1273,6 +1273,28 @@ class ListedCategoriesTests(unittest.TestCase):
         self.assertEqual(extract.recheck_rejected(self.GOLD, candidate, self.PAGE), 0)
 
 
+class RedirectedPageTests(unittest.TestCase):
+    ENTRY = {"url": "https://x.test/cards/card/savor/", "finalUrl": "https://x.test/cards/"}
+
+    def test_a_card_whose_page_is_a_listing_is_wrong_page_and_the_model_is_not_asked(self):
+        candidate = extract.redirected_candidate(CARD, self.ENTRY, "h", "m")
+        self.assertEqual((candidate["status"], candidate["rules"]), ("wrong-page", []))
+        self.assertIn("https://x.test/cards/", candidate["note"])
+        self.assertIsNone(extract.redirected_candidate(CARD, {"url": "https://x.test/a/", "finalUrl": "https://x.test/a/"}, "h", "m"))
+
+    def test_an_extraction_made_before_it_was_known_is_redone_and_then_stays_done(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "c.json"
+            old = {"status": "ok", "pageHash": "h", "model": "m", "promptVersion": extract.PROMPT_VERSION}
+            fetch.write_json(path, old)
+            self.assertTrue(extract.up_to_date(path, "h", "m"))
+            self.assertFalse(extract.up_to_date(path, "h", "m", self.ENTRY))  # its rules were another card's
+            fetch.write_json(path, extract.redirected_candidate(CARD, self.ENTRY, "h", "other-model"))
+            self.assertTrue(extract.up_to_date(path, "h", "m", self.ENTRY))  # whatever the model
+
+
 class VouchedRuleTests(unittest.TestCase):
     def test_a_vouched_rule_only_needs_its_shape(self):
         said = rule(categories=["travel"], rate=3, quote="Earn 5% cash back on dining.")  # the quote doesn't say it

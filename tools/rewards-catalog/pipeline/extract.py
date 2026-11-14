@@ -1651,8 +1651,23 @@ def manual_candidate(card: dict, entry: dict, text: str | None, page_hash: str |
     return candidate
 
 
-def up_to_date(path: Path, page_hash: str, model: str) -> bool:
+def redirected_candidate(card: dict, entry: dict, page_hash: str | None, model: str) -> dict | None:
+    """The candidate for a card whose page sent the reader up to a listing (fetch.redirected_up), or None. It is
+    "wrong-page" with a note saying where it ended up, and the model isn't asked: the page's rates are other cards'."""
+    final = fetch.redirected_up(entry)
+    if final is None:
+        return None
+    candidate = _empty_candidate(card, model, PROMPT_VERSION, page_hash, "wrong-page")
+    candidate["note"] = f"The page redirected to {final}, a page above this card's own: its rates are other cards'. Find the card's own page and set it in url-overrides.json."
+    return candidate
+
+
+def up_to_date(path: Path, page_hash: str, model: str, entry: dict | None = None) -> bool:
+    """Whether a card's saved candidate is for this page, model and prompt. A card whose page redirected up to a listing
+    is up to date only once its candidate says "wrong-page" (redirected_candidate), whatever the model."""
     previous = fetch.read_json(path, None)
+    if entry and fetch.redirected_up(entry):
+        return bool(previous and previous.get("status") == "wrong-page" and previous.get("pageHash") == page_hash)
     return bool(
         previous
         and previous.get("status") != "failed"
@@ -1740,6 +1755,13 @@ def process_cards(
             emit({"event": "card-start", **base, "kind": "hand-entered"})
             candidate = manual_candidate(card, manual[card["id"]], text, page_hash)
         else:
+            redirected = redirected_candidate(card, state.get(card["id"], {}), page_hash, client.model)
+            if redirected:
+                emit({"event": "card-start", **base, "kind": "redirected"})
+                fetch.write_json(path, redirected)
+                counts["wrong-page"] = counts.get("wrong-page", 0) + 1
+                emit({"event": "card", **base, "status": "wrong-page", "rules": 0, "rejected": 0, "errors": [], "warnings": [redirected["note"]]})
+                continue
             if not force and up_to_date(path, page_hash, client.model):
                 counts["up-to-date"] = counts.get("up-to-date", 0) + 1
                 emit({"event": "card", **base, "status": "up-to-date", "rules": None, "rejected": None, "errors": []})

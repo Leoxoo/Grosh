@@ -851,6 +851,7 @@ async function openCard(id, quiet) {
     h("div", { id: "cardJob" }),
     d.manual ? h("p", { class: "small muted", text: "This card's rules are typed in by hand (manual-rules.json), so extracting never asks the model: it only re-checks them against the page. Fix a rule below, or take the card out of manual-rules.json to have the model read the page." }) : null,
     tryOut,
+    cand && cand.note ? h("div", { class: "result", style: "background: var(--warn-bg); color: var(--warn)", text: cand.note }) : null,
     h("h3", { text: "In the app" }),
     rv && rv.rules.length ? appPreview(rv) : h("p", { class: "muted small", text: cand ? "No rules found on this page." : "Not extracted yet: fetch the page, then extract its rules." }),
     rv && rv.rules.length ? stackingBox(id, d, rv) : null,
