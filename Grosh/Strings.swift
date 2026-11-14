@@ -77,7 +77,7 @@ nonisolated enum Strings {
         static let nothingRecordedInPeriod: LocalizedStringResource = "Nothing was recorded in this period."
         static let addWalletFirst: LocalizedStringResource = "Add a wallet first, in Account → Wallets."
         static let onlyThisOne: LocalizedStringResource = "Only This One"
-        static let searchPrompt: LocalizedStringResource = "Note, category or amount"
+        static let searchPrompt: LocalizedStringResource = "Note, category, Card or amount"
         static let timeRange: LocalizedStringResource = "Time Range"
         static let custom: LocalizedStringResource = "Custom"
         static let customEllipsis: LocalizedStringResource = "Custom…"

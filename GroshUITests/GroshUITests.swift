@@ -133,6 +133,8 @@ final class GroshUITests: XCTestCase {
                 let debit = app.buttons["Debit"]
                 walk.expect(debit, "the Card Debit")
                 debit.tap()
+                // Picking a Card goes back from its list to the sheet.
+                walk.expect(sheet, "the Add Transaction sheet")
             }
 
             let noteField = app.descendants(matching: .any).matching(identifier: "TransactionEditor.note").firstMatch
