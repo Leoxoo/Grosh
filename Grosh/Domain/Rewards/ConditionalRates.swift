@@ -38,8 +38,9 @@ nonisolated struct ChoiceRate: Identifiable, Hashable, Sendable {
     let options: [RewardCategory]
     /// Your choice: what the user picked, empty while not set.
     let chosen: [RewardCategory]
-    /// For a top-spend rate, the option the Card was used most for in its current period, if any.
-    let topSpend: RewardCategory?
+    /// For a top-spend rate, the options the Card was used most for in its current period, as many as its picks, most
+    /// first; none before anything was spent.
+    let topSpend: [RewardCategory]
     let rate: CardRate
 
     var id: String { key }
@@ -47,7 +48,7 @@ nonisolated struct ChoiceRate: Identifiable, Hashable, Sendable {
     /// The Reward categories it earns on: Your choice, or for a top-spend rate with none, the top-spend category.
     var earnedOn: [RewardCategory] {
         if !chosen.isEmpty { return chosen }
-        return isTopSpend ? topSpend.map { [$0] } ?? [] : []
+        return isTopSpend ? topSpend : []
     }
 
     /// Your choice once the user picks `option`: it alone for a rate with one pick; otherwise added, or taken away when
@@ -244,12 +245,14 @@ nonisolated extension CardRewards {
             let options = listed.filter { rule.categories.contains($0.id) }
             let chosen = options.filter { (yourChoices[rule.choiceKey] ?? []).contains($0.id) }
             let isTopSpend = rule.selection == "top-spend"
+            let picks = max(1, rule.picks ?? 1)
             let top = isTopSpend
-                ? options.filter { (spending[$0.id] ?? 0) > 0 }.max { (spending[$0.id] ?? 0) < (spending[$1.id] ?? 0) }
-                : nil
+                ? Array(options.filter { (spending[$0.id] ?? 0) > 0 }
+                    .sorted { (spending[$0.id] ?? 0) > (spending[$1.id] ?? 0) }.prefix(picks))
+                : []
             return ChoiceRate(
-                key: rule.choiceKey, isTopSpend: isTopSpend, picks: max(1, rule.picks ?? 1), options: options,
-                chosen: chosen, topSpend: top, rate: rate(of: rule, on: chosen.first ?? top ?? .everythingElse)
+                key: rule.choiceKey, isTopSpend: isTopSpend, picks: picks, options: options,
+                chosen: chosen, topSpend: top, rate: rate(of: rule, on: chosen.first ?? top.first ?? .everythingElse)
             )
         }
     }

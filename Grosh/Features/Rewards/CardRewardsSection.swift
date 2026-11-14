@@ -272,10 +272,12 @@ private struct ChoiceRow: View {
             if !choice.chosen.isEmpty {
                 Text(Strings.Rewards.yourChoiceIs(rate, choice.chosen.map(\.name).formatted(.list(type: .and))))
             } else if choice.isTopSpend {
-                if let top = choice.topSpend {
-                    Text(Strings.Rewards.topCategory(rate, top.name))
-                } else {
-                    Text(Strings.Rewards.topCategoryNone(rate))
+                let top = choice.topSpend.map(\.name).formatted(.list(type: .and))
+                switch (choice.picks, choice.topSpend.isEmpty) {
+                case (1, false): Text(Strings.Rewards.topCategory(rate, top))
+                case (1, true): Text(Strings.Rewards.topCategoryNone(rate))
+                case (_, false): Text(Strings.Rewards.topCategories(rate, choice.picks, top))
+                case (_, true): Text(Strings.Rewards.topCategoriesNone(rate, choice.picks))
                 }
             } else {
                 Text(Strings.Rewards.yourChoiceNotSet(rate))
@@ -342,13 +344,23 @@ private struct YourChoiceView: View {
         List {
             Section {
                 if choice.isTopSpend {
-                    row(String(localized: Strings.Rewards.topCategoryAutomatic), isChosen: choice.chosen.isEmpty) { set([]) }
+                    row(
+                        String(localized: choice.picks == 1
+                            ? Strings.Rewards.topCategoryAutomatic : Strings.Rewards.topCategoriesAutomatic(choice.picks)),
+                        isChosen: choice.chosen.isEmpty
+                    ) { set([]) }
                 }
                 ForEach(choice.options) { option in
                     row(option.name, isChosen: choice.chosen.contains(option)) { set(choice.choosing(option)) }
                 }
             } footer: {
-                Text(choice.isTopSpend ? Strings.Rewards.topCategoryFooter : Strings.Rewards.yourChoiceFooter(choice.picks))
+                if !choice.isTopSpend {
+                    Text(Strings.Rewards.yourChoiceFooter(choice.picks))
+                } else if choice.picks == 1 {
+                    Text(Strings.Rewards.topCategoryFooter)
+                } else {
+                    Text(Strings.Rewards.topCategoriesFooter(choice.picks))
+                }
             }
             if let cap = choice.rate.cap.flatMap({ CardRateText.cap($0, currencyCode: $0.currencyCode ?? "USD") }) {
                 Section {

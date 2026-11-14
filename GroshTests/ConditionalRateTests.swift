@@ -166,8 +166,23 @@ struct ConditionalRateTests {
         #expect(earning(card, catalog, "groceries", spending: spending)?.effectiveRate == 1)
         let choice = try #require(CardRewards(of: card, in: catalog).page(on: TestStore.today, spending: spending).choices.first)
         #expect(choice.isTopSpend)
-        #expect(choice.topSpend?.id == "dining")
+        #expect(choice.topSpend.map(\.id) == ["dining"])
         #expect(earning(card, catalog, "dining")?.effectiveRate == 1)
+    }
+
+    @Test func aTopSpendRateWithTwoPicksEarnsOnTheTwoCategoriesUsedMost() throws {
+        var rule = Fixture.rule(["dining", "groceries", "gas", "transit"], 5, selection: "top-spend")
+        rule["picks"] = 2
+        let (card, catalog) = try linked(Fixture.card("test-top2", "Top 2", issuer: "Test Bank", kind: "cashback", rules: [
+            Fixture.rule(["everything-else"], 1), rule,
+        ]))
+        let spending = ["gas": 80_00, "transit": 60_00, "dining": 20_00]
+        #expect(earning(card, catalog, "gas", spending: spending)?.effectiveRate == 5)
+        #expect(earning(card, catalog, "transit", spending: spending)?.effectiveRate == 5)
+        #expect(earning(card, catalog, "dining", spending: spending)?.effectiveRate == 1)
+        let choice = try #require(CardRewards(of: card, in: catalog).page(on: TestStore.today, spending: spending).choices.first)
+        #expect(choice.picks == 2)
+        #expect(choice.topSpend.map(\.id) == ["gas", "transit"])
     }
 
     @Test func yourChoiceTakesTheTopSpendCategorysPlace() throws {
