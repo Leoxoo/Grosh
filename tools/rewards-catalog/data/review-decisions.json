@@ -156,6 +156,45 @@
       "rule": "1x on everything else"
     }
   },
+  "american-express-business-platinum": {
+    "9dfa5de5265b478c": {
+      "added": {
+        "capAmount": null,
+        "capPeriod": null,
+        "capUnknown": false,
+        "categories": [
+          "hotels"
+        ],
+        "conditions": [],
+        "evidence": {
+          "pageHash": "9f06ca6bd548b355280a5aa1703ae41ce3d2d2c3e4a1ddbe4ec151a274a5d00d",
+          "quote": "You can also get 5X Membership Rewards® points on all flights booked on AmexTravel.com.‡",
+          "url": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-business-platinum-credit-card-amex/"
+        },
+        "firstMonths": null,
+        "hasOtherChoices": false,
+        "merchants": [],
+        "needs": [],
+        "paysWith": null,
+        "picks": null,
+        "rate": 5,
+        "requires": [
+          "issuer-booking"
+        ],
+        "selection": "fixed",
+        "tier": null,
+        "unit": "per-dollar",
+        "validFrom": null,
+        "validTo": null,
+        "verified": "override"
+      },
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "overrides": "quote doesn't mention hotels",
+      "quote": "You can also get 5X Membership Rewards® points on all flights booked on AmexTravel.com.‡",
+      "rule": "5x on hotels"
+    }
+  },
   "american-express-delta-skymiles-blue": {
     "297d5a50d4255e98": {
       "decidedAt": "2026-11-14",
