@@ -752,12 +752,7 @@ nonisolated enum Strings {
         static let elsewhereFooter: LocalizedStringResource = "Recorded as money in that wallet, on the day you received it, linked to the expense. The expense shows its net in the Total."
         static let editorFooter: LocalizedStringResource = "Kept on the expense, which then counts what is left of it. No transaction is made."
         static let couldntSave: LocalizedStringResource = "Couldn't Save Reimbursement"
-        static let noTransactionsToMoveIn: LocalizedStringResource = "No Transactions to Move In"
-        static let noTransactionsToMoveInDescription: LocalizedStringResource = "Money that came into this wallet, such as a deposit, appears here."
-        static let moveTransactionIn: LocalizedStringResource = "Move Transaction In"
-        static let couldntMoveIn: LocalizedStringResource = "Couldn't Move Transaction In"
         static let someonePaidMeBack: LocalizedStringResource = "Someone paid me back"
-        static let moveExistingIn: LocalizedStringResource = "Move an existing transaction in"
         static let sectionFooter: LocalizedStringResource = "Money paid back into this wallet is kept on this expense, and its net, what is left of it, counts in your balance and reports. Money paid back into another wallet is a transaction there."
         static let couldntDelete: LocalizedStringResource = "Couldn't Delete Reimbursement"
     }
