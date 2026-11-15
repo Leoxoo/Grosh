@@ -135,7 +135,7 @@ nonisolated struct CatalogRule: Codable, Hashable, Sendable {
     }
 }
 
-extension CatalogRule {
+nonisolated extension CatalogRule {
     /// The pipeline leaves out a field that is null, false or empty (`publish.published_rule`), so each reads as that
     /// when missing. `categories`, `selection`, `rate`, `unit` and `evidence` are always there.
     init(from decoder: any Decoder) throws {
