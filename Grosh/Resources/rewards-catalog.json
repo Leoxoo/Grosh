@@ -358,6 +358,89 @@
       "verifiedAt": "2026-11-14"
     },
     {
+      "annualFee": 695,
+      "baseEarnRate": 1,
+      "bonusesStack": false,
+      "cardConditions": [],
+      "discontinued": false,
+      "id": "american-express-business-platinum",
+      "isBusiness": true,
+      "issuer": "American Express",
+      "name": "Business Platinum",
+      "network": "American Express",
+      "rewardKind": "points",
+      "rewardProgram": "AMERICAN_EXPRESS",
+      "rules": [
+        {
+          "capUnknown": true,
+          "categories": [
+            "everything-else"
+          ],
+          "conditions": [
+            "Purchases eligible for multiple additional point bonuses will only receive the highest eligible bonus."
+          ],
+          "evidence": {
+            "quote": "Earn 2X points on eligible purchases in key business categories, or on purchases of $5K or more.",
+            "url": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-business-platinum-credit-card-amex/"
+          },
+          "rate": 2,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "airlines"
+          ],
+          "evidence": {
+            "quote": "You can also get 5X Membership Rewards® points on all flights booked on AmexTravel.com.‡",
+            "url": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-business-platinum-credit-card-amex/"
+          },
+          "rate": 5,
+          "requires": [
+            "issuer-booking"
+          ],
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "everything-else"
+          ],
+          "evidence": {
+            "quote": "1X POINTS On Other Eligible Purchases",
+            "url": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-business-platinum-credit-card-amex/"
+          },
+          "rate": 1,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "hotels"
+          ],
+          "conditions": [
+            "Gift cards are not an eligible purchase.",
+            "Hilton for Business program membership is required."
+          ],
+          "evidence": {
+            "quote": "Earn 5X Membership Rewards® points on flights and prepaid hotels booked on AmexTravel.com.‡",
+            "url": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-business-platinum-credit-card-amex/"
+          },
+          "merchants": [
+            "Hilton"
+          ],
+          "rate": 5,
+          "requires": [
+            "issuer-booking"
+          ],
+          "selection": "fixed",
+          "unit": "per-dollar"
+        }
+      ],
+      "sourceUrl": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-business-platinum-credit-card-amex/",
+      "verifiedAt": "2026-11-15"
+    },
+    {
       "annualFee": 0,
       "baseEarnRate": 1,
       "bonusesStack": false,
@@ -411,6 +494,484 @@
       ],
       "sourceUrl": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-blue-american-express-card/",
       "verifiedAt": "2026-11-14"
+    },
+    {
+      "annualFee": 150,
+      "baseEarnRate": 1,
+      "bonusesStack": false,
+      "cardConditions": [],
+      "discontinued": false,
+      "id": "american-express-delta-skymiles-gold",
+      "isBusiness": false,
+      "issuer": "American Express",
+      "name": "Delta SkyMiles Gold",
+      "network": "American Express",
+      "rewardKind": "miles",
+      "rewardProgram": "DELTA",
+      "rules": [
+        {
+          "categories": [
+            "dining"
+          ],
+          "evidence": {
+            "quote": "2X\nMILES\nOn Dining\nAt restaurants, including takeout and delivery in the U.S.‡",
+            "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-gold-american-express-card/"
+          },
+          "rate": 2,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "everything-else"
+          ],
+          "evidence": {
+            "quote": "1X MILES Per Dollar On Other Purchases.‡",
+            "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-gold-american-express-card/"
+          },
+          "rate": 1,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "groceries"
+          ],
+          "evidence": {
+            "quote": "2X\nMILES\nOn Groceries\nAt U.S. supermarkets.‡",
+            "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-gold-american-express-card/"
+          },
+          "rate": 2,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [],
+          "evidence": {
+            "quote": "2X\nMILES\nOn Delta Purchases\nMade directly with Delta.‡",
+            "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-gold-american-express-card/"
+          },
+          "merchants": [
+            "Delta"
+          ],
+          "rate": 2,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        }
+      ],
+      "sourceUrl": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-gold-american-express-card/",
+      "verifiedAt": "2026-11-15"
+    },
+    {
+      "annualFee": 150,
+      "baseEarnRate": 1,
+      "bonusesStack": false,
+      "cardConditions": [],
+      "discontinued": false,
+      "id": "american-express-delta-skymiles-gold-business",
+      "isBusiness": true,
+      "issuer": "American Express",
+      "name": "Delta SkyMiles Gold Business",
+      "network": "American Express",
+      "rewardKind": "miles",
+      "rewardProgram": "DELTA",
+      "rules": [
+        {
+          "capUnknown": true,
+          "categories": [],
+          "conditions": [
+            "2X miles per dollar spent on purchases at U.S. Shipping providers on up to $50,000 of eligible purchases per year",
+            "2X miles per dollar spent on purchases at U.S. providers for Advertising in select media on up to $50,000 of eligible purchases per year"
+          ],
+          "evidence": {
+            "quote": "2X\nMILES\nOn Eligible U.S. Purchases\nat U.S. shipping providers & at U.S. providers for advertising in select media. Miles caps apply.‡",
+            "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-gold/"
+          },
+          "merchants": [
+            "U.S. providers for advertising in select media",
+            "U.S. shipping providers"
+          ],
+          "rate": 2,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "dining"
+          ],
+          "evidence": {
+            "quote": "2X MILES At Restaurants\nWhen you use your Delta SkyMiles® Gold Business Card.‡",
+            "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-gold/"
+          },
+          "rate": 2,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "everything-else"
+          ],
+          "evidence": {
+            "quote": "1X\nMILES\nOn Other Purchases\nMade using the Delta SkyMiles® Gold Business Card.‡",
+            "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-gold/"
+          },
+          "rate": 1,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [],
+          "evidence": {
+            "quote": "2X\nMILES\nAt Delta\nPer every eligible dollar spent on purchases made directly with Delta.‡",
+            "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-gold/"
+          },
+          "merchants": [
+            "Delta"
+          ],
+          "rate": 2,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        }
+      ],
+      "sourceUrl": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-gold/",
+      "verifiedAt": "2026-11-15"
+    },
+    {
+      "annualFee": 350,
+      "baseEarnRate": 1,
+      "bonusesStack": false,
+      "cardConditions": [],
+      "discontinued": false,
+      "id": "american-express-delta-skymiles-platinum",
+      "isBusiness": false,
+      "issuer": "American Express",
+      "name": "Delta SkyMiles Platinum",
+      "network": "American Express",
+      "rewardKind": "miles",
+      "rewardProgram": "DELTA",
+      "rules": [
+        {
+          "categories": [
+            "dining"
+          ],
+          "evidence": {
+            "quote": "2X MILES At restaurants, including takeout and delivery in the U.S.‡",
+            "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-platinum-american-express-card/"
+          },
+          "rate": 2,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "everything-else"
+          ],
+          "evidence": {
+            "quote": "1X MILES Per Dollar On Other Purchases.‡",
+            "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-platinum-american-express-card/"
+          },
+          "rate": 1,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "groceries"
+          ],
+          "evidence": {
+            "quote": "2X\nMILES\nOn Groceries\nAt U.S. supermarkets.‡",
+            "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-platinum-american-express-card/"
+          },
+          "rate": 2,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "hotels"
+          ],
+          "evidence": {
+            "quote": "3X\nMILES\nAt Hotels\nPurchases made directly with hotels.‡",
+            "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-platinum-american-express-card/"
+          },
+          "rate": 3,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [],
+          "evidence": {
+            "quote": "When you earn 3X Miles on Delta flights and Delta Vacations®, one trip can lead you to the next.‡",
+            "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-platinum-american-express-card/"
+          },
+          "merchants": [
+            "Delta"
+          ],
+          "rate": 3,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        }
+      ],
+      "sourceUrl": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-platinum-american-express-card/",
+      "verifiedAt": "2026-11-15"
+    },
+    {
+      "annualFee": 350,
+      "baseEarnRate": 1,
+      "bonusesStack": false,
+      "cardConditions": [],
+      "discontinued": false,
+      "id": "american-express-delta-skymiles-platinum-business",
+      "isBusiness": true,
+      "issuer": "American Express",
+      "name": "Delta SkyMiles Platinum Business",
+      "network": "American Express",
+      "rewardKind": "miles",
+      "rewardProgram": "DELTA",
+      "rules": [
+        {
+          "categories": [
+            "everything-else"
+          ],
+          "evidence": {
+            "quote": "1X\nMILES\nOn Other Purchases\nMade using the Delta SkyMiles® Platinum Business Card.‡",
+            "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-platinum/"
+          },
+          "rate": 1,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "hotels"
+          ],
+          "evidence": {
+            "quote": "3X\nMILES\nAt Delta & Hotels\nPer every eligible dollar spent on purchases made directly with Delta and hotels.‡",
+            "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-platinum/"
+          },
+          "merchants": [
+            "Delta"
+          ],
+          "rate": 3,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "transit"
+          ],
+          "evidence": {
+            "quote": "On Eligible Transit, U.S. Shipping, & or Large Purchases\nEarn on transit including taxicabs, rideshares, and more, at U.S. shipping providers, and or on single eligible purchases of $5K or more, up to $100K of combined eligible purchases per year.\n\n1If your purchase qualifies for a category that has a higher mileage accelerator, only the higher accelerator will apply.‡",
+            "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-platinum/"
+          },
+          "rate": 1.5,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        }
+      ],
+      "sourceUrl": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-platinum/",
+      "verifiedAt": "2026-11-15"
+    },
+    {
+      "annualFee": 650,
+      "baseEarnRate": 1,
+      "bonusesStack": false,
+      "cardConditions": [],
+      "discontinued": false,
+      "id": "american-express-delta-skymiles-reserve",
+      "isBusiness": false,
+      "issuer": "American Express",
+      "name": "Delta SkyMiles Reserve",
+      "network": "American Express",
+      "rewardKind": "miles",
+      "rewardProgram": "DELTA",
+      "rules": [
+        {
+          "categories": [
+            "everything-else"
+          ],
+          "evidence": {
+            "quote": "Earn 1 mile per dollar for all other eligible purchases you make with your Card",
+            "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-reserve-american-express-card/"
+          },
+          "rate": 1,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [],
+          "evidence": {
+            "quote": "Earn 3X Miles on Delta flights and Delta Vacations®",
+            "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-reserve-american-express-card/"
+          },
+          "merchants": [
+            "Delta"
+          ],
+          "rate": 3,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        }
+      ],
+      "sourceUrl": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-reserve-american-express-card/",
+      "verifiedAt": "2026-11-15"
+    },
+    {
+      "annualFee": 550,
+      "baseEarnRate": 1,
+      "bonusesStack": false,
+      "cardConditions": [],
+      "discontinued": false,
+      "id": "american-express-delta-skymiles-reserve-business",
+      "isBusiness": true,
+      "issuer": "American Express",
+      "name": "Delta SkyMiles Reserve Business",
+      "network": "American Express",
+      "rewardKind": "miles",
+      "rewardProgram": "DELTA",
+      "rules": [
+        {
+          "categories": [
+            "everything-else"
+          ],
+          "evidence": {
+            "quote": "1X\nMILES\nOn Other Purchases\nMade using the Delta SkyMiles® Reserve Business Card.‡",
+            "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-reserve/"
+          },
+          "rate": 1,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "transit"
+          ],
+          "evidence": {
+            "quote": "1.5X MILES Per Dollar On eligible transit, U.S. shipping & U.S. office supply store purchases.‡",
+            "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-reserve/"
+          },
+          "rate": 1.5,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [],
+          "evidence": {
+            "quote": "3X\nMILES\nAt Delta\nPer every eligible dollar spent on purchases made directly with Delta.‡",
+            "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-reserve/"
+          },
+          "merchants": [
+            "Delta"
+          ],
+          "rate": 3,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        }
+      ],
+      "sourceUrl": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-reserve/",
+      "verifiedAt": "2026-11-15"
+    },
+    {
+      "annualFee": 350,
+      "baseEarnRate": 1,
+      "bonusesStack": false,
+      "cardConditions": [],
+      "discontinued": false,
+      "id": "american-express-gold",
+      "isBusiness": false,
+      "issuer": "American Express",
+      "name": "Gold",
+      "network": "American Express",
+      "rewardKind": "points",
+      "rewardProgram": "AMERICAN_EXPRESS",
+      "rules": [
+        {
+          "capAmount": 25000,
+          "capPeriod": "year",
+          "categories": [
+            "groceries"
+          ],
+          "evidence": {
+            "quote": "4X Membership Rewards® points per dollar spent at US supermarkets, on up to $25,000 in purchases per calendar year, then 1X points for the rest of the year.‡",
+            "url": "https://www.americanexpress.com/us/credit-cards/card/gold-card/"
+          },
+          "rate": 4,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "capAmount": 50000,
+          "capPeriod": "year",
+          "categories": [
+            "dining"
+          ],
+          "evidence": {
+            "quote": "4X Membership Rewards® points per dollar spent on purchases at restaurants worldwide, on up to $50,000 in purchases per calendar year, then 1X points for the rest of the year.‡",
+            "url": "https://www.americanexpress.com/us/credit-cards/card/gold-card/"
+          },
+          "rate": 4,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "airlines"
+          ],
+          "evidence": {
+            "quote": "3X Membership Rewards® points per dollar spent on flights booked through AmexTravel.com or the Amex Travel App™ or purchased directly from airlines.‡",
+            "url": "https://www.americanexpress.com/us/credit-cards/card/gold-card/"
+          },
+          "rate": 3,
+          "requires": [
+            "issuer-booking"
+          ],
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "car-rentals"
+          ],
+          "evidence": {
+            "quote": "2X Membership Rewards® points per dollar spent on prepaid car rentals booked through AmexTravel.com or the Amex Travel App™ and cruises booked and paid through AmexTravel.com.‡",
+            "url": "https://www.americanexpress.com/us/credit-cards/card/gold-card/"
+          },
+          "rate": 2,
+          "requires": [
+            "issuer-booking"
+          ],
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "everything-else"
+          ],
+          "evidence": {
+            "quote": "1X Membership Rewards® point per dollar spent on all other eligible purchases.‡",
+            "url": "https://www.americanexpress.com/us/credit-cards/card/gold-card/"
+          },
+          "rate": 1,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "hotels"
+          ],
+          "evidence": {
+            "quote": "5X Membership Rewards® points per dollar spent on prepaid hotels booked through AmexTravel.com or the Amex Travel App™. ‡",
+            "url": "https://www.americanexpress.com/us/credit-cards/card/gold-card/"
+          },
+          "rate": 5,
+          "requires": [
+            "issuer-booking"
+          ],
+          "selection": "fixed",
+          "unit": "per-dollar"
+        }
+      ],
+      "sourceUrl": "https://www.americanexpress.com/us/credit-cards/card/gold-card/",
+      "verifiedAt": "2026-11-15"
     },
     {
       "annualFee": 0,
@@ -482,7 +1043,7 @@
         }
       ],
       "sourceUrl": "https://www.bankofamerica.com/credit-cards/products/cash-back-credit-card/cash-back-category-choices/",
-      "verifiedAt": "2026-11-14"
+      "verifiedAt": "2026-11-15"
     },
     {
       "annualFee": 0,
@@ -659,7 +1220,7 @@
         }
       ],
       "sourceUrl": "https://www.citi.com/usc/Multi/Featured/default.htm",
-      "verifiedAt": "2026-11-14"
+      "verifiedAt": "2026-11-15"
     },
     {
       "annualFee": 0,
@@ -733,16 +1294,6 @@
             "everything-else"
           ],
           "evidence": {
-            "quote": "When you use the card, you’ll get 1% Daily Cash back on every purchase.",
-            "url": "https://www.apple.com/apple-card/"
-          },
-          "rate": 1,
-          "selection": "fixed",
-          "unit": "percent"
-        },
-        {
-          "categories": [],
-          "evidence": {
             "quote": "Get 2% Daily Cash back when you use Apple Card with Apple Pay.",
             "url": "https://www.apple.com/apple-card/"
           },
@@ -750,12 +1301,184 @@
           "rate": 2,
           "selection": "fixed",
           "unit": "percent"
+        },
+        {
+          "categories": [
+            "everything-else"
+          ],
+          "evidence": {
+            "quote": "When you use the card, you’ll get 1% Daily Cash back on every purchase.",
+            "url": "https://www.apple.com/apple-card/"
+          },
+          "rate": 1,
+          "selection": "fixed",
+          "unit": "percent"
         }
       ],
       "sourceUrl": "https://www.apple.com/apple-card/",
-      "verifiedAt": "2026-11-14"
+      "verifiedAt": "2026-11-15"
+    },
+    {
+      "annualFee": 0,
+      "baseEarnRate": 1,
+      "bonusesStack": false,
+      "cardConditions": [
+        "However, purchases at restaurants located within another establishment (e.g., hotel, casino, commissary, grocery store, event venue), and purchases for gas at superstores, supermarkets, and warehouse clubs, may earn 1 point per $1 spent because they typically are not assigned codes identifying them as restaurant or gas purchases.",
+        "Merchants are assigned codes by payment networks based on what they primarily sell. We rely on this information to identify gas, transit, restaurant, food delivery, and supermarket purchases. If the purchase is not identified as a gas, transit, restaurant, food delivery, or supermarket purchase, it will not receive additional points."
+      ],
+      "discontinued": false,
+      "id": "navy-federal-more-rewards",
+      "isBusiness": false,
+      "issuer": "Navy Federal",
+      "name": "More Rewards",
+      "network": "American Express",
+      "rewardKind": "points",
+      "rewardProgram": "NAVY_FEDERAL",
+      "rules": [
+        {
+          "categories": [
+            "dining"
+          ],
+          "conditions": [
+            "However, purchases at restaurants located within another establishment (e.g., hotel, casino, commissary, grocery store, event venue), and purchases for gas at superstores, supermarkets, and warehouse clubs, may earn 1 point per $1 spent because they typically are not assigned codes identifying them as restaurant or gas purchases."
+          ],
+          "evidence": {
+            "quote": "3X points at restaurants and on food delivery",
+            "url": "https://www.navyfederal.org/loans-cards/credit-cards/more-rewards.html"
+          },
+          "rate": 3,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "everything-else"
+          ],
+          "evidence": {
+            "quote": "1X points on everything else",
+            "url": "https://www.navyfederal.org/loans-cards/credit-cards/more-rewards.html"
+          },
+          "rate": 1,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "gas"
+          ],
+          "conditions": [
+            "However, purchases at restaurants located within another establishment (e.g., hotel, casino, commissary, grocery store, event venue), and purchases for gas at superstores, supermarkets, and warehouse clubs, may earn 1 point per $1 spent because they typically are not assigned codes identifying them as restaurant or gas purchases."
+          ],
+          "evidence": {
+            "quote": "3X points on gas and transit",
+            "url": "https://www.navyfederal.org/loans-cards/credit-cards/more-rewards.html"
+          },
+          "rate": 3,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "groceries"
+          ],
+          "evidence": {
+            "quote": "3X points at supermarkets",
+            "url": "https://www.navyfederal.org/loans-cards/credit-cards/more-rewards.html"
+          },
+          "rate": 3,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        },
+        {
+          "categories": [
+            "transit"
+          ],
+          "evidence": {
+            "quote": "3X points on gas and transit",
+            "url": "https://www.navyfederal.org/loans-cards/credit-cards/more-rewards.html"
+          },
+          "rate": 3,
+          "selection": "fixed",
+          "unit": "per-dollar"
+        }
+      ],
+      "sourceUrl": "https://www.navyfederal.org/loans-cards/credit-cards/more-rewards.html",
+      "verifiedAt": "2026-11-15"
+    },
+    {
+      "annualFee": 0,
+      "baseEarnRate": 1.5,
+      "bonusesStack": false,
+      "cardConditions": [],
+      "discontinued": false,
+      "id": "synchrony-paypal-cashback",
+      "isBusiness": false,
+      "issuer": "Synchrony",
+      "name": "PayPal Cashback",
+      "network": "Mastercard",
+      "rewardKind": "cashback",
+      "rewardProgram": null,
+      "rules": [
+        {
+          "categories": [
+            "everything-else"
+          ],
+          "evidence": {
+            "quote": "1.5%\ncash back on all other purchases everywhere Mastercard is accepted.",
+            "url": "https://www.paypal.com/us/digital-wallet/manage-money/paypal-cashback-mastercard"
+          },
+          "rate": 1.5,
+          "selection": "fixed",
+          "unit": "percent"
+        },
+        {
+          "categories": [
+            "everything-else"
+          ],
+          "evidence": {
+            "quote": "3%\ncash back when you check out with PayPal.",
+            "url": "https://www.paypal.com/us/digital-wallet/manage-money/paypal-cashback-mastercard"
+          },
+          "paysWith": "PayPal",
+          "rate": 3,
+          "selection": "fixed",
+          "unit": "percent"
+        }
+      ],
+      "sourceUrl": "https://www.paypal.com/us/digital-wallet/manage-money/paypal-cashback-mastercard",
+      "verifiedAt": "2026-11-15"
+    },
+    {
+      "annualFee": 0,
+      "baseEarnRate": 2,
+      "bonusesStack": false,
+      "cardConditions": [],
+      "discontinued": false,
+      "id": "wells-fargo-active-cash",
+      "isBusiness": false,
+      "issuer": "Wells Fargo",
+      "name": "Active Cash",
+      "network": "Visa",
+      "rewardKind": "cashback",
+      "rewardProgram": null,
+      "rules": [
+        {
+          "categories": [
+            "everything-else"
+          ],
+          "evidence": {
+            "quote": "Plus, enjoy unlimited 2% cash rewards on purchases.",
+            "url": "https://creditcards.wellsfargo.com/active-cash-credit-card/"
+          },
+          "rate": 2,
+          "selection": "fixed",
+          "unit": "percent"
+        }
+      ],
+      "sourceUrl": "https://creditcards.wellsfargo.com/active-cash-credit-card/",
+      "verifiedAt": "2026-11-15"
     }
   ],
   "formatVersion": 1,
-  "publishedAt": "2026-11-14"
+  "publishedAt": "2026-11-15"
 }
