@@ -4,8 +4,8 @@
     python3 tools/rewards-catalog/pipeline/publish.py
 
 reads catalog-seed.json (the cards), cache/candidates/ (each card's rules), review-decisions.json (what
-a person accepted) and card-options.json (whether a card's bonuses add up), and writes rewards-catalog.json
-beside this script, and a copy to Grosh/Resources/rewards-catalog.json, the file the app bundles.
+a person accepted) and card-options.json (whether a card's bonuses add up), and writes
+Grosh/Resources/rewards-catalog.json, the one file the app bundles and the only copy of the catalog.
 """
 
 import json
@@ -19,9 +19,8 @@ import extract  # noqa: E402
 import fetch  # noqa: E402
 import review  # noqa: E402
 
-OUT = fetch.DATA / "rewards-catalog.json"
-# The file the app bundles (RewardsCatalog.bundled): a copy of OUT, which nothing else keeps current, so publish writes both.
-APP_FILE = Path(__file__).resolve().parents[3] / "Grosh" / "Resources" / "rewards-catalog.json"
+# The file the app bundles (RewardsCatalog.bundled), and the pipeline's own catalog: there is no second copy to keep current.
+OUT = Path(__file__).resolve().parents[3] / "Grosh" / "Resources" / "rewards-catalog.json"
 SEED = fetch.SEED
 # Raised when the file's shape changes in a way an older app can't read (a field renamed or retyped).
 # Adding a field doesn't need it: the app's reader ignores fields it doesn't know.
@@ -70,7 +69,8 @@ def catalog(cards: list[dict], candidates: dict[str, dict], decisions: dict, pre
     rules, and its options (review.CARD_OPTIONS, off unless `options` turns them on). `previous` is the catalog published last time, or None.
 
     A failed run never deletes a published card. A card with no candidate (cache/ isn't committed, so a fresh clone has
-    none) keeps its last published entry. So does a card whose candidate would lose a published rule that no person
+    none) keeps its last published entry, even when a person has added a rule since: that rule waits for a candidate to publish
+    beside the rest. So does a card whose candidate would lose a published rule that no person
     rejected and no new accepted rule replaces (`lost_rules`): the page redirected up to a listing ("wrong-page"), the
     fetch or extraction "failed", or the model reworded a quote, which makes the rule a new one that waits for review.
     Each such card is added to `kept` as
@@ -79,18 +79,13 @@ def catalog(cards: list[dict], candidates: dict[str, dict], decisions: dict, pre
     before = {card["id"]: card for card in (previous or {}).get("cards", [])}
     published = []
     for card in sorted(cards, key=lambda c: c["id"]):
-        candidate = candidates.get(card["id"])
-        added = any("added" in entry for entry in decisions.get(card["id"], {}).values())
-        if candidate is None and card["id"] in before and not added:
-            published.append(before[card["id"]])
-            continue
-        shown = candidate or review.empty_candidate(card["id"])
+        shown = candidates.get(card["id"]) or review.empty_candidate(card["id"])
         entries = review.accepted_entries(shown, decisions)
-        lost = lost_rules(before[card["id"]], shown, entries, decisions) if candidate and card["id"] in before else []
+        lost = lost_rules(before[card["id"]], shown, entries, decisions) if card["id"] in before else []
         if lost:
             published.append(before[card["id"]])
-            if kept is not None:
-                kept.append({"id": card["id"], "status": candidate.get("status"), "lost": lost})
+            if kept is not None and card["id"] in candidates:  # no candidate is the usual state of a fresh clone: nothing to report
+                kept.append({"id": card["id"], "status": shown.get("status"), "lost": lost})
             continue
         if not entries:  # nobody has checked this card, so its seed facts aren't ours to ship
             continue
@@ -108,8 +103,7 @@ def catalog(cards: list[dict], candidates: dict[str, dict], decisions: dict, pre
 
 # Where publish reads and writes: the seed, the candidates, the decisions, the card options and the catalog. ui.Paths has the same
 # fields, for the web page's own (test) folders.
-PATHS = SimpleNamespace(seed=SEED, candidates=extract.CANDIDATES, decisions=review.DECISIONS, options=review.OPTIONS, catalog=OUT,
-                  app_copy=APP_FILE)
+PATHS = SimpleNamespace(seed=SEED, candidates=extract.CANDIDATES, decisions=review.DECISIONS, options=review.OPTIONS, catalog=OUT)
 
 
 def publish(paths=PATHS, today: str = "", kept: list | None = None) -> dict:
@@ -120,8 +114,6 @@ def publish(paths=PATHS, today: str = "", kept: list | None = None) -> dict:
     document = catalog(cards, found, review.load_decisions(paths.decisions), fetch.read_json(paths.catalog, None),
                        today or date.today().isoformat(), review.load_options(paths.options), kept)
     fetch.write_json(paths.catalog, document)
-    if getattr(paths, "app_copy", None):  # the app bundles this copy: without it a published catalog never reaches a build
-        fetch.write_json(paths.app_copy, document)
     return document
 
 

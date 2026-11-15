@@ -190,6 +190,15 @@ class CatalogTests(unittest.TestCase):
                               decided(cand, (0, "accept", "2026-11-01"), (1, "reject", "2026-12-01")), first, "2026-12-01", kept=kept)
         self.assertEqual((kept, [r["categories"] for r in doc["cards"][0]["rules"]]), ([], [["dining"]]))
 
+    def test_a_card_with_no_candidate_keeps_its_old_entry_even_when_a_person_added_a_rule_since(self):
+        first, decisions = self.published_first()
+        extra = rule(categories=["gas"], quote="3% on gas.")
+        added = {"bank-savor": {**decisions["bank-savor"], review.rule_key("bank-savor", extra): {
+            "decision": "accept", "decidedAt": "2026-12-01", "added": extra}}}
+        kept = []
+        self.assertEqual(publish.catalog([SAVOR], {}, added, first, "2026-12-01", kept=kept), first)  # no cache/: the extracted rules aren't here to publish beside it
+        self.assertEqual(kept, [])  # a fresh clone has no candidates, and saying so for every card would only be noise
+
     def test_a_card_never_published_is_not_held_back_by_a_failed_candidate(self):
         kept = []
         self.assertEqual(publish.catalog([SAVOR], {"bank-savor": dict(candidate(), status="failed")}, {}, None, "2026-12-01", kept=kept)["cards"], [])

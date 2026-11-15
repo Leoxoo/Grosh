@@ -23,7 +23,7 @@ import re
 import sys
 from urllib.parse import urlparse
 
-from fetch import INPUTS, SEED as OUT
+from fetch import INPUTS, SEED as OUT, write_json
 
 # Hand-fixed issuer pages, {card id: url}, for cards whose CardPin url has moved. Kept apart
 # from the seed so that rebuilding the seed from a fresh CSV doesn't undo the fixes.
@@ -210,7 +210,7 @@ def main() -> None:
         "seededFrom": "CardPin raw_import.csv (MIT)",
         "cards": catalog,
     }
-    OUT.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    write_json(OUT, document)  # the writer the review page saves the seed with too, so a rerun gives an empty diff
     print(f"Wrote {len(catalog)} cards to {OUT}")
 
 

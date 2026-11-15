@@ -78,6 +78,13 @@ class BuildTests(unittest.TestCase):
         self.assertEqual({c["id"]: c["needsInfo"] for c in seed if c.get("needsInfo")}, marks)
         self.assertLessEqual({"barclays-carnival-world-mastercard", "american-express-green"}, set(marks))
 
+    def test_the_committed_seed_is_what_the_one_writer_writes_so_saving_it_changes_nothing(self):
+        import fetch
+        text = build_seed.OUT.read_text(encoding="utf-8")
+        document = json.loads(text)
+        self.assertEqual(fetch.json_text(document), text)  # the review page saves through fetch.write_json, as build_seed does
+        self.assertEqual(document["seededFrom"], "CardPin raw_import.csv (MIT)")
+
 
 if __name__ == "__main__":
     unittest.main()

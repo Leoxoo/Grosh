@@ -15,7 +15,7 @@ The app ships a **rewards catalog**: for each known card, its fee, its flat earn
 ```
 pipeline/   the code: build_seed, fetch, extract, quarters, review, publish, and the page (ui.py, ui.html)
 inputs/     what a person writes by hand: extra cards, removed cards, url overrides, calendar pages, needs-info, manual rules
-data/       what the scripts and the page write, committed: the seed, fetch state, review decisions, card options, the catalog
+data/       what the scripts and the page write, committed: the seed, fetch state, review decisions, card options (the catalog is not here: it is Grosh/Resources/rewards-catalog.json)
 tests/      the offline tests
 bench/      the accuracy benchmark
 cache/      saved pages, candidates and settings, not committed
@@ -39,7 +39,7 @@ Each stage reads files and writes files, so any stage can be rerun alone and a f
 | **Validate** | candidates | pass/fail per candidate | Deterministic checks, below. A failing candidate is dropped, never "fixed". |
 | **Diff** | candidates vs. `catalog.json` | `report.md` | Classifies each card: unchanged, changed, new, page gone, extraction failed. |
 | **Review** | candidates | `review-decisions.json` (committed) | `review.py` and each card's view on the page, built. Accept, reject or fix each rule; only accepted rules move on. Details below. |
-| **Publish** | seed, candidates, `review-decisions.json` | `rewards-catalog.json` (committed) | `publish.py` and the **Publish catalog** button in the page's Run panel, built. Only accepted rules; versioned, sorted, byte-stable so the PR diff shows only real changes. Details below. |
+| **Publish** | seed, candidates, `review-decisions.json` | `Grosh/Resources/rewards-catalog.json` (committed; the one copy) | `publish.py` and the **Publish catalog** button in the page's Run panel, built. Only accepted rules; versioned, sorted, byte-stable so the PR diff shows only real changes. Details below. |
 
 ## The fetch stage (`fetch.py`)
 
@@ -49,7 +49,7 @@ python3 -m unittest discover -s tools/rewards-catalog      # offline tests
 ```
 
 - **Standard library only, apart from the browser.** One page per distinct URL (cards that share a page, like the two Expedia cards, fetch once).
-- **Hashes the visible text**, not the HTML, so a changed script bundle or tracking id isn't a change. `fetch-state.json` holds each card's hash and is committed, so a run on any machine knows what changed; the page text lives in `cache/`, which isn't.
+- **Hashes the visible text**, not the HTML, so a changed script bundle or tracking id isn't a change. `fetch-state.json` holds each card's hash and is committed, so a run on any machine knows what changed; the page text lives in `cache/`, which isn't. It stays in git on purpose: `cache/` is empty on a new checkout, and without the hashes every page would count as new and every card would extract again. Its diff is the record of which pages changed (a card's entry changes only when its page text, address or status does), so a run that changes nothing leaves it as it was.
 - **A card can have a calendar page.** `calendar-pages.json` (`{card id: url}`) names a page of its own for a card's quarterly calendar; `build_seed.py` copies it to the card as `calendarUrl`. It is read right after the card's page (once per distinct URL, with no conditional request), saved as `cache/<id>/calendar.txt`, and hashed apart: `hash` stays the card page's and `calendarHash` is the calendar's, with `calendarUrl` and `calendarStatus` beside them. `fetch.pages_hash` joins the two, and that is what extraction compares, so a changed calendar makes the card `changed` and it extracts again, even when its own page is the same. A card with no calendar page has none of these fields and its `pages_hash` is its `hash`. A calendar that wasn't read keeps its last text and hash, and the card's own status doesn't change, since that is about its own page: the outcome's `calendar_error` says why, and `report.md` lists it under "calendar page not read".
 - **A calendar page may be JSON.** Discover's page (`www.discover.com/credit-cards/cash-back/cashback-calendar.html`) has no calendar in its HTML, only a "not working" message that a script hides. The script builds the calendar from `card.discover.com/cardissuer/public/rewards/offer/v1/offer-categories`, so that is its `calendarUrl`. A calendar fetch (`accepts_json`) goes by the reply's body, not its content type, and saves a JSON reply's sentences (`data_text`, one a line; a `<br>` or `&nbsp;` inside a sentence is a space). The 400-character check doesn't apply to JSON, as one quarter is about 180 characters, but a JSON reply that says nothing about earning is `failed`, and the last copy stays. HTML is judged like any page, so a bot wall comes back `needs-browser` and isn't saved. A card page that answers JSON is still "not a web page". The `offers.json` the page also names is old (2020–2021).
 - **Polite:** identifies itself in the User-Agent, obeys robots.txt, waits one second between requests to a host, retries server errors and dropped connections twice with a growing delay, and sends `If-None-Match` / `If-Modified-Since` when it has a cached copy.
@@ -270,7 +270,7 @@ Passing the checks means a rule is supported by its page, not that it is right, 
 python3 tools/rewards-catalog/pipeline/publish.py        # or Publish catalog in the page's Run panel
 ```
 
-Reads `catalog-seed.json`, `cache/candidates/`, `review-decisions.json` and `card-options.json`, and writes `data/rewards-catalog.json`, and the same bytes to `Grosh/Resources/rewards-catalog.json`: the file the app bundles (#163; `RewardsCatalog.bundled`). Both are committed, so a pull request shows exactly which rules ship. Until 2026-11-14 only the first was written and the bundled copy was updated by hand, so a published catalog never reached a build.
+Reads `catalog-seed.json`, `cache/candidates/`, `review-decisions.json` and `card-options.json`, and writes `Grosh/Resources/rewards-catalog.json`: the file the app bundles (#163; `RewardsCatalog.bundled`) and the pipeline's only copy of the catalog (the review page's `Paths.catalog` is the same file). It is committed, so a pull request shows exactly which rules ship. It used to be written twice, to `data/` and to the app, which meant two files to keep byte-identical.
 
 - **Only accepted rules** (`review.accepted_rules`). Rejected rules and rules still waiting are left out.
 - **A card with no accepted rule is left out**, not listed with an empty rule list. Its facts are CardPin's and nobody has checked them, and we ship only what we re-verified. So every card in the file is verified, `verified` isn't written, and `verifiedAt` is the latest day one of its rules was accepted. No decisions exist yet, so the file would hold no cards; it isn't committed until it has some.
