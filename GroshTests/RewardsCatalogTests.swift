@@ -41,6 +41,20 @@ struct RewardsCatalogTests {
         #expect(catalog.formatVersion == RewardsCatalog.formatVersion)
     }
 
+    /// The pipeline and the app each keep their own list of categories, selections and units: this is what ties the
+    /// shipped file to the app's (the pipeline's side is pinned by `tests/test_extract.py`).
+    @Test func everyRuleInTheShippedCatalogUsesACategorySelectionAndUnitTheAppKnows() throws {
+        let catalog = try RewardsCatalog.bundled()
+        let categories = Set(RewardCategory.fixed.map(\.id))
+        for card in catalog.cards {
+            for rule in card.rules {
+                #expect(Set(rule.categories).isSubset(of: categories), "\(card.id): \(rule.categories)")
+                #expect(["fixed", "choose", "top-spend", "rotating"].contains(rule.selection), "\(card.id): \(rule.selection)")
+                #expect(["percent", "per-dollar"].contains(rule.unit), "\(card.id): \(rule.unit)")
+            }
+        }
+    }
+
     @Test func searchMatchesNameAndIssuerWhateverTheCase() throws {
         let catalog = try RewardsCatalogFixture.catalog()
         #expect(catalog.search("voyager").map(\.id) == ["test-voyager-points"])

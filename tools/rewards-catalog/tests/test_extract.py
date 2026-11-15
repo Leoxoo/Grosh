@@ -2,7 +2,9 @@
 
 import io
 import json
+import re
 import unittest
+from pathlib import Path
 import urllib.error
 
 import extract
@@ -132,7 +134,13 @@ class ValidateRuleTests(unittest.TestCase):
         self.assertFalse(fits("utilities", "Earn 3% at electric vehicle charging stations."))
         self.assertTrue(fits("wholesale-clubs", "Earn 3% at wholesale clubs."))
         self.assertTrue(fits("home-improvement", "Earn 3% at home improvement stores."))
-        self.assertTrue(set(extract.CATEGORY_LABELS) == set(extract.CATEGORIES) >= set(extract.APP_CATEGORIES))
+        self.assertTrue(set(extract.CATEGORY_LABELS) == set(extract.CATEGORY_HELP) == set(extract.CATEGORIES))
+
+    def test_the_categories_are_the_apps_reward_categories_in_the_same_order(self):
+        swift = (Path(__file__).resolve().parents[3] / "Grosh" / "Domain" / "Rewards" / "RewardCategory.swift").read_text(encoding="utf-8")
+        listed = re.search(r"static let fixed: \[RewardCategory\] = \[(.*?)\n    \]", swift, re.S).group(1)
+        app = [*re.findall(r'RewardCategory\("([a-z-]+)"', listed), *(["everything-else"] if "everythingElse," in listed else [])]
+        self.assertEqual(list(extract.CATEGORIES), app, "extract.CATEGORIES and RewardCategory.fixed must list the same ids in the same order")
 
     def test_unknown_category_and_unit(self):
         for bad in (["pets"], [], "dining", ["dining", "dining"], [["dining"]]):

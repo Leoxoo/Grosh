@@ -29,7 +29,7 @@ nonisolated struct RewardCategory: Hashable, Identifiable, Sendable {
     static let everythingElse = RewardCategory("everything-else", Strings.Rewards.everythingElse)
 
     /// The Reward categories every user has, in the order they are listed, Everything else last. Their ids are the
-    /// rewards catalog's categories (`CATEGORIES` in `tools/rewards-catalog/pipeline/extract.py`).
+    /// rewards catalog's categories (`CATEGORY_TABLE` in `tools/rewards-catalog/pipeline/extract.py`; its test reads this list, so the two can't drift).
     static let fixed: [RewardCategory] = [
         RewardCategory("dining", Strings.Rewards.dining),
         RewardCategory("groceries", Strings.Rewards.groceries),

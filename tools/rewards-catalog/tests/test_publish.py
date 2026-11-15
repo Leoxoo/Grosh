@@ -1,6 +1,7 @@
 """Offline tests for publish.py: python3 -m unittest discover -s tools/rewards-catalog"""
 
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -231,6 +232,15 @@ class PublishTests(unittest.TestCase):
         publish.publish(paths, today="2026-12-01")
         self.assertEqual(out.read_text(encoding="utf-8"), text)
 
+
+
+class AppShapeTests(unittest.TestCase):
+    def test_a_published_rule_has_the_fields_of_the_apps_catalog_rule(self):
+        swift = (Path(__file__).resolve().parents[3] / "Grosh" / "Domain" / "Rewards" / "RewardsCatalog.swift").read_text(encoding="utf-8")
+        body = re.search(r"struct CatalogRule: .*?\n}\n", swift, re.S).group(0)
+        stored = re.findall(r"^    var (\w+):", body, re.M)  # the rule's own fields (Evidence's are indented further)
+        self.assertEqual(sorted(stored), sorted([*publish.RULE_FIELDS, "evidence"]),
+                         "publish.RULE_FIELDS and CatalogRule in RewardsCatalog.swift must list the same fields")
 
 
 class PaidWithTests(unittest.TestCase):

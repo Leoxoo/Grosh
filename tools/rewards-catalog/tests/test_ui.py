@@ -948,7 +948,7 @@ class ReviewTests(AppCase):
         self.assertEqual((counts["bank-a"], counts["bank-b"]), ({"waiting": 1, "accept": 0, "reject": 0}, None))
         self.assertEqual((overview["summary"]["waiting"], overview["summary"]["accept"]), (1, 0))
         dining = next(c for c in overview["catalog"]["categories"] if c["id"] == "dining")
-        self.assertEqual((dining["label"], "Restaurants" in dining["app"]), ("Dining", True))
+        self.assertEqual((dining["label"], "app" in dining), ("Dining", False))  # which of the user's categories it stands for is the app's, not the page's
         self.assertIn("activation", overview["catalog"]["requires"])
 
     def test_a_fix_is_saved_when_the_quote_backs_it_and_refused_when_it_does_not(self):

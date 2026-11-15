@@ -8,8 +8,8 @@ enum RewardsPrefill {
     /// The milestone a store keeps once it was prefilled.
     static let milestone = "rewardsAsPrefilled"
 
-    /// Which default categories each Reward category stands for: the rewards pipeline's `APP_CATEGORIES`
-    /// (`tools/rewards-catalog/pipeline/extract.py`).
+    /// Which default categories each Reward category stands for. The one copy of this map: the rewards pipeline
+    /// (`tools/rewards-catalog/pipeline/extract.py`) only knows the Reward categories' ids and words.
     static let defaultNames: [String: [String]] = [
         "dining": ["Food & Beverage", "Café", "Restaurants"],
         "groceries": ["Products"],

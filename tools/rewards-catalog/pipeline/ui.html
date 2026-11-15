@@ -519,7 +519,7 @@ function applyJob(job) {
 }
 
 // ---------- card detail ----------
-const term = (id) => state.overview.catalog.categories.find((c) => c.id === id) || { id, label: id, app: [] };
+const term = (id) => state.overview.catalog.categories.find((c) => c.id === id) || { id, label: id };
 const labels = (ids) => ids.map((id) => term(id).label).join(", ");
 const num = (n) => `${+(+n).toFixed(2)}`;
 const unitText = (r) => (r.unit === "percent" ? "%" : "x");
@@ -562,8 +562,6 @@ function ruleTerms(r) {
   return t.join("; ");
 }
 
-// The Grosh categories a rule reaches. A rule the person chooses, or a rotating one with no dates, reaches none yet.
-const appCategories = (r) => (r.selection === "fixed" || r.validFrom ? r.categories.flatMap((id) => term(id).app) : []);
 const REQUIRE_LABEL = { activation: "Activation", "issuer-booking": "Booking through the issuer", "preferred-rewards-tier": "Preferred Rewards membership" };
 function ruleKind(r) {
   if (r.selection === "choose") return `You choose ${r.picks > 1 ? r.picks : "1"}`;
@@ -581,14 +579,12 @@ function ruleCap(r) {
 // it's what the app will use, so it's as much to check as a filled one.
 function ruleFields(r) {
   const row = (name, ...value) => [h("dt", { text: name }), h("dd", {}, value)];
-  const app = r.categories.includes("everything-else") ? "Everything not listed above" : appCategories(r).join(", ");
   const merchants = r.merchants || [];
   const noCategories = r.selection === "rotating" ? "None named" : merchants.length ? "None" : "Any purchase";
   return h("dl", { class: "fields" },
     row("Categories", r.categories.length ? r.categories.map((id) => [chip(term(id).label), " "]) : noCategories),
     r.hasOtherChoices ? row("Also", "More choices than the page lists") : null,
     merchants.length ? row(r.categories.length ? "Also at" : "Only at", merchants.map((m) => [chip(m), " "])) : null,
-    app ? row("Your categories", app) : null,
     row("Cap", ruleCap(r)),
     row("Dates", r.validFrom || r.validTo ? span(r) : "Always"),
     row("Requires", [r.paysWith, ...r.requires.map((q) => REQUIRE_LABEL[q] || q)].filter(Boolean).join(", ") || "Nothing"),
@@ -607,13 +603,12 @@ function appPreview(rv) {
   const base = rows.some((x) => x.rule.categories.includes("everything-else"));
   return [
     h("table", { class: "earn" },
-      h("thead", {}, h("tr", {}, h("th", { text: "Earns" }), h("th", { text: "On" }), h("th", { text: "Your categories" }), h("th", { text: "" }))),
+      h("thead", {}, h("tr", {}, h("th", { text: "Earns" }), h("th", { text: "On" }), h("th", { text: "" }))),
       h("tbody", {}, rows.map((x) => {
-        const r = x.rule, app = appCategories(r);
+        const r = x.rule;
         return h("tr", { class: x.decision ? "" : "waiting" },
           h("td", { class: "rate", text: rateText(r) }),
           h("td", {}, h("div", { text: ruleWhere(r) }), ruleTerms(r) ? h("div", { class: "small muted", text: ruleTerms(r) }) : null),
-          h("td", { class: "small muted", text: r.categories.includes("everything-else") ? "everything not listed above" : app.join(", ") || "—" }),
           h("td", {}, x.decision ? chip(x.edited ? "accepted, fixed" : "accepted", "ok") : chip("waiting", "info")));
       }))),
     base ? null : h("p", { class: "small", style: "color: var(--warn)", text: "No base rate: the app won't know what everything else earns." }),

@@ -68,82 +68,115 @@ MAX_CONDITION_CHARS = 400
 MAX_QUOTE_CHARS = 600  # a rate's sentence (or two: a base rate and its boost), not the page around it
 ATTEMPTS_PER_CHUNK = 2
 
-# The catalog's fixed categories (PIPELINE.md), each with words a quote about it would use.
-# A quote that uses none of them is filed under the wrong category. Brand names (Lyft, Netflix, Amazon...)
-# are deliberately not words: a rate at one named company is not a category rate, and the catalog skips it.
-CATEGORIES = {
-    "dining": ("dining", "restaurant", "takeout", "take out", "food", "bars", "eating out"),
-    "groceries": ("grocer", "supermarket", "food at home"),
-    "gas": ("gas", "fuel", "service station"),
-    "ev-charging": ("ev charging", "electric vehicle charging", "charging station", "ev charg"),
-    "travel": ("travel", "rental car", "car rental", "cruise", "vacation", "trip", "airport"),
-    "airlines": ("airline", "flight", "airfare", "air travel"),
-    "hotels": ("hotel", "lodging", "resort", "motel"),
-    "transit": ("transit", "rideshare", "ride share", "ride-hailing", "taxi", "train", "buses", "parking",
-                "toll", "commut"),
-    "streaming": ("streaming",),
-    "entertainment": ("entertainment", "movie", "theater", "theatre", "concert", "sporting event", "amusement park"),
-    "drugstores": ("drugstore", "drug store", "pharmac"),
-    "online-shopping": ("online", "e-commerce", "internet retail"),
-    "home-improvement": ("home improvement", "hardware store"),
-    "fitness": ("fitness", "gym", "health club"),
-    "phone-internet": ("phone", "wireless", "cable", "internet", "cell"),
-    "utilities": ("utilit", "electricity", "electric bill", "electric compan", "water bill", "trash"),
-    "wholesale-clubs": ("wholesale club", "warehouse club", "wholesale"),
-    "department-stores": ("department store",),
-    "everything-else": ("all other", "everything else", "other purchase", "other eligible", "every purchase",
-                        "every $1", "every dollar", "all purchase", "all eligible", "everywhere", "each purchase",
-                        "all your purchase", "on all", "on every"),
+# The catalog's fixed categories (PIPELINE.md), the one table of them: how each reads in the app and on the page (`label`), what
+# it covers (`help`, which the model is shown), and the words a quote about it would use (`words`). A quote that uses none of
+# them is filed under the wrong category. Brand names (Lyft, Netflix, Amazon...) are deliberately not words: a rate at one named
+# company is not a category rate, and the catalog skips it. The ids are the app's RewardCategory.fixed
+# (Grosh/Domain/Rewards/RewardCategory.swift); tests/test_extract.py reads that file and fails if the two lists differ.
+# The app owns which of the user's own categories each one stands for (RewardsPrefill.defaultNames).
+CATEGORY_TABLE = {
+    "dining": {
+        "label": "Dining",
+        "help": "restaurants, takeout, delivery, bars",
+        "words": ("dining", "restaurant", "takeout", "take out", "food", "bars", "eating out"),
+    },
+    "groceries": {
+        "label": "Groceries",
+        "help": "grocery stores and supermarkets",
+        "words": ("grocer", "supermarket", "food at home"),
+    },
+    "gas": {
+        "label": "Gas",
+        "help": "gas stations and fuel",
+        "words": ("gas", "fuel", "service station"),
+    },
+    "ev-charging": {
+        "label": "EV charging",
+        "help": "electric vehicle charging stations",
+        "words": ("ev charging", "electric vehicle charging", "charging station", "ev charg"),
+    },
+    "travel": {
+        "label": "Travel",
+        "help": "travel in general (car rentals, cruises, travel booked through the issuer); use airlines or hotels when the rate is only for those",
+        "words": ("travel", "rental car", "car rental", "cruise", "vacation", "trip", "airport"),
+    },
+    "airlines": {
+        "label": "Airlines",
+        "help": "airline tickets bought from the airline",
+        "words": ("airline", "flight", "airfare", "air travel"),
+    },
+    "hotels": {
+        "label": "Hotels",
+        "help": "hotel stays",
+        "words": ("hotel", "lodging", "resort", "motel"),
+    },
+    "transit": {
+        "label": "Transit",
+        "help": "rideshare, taxis, trains, buses, parking, tolls",
+        "words": ("transit", "rideshare", "ride share", "ride-hailing", "taxi", "train", "buses", "parking", "toll", "commut"),
+    },
+    "streaming": {
+        "label": "Streaming",
+        "help": "streaming services",
+        "words": ("streaming",),
+    },
+    "entertainment": {
+        "label": "Entertainment",
+        "help": "movies, concerts, theater, sporting events, amusement parks",
+        "words": ("entertainment", "movie", "theater", "theatre", "concert", "sporting event", "amusement park"),
+    },
+    "drugstores": {
+        "label": "Drugstores",
+        "help": "drugstores and pharmacies",
+        "words": ("drugstore", "drug store", "pharmac"),
+    },
+    "online-shopping": {
+        "label": "Online shopping",
+        "help": "online shopping and online retail",
+        "words": ("online", "e-commerce", "internet retail"),
+    },
+    "home-improvement": {
+        "label": "Home improvement",
+        "help": "home improvement and hardware stores",
+        "words": ("home improvement", "hardware store"),
+    },
+    "fitness": {
+        "label": "Fitness",
+        "help": "gyms and fitness clubs",
+        "words": ("fitness", "gym", "health club"),
+    },
+    "phone-internet": {
+        "label": "Phone & internet",
+        "help": "phone, wireless, internet and cable bills",
+        "words": ("phone", "wireless", "cable", "internet", "cell"),
+    },
+    "utilities": {
+        "label": "Utilities",
+        "help": "electricity, water, gas and trash bills",
+        "words": ("utilit", "electricity", "electric bill", "electric compan", "water bill", "trash"),
+    },
+    "wholesale-clubs": {
+        "label": "Wholesale clubs",
+        "help": "wholesale and warehouse clubs",
+        "words": ("wholesale club", "warehouse club", "wholesale"),
+    },
+    "department-stores": {
+        "label": "Department stores",
+        "help": "department stores",
+        "words": ("department store",),
+    },
+    "everything-else": {
+        "label": "Everything else",
+        "help": "the base rate on all other purchases",
+        "words": ("all other", "everything else", "other purchase", "other eligible", "every purchase", "every $1", "every dollar", "all purchase", "all eligible", "everywhere", "each purchase", "all your purchase", "on all", "on every"),
+    },
 }
+CATEGORIES = {name: row["words"] for name, row in CATEGORY_TABLE.items()}
+CATEGORY_HELP = {name: row["help"] for name, row in CATEGORY_TABLE.items()}
+CATEGORY_LABELS = {name: row["label"] for name, row in CATEGORY_TABLE.items()}
 # Travel covers airlines and hotels: a quote naming travel with either is about travel.
 TRAVEL_FAMILY = {"travel", "airlines", "hotels"}
-CATEGORY_HELP = {
-    "dining": "restaurants, takeout, delivery, bars",
-    "groceries": "grocery stores and supermarkets",
-    "gas": "gas stations and fuel",
-    "ev-charging": "electric vehicle charging stations",
-    "travel": "travel in general (car rentals, cruises, travel booked through the issuer); use airlines or hotels when the rate is only for those",
-    "airlines": "airline tickets bought from the airline",
-    "hotels": "hotel stays",
-    "transit": "rideshare, taxis, trains, buses, parking, tolls",
-    "streaming": "streaming services",
-    "entertainment": "movies, concerts, theater, sporting events, amusement parks",
-    "drugstores": "drugstores and pharmacies",
-    "online-shopping": "online shopping and online retail",
-    "home-improvement": "home improvement and hardware stores",
-    "fitness": "gyms and fitness clubs",
-    "phone-internet": "phone, wireless, internet and cable bills",
-    "utilities": "electricity, water, gas and trash bills",
-    "wholesale-clubs": "wholesale and warehouse clubs",
-    "department-stores": "department stores",
-    "everything-else": "the base rate on all other purchases",
-}
-# How the catalog's categories read in the app and on the page, and the app's default categories
-# (DefaultCategories.swift) each one stands for, so a rate can be shown against what the user files spending under.
-# The user can rename or add categories; this is only the starting map.
-CATEGORY_LABELS = {
-    "dining": "Dining", "groceries": "Groceries", "gas": "Gas", "ev-charging": "EV charging", "travel": "Travel",
-    "airlines": "Airlines", "hotels": "Hotels", "transit": "Transit", "streaming": "Streaming",
-    "entertainment": "Entertainment", "drugstores": "Drugstores", "online-shopping": "Online shopping",
-    "home-improvement": "Home improvement", "fitness": "Fitness", "phone-internet": "Phone & internet",
-    "utilities": "Utilities", "wholesale-clubs": "Wholesale clubs", "department-stores": "Department stores",
-    "everything-else": "Everything else",
-}
-APP_CATEGORIES = {
-    "dining": ["Food & Beverage", "Café", "Restaurants"],
-    "groceries": ["Products"],
-    "gas": ["Petrol", "Other Fuel"],
-    "travel": ["Travel"],
-    "transit": ["Taxi", "Public Transport", "Parking Fees"],
-    "streaming": ["Streaming Service", "Apps"],
-    "entertainment": ["Entertainment", "Games", "Movies", "Cultural/Animals"],
-    "drugstores": ["Pharmacy"],
-    "home-improvement": ["Home Improvement"],
-    "fitness": ["Sports"],
-    "phone-internet": ["Phone Bill", "Internet Bill"],
-    "utilities": ["Water Bill", "Electricity Bill", "Gas Bill", "Valet/Trash Bill"],
-    "department-stores": ["Clothing", "Footwear", "Accessories"],
-}
+
 PERIOD_WORDS = {"month": ("month",), "quarter": ("quarter",), "year": ("year", "annual"),
                 "cycle": ("billing cycle", "statement period", "each cycle")}
 

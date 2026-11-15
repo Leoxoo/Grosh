@@ -902,10 +902,9 @@ class App:
 
 def catalog_terms() -> dict:
     """The catalog's fixed lists, for the page's card view and its fix form: each category with its label, what it
-    covers and the app's default categories it stands for; what a rate can require; tiers; cap periods; what the app asks."""
+    covers; what a rate can require; tiers; cap periods; what the app asks."""
     return {
-        "categories": [{"id": name, "label": extract.CATEGORY_LABELS[name], "help": extract.CATEGORY_HELP[name],
-                        "app": extract.APP_CATEGORIES.get(name, [])} for name in extract.CATEGORIES],
+        "categories": [{"id": name, "label": extract.CATEGORY_LABELS[name], "help": extract.CATEGORY_HELP[name]} for name in extract.CATEGORIES],
         "requires": list(extract.REQUIRES), "tiers": list(extract.TIERS), "periods": list(extract.PERIOD_WORDS),
         "needs": extract.NEEDS, "options": review.CARD_OPTIONS,
     }
