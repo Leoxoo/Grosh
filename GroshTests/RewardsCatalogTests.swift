@@ -62,7 +62,10 @@ struct RewardsCatalogTests {
     /// shipped file to the app's (the pipeline's side is pinned by `tests/test_extract.py`).
     @Test func everyRuleInTheShippedCatalogUsesACategorySelectionAndUnitTheAppKnows() throws {
         let catalog = try RewardsCatalog.bundled()
-        let categories = Set(RewardCategory.fixed.map(\.id))
+        // Person-added categories come from tools/rewards-catalog/data/extra-categories.json.
+        // Add each one there when it is added.
+        let personAdded: Set<String> = ["car-rentals"]
+        let categories = Set(RewardCategory.fixed.map(\.id)).union(personAdded)
         for card in catalog.cards {
             for rule in card.rules {
                 #expect(Set(rule.categories).isSubset(of: categories), "\(card.id): \(rule.categories)")
