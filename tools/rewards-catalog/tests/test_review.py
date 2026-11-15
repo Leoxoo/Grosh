@@ -140,6 +140,14 @@ class FixSeveralCategoriesTests(ReviewCase):
         self.assertIn("hotels", rows[1]["overrides"])
         self.assertEqual([r["categories"] for r in self.accepted(cand)], [["airlines"], ["hotels"]])
 
+    def test_the_rules_a_fix_adds_are_listed_right_after_the_rule_they_were_split_from(self):
+        other = rule(categories=["everything-else"], rate=1, quote="1% on all other purchases.")
+        cand = candidate(rule(categories=["airlines"], rate=5, unit="per-dollar", requires=["issuer-booking"], quote=self.QUOTE), other)
+        self.fix(cand, True)
+        rows = review.card_review(cand, review.load_decisions(self.path))["rules"]
+        self.assertEqual([r["rule"]["categories"] for r in rows], [["airlines"], ["hotels"], ["everything-else"]])
+        self.assertEqual([r["splitFrom"] for r in rows], [None, rows[0]["key"], None])
+
 
 class PaidWithAndMerchantsTests(ReviewCase):
     PAYPAL = "Earn 3% cash back on purchases made through PayPal."

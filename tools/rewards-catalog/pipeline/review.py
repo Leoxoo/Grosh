@@ -325,6 +325,16 @@ def card_review(candidate: dict, decisions: dict) -> dict:
     for key, saved in card_decisions.items():
         if "added" in saved and key not in seen:  # one a new extraction found as well is the extraction's
             row(key, saved["added"], saved, True)
+    # A fix that ticked several categories adds one rule per extra category, with the fixed rule's quote. Each is listed
+    # right after the rule it was split from (`splitFrom` is that rule's key), so the fix is seen to have applied.
+    fixed = {entry["quote"]: entry for entry in rules if entry["edited"] and not entry["added"]}
+    for entry in rules:
+        entry["splitFrom"] = fixed[entry["quote"]]["key"] if entry["added"] and entry["quote"] in fixed else None
+    listed = []
+    for entry in rules:
+        if not entry["splitFrom"]:
+            listed += [entry, *(extra for extra in rules if extra["splitFrom"] == entry["key"])]
+    rules = listed
     counts = dict.fromkeys(COUNTS, 0)
     for entry in rules:
         counts[entry["decision"] or "waiting"] += 1

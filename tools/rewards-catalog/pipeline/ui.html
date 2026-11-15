@@ -660,11 +660,19 @@ function reviewRule(cardId, x) {
     await openCard(cardId, true); loadOverview();
   };
   const press = (decision) => async (e) => { e.target.disabled = true; try { await send({ decision }); } catch (err) { alert(err.message); e.target.disabled = false; } };
-  const fix = () => fill(fixArea, fixArea.childNodes.length ? null : fixForm(r, (changes, vouch) => send({ decision: "edit", changes, vouch }), () => fill(fixArea)));
+  const fix = () => fill(fixArea, fixArea.childNodes.length ? null : fixForm(r, async (changes, vouch) => {
+    const more = r.selection === "fixed" ? changes.categories.length - 1 : 0;  // one rule per category: the rest are listed under this one
+    state.fixNotice = more > 0 ? { key: x.key, text: `Saved as ${more + 1} rules, one per category: this one and ${more} more listed right below it.` } : null;
+    try { await send({ decision: "edit", changes, vouch }); } catch (err) { state.fixNotice = null; throw err; }
+  }, () => fill(fixArea)));
+  const notice = state.fixNotice && state.fixNotice.key === x.key ? state.fixNotice.text : null;
+  if (notice) state.fixNotice = null;  // said once, on the card as it is redrawn after the save
   return h("div", { class: "rule" + (x.decision === "accept" ? " accepted" : x.decision === "reject" ? " rejected" : "") },
     h("div", { class: "head" }, h("span", { class: "rate", text: rateText(r) }), h("span", { class: "kind", text: ruleKind(r) })),
+    notice ? h("div", { class: "result ok", text: notice }) : null,
     h("div", { class: "small", style: "margin-top: 4px" },
       decided ? chip(decided.chip, decided.kind) : chip("waiting for review", "info"), " ",
+      x.splitFrom ? [chip("from your fix above", "info"), " "] : null,
       x.added ? [chip(x.overrides ? "used anyway" : "added by you", "info"), " "] : null,
       x.overrides ? [h("span", { title: "The checks said: " + x.overrides }, chip("checks said: " + x.overrides, "warn")), " "] : null,
       x.edited ? [h("span", { title: "Extracted as: " + JSON.stringify({ categories: x.original.categories, rate: x.original.rate, unit: x.original.unit, capAmount: x.original.capAmount, requires: x.original.requires }) }, chip("fixed by you", "info")), " "] : null,
