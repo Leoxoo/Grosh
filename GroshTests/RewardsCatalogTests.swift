@@ -41,6 +41,23 @@ struct RewardsCatalogTests {
         #expect(catalog.formatVersion == RewardsCatalog.formatVersion)
     }
 
+    @Test func aRuleThePipelineLeftEmptyFieldsOutOfReadsThemAsNothing() throws {
+        let data = Data(#"{"categories":["dining"],"selection":"fixed","rate":3,"unit":"percent","evidence":{"quote":"Q.","url":"https://bank.test"}}"#.utf8)
+        let rule = try JSONDecoder().decode(CatalogRule.self, from: data)
+        #expect(rule.categories == ["dining"])
+        #expect(rule.rate == 3)
+        #expect(rule.evidence.quote == "Q.")
+        #expect(rule.picks == nil && rule.capAmount == nil && rule.capPeriod == nil && rule.paysWith == nil)
+        #expect(rule.validFrom == nil && rule.validTo == nil && rule.firstMonths == nil && rule.tier == nil)
+        #expect(!rule.hasOtherChoices && !rule.capUnknown)
+        #expect(rule.requires.isEmpty && rule.needs.isEmpty && rule.conditions.isEmpty && rule.merchants.isEmpty)
+    }
+
+    @Test func aRuleWithoutItsRateIsRefused() {
+        let data = Data(#"{"categories":["dining"],"selection":"fixed","unit":"percent","evidence":{"quote":"Q.","url":"u"}}"#.utf8)
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(CatalogRule.self, from: data) }
+    }
+
     /// The pipeline and the app each keep their own list of categories, selections and units: this is what ties the
     /// shipped file to the app's (the pipeline's side is pinned by `tests/test_extract.py`).
     @Test func everyRuleInTheShippedCatalogUsesACategorySelectionAndUnitTheAppKnows() throws {

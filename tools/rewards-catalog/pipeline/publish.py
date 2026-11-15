@@ -39,12 +39,19 @@ def number(value):
     return int(value) if isinstance(value, float) and value.is_integer() else value
 
 
+# What a rule always says. Every other field is left out when it is null, false or empty, and the app reads a missing one as
+# that (CatalogRule.init(from:)), so most rules are a few lines.
+ALWAYS = ("categories", "selection", "rate", "unit")
+
+
 def published_rule(rule: dict) -> dict:
     published = {field: rule.get(field) for field in RULE_FIELDS}
     for field in review.SET_FIELDS:
         published[field] = sorted(published[field] or [])
     published["merchants"] = sorted(published["merchants"] or [])
     published["rate"], published["capAmount"] = number(published["rate"]), number(published["capAmount"])
+    published = {field: value for field, value in published.items()
+                 if field in ALWAYS or not (value is None or value is False or value == [])}  # 0 is a value, and `0 == False`
     published["evidence"] = {"quote": rule["evidence"]["quote"], "url": rule["evidence"]["url"]}
     return published
 

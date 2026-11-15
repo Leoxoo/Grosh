@@ -50,10 +50,8 @@ class CatalogTests(unittest.TestCase):
         doc = publish.catalog([SAVOR], {"bank-savor": cand}, decisions, None, "2026-11-02")
         (card,) = doc["cards"]
         self.assertEqual(card["rules"], [{
-            "categories": ["dining"], "selection": "fixed", "picks": None, "hasOtherChoices": False, "rate": 3,
-            "unit": "percent", "capAmount": None, "capPeriod": None, "capUnknown": False, "requires": [], "paysWith": None,
-            "validFrom": None, "validTo": None, "firstMonths": None, "tier": None, "needs": [], "conditions": [],
-            "merchants": [], "evidence": {"quote": "Earn unlimited 3% cash back on dining.", "url": URL},  # no page hash, no "verified"
+            "categories": ["dining"], "selection": "fixed", "rate": 3, "unit": "percent",  # what's null, false or empty is left out
+            "evidence": {"quote": "Earn unlimited 3% cash back on dining.", "url": URL},  # no page hash, no "verified"
         }])
 
     def test_a_rule_a_person_added_is_published_even_for_a_card_with_no_candidate(self):
@@ -243,13 +241,40 @@ class AppShapeTests(unittest.TestCase):
                          "publish.RULE_FIELDS and CatalogRule in RewardsCatalog.swift must list the same fields")
 
 
+class LeftOutTests(unittest.TestCase):
+    def test_a_field_that_is_null_false_or_empty_is_left_out_and_one_that_has_a_value_stays(self):
+        capped = publish.published_rule(rule(categories=["gas"], capAmount=1500.0, capPeriod="quarter", requires=["activation"],
+                                             conditions=["Not at superstores."], firstMonths=12, hasOtherChoices=True))
+        self.assertEqual({k: v for k, v in capped.items() if k != "evidence"}, {
+            "categories": ["gas"], "selection": "fixed", "hasOtherChoices": True, "rate": 3, "unit": "percent", "capAmount": 1500,
+            "capPeriod": "quarter", "requires": ["activation"], "firstMonths": 12, "needs": ["account-opened"],
+            "conditions": ["Not at superstores."]})
+
+    def test_a_rule_always_says_what_it_covers_at_which_rate_and_a_rate_of_zero_is_a_value(self):
+        zero = publish.published_rule(dict(rule(), rate=0, categories=[]))
+        self.assertEqual({k: zero[k] for k in ("categories", "selection", "rate", "unit")},
+                         {"categories": [], "selection": "fixed", "rate": 0, "unit": "percent"})
+
+    def test_a_catalog_published_before_fields_were_left_out_is_compared_by_what_it_says(self):
+        cand = candidate(rule(), rule(categories=["everything-else"], rate=1, quote="1% on all other purchases."))
+        decisions = decided(cand, (0, "accept", "2026-11-01"), (1, "accept", "2026-11-01"))
+        first = publish.catalog([SAVOR], {"bank-savor": cand}, decisions, None, "2026-11-01")
+        old = json.loads(json.dumps(first))
+        for r in old["cards"][0]["rules"]:  # as the file was before: every field written
+            r.update({f: r.get(f) for f in publish.RULE_FIELDS} | {"hasOtherChoices": False, "capUnknown": False, "requires": [],
+                                                                   "needs": [], "conditions": [], "merchants": []})
+        kept = []
+        self.assertEqual(publish.catalog([SAVOR], {"bank-savor": cand}, decisions, old, "2026-12-01", kept=kept), first | {"publishedAt": "2026-12-01"})
+        self.assertEqual(kept, [])
+
+
 class PaidWithTests(unittest.TestCase):
     def test_a_rule_says_how_it_is_paid_and_at_which_merchants(self):
         proposal = {"categories": [], "selection": "fixed", "picks": None, "hasOtherChoices": False, "rate": 3, "unit": "percent", "capAmount": None,
                     "capPeriod": None, "requires": [], "validFrom": None, "validTo": None, "conditions": [], "quote": "3% through PayPal at Target and Amazon.",
                     "paysWith": "PayPal", "merchants": ["Target", "Amazon"]}
         published = publish.published_rule(extract.candidate_rule(proposal, "u", "h", "page"))
-        self.assertEqual((published["paysWith"], published["merchants"], published["needs"]), ("PayPal", ["Amazon", "Target"], []))
+        self.assertEqual((published["paysWith"], published["merchants"], published.get("needs", [])), ("PayPal", ["Amazon", "Target"], []))
 
 
 if __name__ == "__main__":

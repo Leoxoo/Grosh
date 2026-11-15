@@ -274,7 +274,7 @@ Reads `catalog-seed.json`, `cache/candidates/`, `review-decisions.json` and `car
 
 - **Only accepted rules** (`review.accepted_rules`). Rejected rules and rules still waiting are left out.
 - **A card with no accepted rule is left out**, not listed with an empty rule list. Its facts are CardPin's and nobody has checked them, and we ship only what we re-verified. So every card in the file is verified, `verified` isn't written, and `verifiedAt` is the latest day one of its rules was accepted. No decisions exist yet, so the file would hold no cards; it isn't committed until it has some.
-- **The shape**, one card shown (every key is always there, `null` when it doesn't apply, so a Swift `Codable` reader needs only optionals; dates are `YYYY-MM-DD` strings):
+- **The shape**, one card shown. A card has every key, `null` when it doesn't apply. A rule always has `categories`, `selection`, `rate`, `unit` and `evidence`; every other field is left out when it is null, false or empty (`publish.published_rule`), and the app reads a missing one as that (`CatalogRule.init(from:)`), so most rules are a few lines. Dates are `YYYY-MM-DD` strings. The example rule is shown in full for what it can say, with the fields a real one leaves out:
 
   ```json
   {

@@ -134,3 +134,30 @@ nonisolated struct CatalogRule: Codable, Hashable, Sendable {
         var url: String
     }
 }
+
+extension CatalogRule {
+    /// The pipeline leaves out a field that is null, false or empty (`publish.published_rule`), so each reads as that
+    /// when missing. `categories`, `selection`, `rate`, `unit` and `evidence` are always there.
+    init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        categories = try values.decode([String].self, forKey: .categories)
+        selection = try values.decode(String.self, forKey: .selection)
+        picks = try values.decodeIfPresent(Int.self, forKey: .picks)
+        hasOtherChoices = try values.decodeIfPresent(Bool.self, forKey: .hasOtherChoices) ?? false
+        rate = try values.decode(Double.self, forKey: .rate)
+        unit = try values.decode(String.self, forKey: .unit)
+        capAmount = try values.decodeIfPresent(Double.self, forKey: .capAmount)
+        capPeriod = try values.decodeIfPresent(String.self, forKey: .capPeriod)
+        capUnknown = try values.decodeIfPresent(Bool.self, forKey: .capUnknown) ?? false
+        requires = try values.decodeIfPresent([String].self, forKey: .requires) ?? []
+        paysWith = try values.decodeIfPresent(String.self, forKey: .paysWith)
+        validFrom = try values.decodeIfPresent(String.self, forKey: .validFrom)
+        validTo = try values.decodeIfPresent(String.self, forKey: .validTo)
+        firstMonths = try values.decodeIfPresent(Int.self, forKey: .firstMonths)
+        tier = try values.decodeIfPresent(String.self, forKey: .tier)
+        needs = try values.decodeIfPresent([String].self, forKey: .needs) ?? []
+        conditions = try values.decodeIfPresent([String].self, forKey: .conditions) ?? []
+        merchants = try values.decodeIfPresent([String].self, forKey: .merchants) ?? []
+        evidence = try values.decode(Evidence.self, forKey: .evidence)
+    }
+}

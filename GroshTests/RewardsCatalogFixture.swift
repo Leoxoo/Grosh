@@ -2,7 +2,7 @@ import Foundation
 @testable import Grosh
 
 /// A small rewards catalog, written as `tools/rewards-catalog/pipeline/publish.py` writes `rewards-catalog.json`
-/// (`formatVersion` 1, every key present, `null` when unused), standing in for the real one until its rules are reviewed.
+/// (`formatVersion` 1; its rules carry every key, which the app reads the same as a rule that leaves out the empty ones), standing in for the real one until its rules are reviewed.
 ///
 /// - `test-savory-cash`: cash back, 3% Dining and Groceries, 1% Everything else, plus rules this ticket doesn't show
 ///   (rotating, Apple Pay, merchants, a Preferred Rewards tier boost, one that needs the account's open date).
