@@ -515,9 +515,11 @@ class App:
 
     def publish_catalog(self) -> dict:
         """Write the accepted rules to the catalog file (publish.py) and say how much went in."""
-        document = publish.publish(self.paths)
+        kept = []
+        document = publish.publish(self.paths, kept=kept)
         return {"cards": len(document["cards"]), "rules": sum(len(c["rules"]) for c in document["cards"]),
-                "publishedAt": document["publishedAt"], "file": self.paths.catalog.name}
+                "publishedAt": document["publishedAt"], "file": self.paths.catalog.name,
+                "kept": [{"id": card["id"], "status": card["status"], "lost": len(card["lost"])} for card in kept]}
 
     # --- the model server ---------------------------------------------------------------------
 

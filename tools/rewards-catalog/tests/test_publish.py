@@ -155,6 +155,53 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(publish.catalog([], {}, {}, first, "2026-12-01")["cards"], [])  # but a card gone from the seed goes
 
 
+    def published_first(self):
+        cand = candidate(self.dining, self.base)
+        decisions = decided(cand, (0, "accept", "2026-11-01"), (1, "accept", "2026-11-01"))
+        return publish.catalog([SAVOR], {"bank-savor": cand}, decisions, None, "2026-11-01"), decisions
+
+    def test_a_published_card_whose_new_candidate_failed_keeps_what_was_published_and_is_reported(self):
+        first, decisions = self.published_first()
+        for status in ("failed", "wrong-page"):
+            failed = dict(candidate(), status=status)  # no rules: the page redirected, or the fetch or model failed
+            kept = []
+            doc = publish.catalog([SAVOR], {"bank-savor": failed}, decisions, first, "2026-12-01", kept=kept)
+            self.assertEqual(doc, first, status)
+            self.assertEqual([(k["id"], k["status"], len(k["lost"])) for k in kept], [("bank-savor", status, 2)])
+
+    def test_a_published_card_whose_rule_was_reworded_keeps_its_old_entry_until_the_new_wording_is_accepted(self):
+        first, decisions = self.published_first()
+        reworded = candidate(rule(quote="Earn unlimited 3% cash back on dining, including delivery."), self.base)
+        kept = []
+        doc = publish.catalog([SAVOR], {"bank-savor": reworded}, decisions, first, "2026-12-01", kept=kept)
+        self.assertEqual((doc, [len(k["lost"]) for k in kept]), (first, [1]))  # the new wording waits for review: nothing shrinks
+        decisions = {**decisions, **decided(reworded, (0, "accept", "2026-12-01"), (1, "accept", "2026-11-01"))}
+        kept = []
+        doc = publish.catalog([SAVOR], {"bank-savor": reworded}, decisions, first, "2026-12-01", kept=kept)
+        self.assertEqual(kept, [])
+        self.assertEqual({r["evidence"]["quote"] for r in doc["cards"][0]["rules"]},
+                         {"Earn unlimited 3% cash back on dining, including delivery.", "1% on all other purchases."})
+
+    def test_rejecting_a_published_rule_on_purpose_drops_it_without_holding_the_card_back(self):
+        first, _ = self.published_first()
+        cand = candidate(self.dining, self.base)
+        kept = []
+        doc = publish.catalog([SAVOR], {"bank-savor": cand},
+                              decided(cand, (0, "accept", "2026-11-01"), (1, "reject", "2026-12-01")), first, "2026-12-01", kept=kept)
+        self.assertEqual((kept, [r["categories"] for r in doc["cards"][0]["rules"]]), ([], [["dining"]]))
+
+    def test_a_card_never_published_is_not_held_back_by_a_failed_candidate(self):
+        kept = []
+        self.assertEqual(publish.catalog([SAVOR], {"bank-savor": dict(candidate(), status="failed")}, {}, None, "2026-12-01", kept=kept)["cards"], [])
+        self.assertEqual(kept, [])
+
+    def test_the_held_back_cards_are_said_in_a_line_each(self):
+        first, decisions = self.published_first()
+        kept = []
+        publish.catalog([SAVOR], {"bank-savor": dict(candidate(), status="wrong-page")}, decisions, first, "2026-12-01", kept=kept)
+        self.assertIn("Kept bank-savor as published (wrong-page)", publish.held_back(kept))
+        self.assertEqual(publish.held_back([]), "")
+
 
 class PublishTests(unittest.TestCase):
     def test_it_writes_the_file_from_the_seed_the_candidates_and_the_decisions_and_a_rerun_changes_nothing(self):

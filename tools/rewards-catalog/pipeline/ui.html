@@ -928,7 +928,8 @@ $("publish").onclick = async (e) => {
   e.target.disabled = true;
   try {
     const p = await api("POST", "/api/publish");
-    $("publishResult").textContent = `Wrote ${p.rules} accepted rule${p.rules === 1 ? "" : "s"} on ${p.cards} card${p.cards === 1 ? "" : "s"} to ${p.file} (${p.publishedAt})`;
+    $("publishResult").textContent = `Wrote ${p.rules} accepted rule${p.rules === 1 ? "" : "s"} on ${p.cards} card${p.cards === 1 ? "" : "s"} to ${p.file} (${p.publishedAt})` +
+      (p.kept.length ? `. Kept as published, because the new rules would lose ${p.kept.reduce((n, c) => n + c.lost, 0)} published rule(s): ${p.kept.map((c) => `${c.id} (${c.status || "no status"})`).join(", ")}` : "");
   } catch (err) { alert(err.message); }
   e.target.disabled = false;
 };

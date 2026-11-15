@@ -50,11 +50,32 @@ def published_rule(rule: dict) -> dict:
     return published
 
 
+def lost_rules(old: dict, candidate: dict, entries: list, decisions: dict) -> list[dict]:
+    """The rules `old` (a card's published entry) would lose if it were rebuilt from `candidate`: each published rule that
+    is neither still accepted (in `entries`), nor one a person rejected, nor replaced by a new accepted rule. A reworded
+    quote is another rule (review.rule_key hashes it), so until the new wording is accepted, the old rule is lost.
+    A page that failed or went to the wrong card has no rules, so it loses them all."""
+    def text(rule):
+        return json.dumps(published_rule(rule), sort_keys=True)
+    now = {text(rule) for rule, _ in entries}
+    rejected = {text(row["rule"]) for row in review.card_review(candidate, decisions)["rules"] if row["decision"] == "reject"}
+    lost = [rule for rule in old.get("rules", []) if text(rule) not in now | rejected]
+    new = len(now - {text(rule) for rule in old.get("rules", [])})  # accepted rules the old entry didn't have: they take a lost one's place
+    return lost if candidate.get("status") in ("failed", "wrong-page") or len(lost) > new else []
+
+
 def catalog(cards: list[dict], candidates: dict[str, dict], decisions: dict, previous: dict | None, today: str,
-            options: dict | None = None) -> dict:
+            options: dict | None = None, kept: list | None = None) -> dict:
     """The catalog the app reads: every seed card a person accepted at least one rule on, with only those
-    rules, and its options (review.CARD_OPTIONS, off unless `options` turns them on). `previous` is the catalog published last time, or None. A card with no candidate (cache/ isn't
-    committed, so a fresh clone has none) keeps its last published entry: failure never deletes."""
+    rules, and its options (review.CARD_OPTIONS, off unless `options` turns them on). `previous` is the catalog published last time, or None.
+
+    A failed run never deletes a published card. A card with no candidate (cache/ isn't committed, so a fresh clone has
+    none) keeps its last published entry. So does a card whose candidate would lose a published rule that no person
+    rejected and no new accepted rule replaces (`lost_rules`): the page redirected up to a listing ("wrong-page"), the
+    fetch or extraction "failed", or the model reworded a quote, which makes the rule a new one that waits for review.
+    Each such card is added to `kept` as
+    {"id", "status", "lost"} (the rules it would have lost, as published), so publish can say what it held back.
+    To drop a published rule on purpose, Reject it: a rejected rule is not lost."""
     before = {card["id"]: card for card in (previous or {}).get("cards", [])}
     published = []
     for card in sorted(cards, key=lambda c: c["id"]):
@@ -65,6 +86,12 @@ def catalog(cards: list[dict], candidates: dict[str, dict], decisions: dict, pre
             continue
         shown = candidate or review.empty_candidate(card["id"])
         entries = review.accepted_entries(shown, decisions)
+        lost = lost_rules(before[card["id"]], shown, entries, decisions) if candidate and card["id"] in before else []
+        if lost:
+            published.append(before[card["id"]])
+            if kept is not None:
+                kept.append({"id": card["id"], "status": candidate.get("status"), "lost": lost})
+            continue
         if not entries:  # nobody has checked this card, so its seed facts aren't ours to ship
             continue
         published.append({
@@ -85,25 +112,34 @@ PATHS = SimpleNamespace(seed=SEED, candidates=extract.CANDIDATES, decisions=revi
                   app_copy=APP_FILE)
 
 
-def publish(paths=PATHS, today: str = "") -> dict:
+def publish(paths=PATHS, today: str = "", kept: list | None = None) -> dict:
     """Build the catalog from the files in `paths` and write it to `paths.catalog` (fetch.write_json: keys sorted,
-    so equal catalogs are equal bytes). Returns what was written."""
+    so equal catalogs are equal bytes). Returns what was written. The cards it held back (see `catalog`) are added to `kept`."""
     cards = fetch.read_json(paths.seed, {"cards": []})["cards"]
     found = {path.stem: fetch.read_json(path, None) for path in sorted(paths.candidates.glob("*.json"))}
     document = catalog(cards, found, review.load_decisions(paths.decisions), fetch.read_json(paths.catalog, None),
-                       today or date.today().isoformat(), review.load_options(paths.options))
+                       today or date.today().isoformat(), review.load_options(paths.options), kept)
     fetch.write_json(paths.catalog, document)
     if getattr(paths, "app_copy", None):  # the app bundles this copy: without it a published catalog never reaches a build
         fetch.write_json(paths.app_copy, document)
     return document
 
 
+def held_back(kept: list) -> str:
+    """What to tell the person about the cards publish left as they were, one line each, or "" if there were none."""
+    return "".join(f"Kept {card['id']} as published ({card['status'] or 'no status'}): the new candidate would lose "
+                   f"{len(card['lost'])} published rule(s), e.g. {card['lost'][0]['evidence']['quote'][:80]!r}. "
+                   "Fix the page or the review, or Reject a rule to drop it.\n" for card in kept)
+
+
 def main() -> None:
     if len(sys.argv) != 1:
         sys.exit(__doc__)
-    document = publish()
+    kept = []
+    document = publish(kept=kept)
     rules = sum(len(card["rules"]) for card in document["cards"])
     print(f"Wrote {len(document['cards'])} cards and {rules} accepted rules to {OUT}")
+    print(held_back(kept), end="")
 
 
 if __name__ == "__main__":
