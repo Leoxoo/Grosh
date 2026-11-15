@@ -142,6 +142,35 @@ class ValidateRuleTests(unittest.TestCase):
         app = [*re.findall(r'RewardCategory\("([a-z-]+)"', listed), *(["everything-else"] if "everythingElse," in listed else [])]
         self.assertEqual(list(extract.CATEGORIES), app, "extract.CATEGORIES and RewardCategory.fixed must list the same ids in the same order")
 
+    def test_a_category_added_on_the_page_is_listed_before_everything_else_and_a_rule_can_use_it(self):
+        import tempfile
+        path = Path(tempfile.mkdtemp()) / "extra-categories.json"
+        self.addCleanup(extract.load_extra_categories, Path(tempfile.mkdtemp()) / "none.json")  # the live lists are the module's: put them back
+        entry = extract.add_category("Pet stores", ["Pet store", "veterinar"], "pet stores and veterinary care", path)
+        self.assertEqual(entry, {"id": "pet-stores", "label": "Pet stores", "help": "pet stores and veterinary care",
+                                 "words": ["pet store", "veterinar"]})
+        self.assertEqual(list(extract.CATEGORIES)[-2:], ["pet-stores", "everything-else"])
+        self.assertEqual((extract.CATEGORY_LABELS["pet-stores"], "pet-stores" in extract.RULE_SCHEMA["properties"]["categories"]["items"]["enum"]),
+                         ("Pet stores", True))
+        self.assertEqual(json.loads(path.read_text())[0]["id"], "pet-stores")
+        quote = "Earn 3% at pet stores and veterinarians."
+        self.assertIsNone(validate_rule(rule(categories=["pet-stores"], quote=quote), None))
+        self.assertIn("doesn't mention", validate_rule(rule(categories=["pet-stores"], quote="Earn 3% at gas stations."), None))
+        extract.load_extra_categories(path)  # a restart reads what was saved
+        self.assertIn("pet-stores", extract.CATEGORIES)
+        self.assertIn("pet-stores", extract.build_messages({"name": "A", "rewardKind": "cashback", "issuer": "I", "sourceUrl": "u"}, "x")[-1]["content"])
+
+    def test_a_category_that_cannot_be_used_is_refused_with_why(self):
+        import tempfile
+        path = Path(tempfile.mkdtemp()) / "extra-categories.json"
+        self.addCleanup(extract.load_extra_categories, Path(tempfile.mkdtemp()) / "none.json")
+        for label, words, help, why in (("", ["pets"], "pets", "name"), ("Dining", ["x food"], "food", "already a category"),
+                                        ("Pets", [], "pets", "words"), ("Pets", ["pe"], "pets", "words"), ("Pets", ["pets"], "", "covers"),
+                                        ("123", ["pets"], "pets", "letters")):
+            with self.assertRaisesRegex(ValueError, why):
+                extract.add_category(label, words, help, path)
+        self.assertFalse(path.exists())
+
     def test_unknown_category_and_unit(self):
         for bad in (["pets"], [], "dining", ["dining", "dining"], [["dining"]]):
             self.assertIn("categories", self.check(categories=bad), bad)

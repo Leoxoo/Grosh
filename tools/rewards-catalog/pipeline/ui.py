@@ -63,6 +63,7 @@ class Paths:
     decisions: Path = review.DECISIONS  # committed: a person's accept or reject on each rule
     options: Path = review.OPTIONS  # committed: what a person turned on for a whole card (bonuses add up)
     url_overrides: Path = fetch.INPUTS / "url-overrides.json"  # committed: {card id: the page to read for it}, applied by build_seed.py
+    extra_categories: Path = extract.EXTRA_CATEGORIES  # committed: the catalog categories a person added on this page
     catalog: Path = publish.OUT  # committed, in Grosh/Resources: the accepted rules, as the app reads and bundles them
 
     @property
@@ -247,6 +248,7 @@ class App:
         self, paths: Paths | None = None, http_get=None, throttle_delay: float = fetch.DELAY_SECONDS, lm_urlopen=None
     ) -> None:
         self.paths = paths or Paths()
+        extract.load_extra_categories(self.paths.extra_categories)  # the live category lists are this app's: the built-in ones and its own
         self.http_get = http_get or fetch.http_get
         self.lm_urlopen = lm_urlopen or urllib.request.urlopen
         self.throttle_delay = throttle_delay
@@ -451,6 +453,16 @@ class App:
                 entry["sourceUrl"], entry["sourceHost"] = url, parts.netloc
         fetch.write_json(self.paths.seed, seed)
         return {"sourceUrl": url}
+
+    def add_category(self, body: dict) -> dict:
+        """Add a category to the catalog's list (extract.add_category); returns the lists the page's forms draw, and the new id."""
+        words = body.get("words")
+        if isinstance(words, str):
+            words = words.split(",")
+        if not isinstance(words, list):
+            raise Problem("Give the words a quote about it would use")
+        entry = extract.add_category(str(body.get("label", "")), words, str(body.get("help", "")), self.paths.extra_categories)
+        return {"id": entry["id"], "catalog": catalog_terms()}
 
     def set_card_option(self, body: dict) -> dict:
         """Turn a card option (review.CARD_OPTIONS) on or off; returns the card's options."""
@@ -885,6 +897,8 @@ class App:
                 return self.set_card_url(body)
             if path == "/api/card-options":
                 return self.set_card_option(body)
+            if path == "/api/category":
+                return self.add_category(body)
             if path == "/api/test-model":
                 return self.test_model()
             if path == "/api/ask":

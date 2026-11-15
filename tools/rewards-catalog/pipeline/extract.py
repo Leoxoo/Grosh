@@ -242,6 +242,60 @@ RULE_SCHEMA = {
                  "requires", "paysWith", "merchants", "validFrom", "validTo", "firstMonths", "tier", "quote", "conditions"],
     "additionalProperties": False,
 }
+
+# Categories a person added on the review page (`add_category`), kept in data/extra-categories.json and listed before Everything
+# else. They are in the same dicts as the built-in ones, which are rebuilt in place when one is added, so everything reading
+# CATEGORIES sees them at once. The app has to list a new category as well (RewardCategory.fixed): the test that reads that file
+# fails until it does, and until then publishing a rule on it ships a category the app doesn't know.
+EXTRA_CATEGORIES = fetch.DATA / "extra-categories.json"
+BUILT_IN_CATEGORIES = dict(CATEGORY_TABLE)
+CATEGORY_ID = re.compile(r"[a-z]+(-[a-z]+)*")
+
+
+def set_extra_categories(extra: list[dict]) -> None:
+    """Make the live category tables the built-in ones plus `extra` ({"id", "label", "help", "words"} each), before Everything else."""
+    last = "everything-else"
+    table = {name: row for name, row in BUILT_IN_CATEGORIES.items() if name != last}
+    table.update({row["id"]: {"label": row["label"], "help": row["help"], "words": tuple(row["words"])} for row in extra})
+    table[last] = BUILT_IN_CATEGORIES[last]
+    for live, field in ((CATEGORY_TABLE, None), (CATEGORIES, "words"), (CATEGORY_HELP, "help"), (CATEGORY_LABELS, "label")):
+        live.clear()
+        live.update({name: (row if field is None else row[field]) for name, row in table.items()})
+    RULE_SCHEMA["properties"]["categories"]["items"]["enum"][:] = list(CATEGORIES)
+
+
+def load_extra_categories(path: Path = EXTRA_CATEGORIES) -> list[dict]:
+    extra = fetch.read_json(path, [])
+    set_extra_categories(extra)
+    return extra
+
+
+def add_category(label: str, words: list[str], help: str, path: Path = EXTRA_CATEGORIES, id: str = "") -> dict:
+    """Add a category to the catalog's list: its `label`, what it covers (`help`, shown to the model) and the `words` a quote
+    about it would use. The id is made from the label unless given. Saved to `path` and live at once. ValueError says what is wrong."""
+    label, help = " ".join(str(label).split()), " ".join(str(help).split())
+    words = list(dict.fromkeys(" ".join(str(w).lower().split()) for w in words if str(w).strip()))
+    name = id.strip() or re.sub(r"[^a-z]+", "-", unicodedata.normalize("NFKD", label).encode("ascii", "ignore").decode().lower()).strip("-")
+    if not 1 <= len(label) <= 40:
+        raise ValueError("A category needs a name of up to 40 characters")
+    if not CATEGORY_ID.fullmatch(name) or len(name) > 40:
+        raise ValueError(f"The id must be lowercase words joined by hyphens (got {name!r}): give the category a name made of letters")
+    if name in CATEGORIES:
+        raise ValueError(f"There is already a category with the id {name} ({CATEGORY_LABELS[name]})")
+    if label.lower() in (existing.lower() for existing in CATEGORY_LABELS.values()):
+        raise ValueError(f"There is already a category called {label}")
+    if not help or len(help) > 200:
+        raise ValueError("Say what the category covers, in up to 200 characters: the model reads it")
+    if not words or any(len(w) < 3 for w in words):
+        raise ValueError("Give the words a quote about it would use, each at least 3 letters (a quote that has none of them can't be filed under it)")
+    extra = fetch.read_json(path, [])
+    entry = {"id": name, "label": label, "help": help, "words": words}
+    fetch.write_json(path, [*extra, entry])
+    set_extra_categories([*extra, entry])
+    return entry
+
+
+load_extra_categories()
 SCHEMA = {
     "type": "object",
     "properties": {

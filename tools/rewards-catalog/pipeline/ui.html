@@ -691,10 +691,39 @@ function reviewRule(cardId, x) {
     fixArea);
 }
 
+// The category checkboxes of the fix and add-rule forms, with "Add a category…": a category the catalog lacks is added to the
+// shared list (data/extra-categories.json), drawn at once and ticked. `values()` are the ticked ids.
+function categoryPicker(selected) {
+  const chosen = new Set(selected), box = h("div", {}), area = h("div", {});
+  const draw = () => fill(box, h("div", { class: "cats" }, state.overview.catalog.categories.map((c) =>
+    h("label", { title: c.help }, h("input", { type: "checkbox", value: c.id, checked: chosen.has(c.id),
+      onchange: (e) => (e.target.checked ? chosen.add(c.id) : chosen.delete(c.id)) }), c.label))));
+  const open = () => {
+    if (area.childNodes.length) return fill(area);
+    const label = h("input", { type: "text", placeholder: "Pet stores", style: "width: 180px" });
+    const words = h("input", { type: "text", placeholder: "pet store, veterinar", style: "width: 280px" });
+    const help = h("input", { type: "text", placeholder: "pet stores and veterinary care", style: "width: 280px" });
+    const error = h("div", {});
+    const add = async (e) => {
+      e.target.disabled = true; fill(error);
+      try {
+        const made = await api("POST", "/api/category", { label: label.value, words: words.value, help: help.value });
+        state.overview.catalog = made.catalog; chosen.add(made.id); draw(); fill(area);
+      } catch (err) { fill(error, h("div", { class: "result bad", text: err.message })); e.target.disabled = false; }
+    };
+    fill(area, h("div", { class: "fix" },
+      h("div", { class: "small muted", text: "Adds a category for every card. The words are what a quote about it says: a rule is filed under it only if its quote has one of them. The app has to list it too (RewardCategory.swift) before a catalog with it can ship." }),
+      h("div", { class: "row" }, h("label", {}, "Name ", label), h("label", {}, "Words, comma separated ", words), h("label", {}, "What it covers ", help)),
+      error, h("div", { class: "row" }, h("button", { type: "button", class: "primary", text: "Add category", onclick: add }), h("button", { type: "button", text: "Cancel", onclick: () => fill(area) }))));
+  };
+  draw();
+  return { element: h("div", {}, box, h("div", { class: "row" }, h("button", { type: "button", text: "Add a category…", onclick: open })), area), values: () => [...chosen] };
+}
+
 // The fields a person may fix on a rule (review.EDITABLE). The server checks the result against the quote.
 function fixForm(r, save, cancel) {
   const cat = state.overview.catalog, error = h("div", {});
-  const cats = cat.categories.map((c) => h("input", { type: "checkbox", value: c.id, checked: r.categories.includes(c.id) }));
+  const cats = categoryPicker(r.categories);
   const reqs = cat.requires.map((q) => h("input", { type: "checkbox", value: q, checked: r.requires.includes(q) }));
   const rate = h("input", { type: "number", step: "0.01", min: "0", value: r.rate, style: "width: 90px" });
   const unit = h("select", {}, h("option", { value: "percent", text: "% cash back" }), h("option", { value: "per-dollar", text: "points or miles per $1" }));
@@ -709,7 +738,7 @@ function fixForm(r, save, cancel) {
     const cap = capAmount.value === "" ? null : +capAmount.value;
     try {
       await save({
-        categories: cats.filter((b) => b.checked).map((b) => b.value), rate: +rate.value, unit: unit.value,
+        categories: cats.values(), rate: +rate.value, unit: unit.value,
         capAmount: cap, capPeriod: cap == null ? null : capPeriod.value || null,
         requires: reqs.filter((b) => b.checked).map((b) => b.value), tier: tier.value || null,
         paysWith: paysWith.value.trim() || null, merchants: merchants.value.split(",").map((m) => m.trim()).filter(Boolean),
@@ -722,7 +751,7 @@ function fixForm(r, save, cancel) {
   };
   return h("div", { class: "fix" },
     h("div", { class: "small muted", text: r.selection === "fixed" ? "A fixed rate has one category, or none if it's for a way of paying or named merchants. Tick several and it becomes one rule per category." : `This rule is "${r.selection}": tick every category it offers.` }),
-    h("div", { class: "cats" }, cat.categories.map((c, i) => h("label", { title: c.help }, cats[i], c.label))),
+    cats.element,
     h("div", { class: "row" }, h("label", {}, "Rate ", rate), h("label", {}, "Unit ", unit), h("label", {}, "Cap $ ", capAmount), h("label", {}, "per ", capPeriod), h("label", {}, "Tier ", tier)),
     h("div", { class: "reqs" }, "Requires: ", cat.requires.map((q, i) => h("label", {}, reqs[i], q)), h("label", {}, "paying with ", paysWith)),
     h("div", { class: "row" }, h("label", {}, "Only at ", merchants)),
@@ -763,7 +792,7 @@ const RULE_DEFAULTS = { categories: [], selection: "fixed", picks: null, hasOthe
   requires: [], paysWith: null, merchants: [], validFrom: null, validTo: null, firstMonths: null, tier: null, quote: "", conditions: [] };
 function ruleForm(initial, pageLines, save, cancel, note) {
   const r = { ...RULE_DEFAULTS, ...initial }, cat = state.overview.catalog, error = h("div", {});
-  const cats = cat.categories.map((c) => h("input", { type: "checkbox", value: c.id, checked: r.categories.includes(c.id) }));
+  const cats = categoryPicker(r.categories);
   const reqs = cat.requires.map((q) => h("input", { type: "checkbox", value: q, checked: r.requires.includes(q) }));
   const selection = h("select", {}, [["fixed", "Fixed: one category, or a way of paying or merchants"], ["choose", "You choose the categories"],
     ["top-spend", "The card picks your top-spend categories"], ["rotating", "Rotating bonus categories"]].map(([v, t]) => h("option", { value: v, text: t })));
@@ -786,7 +815,7 @@ function ruleForm(initial, pageLines, save, cancel, note) {
   selection.value = r.selection; unit.value = r.unit; capPeriod.value = r.capPeriod || ""; tier.value = r.tier || "";
   const fields = () => {
     const num = (el) => (el.value === "" ? null : +el.value), cap = num(capAmount), lines = (t) => t.split("\n").map((x) => x.trim()).filter(Boolean);
-    return { categories: cats.filter((b) => b.checked).map((b) => b.value), selection: selection.value,
+    return { categories: cats.values(), selection: selection.value,
       picks: selection.value === "choose" || selection.value === "top-spend" ? num(picks) : null,
       hasOtherChoices: selection.value === "choose" || selection.value === "top-spend" ? other.checked : false,
       rate: +rate.value, unit: unit.value, capAmount: cap, capPeriod: cap == null ? null : capPeriod.value || null,
@@ -807,7 +836,7 @@ function ruleForm(initial, pageLines, save, cancel, note) {
   return h("div", { class: "fix" },
     note ? h("div", { class: "small muted", text: note }) : null,
     h("div", { class: "row" }, h("label", {}, "Kind ", selection)),
-    h("div", { class: "cats" }, cat.categories.map((c, i) => h("label", { title: c.help }, cats[i], c.label))),
+    cats.element,
     h("div", { class: "row" }, h("label", {}, "Picks ", picks), h("label", { style: "display: flex; flex-direction: row; gap: 6px; align-items: center" }, other, "the page lists more choices than these"), h("span", { class: "small muted", text: "(only for the kinds where you or the card pick)" })),
     h("div", { class: "row" }, h("label", {}, "Rate ", rate), h("label", {}, "Unit ", unit), h("label", {}, "Cap $ ", capAmount), h("label", {}, "per ", capPeriod), h("label", {}, "Tier ", tier)),
     h("div", { class: "reqs" }, "Requires: ", cat.requires.map((q, i) => h("label", {}, reqs[i], q)), h("label", {}, "paying with ", paysWith)),

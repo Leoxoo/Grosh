@@ -58,7 +58,8 @@ class AppCase(unittest.TestCase):
         root = Path(tmp.name)
         self.paths = ui.Paths(seed=root / "seed.json", state=root / "state.json", cache=root / "cache", manual=root / "manual.json",
                               decisions=root / "review-decisions.json", options=root / "card-options.json",
-                              catalog=root / "rewards-catalog.json", url_overrides=root / "url-overrides.json")
+                              catalog=root / "rewards-catalog.json", url_overrides=root / "url-overrides.json",
+                              extra_categories=root / "extra-categories.json")
         self.cards = [card("bank-a", "Savor Rewards"), card("bank-b", "Other Card"), card("zed-c", "Zed Card", "Zed")]
         self.paths.seed.write_text(json.dumps({"cards": self.cards}))
         self.state: dict = {}
@@ -1000,6 +1001,17 @@ class ReviewTests(AppCase):
         (published,) = json.loads(self.paths.catalog.read_text())["cards"]
         self.assertEqual([r["evidence"]["quote"] for r in published["rules"]], [RULE["quote"]])
         self.assertEqual(ui.Paths().catalog.parts[-3:], ("Grosh", "Resources", "rewards-catalog.json"))  # the one copy, the file the app bundles
+
+    def test_a_category_added_on_the_page_is_saved_and_offered_to_every_form(self):
+        self.addCleanup(extract.load_extra_categories, self.paths.extra_categories.with_name("none.json"))
+        status, made = self.app.handle("POST", "/api/category", {}, {"label": "Pet stores", "words": "pet store, veterinar", "help": "pet stores"})
+        self.assertEqual((status, made["id"]), (200, "pet-stores"))
+        self.assertIn("pet-stores", [c["id"] for c in made["catalog"]["categories"]])
+        self.assertEqual(json.loads(self.paths.extra_categories.read_text())[0]["words"], ["pet store", "veterinar"])
+        self.assertIn("pet-stores", [c["id"] for c in self.app.overview()["catalog"]["categories"]])
+        status, problem = self.app.handle("POST", "/api/category", {}, {"label": "Pet stores", "words": "x store", "help": "again"})
+        self.assertEqual(status, 400)
+        self.assertIn("already", problem["error"])
 
     def test_a_card_option_is_saved_shown_in_the_card_and_published(self):
         facts = {"isBusiness": False, "rewardProgram": None, "baseEarnRate": 1, "discontinued": False}
