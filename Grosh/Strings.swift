@@ -35,6 +35,8 @@ nonisolated enum Strings {
         static let remove: LocalizedStringResource = "Remove"
         static let none: LocalizedStringResource = "None"
         static let choose: LocalizedStringResource = "Choose"
+        static let chooseCategory: LocalizedStringResource = "Choose Category"
+        static let chooseCard: LocalizedStringResource = "Choose Card"
         static let any: LocalizedStringResource = "Any"
         static let name: LocalizedStringResource = "Name"
         static let amount: LocalizedStringResource = "Amount"

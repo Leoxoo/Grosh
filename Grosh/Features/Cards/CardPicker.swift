@@ -17,6 +17,8 @@ struct CardPicker: View {
     private let offered: Offered
     /// The first choice, which picks no Card.
     private let noneTitle: LocalizedStringResource
+    /// What the compact row shows when nothing is picked; `nil` uses `noneTitle`.
+    private let placeholderTitle: LocalizedStringResource?
 
     @Query(Card.listed) private var listedCards: [Card]
     @Query(RewardCategories.ownInOrder) private var ownRewardCategories: [OwnRewardCategory]
@@ -47,6 +49,7 @@ struct CardPicker: View {
         _selection = selection
         offered = .paidFrom(wallet, category: category, day: day)
         noneTitle = Strings.Common.none
+        placeholderTitle = Strings.Common.chooseCard
     }
 
     /// Any Card, archived ones included, or none (`noneTitle`, such as "Any"): for filters.
@@ -56,6 +59,7 @@ struct CardPicker: View {
         _selection = selection
         offered = .every
         self.noneTitle = noneTitle
+        placeholderTitle = nil
     }
 
 
@@ -73,7 +77,7 @@ struct CardPicker: View {
     @ViewBuilder
     private func cardRow(choices: [CardEarning]) -> some View {
         if systemImage != nil {
-            FormFieldRow(title: title, compact: true, leading: cardRowMark) {
+            FormFieldRow(title: title, compact: true, appliesListChrome: false, leading: cardRowMark) {
                 cardRowContent(choices: choices)
             }
         } else {
@@ -96,7 +100,7 @@ struct CardPicker: View {
                 }
             }
         } else {
-            Text(noneTitle)
+            Text(placeholderTitle ?? noneTitle)
                 .foregroundStyle(.secondary)
         }
     }
@@ -114,6 +118,7 @@ struct CardPicker: View {
                 if systemImage != nil {
                     Button { isChoosingCard = true } label: { cardRow(choices: choices) }
                         .buttonStyle(.plain)
+                        .compactFormRowChrome(true)
                         .navigationDestination(isPresented: $isChoosingCard) {
                             CardChoiceList(
                                 title: title, wallet: wallet, category: category, day: day ?? today, selection: $selection

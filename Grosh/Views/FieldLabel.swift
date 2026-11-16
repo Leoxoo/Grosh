@@ -53,25 +53,30 @@ extension View {
 struct FormFieldRow<Content: View>: View {
     let title: LocalizedStringResource
     let compact: Bool
+    /// When the row sits inside a list-row ``Button`` or ``NavigationLink``, put ``View/compactFormRowChrome(_:)`` on
+    /// that wrapper instead so the form does not pick up a second leading inset.
+    let appliesListChrome: Bool
     private let leading: AnyView
     @ViewBuilder let content: () -> Content
 
     init(
-        title: LocalizedStringResource, systemImage: String?,
+        title: LocalizedStringResource, systemImage: String?, appliesListChrome: Bool = true,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.title = title
         compact = systemImage != nil
+        self.appliesListChrome = appliesListChrome
         leading = AnyView(FieldLabel(title: title, systemImage: systemImage).compactFormMarkSlot())
         self.content = content
     }
 
     init(
-        title: LocalizedStringResource, compact: Bool, leading: some View,
+        title: LocalizedStringResource, compact: Bool, appliesListChrome: Bool = true, leading: some View,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.title = title
         self.compact = compact
+        self.appliesListChrome = appliesListChrome
         self.leading = AnyView(leading.compactFormMarkSlot())
         self.content = content
     }
@@ -89,6 +94,6 @@ struct FormFieldRow<Content: View>: View {
                 LabeledContent(content: content, label: { leading })
             }
         }
-        .compactFormRowChrome(compact)
+        .compactFormRowChrome(compact && appliesListChrome)
     }
 }

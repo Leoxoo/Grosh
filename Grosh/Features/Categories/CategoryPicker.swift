@@ -64,13 +64,13 @@ struct CategoryPicker: View {
     }
 
     private var categoryRow: some View {
-        FormFieldRow(title: title, compact: systemImage != nil, leading: categoryRowMark) {
+        FormFieldRow(title: title, compact: systemImage != nil, appliesListChrome: false, leading: categoryRowMark) {
             Group {
                 if let selection {
                     Text(selection.name)
                         .foregroundStyle(.primary)
                 } else {
-                    Text(noneTitle ?? Strings.Common.choose)
+                    Text(noneTitle ?? Strings.Common.chooseCategory)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -81,6 +81,7 @@ struct CategoryPicker: View {
         if systemImage != nil {
             Button { isChoosingCategory = true } label: { categoryRow }
                 .buttonStyle(.plain)
+                .compactFormRowChrome(true)
                 .navigationDestination(isPresented: $isChoosingCategory) {
                     CategoryChoiceList(
                         title: title, offered: offered, noneTitle: noneTitle, today: today, selection: $selection
