@@ -116,8 +116,12 @@ struct KeypadSheetFields {
     let saver: SheetSaver
 
     /// The row showing the amount typed on the Keypad.
-    func amountRow(_ title: LocalizedStringResource, currencyCode: String, tint: Color = .primary) -> some View {
-        AmountRow(title, field: KeypadSheetField.amount, entry: $entry, currencyCode: currencyCode, tint: tint)
+    func amountRow(
+        _ title: LocalizedStringResource, currencyCode: String, tint: Color = .primary, systemImage: String? = nil
+    ) -> some View {
+        AmountRow(field: KeypadSheetField.amount, entry: $entry, currencyCode: currencyCode, tint: tint) {
+            FieldLabel(title: title, systemImage: systemImage)
+        }
     }
 
     /// The row showing the form's second amount, such as a Purchase's total, typed on the same Keypad. Nothing is shown
@@ -132,8 +136,16 @@ struct KeypadSheetFields {
     }
 
     /// The Note field. Focusing it puts the Keypad away.
-    func noteField(_ text: Binding<String>) -> some View {
-        TextField(Strings.Common.note, text: text, axis: .vertical)
+    @ViewBuilder
+    func noteField(_ text: Binding<String>, systemImage: String? = nil) -> some View {
+        if let systemImage {
+            TextField(text: text, axis: .vertical) {
+                Label(Strings.Common.note, systemImage: systemImage)
+            }
             .focused(focus, equals: .note)
+        } else {
+            TextField(Strings.Common.note, text: text, axis: .vertical)
+                .focused(focus, equals: .note)
+        }
     }
 }

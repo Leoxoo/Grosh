@@ -103,7 +103,6 @@ final class GroshUITests: XCTestCase {
             app.buttons["Add Transaction"].tap()
             let sheet = app.navigationBars["Add Transaction"]
             walk.expect(sheet, "the Add Transaction sheet")
-            app.segmentedControls.buttons["Expense"].tap()
             // Typed as written on the Keypad, which is up when the sheet opens: 4, 2 makes 42.
             let four = app.buttons["Keypad.4"]
             walk.expect(four, "the Keypad")

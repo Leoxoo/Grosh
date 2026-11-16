@@ -6,6 +6,7 @@ import SwiftUI
 /// filter picks from every wallet, archived ones included, or none. The Transfer sheet's pickers also show balances.
 struct WalletPicker: View {
     let title: LocalizedStringResource
+    var systemImage: String?
     @Binding var selection: Wallet?
     /// Which wallets the picker offers, and what it shows beside them.
     private let offered: Offered
@@ -31,25 +32,26 @@ struct WalletPicker: View {
     }
 
     /// Picks from the unarchived wallets.
-    init(title: LocalizedStringResource, selection: Binding<Wallet?>) {
-        self.init(title: title, selection: selection, offered: .unarchived)
+    init(title: LocalizedStringResource, selection: Binding<Wallet?>, systemImage: String? = nil) {
+        self.init(title: title, selection: selection, offered: .unarchived, systemImage: systemImage)
     }
 
     /// Picks from the unarchived wallets, showing each one's balance from `balances`: the chosen wallet's on a Balance
     /// row of its own under the picker, and every wallet's in its option in the dropdown, so they can be compared before
     /// choosing. The row shows the chosen wallet's color.
-    init(title: LocalizedStringResource, selection: Binding<Wallet?>, balances: WalletBalances) {
-        self.init(title: title, selection: selection, offered: .unarchivedWithBalances(balances))
+    init(title: LocalizedStringResource, selection: Binding<Wallet?>, balances: WalletBalances, systemImage: String? = nil) {
+        self.init(title: title, selection: selection, offered: .unarchivedWithBalances(balances), systemImage: systemImage)
     }
 
     /// Picks from every wallet, archived ones included, or none (`noneTitle`, such as "Any"): for filters.
-    init(title: LocalizedStringResource, everyWalletOr noneTitle: LocalizedStringResource, selection: Binding<Wallet?>) {
-        self.init(title: title, selection: selection, offered: .everyWalletOr(noneTitle))
+    init(title: LocalizedStringResource, everyWalletOr noneTitle: LocalizedStringResource, selection: Binding<Wallet?>, systemImage: String? = nil) {
+        self.init(title: title, selection: selection, offered: .everyWalletOr(noneTitle), systemImage: systemImage)
     }
 
     /// Picks from the wallets `offered` names, fetching just those.
-    private init(title: LocalizedStringResource, selection: Binding<Wallet?>, offered: Offered) {
+    private init(title: LocalizedStringResource, selection: Binding<Wallet?>, offered: Offered, systemImage: String? = nil) {
         self.title = title
+        self.systemImage = systemImage
         _selection = selection
         self.offered = offered
         _wallets = Query(offered.wallets)
@@ -57,7 +59,7 @@ struct WalletPicker: View {
 
     var body: some View {
         if case .unarchivedWithBalances(let balances) = offered {
-            LabeledContent(title) {
+            LabeledContent {
                 Menu {
                     Picker(title, selection: $selection) {
                         options(balances: balances)
@@ -68,6 +70,8 @@ struct WalletPicker: View {
                 }
                 .menuStyle(.button)
                 .buttonStyle(.borderless)
+            } label: {
+                FieldLabel(title: title, systemImage: systemImage)
             }
             if let selection {
                 LabeledContent(Strings.Common.balance) {
@@ -75,11 +79,13 @@ struct WalletPicker: View {
                 }
             }
         } else {
-            Picker(title, selection: $selection) {
+            Picker(selection: $selection) {
                 if case .everyWalletOr(let noneTitle) = offered {
                     Text(noneTitle).tag(Wallet?.none)
                 }
                 options(balances: nil)
+            } label: {
+                FieldLabel(title: title, systemImage: systemImage)
             }
         }
     }

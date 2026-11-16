@@ -87,17 +87,6 @@ private struct TransactionForm: View {
             failureTitle: Strings.Transactions.couldntSave,
             save: save
         ) { fields in
-            Section {
-                Picker(Strings.Common.type, selection: $draft.type) {
-                    ForEach(draft.types, id: \.self) { type in
-                        Text(type.title).tag(type)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .disabled(draft.isLockedByPayments)
-            }
-
             mainSection(fields)
             detailsSection
         }
@@ -111,22 +100,28 @@ private struct TransactionForm: View {
 
     private func mainSection(_ fields: KeypadSheetFields) -> some View {
         Section {
-            WalletPicker(title: Strings.Common.wallet, selection: $draft.wallet)
+            WalletPicker(title: Strings.Common.wallet, selection: $draft.wallet, systemImage: "wallet.pass")
                 .disabled(draft.isLockedByPayments)
-            fields.amountRow(Strings.Common.amount, currencyCode: draft.currencyCode, tint: draft.direction.tint)
-            CategoryPicker(title: Strings.Common.category, type: draft.type, selection: $draft.category)
+            fields.amountRow(
+                Strings.Common.amount, currencyCode: draft.currencyCode, tint: draft.direction.tint,
+                systemImage: "banknote"
+            )
+            CategoryPicker(
+                title: Strings.Common.category, type: $draft.type, types: draft.types, selection: $draft.category,
+                systemImage: "tag"
+            )
                 .disabled(draft.isLockedByPayments)
                 .accessibilityIdentifier("TransactionEditor.category")
             if draft.offersCard {
                 CardPicker(
                     title: Strings.Common.card, wallet: draft.wallet, category: draft.category, day: draft.day,
-                    selection: $draft.card
+                    selection: $draft.card, systemImage: "creditcard"
                 )
                     .accessibilityIdentifier("TransactionEditor.card")
             }
-            fields.noteField($draft.note)
+            fields.noteField($draft.note, systemImage: "note.text")
                 .accessibilityIdentifier("TransactionEditor.note")
-            DayStepper(title: Strings.Common.date, day: $draft.day)
+            DayStepper(title: Strings.Common.date, day: $draft.day, systemImage: "calendar", showsWeekday: true)
         } footer: {
             if let problem = draft.shownProblem {
                 Text(problem.localizedDescription)

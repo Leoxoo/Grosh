@@ -1,12 +1,15 @@
 import SwiftUI
 
 /// A form row for a transaction's date: a date picker between ‹ and › buttons that step one day back or forward.
+/// `showsWeekday` writes the day of the week with the date, such as "Friday, Nov 13, 2026".
 struct DayStepper: View {
     let title: LocalizedStringResource
     @Binding var day: CalendarDay
+    var systemImage: String?
+    var showsWeekday = false
 
     var body: some View {
-        LabeledContent(title) {
+        LabeledContent {
             HStack(spacing: 4) {
                 Button {
                     day = day.adding(days: -1)
@@ -16,8 +19,7 @@ struct DayStepper: View {
                 }
                 .accessibilityLabel(Strings.Common.previousDay)
 
-                DayPicker(title: title, day: $day)
-                    .labelsHidden()
+                dateControl
 
                 Button {
                     day = day.adding(days: 1)
@@ -28,6 +30,31 @@ struct DayStepper: View {
                 .accessibilityLabel(Strings.Common.nextDay)
             }
             .buttonStyle(.borderless)
+        } label: {
+            FieldLabel(title: title, systemImage: systemImage)
+        }
+    }
+
+    @ViewBuilder
+    private var dateControl: some View {
+        if showsWeekday {
+            let weekday = day.date().formatted(.dateTime.weekday(.wide).month(.abbreviated).day().year())
+            ZStack {
+                DayPicker(title: title, day: $day)
+                    .labelsHidden()
+                    .opacity(0.011)
+                    .accessibilityHidden(true)
+                Text(weekday)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .allowsHitTesting(false)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(weekday)
+            .accessibilityAddTraits(.isButton)
+        } else {
+            DayPicker(title: title, day: $day)
+                .labelsHidden()
         }
     }
 }

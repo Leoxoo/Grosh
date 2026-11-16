@@ -92,6 +92,9 @@ struct CategoryListView: View {
     @ViewBuilder
     private var categorySections: some View {
         Section {
+            if type.isUserManaged {
+                Button(Strings.Categories.newCategory, systemImage: "plus.circle") { editorMode = .add(type) }
+            }
             ForEach(rows) { category in
                 let canDelete = usage.canDelete(category)
                 Button {

@@ -11,6 +11,7 @@ import SwiftUI
 /// none.
 struct CardPicker: View {
     let title: LocalizedStringResource
+    var systemImage: String?
     @Binding var selection: Card?
     /// The Cards of one wallet, or every Card.
     private let offered: Offered
@@ -38,17 +39,19 @@ struct CardPicker: View {
     /// best first for what it earns on `day`, the transaction's own (today when not given).
     init(
         title: LocalizedStringResource, wallet: Wallet?, category: Category? = nil, day: CalendarDay? = nil,
-        selection: Binding<Card?>
+        selection: Binding<Card?>, systemImage: String? = nil
     ) {
         self.title = title
+        self.systemImage = systemImage
         _selection = selection
         offered = .paidFrom(wallet, category: category, day: day)
         noneTitle = Strings.Common.none
     }
 
     /// Any Card, archived ones included, or none (`noneTitle`, such as "Any"): for filters.
-    init(title: LocalizedStringResource, everyCardOr noneTitle: LocalizedStringResource, selection: Binding<Card?>) {
+    init(title: LocalizedStringResource, everyCardOr noneTitle: LocalizedStringResource, selection: Binding<Card?>, systemImage: String? = nil) {
         self.title = title
+        self.systemImage = systemImage
         _selection = selection
         offered = .every
         self.noneTitle = noneTitle
@@ -66,7 +69,7 @@ struct CardPicker: View {
             NavigationLink {
                 CardChoiceList(title: title, wallet: wallet, category: category, day: day ?? today, selection: $selection)
             } label: {
-                LabeledContent(title) {
+                LabeledContent {
                     if let selection {
                         VStack(alignment: .trailing, spacing: 2) {
                             Text(selection.displayName)
@@ -79,6 +82,8 @@ struct CardPicker: View {
                     } else {
                         Text(noneTitle)
                     }
+                } label: {
+                    FieldLabel(title: title, systemImage: systemImage)
                 }
             }
         case .every:

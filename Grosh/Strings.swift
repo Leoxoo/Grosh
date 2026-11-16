@@ -510,6 +510,7 @@ nonisolated enum Strings {
         static let nameTaken: LocalizedStringResource = "Another category of this type already has this name."
         static let fixedType: LocalizedStringResource = "Only Expense and Income categories can be added or moved."
         static let addCategory: LocalizedStringResource = "Add Category"
+        static let newCategory: LocalizedStringResource = "New category"
         static let editCategory: LocalizedStringResource = "Edit Category"
         static let couldntSave: LocalizedStringResource = "Couldn't Save Category"
         static let parent: LocalizedStringResource = "Parent"
