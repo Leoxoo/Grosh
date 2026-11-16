@@ -17,7 +17,6 @@ struct CategoryPicker: View {
     private let noneTitle: LocalizedStringResource?
 
     @Environment(\.today) private var today
-    @State private var isChoosingCategory = false
 
     /// A transaction's category: those of `type` the user may pick by hand.
     init(title: LocalizedStringResource, type: CategoryType, selection: Binding<Category?>, systemImage: String? = nil) {
@@ -79,14 +78,18 @@ struct CategoryPicker: View {
 
     var body: some View {
         if systemImage != nil {
-            Button { isChoosingCategory = true } label: { categoryRow }
-                .buttonStyle(.plain)
-                .compactFormRowChrome(true)
-                .navigationDestination(isPresented: $isChoosingCategory) {
-                    CategoryChoiceList(
-                        title: title, offered: offered, noneTitle: noneTitle, today: today, selection: $selection
-                    )
-                }
+            // A link, not a destination modifier on the row: a Form is a list, and a destination registered inside it
+            // is rebuilt with the row.
+            NavigationLink {
+                CategoryChoiceList(
+                    title: title, offered: offered, noneTitle: noneTitle, today: today, selection: $selection
+                )
+            } label: {
+                categoryRow
+            }
+            .buttonStyle(.plain)
+            .navigationLinkIndicatorVisibility(.hidden)
+            .compactFormRowChrome(true)
         } else {
             NavigationLink {
                 CategoryChoiceList(

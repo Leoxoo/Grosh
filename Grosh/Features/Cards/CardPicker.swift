@@ -30,7 +30,6 @@ struct CardPicker: View {
     /// The Cards with what each earns, kept until what they were worked out from changes or the store saves
     /// (``CardChoicesKey``), so a top-spend Card's spending isn't fetched again on every keystroke in the form.
     @State private var keptChoices = DrawingCache<CardChoicesKey, [CardEarning]>()
-    @State private var isChoosingCard = false
 
     private enum Offered {
         /// The Cards paid from a wallet, ordered for what a purchase in the category on the day earns when there is one.
@@ -66,8 +65,15 @@ struct CardPicker: View {
     @ViewBuilder
     private var cardRowMark: some View {
         if let selection {
-            CardMark(card: selection, height: 28, shrunkForScale: displayScale)
-                .accessibilityLabel(Text(title))
+            // A picture drawn at the mark's height is a wide card, much bigger than the symbol. Fit it to that symbol.
+            Group {
+                if selection.image != nil {
+                    CardSymbolPhoto(card: selection)
+                } else {
+                    CardMark(card: selection, height: CompactFormLayout.markSide, shrunkForScale: displayScale)
+                }
+            }
+            .accessibilityLabel(Text(title))
         } else {
             FieldLabel(title: title, systemImage: systemImage)
         }
@@ -116,14 +122,18 @@ struct CardPicker: View {
             }
             Group {
                 if systemImage != nil {
-                    Button { isChoosingCard = true } label: { cardRow(choices: choices) }
-                        .buttonStyle(.plain)
-                        .compactFormRowChrome(true)
-                        .navigationDestination(isPresented: $isChoosingCard) {
-                            CardChoiceList(
-                                title: title, wallet: wallet, category: category, day: day ?? today, selection: $selection
-                            )
-                        }
+                    // A link, not a destination modifier on the row: a Form is a list, and a destination registered
+                    // inside it is rebuilt with the row.
+                    NavigationLink {
+                        CardChoiceList(
+                            title: title, wallet: wallet, category: category, day: day ?? today, selection: $selection
+                        )
+                    } label: {
+                        cardRow(choices: choices)
+                    }
+                    .buttonStyle(.plain)
+                    .navigationLinkIndicatorVisibility(.hidden)
+                    .compactFormRowChrome(true)
                 } else {
                     NavigationLink {
                         CardChoiceList(
@@ -177,6 +187,35 @@ struct CardPicker: View {
     }
 }
 
+/// A Card's picture at the size of its symbol. The compact row's mark slot is taller than that symbol, and a picture
+/// drawn to the slot's height is a wide card.
+private struct CardSymbolPhoto: View {
+    let card: Card
+
+    var body: some View {
+        CardSymbol(color: card.color.color, font: nil)
+            .hidden()
+            .overlay {
+                if let image = card.image {
+                    GeometryReader { geo in
+                        let height = min(geo.size.height, geo.size.width / CropShape.creditCard.aspect)
+                        Image(decorative: image, scale: 1)
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: height * CropShape.creditCard.aspect, height: height)
+                            .clipShape(
+                                RoundedRectangle(
+                                    cornerRadius: height * CropShape.creditCard.cornerRatio, style: .continuous
+                                )
+                            )
+                            .frame(width: geo.size.width, height: geo.size.height)
+                    }
+                }
+            }
+            .accessibilityHidden(true)
+    }
+}
+
 /// The list a transaction's ``CardPicker`` pushes: "None", then the Cards in the order given, each with its mark, its
 /// name and, when the category earns on it, a second line saying what. Picking one goes back.
 private struct CardChoiceList: View {
@@ -193,7 +232,6 @@ private struct CardChoiceList: View {
     @Environment(\.modelContext) private var context
     @StoreSaves private var saves
     @State private var keptChoices = DrawingCache<CardChoicesKey, [CardEarning]>()
-    @State private var isChoosingCard = false
 
     var body: some View {
         // Worked out here rather than handed over by the form, which redraws as the list goes back, and kept until what
