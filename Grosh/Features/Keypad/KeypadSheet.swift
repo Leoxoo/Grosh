@@ -135,14 +135,17 @@ struct KeypadSheetFields {
         }
     }
 
-    /// The Note field. Focusing it puts the Keypad away.
+    /// The Note field. Focusing it puts the Keypad away. With an icon, the title sits on the leading side, as the
+    /// other rows do; a text field's own label does not draw one.
     @ViewBuilder
     func noteField(_ text: Binding<String>, systemImage: String? = nil) -> some View {
         if let systemImage {
-            TextField(text: text, axis: .vertical) {
-                Label(Strings.Common.note, systemImage: systemImage)
+            LabeledContent {
+                TextField("", text: text, axis: .vertical)
+                    .focused(focus, equals: .note)
+            } label: {
+                FieldLabel(title: Strings.Common.note, systemImage: systemImage)
             }
-            .focused(focus, equals: .note)
         } else {
             TextField(Strings.Common.note, text: text, axis: .vertical)
                 .focused(focus, equals: .note)

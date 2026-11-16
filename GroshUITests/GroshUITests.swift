@@ -136,10 +136,12 @@ final class GroshUITests: XCTestCase {
                 walk.expect(sheet, "the Add Transaction sheet")
             }
 
-            let noteField = app.descendants(matching: .any).matching(identifier: "TransactionEditor.note").firstMatch
-            walk.expect(noteField, "the Note field")
-            noteField.tap()
-            noteField.typeText(note)
+            let noteRow = app.descendants(matching: .any).matching(identifier: "TransactionEditor.note").firstMatch
+            walk.expect(noteRow, "the Note field")
+            let noteField = noteRow.textFields.firstMatch
+            let typing = noteField.exists ? noteField : noteRow
+            typing.tap()
+            typing.typeText(note)
             XCTAssertTrue(
                 save.isEnabled,
                 "\(walk.current): Save is off, so the Expense still lacks a wallet, an amount, a category or its Card."
