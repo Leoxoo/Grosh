@@ -121,7 +121,8 @@ struct KeypadSheetFields {
     ) -> some View {
         AmountRow(
             field: KeypadSheetField.amount, entry: $entry, currencyCode: currencyCode, tint: tint,
-            alignsContentLeading: systemImage != nil
+            font: systemImage != nil ? .title.weight(.semibold) : .title2.weight(.semibold),
+            alignsContentLeading: systemImage != nil, showsAmountTitle: systemImage != nil, amountTitle: title, fieldIcon: systemImage
         ) {
             FieldLabel(title: title, systemImage: systemImage)
         }

@@ -17,6 +17,7 @@ struct CategoryPicker: View {
     private let noneTitle: LocalizedStringResource?
 
     @Environment(\.today) private var today
+    @State private var isChoosingCategory = false
 
     /// A transaction's category: those of `type` the user may pick by hand.
     init(title: LocalizedStringResource, type: CategoryType, selection: Binding<Category?>, systemImage: String? = nil) {
@@ -51,20 +52,51 @@ struct CategoryPicker: View {
         self.noneTitle = noneTitle
     }
 
+
+    @ViewBuilder
+    private var categoryRowMark: some View {
+        if let selection {
+            CategoryIcon(category: selection, size: 28)
+                .accessibilityLabel(Text(title))
+        } else {
+            FieldLabel(title: title, systemImage: systemImage)
+        }
+    }
+
+    private var categoryRow: some View {
+        FormFieldRow(title: title, compact: systemImage != nil, leading: categoryRowMark) {
+            Group {
+                if let selection {
+                    Text(selection.name)
+                        .foregroundStyle(.primary)
+                } else {
+                    Text(noneTitle ?? Strings.Common.choose)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
     var body: some View {
-        NavigationLink {
-            CategoryChoiceList(
-                title: title, offered: offered, noneTitle: noneTitle, today: today, selection: $selection
-            )
-        } label: {
-            FormFieldRow(title: title, systemImage: systemImage) {
-                Group {
+        if systemImage != nil {
+            Button { isChoosingCategory = true } label: { categoryRow }
+                .buttonStyle(.plain)
+                .navigationDestination(isPresented: $isChoosingCategory) {
+                    CategoryChoiceList(
+                        title: title, offered: offered, noneTitle: noneTitle, today: today, selection: $selection
+                    )
+                }
+        } else {
+            NavigationLink {
+                CategoryChoiceList(
+                    title: title, offered: offered, noneTitle: noneTitle, today: today, selection: $selection
+                )
+            } label: {
+                FormFieldRow(title: title, systemImage: nil) {
                     if let selection {
                         CategoryLabel(category: selection, indentsSubcategories: false)
-                            .foregroundStyle(.primary)
                     } else {
                         Text(noneTitle ?? Strings.Common.choose)
-                            .foregroundStyle(.secondary)
                     }
                 }
             }

@@ -20,6 +20,7 @@ struct DayStepper: View {
                 .accessibilityLabel(Strings.Common.previousDay)
 
                 dateControl
+                    .frame(maxWidth: .infinity)
 
                 Button {
                     day = day.adding(days: 1)
@@ -29,6 +30,7 @@ struct DayStepper: View {
                 }
                 .accessibilityLabel(Strings.Common.nextDay)
             }
+            .frame(maxWidth: .infinity)
             .buttonStyle(.borderless)
         }
     }
@@ -45,6 +47,8 @@ struct DayStepper: View {
                 Text(weekday)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
                     .allowsHitTesting(false)
             }
             .accessibilityElement(children: .ignore)

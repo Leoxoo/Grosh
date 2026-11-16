@@ -28,6 +28,7 @@ struct CardPicker: View {
     /// The Cards with what each earns, kept until what they were worked out from changes or the store saves
     /// (``CardChoicesKey``), so a top-spend Card's spending isn't fetched again on every keystroke in the form.
     @State private var keptChoices = DrawingCache<CardChoicesKey, [CardEarning]>()
+    @State private var isChoosingCard = false
 
     private enum Offered {
         /// The Cards paid from a wallet, ordered for what a purchase in the category on the day earns when there is one.
@@ -57,6 +58,49 @@ struct CardPicker: View {
         self.noneTitle = noneTitle
     }
 
+
+    @ViewBuilder
+    private var cardRowMark: some View {
+        if let selection {
+            CardMark(card: selection, height: 28, shrunkForScale: displayScale)
+                .accessibilityLabel(Text(title))
+        } else {
+            FieldLabel(title: title, systemImage: systemImage)
+        }
+    }
+
+
+    @ViewBuilder
+    private func cardRow(choices: [CardEarning]) -> some View {
+        if systemImage != nil {
+            FormFieldRow(title: title, compact: true, leading: cardRowMark) {
+                cardRowContent(choices: choices)
+            }
+        } else {
+            FormFieldRow(title: title, systemImage: nil) {
+                cardRowContent(choices: choices)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func cardRowContent(choices: [CardEarning]) -> some View {
+        if let selection {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(selection.displayName)
+                    .foregroundStyle(.primary)
+                if let detail = choices.first(where: { $0.card == selection })?.detail {
+                    Text(detail)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } else {
+            Text(noneTitle)
+                .foregroundStyle(.secondary)
+        }
+    }
+
     var body: some View {
         switch offered {
         case .paidFrom(let wallet, let category, let day):
@@ -66,23 +110,22 @@ struct CardPicker: View {
                     own: ownRewardCategories, context: context
                 )
             }
-            NavigationLink {
-                CardChoiceList(title: title, wallet: wallet, category: category, day: day ?? today, selection: $selection)
-            } label: {
-                FormFieldRow(title: title, systemImage: systemImage) {
-                    if let selection {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(selection.displayName)
-                                .foregroundStyle(.primary)
-                            if let detail = choices.first(where: { $0.card == selection })?.detail {
-                                Text(detail)
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                            }
+            Group {
+                if systemImage != nil {
+                    Button { isChoosingCard = true } label: { cardRow(choices: choices) }
+                        .buttonStyle(.plain)
+                        .navigationDestination(isPresented: $isChoosingCard) {
+                            CardChoiceList(
+                                title: title, wallet: wallet, category: category, day: day ?? today, selection: $selection
+                            )
                         }
-                    } else {
-                        Text(noneTitle)
-                            .foregroundStyle(.secondary)
+                } else {
+                    NavigationLink {
+                        CardChoiceList(
+                            title: title, wallet: wallet, category: category, day: day ?? today, selection: $selection
+                        )
+                    } label: {
+                        cardRow(choices: choices)
                     }
                 }
             }
@@ -145,6 +188,7 @@ private struct CardChoiceList: View {
     @Environment(\.modelContext) private var context
     @StoreSaves private var saves
     @State private var keptChoices = DrawingCache<CardChoicesKey, [CardEarning]>()
+    @State private var isChoosingCard = false
 
     var body: some View {
         // Worked out here rather than handed over by the form, which redraws as the list goes back, and kept until what

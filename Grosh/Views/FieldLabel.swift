@@ -1,5 +1,12 @@
 import SwiftUI
 
+/// Shared measurements for the compact Add Transaction form so every row's text starts in the same place.
+enum CompactFormLayout {
+    static let markSide: CGFloat = 28
+    static let markSpacing: CGFloat = 12
+    static let horizontalInset: CGFloat = 16
+}
+
 /// A form row's title, or an icon alone when `systemImage` is set so VoiceOver still has the field's name.
 struct FieldLabel: View {
     let title: LocalizedStringResource
@@ -10,35 +17,78 @@ struct FieldLabel: View {
             Image(systemName: systemImage)
                 .imageScale(.medium)
                 .foregroundStyle(.secondary)
-                .frame(width: 28, alignment: .center)
-                .accessibilityLabel(Text(title))
         } else {
             Text(title)
         }
     }
 }
 
+extension View {
+    /// Fixes the leading mark to the same width on every compact form row.
+    func compactFormMarkSlot() -> some View {
+        frame(width: CompactFormLayout.markSide, height: CompactFormLayout.markSide, alignment: .center)
+    }
+
+    @ViewBuilder
+    func compactFormRowChrome(_ compact: Bool) -> some View {
+        if compact {
+            self
+                .listRowInsets(
+                    EdgeInsets(
+                        top: 11, leading: CompactFormLayout.horizontalInset,
+                        bottom: 11, trailing: CompactFormLayout.horizontalInset
+                    )
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            self
+        }
+    }
+}
+
 /// A form row's leading mark and main content. With an icon-only mark (`systemImage` set), the content is
 /// left-aligned in one line; otherwise the mark is a ``LabeledContent`` title and the content stays at the trailing
-/// edge, as on other forms.
+/// edge, as on other forms. `leading` replaces the default ``FieldLabel`` when the mark should reflect a choice, such
+/// as a wallet's colored symbol.
 struct FormFieldRow<Content: View>: View {
     let title: LocalizedStringResource
-    var systemImage: String?
+    let compact: Bool
+    private let leading: AnyView
     @ViewBuilder let content: () -> Content
 
-    private var compact: Bool { systemImage != nil }
+    init(
+        title: LocalizedStringResource, systemImage: String?,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.title = title
+        compact = systemImage != nil
+        leading = AnyView(FieldLabel(title: title, systemImage: systemImage).compactFormMarkSlot())
+        self.content = content
+    }
+
+    init(
+        title: LocalizedStringResource, compact: Bool, leading: some View,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.title = title
+        self.compact = compact
+        self.leading = AnyView(leading.compactFormMarkSlot())
+        self.content = content
+    }
 
     var body: some View {
-        if compact {
-            HStack(alignment: .center, spacing: 12) {
-                FieldLabel(title: title, systemImage: systemImage)
-                content()
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        Group {
+            if compact {
+                HStack(alignment: .center, spacing: CompactFormLayout.markSpacing) {
+                    leading
+                    content()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                LabeledContent(content: content, label: { leading })
             }
-        } else {
-            LabeledContent(content: content, label: {
-                FieldLabel(title: title, systemImage: systemImage)
-            })
         }
+        .compactFormRowChrome(compact)
     }
 }

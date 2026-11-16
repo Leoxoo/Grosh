@@ -59,7 +59,7 @@ struct WalletPicker: View {
 
     var body: some View {
         if case .unarchivedWithBalances(let balances) = offered {
-            FormFieldRow(title: title, systemImage: systemImage) {
+            FormFieldRow(title: title, compact: systemImage != nil, leading: walletRowMark) {
                 walletMenu(balances: balances)
             }
             if let selection {
@@ -68,7 +68,7 @@ struct WalletPicker: View {
                 }
             }
         } else if systemImage != nil {
-            FormFieldRow(title: title, systemImage: systemImage) {
+            FormFieldRow(title: title, compact: true, leading: walletRowMark) {
                 walletMenu(balances: nil) {
                     if case .everyWalletOr(let noneTitle) = offered {
                         Text(noneTitle).tag(Wallet?.none)
@@ -101,15 +101,24 @@ struct WalletPicker: View {
             selectionLabel
         }
         .menuStyle(.button)
-        .buttonStyle(.borderless)
+        .buttonStyle(.plain)
     }
 
     /// The chosen wallet as the row shows it: its symbol on its colored circle and its name, on one line however long
     /// the name is. A picker's own row can't show the color, so this draws the menu's button itself.
+    @ViewBuilder
+    private var walletRowMark: some View {
+        if let selection {
+            SymbolCircle(symbolName: selection.symbolName, color: selection.color, size: 28)
+                .accessibilityLabel(Text(title))
+        } else {
+            FieldLabel(title: title, systemImage: systemImage)
+        }
+    }
+
     private var selectionLabel: some View {
         HStack(spacing: 8) {
             if let selection {
-                SymbolCircle(symbolName: selection.symbolName, color: selection.color)
                 Text(Self.name(of: selection))
                     .lineLimit(1)
                     .foregroundStyle(.primary)
@@ -117,11 +126,13 @@ struct WalletPicker: View {
                 Text(Strings.Common.choose)
                     .foregroundStyle(.secondary)
             }
+            Spacer(minLength: 0)
             Image(systemName: "chevron.up.chevron.down")
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// An option for each of the choices: the wallet's symbol and name, with its balance under the name when there are

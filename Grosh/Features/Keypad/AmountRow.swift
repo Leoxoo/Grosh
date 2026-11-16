@@ -17,6 +17,10 @@ struct AmountRow<Label: View>: View {
     var font: Font = .title2.weight(.semibold)
     /// Puts the amount on the leading side of the row, under an icon-only mark, rather than at the trailing edge.
     var alignsContentLeading = false
+    /// Writes the field name above the amount, as on the Add Transaction form.
+    var showsAmountTitle = false
+    var amountTitle: LocalizedStringResource?
+    var fieldIcon: String?
     @ViewBuilder let label: Label
 
     @Environment(KeypadTarget.self) private var keypad: KeypadTarget?
@@ -43,18 +47,28 @@ struct AmountRow<Label: View>: View {
             .monospacedDigit()
             .lineLimit(1)
             .minimumScaleFactor(0.5)
-            .padding(.horizontal, 6)
+            .padding(.horizontal, alignsContentLeading ? 0 : 6)
             .background(
                 isTypingHere ? AnyShapeStyle(.fill.tertiary) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 8)
             )
 
         Group {
-            if alignsContentLeading {
-                HStack(alignment: .center, spacing: 12) {
-                    label
+            if alignsContentLeading, showsAmountTitle, let amountTitle, let fieldIcon {
+                FormFieldRow(title: amountTitle, systemImage: fieldIcon) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(amountTitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        amount
+                    }
+                }
+            } else if alignsContentLeading {
+                HStack(alignment: .center, spacing: CompactFormLayout.markSpacing) {
+                    label.compactFormMarkSlot()
                     amount
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 LabeledContent {
                     amount
@@ -63,6 +77,7 @@ struct AmountRow<Label: View>: View {
                 }
             }
         }
+        .compactFormRowChrome(alignsContentLeading && !(showsAmountTitle && fieldIcon != nil))
         .contentShape(.rect)
         .onTapGesture(perform: tap)
         .amountKeyboardInput(typing: press)
