@@ -87,6 +87,17 @@ private struct TransactionForm: View {
             failureTitle: Strings.Transactions.couldntSave,
             save: save
         ) { fields in
+            Section {
+                Picker(Strings.Common.type, selection: $draft.type) {
+                    ForEach(draft.types, id: \.self) { type in
+                        Text(type.title).tag(type)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .disabled(draft.isLockedByPayments)
+            }
+
             mainSection(fields)
             detailsSection
         }
@@ -106,10 +117,7 @@ private struct TransactionForm: View {
                 Strings.Common.amount, currencyCode: draft.currencyCode, tint: draft.direction.tint,
                 systemImage: "banknote"
             )
-            CategoryPicker(
-                title: Strings.Common.category, type: $draft.type, types: draft.types, selection: $draft.category,
-                systemImage: "tag"
-            )
+            CategoryPicker(title: Strings.Common.category, type: draft.type, selection: $draft.category, systemImage: "tag")
                 .disabled(draft.isLockedByPayments)
                 .accessibilityIdentifier("TransactionEditor.category")
             if draft.offersCard {
