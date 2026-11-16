@@ -69,21 +69,21 @@ struct CardPicker: View {
             NavigationLink {
                 CardChoiceList(title: title, wallet: wallet, category: category, day: day ?? today, selection: $selection)
             } label: {
-                LabeledContent {
+                FormFieldRow(title: title, systemImage: systemImage) {
                     if let selection {
-                        VStack(alignment: .trailing, spacing: 2) {
+                        VStack(alignment: .leading, spacing: 2) {
                             Text(selection.displayName)
                                 .foregroundStyle(.primary)
                             if let detail = choices.first(where: { $0.card == selection })?.detail {
                                 Text(detail)
                                     .font(.footnote)
+                                    .foregroundStyle(.secondary)
                             }
                         }
                     } else {
                         Text(noneTitle)
+                            .foregroundStyle(.secondary)
                     }
-                } label: {
-                    FieldLabel(title: title, systemImage: systemImage)
                 }
             }
         case .every:

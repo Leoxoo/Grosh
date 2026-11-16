@@ -57,15 +57,16 @@ struct CategoryPicker: View {
                 title: title, offered: offered, noneTitle: noneTitle, today: today, selection: $selection
             )
         } label: {
-            LabeledContent {
-                if let selection {
-                    CategoryLabel(category: selection, indentsSubcategories: false)
-                        .foregroundStyle(.primary)
-                } else {
-                    Text(noneTitle ?? Strings.Common.choose)
+            FormFieldRow(title: title, systemImage: systemImage) {
+                Group {
+                    if let selection {
+                        CategoryLabel(category: selection, indentsSubcategories: false)
+                            .foregroundStyle(.primary)
+                    } else {
+                        Text(noneTitle ?? Strings.Common.choose)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-            } label: {
-                FieldLabel(title: title, systemImage: systemImage)
             }
         }
     }

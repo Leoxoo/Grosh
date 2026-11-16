@@ -15,14 +15,15 @@ struct AmountRow<Label: View>: View {
     /// Shown, dimmed, while nothing is typed, for an amount that may be left open, such as "Any"; `nil` shows 0.
     var placeholder: LocalizedStringResource?
     var font: Font = .title2.weight(.semibold)
+    /// Puts the amount on the leading side of the row, under an icon-only mark, rather than at the trailing edge.
+    var alignsContentLeading = false
     @ViewBuilder let label: Label
 
     @Environment(KeypadTarget.self) private var keypad: KeypadTarget?
     @FocusState private var hasKeyboardFocus: Bool
 
     var body: some View {
-        LabeledContent {
-            VStack(alignment: .trailing, spacing: 2) {
+        let amount = VStack(alignment: alignsContentLeading ? .leading : .trailing, spacing: 2) {
                 if entry.isCalculation {
                     Text(entry.text())
                         .font(.callout)
@@ -46,8 +47,21 @@ struct AmountRow<Label: View>: View {
             .background(
                 isTypingHere ? AnyShapeStyle(.fill.tertiary) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 8)
             )
-        } label: {
-            label
+
+        Group {
+            if alignsContentLeading {
+                HStack(alignment: .center, spacing: 12) {
+                    label
+                    amount
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                LabeledContent {
+                    amount
+                } label: {
+                    label
+                }
+            }
         }
         .contentShape(.rect)
         .onTapGesture(perform: tap)

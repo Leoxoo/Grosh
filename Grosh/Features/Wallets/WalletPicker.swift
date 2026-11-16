@@ -59,23 +59,20 @@ struct WalletPicker: View {
 
     var body: some View {
         if case .unarchivedWithBalances(let balances) = offered {
-            LabeledContent {
-                Menu {
-                    Picker(title, selection: $selection) {
-                        options(balances: balances)
-                    }
-                    .pickerStyle(.inline)
-                } label: {
-                    selectionLabel
-                }
-                .menuStyle(.button)
-                .buttonStyle(.borderless)
-            } label: {
-                FieldLabel(title: title, systemImage: systemImage)
+            FormFieldRow(title: title, systemImage: systemImage) {
+                walletMenu(balances: balances)
             }
             if let selection {
                 LabeledContent(Strings.Common.balance) {
                     AmountText(amount: balances.balance(of: selection), showsColor: false)
+                }
+            }
+        } else if systemImage != nil {
+            FormFieldRow(title: title, systemImage: systemImage) {
+                walletMenu(balances: nil) {
+                    if case .everyWalletOr(let noneTitle) = offered {
+                        Text(noneTitle).tag(Wallet?.none)
+                    }
                 }
             }
         } else {
@@ -88,6 +85,23 @@ struct WalletPicker: View {
                 FieldLabel(title: title, systemImage: systemImage)
             }
         }
+    }
+
+    @ViewBuilder
+    private func walletMenu(
+        balances: WalletBalances?, @ViewBuilder noneChoice: () -> some View = { EmptyView() }
+    ) -> some View {
+        Menu {
+            Picker(title, selection: $selection) {
+                noneChoice()
+                options(balances: balances)
+            }
+            .pickerStyle(.inline)
+        } label: {
+            selectionLabel
+        }
+        .menuStyle(.button)
+        .buttonStyle(.borderless)
     }
 
     /// The chosen wallet as the row shows it: its symbol on its colored circle and its name, on one line however long

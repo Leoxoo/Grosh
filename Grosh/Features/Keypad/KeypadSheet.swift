@@ -119,7 +119,10 @@ struct KeypadSheetFields {
     func amountRow(
         _ title: LocalizedStringResource, currencyCode: String, tint: Color = .primary, systemImage: String? = nil
     ) -> some View {
-        AmountRow(field: KeypadSheetField.amount, entry: $entry, currencyCode: currencyCode, tint: tint) {
+        AmountRow(
+            field: KeypadSheetField.amount, entry: $entry, currencyCode: currencyCode, tint: tint,
+            alignsContentLeading: systemImage != nil
+        ) {
             FieldLabel(title: title, systemImage: systemImage)
         }
     }
@@ -135,16 +138,14 @@ struct KeypadSheetFields {
         }
     }
 
-    /// The Note field. Focusing it puts the Keypad away. With an icon, the title sits on the leading side, as the
-    /// other rows do; a text field's own label does not draw one.
+    /// The Note field. Focusing it puts the Keypad away. With an icon, only the icon is shown and the placeholder
+    /// names the field.
     @ViewBuilder
     func noteField(_ text: Binding<String>, systemImage: String? = nil) -> some View {
         if let systemImage {
-            LabeledContent {
-                TextField("", text: text, axis: .vertical)
+            FormFieldRow(title: Strings.Common.note, systemImage: systemImage) {
+                TextField(Strings.Common.note, text: text, axis: .vertical)
                     .focused(focus, equals: .note)
-            } label: {
-                FieldLabel(title: Strings.Common.note, systemImage: systemImage)
             }
         } else {
             TextField(Strings.Common.note, text: text, axis: .vertical)

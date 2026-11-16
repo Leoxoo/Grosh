@@ -9,7 +9,7 @@ struct DayStepper: View {
     var showsWeekday = false
 
     var body: some View {
-        LabeledContent {
+        FormFieldRow(title: title, systemImage: systemImage) {
             HStack(spacing: 4) {
                 Button {
                     day = day.adding(days: -1)
@@ -30,8 +30,6 @@ struct DayStepper: View {
                 .accessibilityLabel(Strings.Common.nextDay)
             }
             .buttonStyle(.borderless)
-        } label: {
-            FieldLabel(title: title, systemImage: systemImage)
         }
     }
 
