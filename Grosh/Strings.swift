@@ -411,7 +411,6 @@ nonisolated enum Strings {
         static let baseRate: LocalizedStringResource = "Base rate"
         static func daysLeft(_ count: Int) -> LocalizedStringResource { "\(count) days left" }
         static func quarterBonus(_ months: String) -> LocalizedStringResource { "\(months) quarter" }
-        static func baseShare(_ rate: String) -> LocalizedStringResource { "\(rate) base" }
         static let earning: LocalizedStringResource = "Earning"
         static func alsoAt(_ merchants: String) -> LocalizedStringResource { "Also at \(merchants)" }
         static func topCategoryNone(_ rate: String) -> LocalizedStringResource { "\(rate) on your top category" }

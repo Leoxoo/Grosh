@@ -5,8 +5,9 @@ import SwiftUI
 /// counted and added up when the card's Bonuses add up, best first and Everything else last; its rates on Your choice or
 /// the top category; and the rates it earns only when paid a certain way or at certain merchants. Then the current
 /// rotating quarter, its dates and days left first, and the next one. A points or miles Card shows each rate's
-/// Multiplier as a pill, and an Edited rate says so. A row opens its details. A Card that isn't linked offers Add
-/// rewards, which links it to the catalog; the pencil opens the rate editor.
+/// Multiplier beside the category. The Effective rate sits in a green Liquid Glass capsule, and an Edited rate says
+/// so. A row opens its details.
+/// A Card that isn't linked offers Add rewards, which links it to the catalog; the pencil opens the rate editor.
 struct CardRewardsSection: View {
     let card: Card
     let today: CalendarDay
@@ -105,9 +106,9 @@ struct CardRewardsSection: View {
     }
 }
 
-/// What a purchase in one Reward category earns: the Multiplier pill for a points or miles Card, the category, Edited
-/// when the user changed a rate in it, the Effective rate on the right, and how it adds up under it ("1% base + 2% +
-/// 4% Oct–Dec") or which quarter it is.
+/// What a purchase in one Reward category earns: the Multiplier for a points or miles Card, the category, Edited when
+/// the user changed a rate in it, and the Effective rate on the right in a green Liquid Glass capsule. A cap or a
+/// single quarter is noted under the category. How several rates add up is on the row's own screen.
 private struct EarnedRateRow: View {
     let earning: PurchaseEarning
 
@@ -116,7 +117,7 @@ private struct EarnedRateRow: View {
             if let multiplier = earning.multiplier {
                 Text(Strings.Rewards.multiplier(CardRateText.number(multiplier)))
                     .monospacedDigit()
-                    .capsuleBadge(.tint, on: .accentColor)
+                    .foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
@@ -133,9 +134,7 @@ private struct EarnedRateRow: View {
                 }
             }
             Spacer()
-            Text(CardRateText.percent(earning.effectiveRate))
-                .monospacedDigit()
-                .fontWeight(.semibold)
+            EffectiveRateBadge(rate: CardRateText.percent(earning.effectiveRate))
         }
         .accessibilityElement(children: .combine)
     }
