@@ -110,7 +110,8 @@ struct CategoryPicker: View {
 
 /// The list ``CategoryPicker`` pushes: the offered categories, the parents used most lately first
 /// (``CategoryCatalog/byRecentUse(_:transactions:today:)``), each followed by its subcategories in their usual order,
-/// indented. A search narrows it to the categories whose names match.
+/// indented. Each parent and its subcategories sit in their own group, with a gap before the next parent. A search
+/// narrows it to the categories whose names match.
 private struct CategoryChoiceList: View {
     enum Offered {
         /// The categories of a type the user may pick by hand.
@@ -168,7 +169,7 @@ private struct CategoryChoiceList: View {
     }
 
     var body: some View {
-        let sections = self.sections
+        let groups = self.groups
         List {
             if case .switching(let type, let types) = offered, types.count > 1 {
                 Section {
@@ -179,6 +180,7 @@ private struct CategoryChoiceList: View {
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
+                    .groupedRow(.only)
                 }
             }
             if let addableType {
@@ -186,25 +188,22 @@ private struct CategoryChoiceList: View {
                     Button(Strings.Categories.newCategory, systemImage: "plus.circle") {
                         adding = NewCategory(type: addableType)
                     }
+                    .groupedRow(.only)
                 }
             }
             if noneTitle != nil && !isSearching {
                 Section {
                     row(nil)
+                        .groupedRow(.only)
                 }
             }
-            ForEach(sections) { section in
-                Section {
-                    ForEach(section.categories) { row($0) }
-                } header: {
-                    if let title = section.title {
-                        Text(title)
-                    }
-                }
+            ForEach(groups) { group in
+                categorySection(group)
             }
         }
+        .roundedSectionsListStyle()
         .overlay {
-            if isSearching && sections.isEmpty {
+            if isSearching && groups.isEmpty {
                 ContentUnavailableView.search(text: query.trimmingCharacters(in: .whitespacesAndNewlines))
             }
         }
@@ -236,27 +235,46 @@ private struct CategoryChoiceList: View {
         dismiss()
     }
 
-    /// One section of choices: under its type's name when every category is offered.
-    private struct ChoiceSection: Identifiable {
+    /// One group of choices: a parent and its subcategories. `title` is the type's name on the first group of that
+    /// type, when every category is offered.
+    private struct ChoiceGroup: Identifiable {
         let title: String?
         let categories: [Category]
-        var id: String { title ?? "" }
+        var id: PersistentIdentifier { categories[0].persistentModelID }
     }
 
-    private var sections: [ChoiceSection] {
-        let all: [ChoiceSection] = switch offered {
+    private var groups: [ChoiceGroup] {
+        let offeredTrees: [(title: String?, categories: [Category])] = switch offered {
         case .pickable(let type):
-            [ChoiceSection(title: nil, categories: CategoryCatalog.pickable(of: type, from: categories))]
+            [(nil, CategoryCatalog.pickable(of: type, from: categories))]
         case .switching(let type, _):
-            [ChoiceSection(title: nil, categories: CategoryCatalog.pickable(of: type.wrappedValue, from: categories))]
+            [(nil, CategoryCatalog.pickable(of: type.wrappedValue, from: categories))]
         case .every:
             CategoryType.allCases.map { type in
-                ChoiceSection(title: type.title, categories: CategoryCatalog.tree(of: type, from: categories))
+                (type.title, CategoryCatalog.tree(of: type, from: categories))
             }
         }
-        return all
-            .map { ChoiceSection(title: $0.title, categories: arranged($0.categories)) }
-            .filter { !$0.categories.isEmpty }
+        return offeredTrees.flatMap { title, tree in
+            CategoryCatalog.parentGroups(in: arranged(tree)).enumerated().map { index, categories in
+                ChoiceGroup(title: index == 0 ? title : nil, categories: categories)
+            }
+        }
+    }
+
+    /// A parent and its subcategories on one card. The type's name heads the first card of that type.
+    @ViewBuilder
+    private func categorySection(_ group: ChoiceGroup) -> some View {
+        if let title = group.title {
+            Section {
+                GroupedForEach(group.categories) { row($0) }
+            } header: {
+                Text(title)
+            }
+        } else {
+            Section {
+                GroupedForEach(group.categories) { row($0) }
+            }
+        }
     }
 
     /// `tree` as the list shows it: the most used lately first, narrowed to the categories matching the search.
