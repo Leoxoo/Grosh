@@ -15,7 +15,8 @@ enum StoreOpening {
     /// Brings a store just opened up to date before any screen reads it: the default categories seeded into an empty
     /// one and any missing ones restored (``CategorySeeder``), the With names typed before there were people turned into
     /// people (``Person/migrateWithNames(in:)``, ADR-0009), so no screen ever sees a With without its Person, and every
-    /// link given its kind (``Transaction/migrateLinkKinds(in:)``, ADR-0012), the default categories given their
+    /// link given its kind (``Transaction/migrateLinkKinds(in:)``, ADR-0012), each category's one Rewards as from before
+    /// moved into its list (``RewardCategories/keepSingleRewardsAs(in:)``, ADR-0015), the default categories given their
     /// Rewards as once (``RewardsPrefill``), each linked Card given its entry as the shipped catalog has it now
     /// (``Card/keepCatalogEntries(from:in:)``, ADR-0014), and the saved month totals rebuilt when their format is
     /// missing or old (``WalletMonthTotals/rebuildIfOutdated(in:)``, ADR-0013), or else any month left dirty by a save
@@ -28,6 +29,7 @@ enum StoreOpening {
         try CategorySeeder.restoreMissingDefaults(in: context)
         try Person.migrateWithNames(in: context)
         try Transaction.migrateLinkKinds(in: context)
+        try RewardCategories.keepSingleRewardsAs(in: context)
         try RewardsPrefill.prefillIfNeeded(in: context)
         try Card.keepCatalogEntries(from: catalog, in: context)
         try WalletMonthTotals.rebuildIfOutdated(in: context)

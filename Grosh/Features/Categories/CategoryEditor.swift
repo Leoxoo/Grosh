@@ -217,27 +217,14 @@ private struct CategoryForm: View {
     private var rewardsSection: some View {
         let rewards = RewardCategory.listed(own: ownRewardCategories.map(RewardCategory.init))
         return Section {
-            Picker(Strings.Rewards.rewardsAs, selection: rewardsAsChoice) {
-                if let parent = draft.parent {
-                    Text(Strings.Categories.sameAsParent(parent.name, RewardCategory.named(parent.rewardsAs, in: rewards).name))
-                        .tag(String?.none)
-                }
-                ForEach(rewards) { reward in
-                    Text(reward.name).tag(Optional(reward.id))
-                }
+            RewardsAsMenu(own: draft.ownRewardsAs, parent: draft.parent, rewards: rewards) { ids in
+                draft.ownRewardsAs = ids
+            } label: {
+                Text(Strings.Rewards.rewardsAs)
             }
         } footer: {
             Text(Strings.Rewards.rewardsAsFooter)
         }
-    }
-
-    /// The Reward category the picker shows. A top-level category with none of its own is Everything else; a
-    /// subcategory with none follows its parent, which its first choice names.
-    private var rewardsAsChoice: Binding<String?> {
-        Binding(
-            get: { RewardCategory.shownChoice(own: draft.ownRewardsAs, isSubcategory: draft.parent != nil) },
-            set: { draft.ownRewardsAs = $0 }
-        )
     }
 
     private var iconSection: some View {

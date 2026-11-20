@@ -182,6 +182,21 @@ nonisolated extension CardRewards {
         )
     }
 
+    /// What a purchase in a category counting as each of `rewards` earns with the Card on `today`: the best of what
+    /// each earns (``earning(for:on:own:spending:)``), the first of them on equal rates. Rates of different Reward
+    /// categories are never added together, since one purchase is only one of them (ADR-0015). `nil` for a Card with no
+    /// rate that covers any of them.
+    func earning(
+        for rewards: [String], on today: CalendarDay, own: [RewardCategory] = [], spending: [String: Int] = [:]
+    ) -> PurchaseEarning? {
+        var best: PurchaseEarning?
+        for reward in rewards {
+            guard let earned = earning(for: reward, on: today, own: own, spending: spending) else { continue }
+            if earned.effectiveRate > best?.effectiveRate ?? -.infinity { best = earned }
+        }
+        return best
+    }
+
     /// Best Effective rate first and Everything else last; equal ones in the order given.
     private static func sorted(_ earned: [PurchaseEarning]) -> [PurchaseEarning] {
         earned.enumerated().sorted { lhs, rhs in

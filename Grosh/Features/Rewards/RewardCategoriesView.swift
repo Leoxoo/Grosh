@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 /// Account → Cards → Reward categories: each Reward category with the user's Expense categories that count as it.
-/// Tapping a category changes what it counts as. The user adds Reward categories of their own here, and renames or
+/// Tapping a category checks what it counts as, which can be several; it is then listed under each (ADR-0015). The user adds Reward categories of their own here, and renames or
 /// deletes them.
 struct RewardCategoriesView: View {
     @Environment(\.modelContext) private var context
@@ -43,10 +43,12 @@ struct RewardCategoriesView: View {
                             .foregroundStyle(.secondary)
                     }
                     ForEach(entry.categories) { category in
-                        RewardsAsRow(category: category, rewards: listed) { id in
+                        RewardsAsMenu(own: category.ownRewardsAs, parent: category.parent, rewards: listed) { ids in
                             Log.store.perform("Changing a category's Rewards as", errorMessage: &errorMessage) {
-                                try rewards.setRewardsAs(of: category, to: id)
+                                try rewards.setRewardsAs(of: category, to: ids)
                             }
+                        } label: {
+                            CategoryLabel(category: category)
                         }
                     }
                 } header: {
@@ -124,35 +126,6 @@ struct RewardCategoriesView: View {
             case .rename(let own): try rewards.rename(own, to: typedName)
             }
         }
-    }
-}
-
-/// One of the user's categories, with a menu of the Reward categories it can count as. A subcategory's first choice
-/// is to follow its parent.
-private struct RewardsAsRow: View {
-    let category: Category
-    let rewards: [RewardCategory]
-    let set: (String?) -> Void
-
-    var body: some View {
-        Picker(selection: Binding(get: { choice }, set: { set($0) })) {
-            if let parent = category.parent {
-                Text(Strings.Categories.sameAsParent(parent.name, RewardCategory.named(parent.rewardsAs, in: rewards).name))
-                    .tag(String?.none)
-            }
-            ForEach(rewards) { reward in
-                Text(reward.name).tag(Optional(reward.id))
-            }
-        } label: {
-            CategoryLabel(category: category)
-        }
-        .pickerStyle(.menu)
-    }
-
-    /// What the menu shows as chosen: the category's own, Everything else for a top-level one with none, or following
-    /// its parent for a subcategory with none.
-    private var choice: String? {
-        RewardCategory.shownChoice(own: category.ownRewardsAs, isSubcategory: category.parent != nil)
     }
 }
 

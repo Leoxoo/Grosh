@@ -18,7 +18,7 @@ extension RewardCategoryError: LocalizedError {
 }
 
 /// The Reward categories, fixed and the user's own, and which of the user's categories count as each: the rules
-/// behind Account → Cards → Reward categories.
+/// behind Account → Cards → Reward categories. A category can count as several (ADR-0015).
 struct RewardCategories {
     let context: ModelContext
 
@@ -47,25 +47,47 @@ struct RewardCategories {
     }
 
     /// Every Reward category in list order, with the categories found in `all` counting as it: the Expense categories
-    /// whose Rewards as the user sets, in tree order, hidden ones included. A category counting as a Reward category
-    /// that no longer exists is listed under Everything else, which is what it earns as. For a screen that already
-    /// holds the categories and the user's `own` Reward categories from a query.
+    /// whose Rewards as the user sets, in tree order, hidden ones included. A category counting as several is listed
+    /// under each. One counting only as Reward categories that no longer exist is listed under Everything else, which
+    /// is what it earns as. For a screen that already holds the categories and the user's `own` Reward categories from
+    /// a query.
     static func map(of all: [Category], own: [RewardCategory]) -> [Entry] {
         let rewards = RewardCategory.listed(own: own)
         let known = Set(rewards.map(\.id))
-        let categories = CategoryCatalog.tree(of: .expense, from: all).filter(\.offersRewardsAs)
-        let byReward = Dictionary(grouping: categories) { category in
-            category.rewardsAs.flatMap { known.contains($0) ? $0 : nil } ?? RewardCategory.everythingElse.id
+        var byReward: [String: [Category]] = [:]
+        for category in CategoryCatalog.tree(of: .expense, from: all) where category.offersRewardsAs {
+            let counted = (category.rewardsAs ?? []).filter(known.contains)
+            for id in counted.isEmpty ? [RewardCategory.everythingElse.id] : counted {
+                byReward[id, default: []].append(category)
+            }
         }
         return rewards.map { Entry(reward: $0, categories: byReward[$0.id] ?? []) }
     }
 
-    /// Sets the Reward category `category` counts as, or with `nil` lets it follow its parent's (a top-level one's is
+    /// Sets the Reward categories `category` counts as, or with none lets it follow its parent's (a top-level one's is
     /// then Everything else), as its editor would. Saves.
-    func setRewardsAs(of category: Category, to id: String?) throws {
+    func setRewardsAs(of category: Category, to ids: [String]) throws {
         var draft = CategoryDraft(category)
-        draft.ownRewardsAs = id
+        draft.ownRewardsAs = ids
         try CategoryCatalog(context: context).update(category, to: draft)
+    }
+
+    /// Moves the one Reward category each category had in a store from before a category could count as several into
+    /// its list, unless the list was already set, and clears the old field, so the list is the only copy (ADR-0015).
+    /// Does nothing on a store already moved. Saves when it moved any.
+    static func keepSingleRewardsAs(in context: ModelContext) throws {
+        let read = FetchDescriptor<Category>(predicate: #Predicate { $0.singleRewardsAs != nil })
+        var any = read
+        any.fetchLimit = 1
+        guard try context.fetchCount(any) > 0 else { return }
+        let unmoved = try context.fetch(read)
+        for category in unmoved {
+            if category.ownRewardsAs.isEmpty, let single = category.singleRewardsAs {
+                category.ownRewardsAs = [single]
+            }
+            category.singleRewardsAs = nil
+        }
+        try context.save()
     }
 
     /// Adds a Reward category of the user's own, after the others they added. Saves.
@@ -84,14 +106,17 @@ struct RewardCategories {
         try own.saveToStore()
     }
 
-    /// Removes one of the user's own Reward categories. Every category that counted as it goes back to Everything else:
-    /// a top-level one to having none of its own, a subcategory to Everything else of its own, so it doesn't take up
-    /// its parent's instead, and every rate a Card had for it goes too. Saves.
+    /// Removes one of the user's own Reward categories. Every category that counted as it stops counting as it, keeping
+    /// its others; one left with none goes back to Everything else: a top-level one to having none of its own, a
+    /// subcategory to Everything else of its own, so it doesn't take up its parent's instead. Every rate a Card had for
+    /// it goes too. Saves.
     func delete(_ own: OwnRewardCategory) throws {
-        let id: String? = own.key
-        let counting = try context.fetch(FetchDescriptor<Category>(predicate: #Predicate { $0.ownRewardsAs == id }))
-        for category in counting {
-            category.ownRewardsAs = category.parent == nil ? nil : RewardCategory.everythingElse.id
+        let key = own.key
+        let expense = CategoryType.expense.rawValue
+        let categories = try context.fetch(FetchDescriptor<Category>(predicate: #Predicate { $0.typeRaw == expense }))
+        for category in categories where category.ownRewardsAs.contains(key) {
+            let left = category.ownRewardsAs.filter { $0 != key }
+            category.ownRewardsAs = left.isEmpty && category.parent != nil ? [RewardCategory.everythingElse.id] : left
         }
         let rated = try context.fetch(FetchDescriptor<Card>(predicate: #Predicate { $0.enteredRatesData != nil }))
         for card in rated where card.enteredRates.contains(where: { $0.reward == own.key }) {

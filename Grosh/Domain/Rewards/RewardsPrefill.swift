@@ -8,8 +8,9 @@ enum RewardsPrefill {
     /// The milestone a store keeps once it was prefilled.
     static let milestone = "rewardsAsPrefilled"
 
-    /// Which default categories each Reward category stands for. The one copy of this map: the rewards pipeline
-    /// (`tools/rewards-catalog/pipeline/extract.py`) only knows the Reward categories' ids and words.
+    /// Which default categories each Reward category stands for; a name under several gets them all (ADR-0015). The one
+    /// copy of this map: the rewards pipeline (`tools/rewards-catalog/pipeline/extract.py`) only knows the Reward
+    /// categories' ids and words.
     static let defaultNames: [String: [String]] = [
         "dining": ["Food & Beverage", "Café", "Restaurants"],
         "groceries": ["Products"],
@@ -32,14 +33,15 @@ enum RewardsPrefill {
         var reached = FetchDescriptor<StoreMilestone>(predicate: #Predicate { $0.name == name })
         reached.fetchLimit = 1
         guard try context.fetchCount(reached) == 0 else { return }
-        let rewardByName = Dictionary(
-            defaultNames.flatMap { reward, names in names.map { ($0, reward) } }, uniquingKeysWith: { first, _ in first }
+        let order = RewardCategory.fixed.map(\.id)
+        let rewardsByName = Dictionary(
+            order.flatMap { reward in (defaultNames[reward] ?? []).map { ($0, [reward]) } }, uniquingKeysWith: +
         )
         let expense = CategoryType.expense.rawValue
         let categories = try context.fetch(FetchDescriptor<Category>(predicate: #Predicate { $0.typeRaw == expense }))
-        for category in categories where category.offersRewardsAs && category.ownRewardsAs == nil {
-            if let reward = rewardByName[category.name] {
-                category.ownRewardsAs = reward
+        for category in categories where category.offersRewardsAs && category.ownRewardsAs.isEmpty {
+            if let rewards = rewardsByName[category.name] {
+                category.ownRewardsAs = rewards
             }
         }
         context.insert(StoreMilestone(name: milestone))

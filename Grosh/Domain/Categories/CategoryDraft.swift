@@ -9,7 +9,7 @@ nonisolated struct CategoryDraft {
         didSet {
             if type != oldValue {
                 parent = nil
-                ownRewardsAs = nil
+                ownRewardsAs = []
             }
         }
     }
@@ -19,9 +19,9 @@ nonisolated struct CategoryDraft {
     var parent: Category?
     /// The Kind the category sets for its Recurring transactions, or `nil` to follow its parent's.
     var ownKind: RecurringKind?
-    /// The Reward category the category counts as (``RewardCategory/id``), or `nil` to follow its parent's, or for a
-    /// top-level one, Everything else. Only an Expense category keeps one.
-    var ownRewardsAs: String?
+    /// The Reward categories the category counts as (``RewardCategory/id``s), or none to follow its parent's, or for
+    /// a top-level one, Everything else (ADR-0015). Only an Expense category keeps any.
+    var ownRewardsAs: [String]
 
     init(
         name: String = "",
@@ -30,7 +30,7 @@ nonisolated struct CategoryDraft {
         color: PaletteColor = .gray,
         parent: Category? = nil,
         ownKind: RecurringKind? = nil,
-        ownRewardsAs: String? = nil
+        ownRewardsAs: [String] = []
     ) {
         self.name = name
         self.type = type
@@ -59,7 +59,7 @@ nonisolated struct CategoryDraft {
     }
 
     /// The Rewards as a category saved from this draft keeps: none unless it is an Expense category.
-    var storedRewardsAs: String? { type == .expense ? ownRewardsAs : nil }
+    var storedRewardsAs: [String] { type == .expense ? ownRewardsAs : [] }
 
     var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 

@@ -23,12 +23,14 @@ enum CardTopSpend {
         })
     }
 
-    /// The Expenses among `paid` on `period`'s days, summed per Reward category, in cents.
+    /// The Expenses among `paid` on `period`'s days, summed per Reward category, in cents. A purchase whose category
+    /// counts as several is counted toward each, since the issuer may see it as any of them (ADR-0015).
     static func spending(of paid: [Transaction], in period: CardPeriod) -> [String: Int] {
         var spending: [String: Int] = [:]
         for transaction in paid where period.contains(transaction.day) && transaction.amountCents < 0 {
-            guard let reward = transaction.category?.rewardsAs else { continue }
-            spending[reward, default: 0] -= transaction.amountCents
+            for reward in transaction.category?.rewardsAs ?? [] {
+                spending[reward, default: 0] -= transaction.amountCents
+            }
         }
         return spending
     }

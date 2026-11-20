@@ -304,7 +304,7 @@ The kind of purchase a card's rate is for, in the words banks use: Dining, Groce
 _Avoid_: Category (that is the user's), catalog category (that is the fixed list as the catalog uses it)
 
 **Rewards as**:
-The Reward category one of the user's Expense categories counts as, such as Café → Dining. A category nobody mapped counts as Everything else, and a subcategory follows its parent's until the user sets its own.
+The Reward categories one of the user's Expense categories counts as, such as Café → Dining, or Travel → Travel and Airlines. A purchase in a category that counts as several earns the best rate among them (ADR-0015). A category nobody mapped counts as Everything else, which never sits beside another, and a subcategory follows its parent's until the user sets its own.
 _Avoid_: Mapping, link
 
 **Custom card**:

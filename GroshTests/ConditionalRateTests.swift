@@ -196,8 +196,8 @@ struct ConditionalRateTests {
 
     @Test func topSpendIsCountedFromTheCardsCurrentPeriodOnly() throws {
         let rewards = RewardCategories(context: store.context)
-        try rewards.setRewardsAs(of: try store.category("Food & Beverage"), to: "dining")
-        try rewards.setRewardsAs(of: try store.category("Products"), to: "groceries")
+        try rewards.setRewardsAs(of: try store.category("Food & Beverage"), to: ["dining"])
+        try rewards.setRewardsAs(of: try store.category("Products"), to: ["groceries"])
         let (card, _) = try linked(Self.topSpend, statementDay: 5)
         let other = try store.context.addCard("Other", paidFrom: store.checking)
         func pay(_ cents: Int, _ category: String, on day: CalendarDay, with paying: Card) throws {
@@ -213,6 +213,15 @@ struct ConditionalRateTests {
 
         let spending = try CardTopSpend.spending(of: card, on: TestStore.today, in: store.context)
         #expect(spending == ["dining": 50_00, "groceries": 30_00])
+    }
+
+    @Test func topSpendCountsAPurchaseTowardEachRewardCategoryItsCategoryCountsAs() throws {
+        try RewardCategories(context: store.context).setRewardsAs(of: try store.category("Travel"), to: ["travel", "airlines"])
+        let (card, _) = try linked(Self.topSpend, statementDay: 5)
+        try store.record(-20_00, "Travel", on: day(2026, 10, 7)).card = card
+        try store.context.save()
+        let spending = try CardTopSpend.spending(of: card, on: TestStore.today, in: store.context)
+        #expect(spending == ["travel": 20_00, "airlines": 20_00])
     }
 
     // MARK: Shown, never earned
@@ -303,7 +312,7 @@ struct ConditionalRateTests {
 
     @Test func thePickerSaysWhatACategoryEarnsAddedUp() throws {
         let (card, catalog) = try linked(Self.flex())
-        try RewardCategories(context: store.context).setRewardsAs(of: try store.category("Products"), to: "groceries")
+        try RewardCategories(context: store.context).setRewardsAs(of: try store.category("Products"), to: ["groceries"])
         let order = CardEarning.ordered(
             [card], for: try store.category("Products"), in: catalog, own: [], on: TestStore.today, spending: { _ in [:] }
         )

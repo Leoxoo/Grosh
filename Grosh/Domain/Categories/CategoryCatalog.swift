@@ -101,7 +101,7 @@ struct CategoryCatalog {
             for retyped in [category] + children {
                 retyped.type = draft.type
                 if draft.type != .expense {
-                    retyped.ownRewardsAs = nil
+                    retyped.ownRewardsAs = []
                 }
             }
         }
