@@ -19,7 +19,7 @@ extension Transaction {
 }
 
 nonisolated extension CategoryType {
-    /// The types the user sees, in order: the segments of Account → Categories and of the Add sheet.
+    /// The types the user sees, in order: the segments of Account → Categories and of a transaction's category chooser.
     static let segments: [CategoryType] = ordinary + [.debtLoan]
 
     /// Expense and Income, in order: the types of the user's own categories, and all that a Recurring transaction, a

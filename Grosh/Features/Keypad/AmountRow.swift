@@ -15,39 +15,57 @@ struct AmountRow<Label: View>: View {
     /// Shown, dimmed, while nothing is typed, for an amount that may be left open, such as "Any"; `nil` shows 0.
     var placeholder: LocalizedStringResource?
     var font: Font = .title2.weight(.semibold)
+    /// The compact row of the Add Transaction form: `label` is its icon-only mark, and this title is written above the
+    /// amount on the leading side, rather than the amount at the trailing edge. `nil` keeps the usual row.
+    var leadingTitle: LocalizedStringResource?
     @ViewBuilder let label: Label
 
     @Environment(KeypadTarget.self) private var keypad: KeypadTarget?
     @FocusState private var hasKeyboardFocus: Bool
 
     var body: some View {
-        LabeledContent {
-            VStack(alignment: .trailing, spacing: 2) {
-                if entry.isCalculation {
-                    Text(entry.text())
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+        let amount = VStack(alignment: leadingTitle != nil ? .leading : .trailing, spacing: 2) {
+            if entry.isCalculation {
+                Text(entry.text())
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            if let placeholder, entry.isEmpty {
+                Text(placeholder)
+                    .font(font)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(entry.amountText(currencyCode: currencyCode))
+                    .font(font)
+                    .foregroundStyle(entry.cents == nil ? .invalid : tint)
+                    .contentTransition(.numericText())
+            }
+        }
+        .monospacedDigit()
+        .lineLimit(1)
+        .minimumScaleFactor(0.5)
+        .padding(.horizontal, leadingTitle != nil ? 0 : 6)
+        .background(
+            isTypingHere ? AnyShapeStyle(.fill.tertiary) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 8)
+        )
+
+        Group {
+            if let leadingTitle {
+                FormFieldRow(compact: true, leading: label) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(leadingTitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        amount
+                    }
                 }
-                if let placeholder, entry.isEmpty {
-                    Text(placeholder)
-                        .font(font)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text(entry.amountText(currencyCode: currencyCode))
-                        .font(font)
-                        .foregroundStyle(entry.cents == nil ? .invalid : tint)
-                        .contentTransition(.numericText())
+            } else {
+                LabeledContent {
+                    amount
+                } label: {
+                    label
                 }
             }
-            .monospacedDigit()
-            .lineLimit(1)
-            .minimumScaleFactor(0.5)
-            .padding(.horizontal, 6)
-            .background(
-                isTypingHere ? AnyShapeStyle(.fill.tertiary) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 8)
-            )
-        } label: {
-            label
         }
         .contentShape(.rect)
         .onTapGesture(perform: tap)

@@ -1,12 +1,15 @@
 import SwiftUI
 
 /// A form row for a transaction's date: a date picker between ‹ and › buttons that step one day back or forward.
+/// `showsWeekday` writes the day of the week with the date, such as "Friday, Nov 13, 2026".
 struct DayStepper: View {
     let title: LocalizedStringResource
     @Binding var day: CalendarDay
+    var systemImage: String?
+    var showsWeekday = false
 
     var body: some View {
-        LabeledContent(title) {
+        FormFieldRow(title: title, systemImage: systemImage) {
             HStack(spacing: 4) {
                 Button {
                     day = day.adding(days: -1)
@@ -16,8 +19,8 @@ struct DayStepper: View {
                 }
                 .accessibilityLabel(Strings.Common.previousDay)
 
-                DayPicker(title: title, day: $day)
-                    .labelsHidden()
+                dateControl
+                    .frame(maxWidth: spansRow ? .infinity : nil)
 
                 Button {
                     day = day.adding(days: 1)
@@ -27,7 +30,36 @@ struct DayStepper: View {
                 }
                 .accessibilityLabel(Strings.Common.nextDay)
             }
+            .frame(maxWidth: spansRow ? .infinity : nil)
             .buttonStyle(.borderless)
+        }
+    }
+
+    /// The compact row (with an icon) spans the date across it; elsewhere the stepper sits at the trailing edge.
+    private var spansRow: Bool { systemImage != nil }
+
+    @ViewBuilder
+    private var dateControl: some View {
+        if showsWeekday {
+            let weekday = day.date().formatted(.dateTime.weekday(.wide).month(.abbreviated).day().year())
+            ZStack {
+                DayPicker(title: title, day: $day)
+                    .labelsHidden()
+                    .opacity(0.011)
+                    .accessibilityHidden(true)
+                Text(weekday)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
+                    .allowsHitTesting(false)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(weekday)
+            .accessibilityAddTraits(.isButton)
+        } else {
+            DayPicker(title: title, day: $day)
+                .labelsHidden()
         }
     }
 }

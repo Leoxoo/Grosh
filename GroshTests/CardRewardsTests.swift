@@ -59,7 +59,7 @@ struct CardRewardsTests {
         let order = CardEarning.ordered(
             [card], for: try store.category("Education"), in: catalog, own: [], on: TestStore.today, spending: { _ in [:] }
         )
-        #expect(order.first?.detail == "2× · 2% · Everything else (then 1× after $50,000)")
+        #expect(order.first?.detail == "Everything else (then 1× after $50,000)")
     }
 
     @Test func aCardShowsItsFixedRatesBestFirstAndEverythingElseLast() throws {

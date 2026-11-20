@@ -119,6 +119,7 @@ struct ConditionalRateTests {
         let dining = try #require(earned.first)
         #expect(dining.parts.map(\.adds) == [1, 2, 4])
         #expect(dining.parts.map { $0.quarter?.start } == [nil, nil, "2026-10-01"])
+        #expect(CardRateText.breakdown(of: dining) == nil)
         let january = CardRewards(of: card, in: catalog).page(on: day(2027, 1, 15)).earned
         #expect(january.map(\.reward.id) == ["groceries", "streaming", "dining", "drugstores", "everything-else"])
         #expect(january.map(\.effectiveRate) == [5, 5, 3, 3, 1])
@@ -130,6 +131,7 @@ struct ConditionalRateTests {
         #expect(dining.reward.id == "dining")
         #expect(dining.effectiveRate == 5)
         #expect(dining.parts.map(\.adds) == [5])
+        #expect(CardRateText.breakdown(of: dining) == "Oct–Dec quarter")
     }
 
     // MARK: Your choice
@@ -307,6 +309,6 @@ struct ConditionalRateTests {
         let order = CardEarning.ordered(
             [card], for: try store.category("Products"), in: catalog, own: [], on: TestStore.today, spending: { _ in [:] }
         )
-        #expect(order.first?.detail == "5% · Groceries")
+        #expect(order.first?.detail == "Groceries")
     }
 }

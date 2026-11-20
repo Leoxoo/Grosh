@@ -67,8 +67,9 @@ private struct HomeContent: View {
             .reportPresentation(isPresented: $isShowingReport) {
                 ReportView(startingOn: monthPeriod)
             }
-            .transactionSearchButton()
+            // The bar shows the outer toolbar item first, so Search sits to the left of the bell.
             .dueRemindersBell()
+            .transactionSearchButton()
             .addTransactionButton()
         }
     }

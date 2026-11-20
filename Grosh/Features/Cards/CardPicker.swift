@@ -5,12 +5,14 @@ import SwiftUI
 /// Picks a Card. A transaction's Card is picked from a list it pushes: the unarchived Cards whose paying wallet is its
 /// wallet, in the order they were added, or "None"; the current selection stays visible even when it was archived
 /// since (editing a past transaction). Once an Expense's category is picked, they are listed best first for what that
-/// category earns, each with a second line saying what (``CardEarning``), and the row says what the picked Card earns;
-/// picking the category never picks a Card. What each earns is worked out for the transaction's own day. Clear the
+/// category earns, the Reward category under its name and the Effective rate in a green Liquid Glass capsule on the
+/// right (``CardEarning``). The row says what the picked Card earns. Picking the category never picks a Card. What
+/// each earns is worked out for the transaction's own day. Clear the
 /// selection when the transaction's wallet changes. A filter picks from a menu of every Card, archived ones included, or
 /// none.
 struct CardPicker: View {
     let title: LocalizedStringResource
+    var systemImage: String?
     @Binding var selection: Card?
     /// The Cards of one wallet, or every Card.
     private let offered: Offered
@@ -38,9 +40,10 @@ struct CardPicker: View {
     /// best first for what it earns on `day`, the transaction's own (today when not given).
     init(
         title: LocalizedStringResource, wallet: Wallet?, category: Category? = nil, day: CalendarDay? = nil,
-        selection: Binding<Card?>
+        selection: Binding<Card?>, systemImage: String? = nil
     ) {
         self.title = title
+        self.systemImage = systemImage
         _selection = selection
         offered = .paidFrom(wallet, category: category, day: day)
         noneTitle = Strings.Common.none
@@ -54,6 +57,56 @@ struct CardPicker: View {
         self.noneTitle = noneTitle
     }
 
+    /// The compact row's mark: the picked Card's image as a small card the size of its symbol, or that symbol; the
+    /// field's icon while none is picked.
+    @ViewBuilder
+    private var cardRowMark: some View {
+        if let selection {
+            mark(of: selection)
+                .accessibilityLabel(Text(title))
+        } else {
+            FieldLabel(title: title, systemImage: systemImage)
+        }
+    }
+
+    @ViewBuilder
+    private func cardRow(choices: [CardEarning]) -> some View {
+        if systemImage != nil {
+            FormFieldRow(compact: true, appliesListChrome: false, leading: cardRowMark) {
+                cardRowContent(choices: choices)
+            }
+        } else {
+            FormFieldRow(title: title, systemImage: nil) {
+                cardRowContent(choices: choices)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func cardRowContent(choices: [CardEarning]) -> some View {
+        if let selection {
+            let earning = choices.first { $0.card == selection }
+            HStack(spacing: 8) {
+                VStack(alignment: systemImage == nil ? .trailing : .leading, spacing: 2) {
+                    Text(selection.displayName)
+                        .foregroundStyle(.primary)
+                    if let detail = earning?.detail {
+                        Text(detail)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if let rate = earning?.earning.map({ CardRateText.percent($0.effectiveRate) }) {
+                    Spacer(minLength: 8)
+                    EffectiveRateBadge(rate: rate)
+                }
+            }
+        } else {
+            Text(systemImage == nil ? noneTitle : Strings.Common.chooseCard)
+                .foregroundStyle(.secondary)
+        }
+    }
+
     var body: some View {
         switch offered {
         case .paidFrom(let wallet, let category, let day):
@@ -63,23 +116,18 @@ struct CardPicker: View {
                     own: ownRewardCategories, context: context
                 )
             }
-            NavigationLink {
+            let link = NavigationLink {
                 CardChoiceList(title: title, wallet: wallet, category: category, day: day ?? today, selection: $selection)
             } label: {
-                LabeledContent(title) {
-                    if let selection {
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(selection.displayName)
-                                .foregroundStyle(.primary)
-                            if let detail = choices.first(where: { $0.card == selection })?.detail {
-                                Text(detail)
-                                    .font(.footnote)
-                            }
-                        }
-                    } else {
-                        Text(noneTitle)
-                    }
-                }
+                cardRow(choices: choices)
+            }
+            if systemImage != nil {
+                link
+                    .buttonStyle(.plain)
+                    .navigationLinkIndicatorVisibility(.hidden)
+                    .compactFormRowChrome(true)
+            } else {
+                link
             }
         case .every:
             menu
@@ -125,7 +173,8 @@ struct CardPicker: View {
 }
 
 /// The list a transaction's ``CardPicker`` pushes: "None", then the Cards in the order given, each with its mark, its
-/// name and, when the category earns on it, a second line saying what. Picking one goes back.
+/// name, the Reward category under the name, and the Effective rate in a green Liquid Glass capsule on the right.
+/// Picking one goes back.
 private struct CardChoiceList: View {
     let title: LocalizedStringResource
     let wallet: Wallet?
@@ -157,17 +206,18 @@ private struct CardChoiceList: View {
         }
         List {
             Section {
-                row(nil, detail: nil)
+                row(nil)
                 ForEach(choices) { choice in
-                    row(choice.card, detail: choice.detail)
+                    row(choice)
                 }
             }
         }
         .navigationTitle(title)
     }
 
-    private func row(_ card: Card?, detail: String?) -> some View {
-        Button {
+    private func row(_ choice: CardEarning?) -> some View {
+        let card = choice?.card
+        return Button {
             selection = card
             dismiss()
         } label: {
@@ -178,13 +228,16 @@ private struct CardChoiceList: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(card.map { $0.isArchived ? String(localized: Strings.Common.archivedName($0.displayName)) : $0.displayName }
                         ?? String(localized: Strings.Common.none))
-                    if let detail {
+                    if let detail = choice?.detail {
                         Text(detail)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                 }
-                Spacer()
+                Spacer(minLength: 8)
+                if let rate = choice?.earning.map({ CardRateText.percent($0.effectiveRate) }) {
+                    EffectiveRateBadge(rate: rate)
+                }
                 if card == selection {
                     Image(systemName: "checkmark")
                         .foregroundStyle(.tint)

@@ -62,6 +62,18 @@ struct TransactionDetailView: View {
         return List {
             Section {
                 TransactionDetailHeader(transaction: transaction)
+                Label(transaction.day.date().formatted(date: .complete, time: .omitted), systemImage: "calendar")
+                if let wallet = transaction.wallet {
+                    WalletLabel(title: Strings.Common.wallet, wallet: wallet)
+                }
+                if let card = transaction.card {
+                    LabeledContent(Strings.Common.card) {
+                        HStack(spacing: 6) {
+                            CardMark(card: card, height: 18)
+                            Text(card.displayName)
+                        }
+                    }
+                }
             }
 
             if transaction.isExcludedFromReport {
@@ -88,8 +100,10 @@ struct TransactionDetailView: View {
 
             OwesMeSection(transaction: transaction)
 
-            Section {
-                fields
+            if !transaction.note.isEmpty || !transaction.withName.isEmpty || !transaction.eventName.isEmpty {
+                Section {
+                    detailNotes
+                }
             }
 
             RelatedTransactionsSection(transaction: transaction)
@@ -131,20 +145,9 @@ struct TransactionDetailView: View {
         }
     }
 
-    /// Every other field of the transaction. Empty optional fields are left out.
+    /// Note, With and Event, when any of them is set. Wallet and Card sit with the transaction above.
     @ViewBuilder
-    private var fields: some View {
-        if let wallet = transaction.wallet {
-            WalletLabel(title: Strings.Common.wallet, wallet: wallet)
-        }
-        if let card = transaction.card {
-            LabeledContent(Strings.Common.card) {
-                HStack(spacing: 6) {
-                    CardMark(card: card, height: 18)
-                    Text(card.displayName)
-                }
-            }
-        }
+    private var detailNotes: some View {
         if !transaction.note.isEmpty {
             LabeledContent(Strings.Common.note, value: transaction.note)
         }
@@ -157,7 +160,7 @@ struct TransactionDetailView: View {
     }
 }
 
-/// The category, the amount in color, and the date.
+/// The category and the amount in color. The day is the next row, set apart from the amount.
 private struct TransactionDetailHeader: View {
     let transaction: Transaction
 
@@ -173,9 +176,6 @@ private struct TransactionDetailHeader: View {
                     ReimbursementNetText(transaction: transaction)
                         .font(.title3)
                 }
-                Text(transaction.day.date().formatted(date: .complete, time: .omitted))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 4)

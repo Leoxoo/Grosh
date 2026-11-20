@@ -161,17 +161,17 @@ private struct TransactionListContent: View {
         }
         .toolbar {
             if !isSelecting {
+                #if os(iOS)
+                ToolbarItem(placement: .primaryAction) {
+                    Button(Strings.Screens.search, systemImage: "magnifyingglass") { isSearchPresented = true }
+                }
+                #endif
                 ToolbarItem(placement: .primaryAction) {
                     TransactionsMenu(
                         walletSelection: walletSelection, timeRange: $timeRange, grouping: $grouping,
                         startSelecting: startSelecting, filter: $filter
                     )
                 }
-                #if os(iOS)
-                ToolbarItem(placement: .primaryAction) {
-                    Button(Strings.Screens.search, systemImage: "magnifyingglass") { isSearchPresented = true }
-                }
-                #endif
                 #if !os(iOS)
                 // On iPhone and iPad, Filters is in the "…" menu: beside the tab's title the bar has room for two
                 // buttons (ADR-0009).

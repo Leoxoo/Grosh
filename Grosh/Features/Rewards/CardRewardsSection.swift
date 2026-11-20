@@ -5,17 +5,17 @@ import SwiftUI
 /// counted and added up when the card's Bonuses add up, best first and Everything else last; its rates on Your choice or
 /// the top category; and the rates it earns only when paid a certain way or at certain merchants. Then the current
 /// rotating quarter, its dates and days left first, and the next one. A points or miles Card shows each rate's
-/// Multiplier as a pill, and an Edited rate says so. A row opens its details. A Card that isn't linked offers Add
-/// rewards, which links it to the catalog; the pencil opens the rate editor.
+/// Multiplier beside the category. The Effective rate sits in a green Liquid Glass capsule, and an Edited rate says
+/// so. A row opens its details.
+/// A Card that isn't linked offers Add rewards, which links it to the catalog; the pencil opens the rate editor. Use
+/// inside a `List`, with the screen presenting ``CardRewardsAction/sheet(for:errorMessage:)`` for what `action` opens.
 struct CardRewardsSection: View {
     let card: Card
     let today: CalendarDay
+    @Binding var action: CardRewardsAction?
 
     @Environment(\.rewardsCatalog) private var catalog
     @Query(RewardCategories.ownInOrder) private var ownRewardCategories: [OwnRewardCategory]
-    @State private var isLinking = false
-    @State private var isEditingRates = false
-    @State private var errorMessage: String?
 
     var body: some View {
         let rewards = CardRewards(of: card, in: catalog)
@@ -26,7 +26,7 @@ struct CardRewardsSection: View {
             Section {
                 if rewards.entry == nil {
                     Button {
-                        isLinking = true
+                        action = .link
                     } label: {
                         HStack {
                             Text(Strings.Rewards.addRewards)
@@ -75,7 +75,7 @@ struct CardRewardsSection: View {
                     Text(Strings.Rewards.rewards)
                     Spacer()
                     Button {
-                        isEditingRates = true
+                        action = .editRates
                     } label: {
                         Image(systemName: "pencil")
                             .accessibilityLabel(Strings.Rewards.editRates)
@@ -91,23 +91,36 @@ struct CardRewardsSection: View {
                 QuartersSection(quarters: page.quarters, today: today)
             }
         }
-        .sheet(isPresented: $isLinking) {
-            CatalogCardSearchSheet { entry in
-                Log.store.perform("Linking a Card to the rewards catalog", errorMessage: &errorMessage) {
-                    try card.link(to: entry)
-                }
-            }
-        }
-        .sheet(isPresented: $isEditingRates) {
-            CardRatesEditor(card: card)
-        }
-        .errorAlert(Strings.Cards.couldntChange, message: $errorMessage)
     }
 }
 
-/// What a purchase in one Reward category earns: the Multiplier pill for a points or miles Card, the category, Edited
-/// when the user changed a rate in it, the Effective rate on the right, and how it adds up under it ("1% base + 2% +
-/// 4% Oct–Dec") or which quarter it is.
+/// What the Rewards section of a Card's page opens: the catalog search that links the Card, or the rate editor.
+enum CardRewardsAction: Identifiable {
+    case link, editRates
+
+    var id: Self { self }
+
+    /// The sheet this opens for `card`; a link that fails says so in `errorMessage`. Present it from the screen, outside
+    /// its `List`: a sheet on the section's content is attached to each of its parts, so one tap presented it twice and
+    /// the second presentation closed the first.
+    @ViewBuilder
+    func sheet(for card: Card, errorMessage: Binding<String?>) -> some View {
+        switch self {
+        case .link:
+            CatalogCardSearchSheet { entry in
+                Log.store.perform("Linking a Card to the rewards catalog", errorMessage: &errorMessage.wrappedValue) {
+                    try card.link(to: entry)
+                }
+            }
+        case .editRates:
+            CardRatesEditor(card: card)
+        }
+    }
+}
+
+/// What a purchase in one Reward category earns: the Multiplier for a points or miles Card, the category, Edited when
+/// the user changed a rate in it, and the Effective rate on the right in a green Liquid Glass capsule. A cap or a
+/// single quarter is noted under the category. How several rates add up is on the row's own screen.
 private struct EarnedRateRow: View {
     let earning: PurchaseEarning
 
@@ -116,7 +129,7 @@ private struct EarnedRateRow: View {
             if let multiplier = earning.multiplier {
                 Text(Strings.Rewards.multiplier(CardRateText.number(multiplier)))
                     .monospacedDigit()
-                    .capsuleBadge(.tint, on: .accentColor)
+                    .foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
@@ -133,9 +146,7 @@ private struct EarnedRateRow: View {
                 }
             }
             Spacer()
-            Text(CardRateText.percent(earning.effectiveRate))
-                .monospacedDigit()
-                .fontWeight(.semibold)
+            EffectiveRateBadge(rate: CardRateText.percent(earning.effectiveRate))
         }
         .accessibilityElement(children: .combine)
     }
@@ -398,7 +409,8 @@ private struct YourChoiceView: View {
     }
 }
 
-/// One rate: the Multiplier pill for a points or miles Card, the Reward category, and the Effective rate on the right.
+/// One rate: the Multiplier for a points or miles Card, the Reward category, and the Effective rate on the right in a
+/// green Liquid Glass capsule, as on the Card's page.
 struct CardRateRow: View {
     let rate: CardRate
 
@@ -407,7 +419,7 @@ struct CardRateRow: View {
             if let multiplier = rate.multiplier {
                 Text(Strings.Rewards.multiplier(CardRateText.number(multiplier)))
                     .monospacedDigit()
-                    .capsuleBadge(.tint, on: .accentColor)
+                    .foregroundStyle(.secondary)
             }
             Text(rate.reward.name)
             if rate.isEdited {
@@ -415,9 +427,7 @@ struct CardRateRow: View {
                     .capsuleBadge(.secondary, on: .secondary)
             }
             Spacer()
-            Text(CardRateText.percent(rate.effectiveRate))
-                .monospacedDigit()
-                .fontWeight(.semibold)
+            EffectiveRateBadge(rate: CardRateText.percent(rate.effectiveRate))
         }
         .accessibilityElement(children: .combine)
     }

@@ -111,22 +111,24 @@ private struct TransactionForm: View {
 
     private func mainSection(_ fields: KeypadSheetFields) -> some View {
         Section {
-            WalletPicker(title: Strings.Common.wallet, selection: $draft.wallet)
+            WalletPicker(title: Strings.Common.wallet, selection: $draft.wallet, systemImage: "wallet.pass")
                 .disabled(draft.isLockedByPayments)
-            fields.amountRow(Strings.Common.amount, currencyCode: draft.currencyCode, tint: draft.direction.tint)
-            CategoryPicker(title: Strings.Common.category, type: draft.type, selection: $draft.category)
+            fields.amountRow(
+                Strings.Common.amount, currencyCode: draft.currencyCode, tint: draft.direction.tint,
+                systemImage: "banknote"
+            )
+            CategoryPicker(title: Strings.Common.category, type: draft.type, selection: $draft.category, systemImage: "tag")
                 .disabled(draft.isLockedByPayments)
                 .accessibilityIdentifier("TransactionEditor.category")
             if draft.offersCard {
                 CardPicker(
                     title: Strings.Common.card, wallet: draft.wallet, category: draft.category, day: draft.day,
-                    selection: $draft.card
+                    selection: $draft.card, systemImage: "creditcard"
                 )
                     .accessibilityIdentifier("TransactionEditor.card")
             }
-            fields.noteField($draft.note)
-                .accessibilityIdentifier("TransactionEditor.note")
-            DayStepper(title: Strings.Common.date, day: $draft.day)
+            fields.noteField($draft.note, systemImage: "note.text", identifier: "TransactionEditor.note")
+            DayStepper(title: Strings.Common.date, day: $draft.day, systemImage: "calendar", showsWeekday: true)
         } footer: {
             if let problem = draft.shownProblem {
                 Text(problem.localizedDescription)
