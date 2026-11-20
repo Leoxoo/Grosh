@@ -116,8 +116,16 @@ struct KeypadSheetFields {
     let saver: SheetSaver
 
     /// The row showing the amount typed on the Keypad.
-    func amountRow(_ title: LocalizedStringResource, currencyCode: String, tint: Color = .primary) -> some View {
-        AmountRow(title, field: KeypadSheetField.amount, entry: $entry, currencyCode: currencyCode, tint: tint)
+    func amountRow(
+        _ title: LocalizedStringResource, currencyCode: String, tint: Color = .primary, systemImage: String? = nil
+    ) -> some View {
+        AmountRow(
+            field: KeypadSheetField.amount, entry: $entry, currencyCode: currencyCode, tint: tint,
+            font: systemImage != nil ? .title.weight(.semibold) : .title2.weight(.semibold),
+            leadingTitle: systemImage != nil ? title : nil
+        ) {
+            FieldLabel(title: title, systemImage: systemImage)
+        }
     }
 
     /// The row showing the form's second amount, such as a Purchase's total, typed on the same Keypad. Nothing is shown
@@ -131,9 +139,19 @@ struct KeypadSheetFields {
         }
     }
 
-    /// The Note field. Focusing it puts the Keypad away.
-    func noteField(_ text: Binding<String>) -> some View {
-        TextField(Strings.Common.note, text: text, axis: .vertical)
-            .focused(focus, equals: .note)
+    /// The Note field. Focusing it puts the Keypad away. With an icon, only the icon is shown and the placeholder
+    /// names the field; `identifier` then goes on the text field itself, not the row's icon.
+    @ViewBuilder
+    func noteField(_ text: Binding<String>, systemImage: String? = nil, identifier: String? = nil) -> some View {
+        if let systemImage {
+            FormFieldRow(title: Strings.Common.note, systemImage: systemImage) {
+                TextField(Strings.Common.note, text: text, axis: .vertical)
+                    .focused(focus, equals: .note)
+                    .accessibilityIdentifier(identifier ?? "")
+            }
+        } else {
+            TextField(Strings.Common.note, text: text, axis: .vertical)
+                .focused(focus, equals: .note)
+        }
     }
 }

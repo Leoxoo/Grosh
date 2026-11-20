@@ -4,7 +4,7 @@ import Testing
 @testable import Grosh
 
 /// The Card picker of an Expense, once its category is picked: the wallet's Cards best first for what that category
-/// earns, Cards without a rate for it after in the user's order, and a second line saying what each earns.
+/// earns, Cards without a rate for it after in the user's order, and the Reward category under each name.
 @MainActor
 @Suite(.namedInTheLog)
 struct CardPickerOrderTests {
@@ -58,8 +58,8 @@ struct CardPickerOrderTests {
         let savory = try linked("Savory", to: "test-savory-cash")
         let voyager = try linked("Voyager", to: "test-voyager-points")
         let order = ordered([savory, voyager], for: try store.category("Café"))
-        #expect(order.map(\.detail) == ["3% · Dining", "3× · 3% · Dining"])
-        #expect(ordered([savory], for: try store.category("Education")).first?.detail == "1% · Everything else")
+        #expect(order.map(\.detail) == ["Dining", "Dining"])
+        #expect(ordered([savory], for: try store.category("Education")).first?.detail == "Everything else")
     }
 
     @Test func pickingACategoryNeverPicksACard() throws {

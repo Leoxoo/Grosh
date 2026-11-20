@@ -45,18 +45,11 @@ nonisolated enum CardRateText {
         return "\(from.date().formatted(style)) – \(to.date().formatted(style))"
     }
 
-    /// How a purchase's earning adds up, under its row: "1% base + 2% + 4% Oct–Dec" when it is several rates, the
-    /// quarter ("Oct–Dec quarter") when it is one quarter's, else `nil`.
+    /// A note under a purchase's row when one rate needs it: a cap ("Up to $50,000 a year, then 1×"), or which quarter a
+    /// single bonus is ("Oct–Dec quarter"). Several rates that add up are explained on the row's own screen, so this
+    /// is `nil` for those.
     static func breakdown(of earning: PurchaseEarning) -> String? {
-        if earning.isAddedUp {
-            return earning.parts.enumerated().map { index, part in
-                if index == 0 && part.quarter == nil && part.rate.reward == .everythingElse {
-                    return String(localized: Strings.Rewards.baseShare(percent(part.adds)))
-                }
-                let share = percent(part.adds)
-                return part.quarter.map { "\(share) \(months(from: $0.from, to: $0.to))" } ?? share
-            }.joined(separator: " + ")
-        }
+        guard !earning.isAddedUp else { return nil }
         if let part = earning.parts.first, let after = part.rate.afterCap, let cap = part.rate.cap,
            let upTo = self.cap(cap, currencyCode: cap.currencyCode ?? "USD") {
             return String(localized: Strings.Rewards.thenAfterCap(upTo, rate(effective: after.effectiveRate, multiplier: after.multiplier)))

@@ -34,8 +34,15 @@ struct CategoryEditor: View {
     ]
 
     let mode: Mode
+    /// Called with the category just added, once it is saved. Editing calls nothing.
+    var didAdd: ((Category) -> Void)?
 
     @Environment(\.modelContext) private var context
+
+    init(mode: Mode, didAdd: ((Category) -> Void)? = nil) {
+        self.mode = mode
+        self.didAdd = didAdd
+    }
 
     var body: some View {
         MadeOnce {
@@ -46,7 +53,7 @@ struct CategoryEditor: View {
                 (draft: CategoryDraft(category), inUse: CategoryCatalog(context: context).inUse([category]))
             }
         } content: { start in
-            CategoryForm(mode: mode, startingDraft: start.draft, inUse: start.inUse)
+            CategoryForm(mode: mode, startingDraft: start.draft, inUse: start.inUse, didAdd: didAdd)
         }
     }
 }
@@ -57,6 +64,7 @@ private struct CategoryForm: View {
     /// Whether the category being edited (or a subcategory) has transactions, counted in the store once when the sheet
     /// opens rather than each time it draws.
     let inUse: Set<PersistentIdentifier>
+    var didAdd: ((Category) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
@@ -70,9 +78,13 @@ private struct CategoryForm: View {
     @State private var keptParentOptions = DrawingCache<CategoryType, [Category]>()
     private let saver = SheetSaver(Strings.Categories.couldntSave)
 
-    init(mode: CategoryEditor.Mode, startingDraft: CategoryDraft, inUse: Set<PersistentIdentifier>) {
+    init(
+        mode: CategoryEditor.Mode, startingDraft: CategoryDraft, inUse: Set<PersistentIdentifier>,
+        didAdd: ((Category) -> Void)? = nil
+    ) {
         self.mode = mode
         self.inUse = inUse
+        self.didAdd = didAdd
         _draft = State(initialValue: startingDraft)
     }
 
@@ -268,7 +280,8 @@ private struct CategoryForm: View {
             if let editing {
                 try catalog.update(editing, to: draft)
             } else {
-                try catalog.add(draft)
+                let category = try catalog.add(draft)
+                didAdd?(category)
             }
         }
     }

@@ -35,6 +35,8 @@ nonisolated enum Strings {
         static let remove: LocalizedStringResource = "Remove"
         static let none: LocalizedStringResource = "None"
         static let choose: LocalizedStringResource = "Choose"
+        static let chooseCategory: LocalizedStringResource = "Choose Category"
+        static let chooseCard: LocalizedStringResource = "Choose Card"
         static let any: LocalizedStringResource = "Any"
         static let name: LocalizedStringResource = "Name"
         static let amount: LocalizedStringResource = "Amount"
@@ -409,7 +411,6 @@ nonisolated enum Strings {
         static let baseRate: LocalizedStringResource = "Base rate"
         static func daysLeft(_ count: Int) -> LocalizedStringResource { "\(count) days left" }
         static func quarterBonus(_ months: String) -> LocalizedStringResource { "\(months) quarter" }
-        static func baseShare(_ rate: String) -> LocalizedStringResource { "\(rate) base" }
         static let earning: LocalizedStringResource = "Earning"
         static func alsoAt(_ merchants: String) -> LocalizedStringResource { "Also at \(merchants)" }
         static func topCategoryNone(_ rate: String) -> LocalizedStringResource { "\(rate) on your top category" }
@@ -510,6 +511,7 @@ nonisolated enum Strings {
         static let nameTaken: LocalizedStringResource = "Another category of this type already has this name."
         static let fixedType: LocalizedStringResource = "Only Expense and Income categories can be added or moved."
         static let addCategory: LocalizedStringResource = "Add Category"
+        static let newCategory: LocalizedStringResource = "New category"
         static let editCategory: LocalizedStringResource = "Edit Category"
         static let couldntSave: LocalizedStringResource = "Couldn't Save Category"
         static let parent: LocalizedStringResource = "Parent"
@@ -752,12 +754,7 @@ nonisolated enum Strings {
         static let elsewhereFooter: LocalizedStringResource = "Recorded as money in that wallet, on the day you received it, linked to the expense. The expense shows its net in the Total."
         static let editorFooter: LocalizedStringResource = "Kept on the expense, which then counts what is left of it. No transaction is made."
         static let couldntSave: LocalizedStringResource = "Couldn't Save Reimbursement"
-        static let noTransactionsToMoveIn: LocalizedStringResource = "No Transactions to Move In"
-        static let noTransactionsToMoveInDescription: LocalizedStringResource = "Money that came into this wallet, such as a deposit, appears here."
-        static let moveTransactionIn: LocalizedStringResource = "Move Transaction In"
-        static let couldntMoveIn: LocalizedStringResource = "Couldn't Move Transaction In"
         static let someonePaidMeBack: LocalizedStringResource = "Someone paid me back"
-        static let moveExistingIn: LocalizedStringResource = "Move an existing transaction in"
         static let sectionFooter: LocalizedStringResource = "Money paid back into this wallet is kept on this expense, and its net, what is left of it, counts in your balance and reports. Money paid back into another wallet is a transaction there."
         static let couldntDelete: LocalizedStringResource = "Couldn't Delete Reimbursement"
     }
