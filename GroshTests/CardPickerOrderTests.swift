@@ -14,7 +14,7 @@ struct CardPickerOrderTests {
     init() throws {
         store = try TestStore()
         catalog = try RewardsCatalogFixture.catalog()
-        try RewardCategories(context: store.context).setRewardsAs(of: try store.category("Food & Beverage"), to: "dining")
+        try RewardCategories(context: store.context).setRewardsAs(of: try store.category("Food & Beverage"), to: ["dining"])
     }
 
     private func linked(_ name: String, to id: String, pointValue: Double = 1) throws -> Card {
@@ -68,5 +68,29 @@ struct CardPickerOrderTests {
         draft.wallet = store.checking
         draft.category = try store.category("Restaurants")
         #expect(draft.card == nil)
+    }
+
+    // MARK: A category that counts as several Reward categories (ADR-0015)
+
+    @Test func aCategoryThatCountsAsSeveralEarnsTheBestOfThemWithEachCard() throws {
+        try RewardCategories(context: store.context).setRewardsAs(of: try store.category("Travel"), to: ["travel", "airlines"])
+        let flights = try store.context.addCard("Flights", paidFrom: store.checking)
+        try flights.saveRate(in: catalog, EnteredRate(reward: "travel", rate: 2), replacing: nil)
+        try flights.saveRate(in: catalog, EnteredRate(reward: "airlines", rate: 5), replacing: nil)
+        let trips = try store.context.addCard("Trips", paidFrom: store.checking)
+        try trips.saveRate(in: catalog, EnteredRate(reward: "travel", rate: 3), replacing: nil)
+
+        let order = ordered([trips, flights], for: try store.category("Travel"))
+        #expect(order.map(\.card.name) == ["Flights", "Trips"])
+        #expect(order.map { $0.earning?.effectiveRate } == [5, 3])
+        #expect(order.map(\.detail) == ["Airlines", "Travel"])
+    }
+
+    @Test func equalRatesInSeveralRewardCategoriesNameTheFirstOfThem() throws {
+        try RewardCategories(context: store.context).setRewardsAs(of: try store.category("Travel"), to: ["travel", "airlines"])
+        let card = try store.context.addCard("Even", paidFrom: store.checking)
+        try card.saveRate(in: catalog, EnteredRate(reward: "airlines", rate: 3), replacing: nil)
+        try card.saveRate(in: catalog, EnteredRate(reward: "travel", rate: 3), replacing: nil)
+        #expect(ordered([card], for: try store.category("Travel")).first?.detail == "Travel")
     }
 }

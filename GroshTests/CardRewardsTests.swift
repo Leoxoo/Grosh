@@ -55,7 +55,7 @@ struct CardRewardsTests {
         #expect(after.multiplier == 1)
         let earned = try #require(CardRewards(of: card, in: catalog).page(on: TestStore.today).earned.first)
         #expect(CardRateText.breakdown(of: earned) == "Up to $50,000 a year, then 1×")
-        try RewardCategories(context: store.context).setRewardsAs(of: try store.category("Education"), to: nil)
+        try RewardCategories(context: store.context).setRewardsAs(of: try store.category("Education"), to: [])
         let order = CardEarning.ordered(
             [card], for: try store.category("Education"), in: catalog, own: [], on: TestStore.today, spending: { _ in [:] }
         )

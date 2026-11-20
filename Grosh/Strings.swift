@@ -392,7 +392,7 @@ nonisolated enum Strings {
         static let rewardsAs: LocalizedStringResource = "Rewards as"
         static let rewardsAsFooter: LocalizedStringResource = "The kind of purchase a card's rate is for that this category counts as, so Grosh can tell what each Card earns on it."
         static let rewardCategories: LocalizedStringResource = "Reward Categories"
-        static let rewardCategoriesFooter: LocalizedStringResource = "Each of your Expense categories counts as one Reward category, the kind of purchase a card's rate is for. Tap a category to change what it counts as."
+        static let rewardCategoriesFooter: LocalizedStringResource = "Each of your Expense categories counts as one or more Reward categories, the kinds of purchase a card's rate is for. A purchase earns the best rate among them. Tap a category to check what it counts as."
         static let addRewardCategory: LocalizedStringResource = "Add Reward Category"
         static let renameRewardCategory: LocalizedStringResource = "Rename Reward Category"
         static let deleteRewardCategory: LocalizedStringResource = "Delete Reward Category"

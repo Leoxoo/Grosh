@@ -198,8 +198,8 @@ struct ConditionalRateTests {
 
     @Test func topSpendIsCountedFromTheCardsCurrentPeriodOnly() throws {
         let rewards = RewardCategories(context: store.context)
-        try rewards.setRewardsAs(of: try store.category("Food & Beverage"), to: "dining")
-        try rewards.setRewardsAs(of: try store.category("Products"), to: "groceries")
+        try rewards.setRewardsAs(of: try store.category("Food & Beverage"), to: ["dining"])
+        try rewards.setRewardsAs(of: try store.category("Products"), to: ["groceries"])
         let (card, _) = try linked(Self.topSpend, statementDay: 5)
         let other = try store.context.addCard("Other", paidFrom: store.checking)
         func pay(_ cents: Int, _ category: String, on day: CalendarDay, with paying: Card) throws {
@@ -215,6 +215,27 @@ struct ConditionalRateTests {
 
         let spending = try CardTopSpend.spending(of: card, on: TestStore.today, in: store.context)
         #expect(spending == ["dining": 50_00, "groceries": 30_00])
+    }
+
+    @Test func topSpendSplitsAPurchaseEvenlyBetweenTheRewardCategoriesItsCategoryCountsAs() throws {
+        let rewards = RewardCategories(context: store.context)
+        try rewards.setRewardsAs(of: try store.category("Travel"), to: ["travel", "airlines"])
+        try rewards.setRewardsAs(of: try store.category("Food & Beverage"), to: ["dining"])
+        let (card, catalog) = try linked(Fixture.card("test-top-travel", "Top", issuer: "Test Bank", kind: "cashback", rules: [
+            Fixture.rule(["everything-else"], 1),
+            Fixture.rule(["dining", "travel", "airlines"], 5, selection: "top-spend"),
+        ]), statementDay: 5)
+        try store.record(-500_00, "Travel", on: day(2026, 10, 7)).card = card
+        try store.record(-400_00, "Restaurants", on: day(2026, 10, 7)).card = card
+        try store.record(-1, "Travel", on: day(2026, 10, 8)).card = card
+        try store.context.save()
+
+        let spending = try CardTopSpend.spending(of: card, on: TestStore.today, in: store.context)
+        #expect(spending == ["travel": 250_01, "airlines": 250_00, "dining": 400_00])
+        // Dining, not Travel or Airlines, is the top one.
+        #expect(earning(card, catalog, "dining", spending: spending)?.effectiveRate == 5)
+        #expect(earning(card, catalog, "travel", spending: spending)?.effectiveRate == 1)
+        #expect(earning(card, catalog, "airlines", spending: spending)?.effectiveRate == 1)
     }
 
     // MARK: Shown, never earned
@@ -305,7 +326,7 @@ struct ConditionalRateTests {
 
     @Test func thePickerSaysWhatACategoryEarnsAddedUp() throws {
         let (card, catalog) = try linked(Self.flex())
-        try RewardCategories(context: store.context).setRewardsAs(of: try store.category("Products"), to: "groceries")
+        try RewardCategories(context: store.context).setRewardsAs(of: try store.category("Products"), to: ["groceries"])
         let order = CardEarning.ordered(
             [card], for: try store.category("Products"), in: catalog, own: [], on: TestStore.today, spending: { _ in [:] }
         )
