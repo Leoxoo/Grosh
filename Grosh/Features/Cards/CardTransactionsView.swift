@@ -237,5 +237,8 @@ private struct CardPeriodStepper: View {
             .disabled(period >= periods.upperBound)
         }
         .buttonStyle(.borderless)
+        // The list starts a row's separator under its first text, here the centered title; start it at the row's
+        // leading edge, as under the other rows.
+        .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
     }
 }
