@@ -127,8 +127,7 @@ private struct TransactionForm: View {
                 )
                     .accessibilityIdentifier("TransactionEditor.card")
             }
-            fields.noteField($draft.note, systemImage: "note.text")
-                .accessibilityIdentifier("TransactionEditor.note")
+            fields.noteField($draft.note, systemImage: "note.text", identifier: "TransactionEditor.note")
             DayStepper(title: Strings.Common.date, day: $draft.day, systemImage: "calendar", showsWeekday: true)
         } footer: {
             if let problem = draft.shownProblem {

@@ -18,8 +18,6 @@ struct CardPicker: View {
     private let offered: Offered
     /// The first choice, which picks no Card.
     private let noneTitle: LocalizedStringResource
-    /// What the compact row shows when nothing is picked; `nil` uses `noneTitle`.
-    private let placeholderTitle: LocalizedStringResource?
 
     @Query(Card.listed) private var listedCards: [Card]
     @Query(RewardCategories.ownInOrder) private var ownRewardCategories: [OwnRewardCategory]
@@ -49,42 +47,32 @@ struct CardPicker: View {
         _selection = selection
         offered = .paidFrom(wallet, category: category, day: day)
         noneTitle = Strings.Common.none
-        placeholderTitle = Strings.Common.chooseCard
     }
 
     /// Any Card, archived ones included, or none (`noneTitle`, such as "Any"): for filters.
-    init(title: LocalizedStringResource, everyCardOr noneTitle: LocalizedStringResource, selection: Binding<Card?>, systemImage: String? = nil) {
+    init(title: LocalizedStringResource, everyCardOr noneTitle: LocalizedStringResource, selection: Binding<Card?>) {
         self.title = title
-        self.systemImage = systemImage
         _selection = selection
         offered = .every
         self.noneTitle = noneTitle
-        placeholderTitle = nil
     }
 
-
+    /// The compact row's mark: the picked Card's image as a small card the size of its symbol, or that symbol; the
+    /// field's icon while none is picked.
     @ViewBuilder
     private var cardRowMark: some View {
         if let selection {
-            // A picture drawn at the mark's height is a wide card, much bigger than the symbol. Fit it to that symbol.
-            Group {
-                if selection.image != nil {
-                    CardSymbolPhoto(card: selection)
-                } else {
-                    CardMark(card: selection, height: CompactFormLayout.markSide, shrunkForScale: displayScale)
-                }
-            }
-            .accessibilityLabel(Text(title))
+            mark(of: selection)
+                .accessibilityLabel(Text(title))
         } else {
             FieldLabel(title: title, systemImage: systemImage)
         }
     }
 
-
     @ViewBuilder
     private func cardRow(choices: [CardEarning]) -> some View {
         if systemImage != nil {
-            FormFieldRow(title: title, compact: true, appliesListChrome: false, leading: cardRowMark) {
+            FormFieldRow(compact: true, appliesListChrome: false, leading: cardRowMark) {
                 cardRowContent(choices: choices)
             }
         } else {
@@ -99,7 +87,7 @@ struct CardPicker: View {
         if let selection {
             let earning = choices.first { $0.card == selection }
             HStack(spacing: 8) {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: systemImage == nil ? .trailing : .leading, spacing: 2) {
                     Text(selection.displayName)
                         .foregroundStyle(.primary)
                     if let detail = earning?.detail {
@@ -114,7 +102,7 @@ struct CardPicker: View {
                 }
             }
         } else {
-            Text(placeholderTitle ?? noneTitle)
+            Text(systemImage == nil ? noneTitle : Strings.Common.chooseCard)
                 .foregroundStyle(.secondary)
         }
     }
@@ -128,29 +116,18 @@ struct CardPicker: View {
                     own: ownRewardCategories, context: context
                 )
             }
-            Group {
-                if systemImage != nil {
-                    // A link, not a destination modifier on the row: a Form is a list, and a destination registered
-                    // inside it is rebuilt with the row.
-                    NavigationLink {
-                        CardChoiceList(
-                            title: title, wallet: wallet, category: category, day: day ?? today, selection: $selection
-                        )
-                    } label: {
-                        cardRow(choices: choices)
-                    }
+            let link = NavigationLink {
+                CardChoiceList(title: title, wallet: wallet, category: category, day: day ?? today, selection: $selection)
+            } label: {
+                cardRow(choices: choices)
+            }
+            if systemImage != nil {
+                link
                     .buttonStyle(.plain)
                     .navigationLinkIndicatorVisibility(.hidden)
                     .compactFormRowChrome(true)
-                } else {
-                    NavigationLink {
-                        CardChoiceList(
-                            title: title, wallet: wallet, category: category, day: day ?? today, selection: $selection
-                        )
-                    } label: {
-                        cardRow(choices: choices)
-                    }
-                }
+            } else {
+                link
             }
         case .every:
             menu
@@ -192,35 +169,6 @@ struct CardPicker: View {
     /// A Card's mark in the picker: its image as a small card 16 points tall, or its coloured symbol when it has none.
     private func mark(of card: Card) -> some View {
         CardMark(card: card, height: 16, shrunkForScale: displayScale)
-    }
-}
-
-/// A Card's picture at the size of its symbol. The compact row's mark slot is taller than that symbol, and a picture
-/// drawn to the slot's height is a wide card.
-private struct CardSymbolPhoto: View {
-    let card: Card
-
-    var body: some View {
-        CardSymbol(color: card.color.color, font: nil)
-            .hidden()
-            .overlay {
-                if let image = card.image {
-                    GeometryReader { geo in
-                        let height = min(geo.size.height, geo.size.width / CropShape.creditCard.aspect)
-                        Image(decorative: image, scale: 1)
-                            .resizable()
-                            .interpolation(.high)
-                            .frame(width: height * CropShape.creditCard.aspect, height: height)
-                            .clipShape(
-                                RoundedRectangle(
-                                    cornerRadius: height * CropShape.creditCard.cornerRatio, style: .continuous
-                                )
-                            )
-                            .frame(width: geo.size.width, height: geo.size.height)
-                    }
-                }
-            }
-            .accessibilityHidden(true)
     }
 }
 

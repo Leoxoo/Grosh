@@ -25,22 +25,6 @@ struct KeypadInput: UIViewRepresentable {
     }
 }
 
-/// The keyboard the Keypad is shown in. Its height is the pad above the home indicator, plus that inset once the
-/// keyboard has one, so the keys keep their height.
-private final class KeypadInputContainer: UIInputView {
-    override var intrinsicContentSize: CGSize {
-        CGSize(width: UIView.noIntrinsicMetric, height: Keypad.keyboardHeight + safeAreaInsets.bottom)
-    }
-
-    override func safeAreaInsetsDidChange() {
-        super.safeAreaInsetsDidChange()
-        let height = Keypad.keyboardHeight + safeAreaInsets.bottom
-        guard frame.height != height else { return }
-        frame.size.height = height
-        invalidateIntrinsicContentSize()
-    }
-}
-
 /// What the Keypad types through on iPhone: an empty text field that never holds text of its own, with the Keypad as
 /// its input view. A text field rather than a plain view taking keys, so a hardware keyboard types into it too, and the
 /// system describes it as one thing to VoiceOver and to UI tests.
@@ -54,20 +38,19 @@ final class KeypadInputField: UITextField, UITextFieldDelegate {
         super.init(frame: .zero)
         pad.view.backgroundColor = .clear
         pad.view.translatesAutoresizingMaskIntoConstraints = false
-        let container = KeypadInputContainer(
+        let container = UIInputView(
             frame: CGRect(x: 0, y: 0, width: 0, height: Keypad.keyboardHeight), inputViewStyle: .keyboard
         )
         container.allowsSelfSizing = true
         container.addSubview(pad.view)
         let margin: CGFloat = 8
         let safeArea = container.safeAreaLayoutGuide
-        // No fixed height on the pad. The home indicator sits inside this view, so a 270-point height plus the
-        // insets cannot fit the 286-point frame, and UIKit lays the keys out again to break it.
         NSLayoutConstraint.activate([
             pad.view.leadingAnchor.constraint(equalTo: safeArea.leadingAnchor, constant: margin),
             pad.view.trailingAnchor.constraint(equalTo: safeArea.trailingAnchor, constant: -margin),
             pad.view.topAnchor.constraint(equalTo: container.topAnchor, constant: margin),
             pad.view.bottomAnchor.constraint(equalTo: safeArea.bottomAnchor, constant: -margin),
+            pad.view.heightAnchor.constraint(equalToConstant: Keypad.keyboardHeight - 2 * margin),
         ])
         inputView = container
         // A number pad, as far as the text system knows, so it asks for no predictions: with the Keypad in the

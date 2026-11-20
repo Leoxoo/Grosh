@@ -397,7 +397,8 @@ private struct YourChoiceView: View {
     }
 }
 
-/// One rate: the Multiplier pill for a points or miles Card, the Reward category, and the Effective rate on the right.
+/// One rate: the Multiplier for a points or miles Card, the Reward category, and the Effective rate on the right in a
+/// green Liquid Glass capsule, as on the Card's page.
 struct CardRateRow: View {
     let rate: CardRate
 
@@ -406,7 +407,7 @@ struct CardRateRow: View {
             if let multiplier = rate.multiplier {
                 Text(Strings.Rewards.multiplier(CardRateText.number(multiplier)))
                     .monospacedDigit()
-                    .capsuleBadge(.tint, on: .accentColor)
+                    .foregroundStyle(.secondary)
             }
             Text(rate.reward.name)
             if rate.isEdited {
@@ -414,9 +415,7 @@ struct CardRateRow: View {
                     .capsuleBadge(.secondary, on: .secondary)
             }
             Spacer()
-            Text(CardRateText.percent(rate.effectiveRate))
-                .monospacedDigit()
-                .fontWeight(.semibold)
+            EffectiveRateBadge(rate: CardRateText.percent(rate.effectiveRate))
         }
         .accessibilityElement(children: .combine)
     }

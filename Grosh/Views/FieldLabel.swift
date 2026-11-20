@@ -14,7 +14,8 @@ struct FieldLabel: View {
 
     var body: some View {
         if let systemImage {
-            Image(systemName: systemImage)
+            Label(title, systemImage: systemImage)
+                .labelStyle(.iconOnly)
                 .imageScale(.medium)
                 .foregroundStyle(.secondary)
         } else {
@@ -49,35 +50,22 @@ extension View {
 /// A form row's leading mark and main content. With an icon-only mark (`systemImage` set), the content is
 /// left-aligned in one line; otherwise the mark is a ``LabeledContent`` title and the content stays at the trailing
 /// edge, as on other forms. `leading` replaces the default ``FieldLabel`` when the mark should reflect a choice, such
-/// as a wallet's colored symbol.
-struct FormFieldRow<Content: View>: View {
-    let title: LocalizedStringResource
+/// as a wallet's colored symbol. Only the compact row fixes the mark's size; a title keeps its own width.
+struct FormFieldRow<Leading: View, Content: View>: View {
     let compact: Bool
     /// When the row sits inside a list-row ``Button`` or ``NavigationLink``, put ``View/compactFormRowChrome(_:)`` on
     /// that wrapper instead so the form does not pick up a second leading inset.
-    let appliesListChrome: Bool
-    private let leading: AnyView
+    var appliesListChrome = true
+    let leading: Leading
     @ViewBuilder let content: () -> Content
 
     init(
-        title: LocalizedStringResource, systemImage: String?, appliesListChrome: Bool = true,
+        compact: Bool, appliesListChrome: Bool = true, leading: Leading,
         @ViewBuilder content: @escaping () -> Content
     ) {
-        self.title = title
-        compact = systemImage != nil
-        self.appliesListChrome = appliesListChrome
-        leading = AnyView(FieldLabel(title: title, systemImage: systemImage).compactFormMarkSlot())
-        self.content = content
-    }
-
-    init(
-        title: LocalizedStringResource, compact: Bool, appliesListChrome: Bool = true, leading: some View,
-        @ViewBuilder content: @escaping () -> Content
-    ) {
-        self.title = title
         self.compact = compact
         self.appliesListChrome = appliesListChrome
-        self.leading = AnyView(leading.compactFormMarkSlot())
+        self.leading = leading
         self.content = content
     }
 
@@ -85,7 +73,7 @@ struct FormFieldRow<Content: View>: View {
         Group {
             if compact {
                 HStack(alignment: .center, spacing: CompactFormLayout.markSpacing) {
-                    leading
+                    leading.compactFormMarkSlot()
                     content()
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -95,5 +83,14 @@ struct FormFieldRow<Content: View>: View {
             }
         }
         .compactFormRowChrome(compact && appliesListChrome)
+    }
+}
+
+extension FormFieldRow where Leading == FieldLabel {
+    /// A row whose mark is the field's icon when `systemImage` is set (compact), or its title otherwise.
+    init(title: LocalizedStringResource, systemImage: String?, @ViewBuilder content: @escaping () -> Content) {
+        self.init(
+            compact: systemImage != nil, leading: FieldLabel(title: title, systemImage: systemImage), content: content
+        )
     }
 }

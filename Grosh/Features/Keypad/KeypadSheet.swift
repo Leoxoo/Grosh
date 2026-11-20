@@ -122,7 +122,7 @@ struct KeypadSheetFields {
         AmountRow(
             field: KeypadSheetField.amount, entry: $entry, currencyCode: currencyCode, tint: tint,
             font: systemImage != nil ? .title.weight(.semibold) : .title2.weight(.semibold),
-            alignsContentLeading: systemImage != nil, showsAmountTitle: systemImage != nil, amountTitle: title, fieldIcon: systemImage
+            leadingTitle: systemImage != nil ? title : nil
         ) {
             FieldLabel(title: title, systemImage: systemImage)
         }
@@ -140,13 +140,14 @@ struct KeypadSheetFields {
     }
 
     /// The Note field. Focusing it puts the Keypad away. With an icon, only the icon is shown and the placeholder
-    /// names the field.
+    /// names the field; `identifier` then goes on the text field itself, not the row's icon.
     @ViewBuilder
-    func noteField(_ text: Binding<String>, systemImage: String? = nil) -> some View {
+    func noteField(_ text: Binding<String>, systemImage: String? = nil, identifier: String? = nil) -> some View {
         if let systemImage {
             FormFieldRow(title: Strings.Common.note, systemImage: systemImage) {
                 TextField(Strings.Common.note, text: text, axis: .vertical)
                     .focused(focus, equals: .note)
+                    .accessibilityIdentifier(identifier ?? "")
             }
         } else {
             TextField(Strings.Common.note, text: text, axis: .vertical)

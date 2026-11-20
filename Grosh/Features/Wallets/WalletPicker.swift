@@ -31,35 +31,37 @@ struct WalletPicker: View {
         }
     }
 
-    /// Picks from the unarchived wallets.
+    /// Picks from the unarchived wallets. With `systemImage`, the row is a compact one: the chosen wallet's colored
+    /// symbol, or the icon while none is chosen, then its name.
     init(title: LocalizedStringResource, selection: Binding<Wallet?>, systemImage: String? = nil) {
-        self.init(title: title, selection: selection, offered: .unarchived, systemImage: systemImage)
+        self.init(title: title, selection: selection, offered: .unarchived)
+        self.systemImage = systemImage
     }
 
     /// Picks from the unarchived wallets, showing each one's balance from `balances`: the chosen wallet's on a Balance
     /// row of its own under the picker, and every wallet's in its option in the dropdown, so they can be compared before
     /// choosing. The row shows the chosen wallet's color.
-    init(title: LocalizedStringResource, selection: Binding<Wallet?>, balances: WalletBalances, systemImage: String? = nil) {
-        self.init(title: title, selection: selection, offered: .unarchivedWithBalances(balances), systemImage: systemImage)
+    init(title: LocalizedStringResource, selection: Binding<Wallet?>, balances: WalletBalances) {
+        self.init(title: title, selection: selection, offered: .unarchivedWithBalances(balances))
     }
 
     /// Picks from every wallet, archived ones included, or none (`noneTitle`, such as "Any"): for filters.
-    init(title: LocalizedStringResource, everyWalletOr noneTitle: LocalizedStringResource, selection: Binding<Wallet?>, systemImage: String? = nil) {
-        self.init(title: title, selection: selection, offered: .everyWalletOr(noneTitle), systemImage: systemImage)
+    init(title: LocalizedStringResource, everyWalletOr noneTitle: LocalizedStringResource, selection: Binding<Wallet?>) {
+        self.init(title: title, selection: selection, offered: .everyWalletOr(noneTitle))
     }
 
     /// Picks from the wallets `offered` names, fetching just those.
-    private init(title: LocalizedStringResource, selection: Binding<Wallet?>, offered: Offered, systemImage: String? = nil) {
+    private init(title: LocalizedStringResource, selection: Binding<Wallet?>, offered: Offered) {
         self.title = title
-        self.systemImage = systemImage
         _selection = selection
         self.offered = offered
         _wallets = Query(offered.wallets)
     }
 
     var body: some View {
-        if case .unarchivedWithBalances(let balances) = offered {
-            FormFieldRow(title: title, compact: systemImage != nil, leading: walletRowMark) {
+        switch offered {
+        case .unarchivedWithBalances(let balances):
+            LabeledContent(title) {
                 walletMenu(balances: balances)
             }
             if let selection {
@@ -67,33 +69,25 @@ struct WalletPicker: View {
                     AmountText(amount: balances.balance(of: selection), showsColor: false)
                 }
             }
-        } else if systemImage != nil {
-            FormFieldRow(title: title, compact: true, leading: walletRowMark) {
-                walletMenu(balances: nil) {
-                    if case .everyWalletOr(let noneTitle) = offered {
-                        Text(noneTitle).tag(Wallet?.none)
-                    }
-                }
+        case .unarchived where systemImage != nil:
+            FormFieldRow(compact: true, leading: walletRowMark) {
+                walletMenu(balances: nil)
             }
-        } else {
-            Picker(selection: $selection) {
+        default:
+            Picker(title, selection: $selection) {
                 if case .everyWalletOr(let noneTitle) = offered {
                     Text(noneTitle).tag(Wallet?.none)
                 }
                 options(balances: nil)
-            } label: {
-                FieldLabel(title: title, systemImage: systemImage)
             }
         }
     }
 
+    /// A menu of the wallets drawn as ``selectionLabel``.
     @ViewBuilder
-    private func walletMenu(
-        balances: WalletBalances?, @ViewBuilder noneChoice: () -> some View = { EmptyView() }
-    ) -> some View {
-        Menu {
+    private func walletMenu(balances: WalletBalances?) -> some View {
+        let menu = Menu {
             Picker(title, selection: $selection) {
-                noneChoice()
                 options(balances: balances)
             }
             .pickerStyle(.inline)
@@ -101,11 +95,15 @@ struct WalletPicker: View {
             selectionLabel
         }
         .menuStyle(.button)
-        .buttonStyle(.plain)
+        if systemImage != nil {
+            menu.buttonStyle(.plain)
+        } else {
+            menu.buttonStyle(.borderless)
+        }
     }
 
-    /// The chosen wallet as the row shows it: its symbol on its colored circle and its name, on one line however long
-    /// the name is. A picker's own row can't show the color, so this draws the menu's button itself.
+    /// The compact row's mark: the chosen wallet's symbol on its colored circle, or the field's icon while none is
+    /// chosen.
     @ViewBuilder
     private var walletRowMark: some View {
         if let selection {
@@ -116,9 +114,15 @@ struct WalletPicker: View {
         }
     }
 
+    /// The chosen wallet as the row shows it: its symbol on its colored circle (the compact row's mark instead) and its
+    /// name, on one line however long the name is. A picker's own row can't show the color, so this draws the menu's
+    /// button itself.
     private var selectionLabel: some View {
         HStack(spacing: 8) {
             if let selection {
+                if systemImage == nil {
+                    SymbolCircle(symbolName: selection.symbolName, color: selection.color)
+                }
                 Text(Self.name(of: selection))
                     .lineLimit(1)
                     .foregroundStyle(.primary)
@@ -126,13 +130,15 @@ struct WalletPicker: View {
                 Text(Strings.Common.choose)
                     .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 0)
+            if systemImage != nil {
+                Spacer(minLength: 0)
+            }
             Image(systemName: "chevron.up.chevron.down")
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: systemImage != nil ? .infinity : nil, alignment: .leading)
     }
 
     /// An option for each of the choices: the wallet's symbol and name, with its balance under the name when there are

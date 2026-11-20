@@ -3,11 +3,10 @@ import SwiftUI
 
 /// Picks a category. A transaction's category is picked from the categories of its type the user may pick by hand
 /// (``CategoryCatalog/pickable(of:from:)``): hidden ones and those the app files itself are left out, and Debt/Loan
-/// offers only Loan and Debt; the current selection still shows when it isn't offered any more. Passing `types` puts
-/// Expense, Income and Debt/Loan at the top of that list, and choosing one changes the transaction's type. A filter
-/// picks from every category of every type, hidden and locked ones included, or none. The list it opens puts the
-/// categories used most in the last month first, each with its subcategories in their usual order, and can be searched
-/// by name. Where a category of the user's own can be added, New category is the first row.
+/// offers only Loan and Debt; the current selection still shows when it isn't offered any more. A filter picks from
+/// every category of every type, hidden and locked ones included, or none. The list it opens puts the categories used
+/// most in the last month first, each with its subcategories in their usual order, and can be searched by name. Where
+/// a category of the user's own can be added, New category is the first row.
 struct CategoryPicker: View {
     let title: LocalizedStringResource
     var systemImage: String?
@@ -27,31 +26,15 @@ struct CategoryPicker: View {
         noneTitle = nil
     }
 
-    /// A transaction's category, with Expense, Income and Debt/Loan chosen in the list. `types` is the ones it offers.
-    init(
-        title: LocalizedStringResource, type: Binding<CategoryType>, types: [CategoryType],
-        selection: Binding<Category?>, systemImage: String? = nil
-    ) {
-        self.title = title
-        self.systemImage = systemImage
-        _selection = selection
-        offered = .switching(type, types)
-        noneTitle = nil
-    }
-
     /// Any category of any type, hidden and locked ones included, or none (`noneTitle`, such as "Any"): for filters.
-    init(
-        title: LocalizedStringResource, everyCategoryOr noneTitle: LocalizedStringResource,
-        selection: Binding<Category?>, systemImage: String? = nil
-    ) {
+    init(title: LocalizedStringResource, everyCategoryOr noneTitle: LocalizedStringResource, selection: Binding<Category?>) {
         self.title = title
-        self.systemImage = systemImage
         _selection = selection
         offered = .every
         self.noneTitle = noneTitle
     }
 
-
+    /// The compact row's mark: the picked category's icon, or the field's icon while none is picked.
     @ViewBuilder
     private var categoryRowMark: some View {
         if let selection {
@@ -62,9 +45,10 @@ struct CategoryPicker: View {
         }
     }
 
+    @ViewBuilder
     private var categoryRow: some View {
-        FormFieldRow(title: title, compact: systemImage != nil, appliesListChrome: false, leading: categoryRowMark) {
-            Group {
+        if systemImage != nil {
+            FormFieldRow(compact: true, appliesListChrome: false, leading: categoryRowMark) {
                 if let selection {
                     Text(selection.name)
                         .foregroundStyle(.primary)
@@ -73,37 +57,31 @@ struct CategoryPicker: View {
                         .foregroundStyle(.secondary)
                 }
             }
+        } else {
+            FormFieldRow(title: title, systemImage: nil) {
+                if let selection {
+                    CategoryLabel(category: selection, indentsSubcategories: false)
+                        .foregroundStyle(.primary)
+                } else {
+                    Text(noneTitle ?? Strings.Common.choose)
+                }
+            }
         }
     }
 
     var body: some View {
+        let link = NavigationLink {
+            CategoryChoiceList(title: title, offered: offered, noneTitle: noneTitle, today: today, selection: $selection)
+        } label: {
+            categoryRow
+        }
         if systemImage != nil {
-            // A link, not a destination modifier on the row: a Form is a list, and a destination registered inside it
-            // is rebuilt with the row.
-            NavigationLink {
-                CategoryChoiceList(
-                    title: title, offered: offered, noneTitle: noneTitle, today: today, selection: $selection
-                )
-            } label: {
-                categoryRow
-            }
-            .buttonStyle(.plain)
-            .navigationLinkIndicatorVisibility(.hidden)
-            .compactFormRowChrome(true)
+            link
+                .buttonStyle(.plain)
+                .navigationLinkIndicatorVisibility(.hidden)
+                .compactFormRowChrome(true)
         } else {
-            NavigationLink {
-                CategoryChoiceList(
-                    title: title, offered: offered, noneTitle: noneTitle, today: today, selection: $selection
-                )
-            } label: {
-                FormFieldRow(title: title, systemImage: nil) {
-                    if let selection {
-                        CategoryLabel(category: selection, indentsSubcategories: false)
-                    } else {
-                        Text(noneTitle ?? Strings.Common.choose)
-                    }
-                }
-            }
+            link
         }
     }
 }
@@ -116,8 +94,6 @@ private struct CategoryChoiceList: View {
     enum Offered {
         /// The categories of a type the user may pick by hand.
         case pickable(CategoryType)
-        /// Expense, Income and Debt/Loan, whichever of `types` this transaction offers, written back as it changes.
-        case switching(Binding<CategoryType>, [CategoryType])
         /// Every category, by type.
         case every
     }
@@ -163,7 +139,6 @@ private struct CategoryChoiceList: View {
     private var addableType: CategoryType? {
         switch offered {
         case .pickable(let type): type.isUserManaged ? type : nil
-        case .switching(let type, _): type.wrappedValue.isUserManaged ? type.wrappedValue : nil
         case .every: .expense
         }
     }
@@ -171,18 +146,6 @@ private struct CategoryChoiceList: View {
     var body: some View {
         let groups = self.groups
         List {
-            if case .switching(let type, let types) = offered, types.count > 1 {
-                Section {
-                    Picker(Strings.Common.type, selection: type) {
-                        ForEach(types, id: \.self) { segment in
-                            Text(segment.title).tag(segment)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .groupedRow(.only)
-                }
-            }
             if let addableType {
                 Section {
                     Button(Strings.Categories.newCategory, systemImage: "plus.circle") {
@@ -216,21 +179,11 @@ private struct CategoryChoiceList: View {
         }
     }
 
-    /// Chooses the category the editor just added, and closes the list. A transaction's type follows it.
+    /// Chooses the category the editor just added, when this list offers its type, and closes the list.
     private func finishAdding() {
         guard let created else { return }
         self.created = nil
-        switch offered {
-        case .switching(let type, let types):
-            guard types.contains(created.type) else { return }
-            if created.type != type.wrappedValue {
-                type.wrappedValue = created.type
-            }
-        case .pickable(let type):
-            guard created.type == type else { return }
-        case .every:
-            break
-        }
+        if case .pickable(let type) = offered, created.type != type { return }
         selection = created
         dismiss()
     }
@@ -247,8 +200,6 @@ private struct CategoryChoiceList: View {
         let offeredTrees: [(title: String?, categories: [Category])] = switch offered {
         case .pickable(let type):
             [(nil, CategoryCatalog.pickable(of: type, from: categories))]
-        case .switching(let type, _):
-            [(nil, CategoryCatalog.pickable(of: type.wrappedValue, from: categories))]
         case .every:
             CategoryType.allCases.map { type in
                 (type.title, CategoryCatalog.tree(of: type, from: categories))

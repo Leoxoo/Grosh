@@ -44,7 +44,6 @@ struct TransactionDayHeader: View {
     var listed = ListedAmount.net
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.colorScheme) private var colorScheme
 
     private var hasTransactions: Bool { !day.transactions.isEmpty }
 
@@ -66,6 +65,7 @@ struct TransactionDayHeader: View {
         }
         .textCase(nil)
         .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isHeader)
         .accessibilityLabel(date.formatted(.dateTime.weekday(.wide).day().month(.wide).year()))
         .accessibilityValue(hasTransactions ? day.total(listed).signedFormatted() : "")
     }
@@ -75,9 +75,8 @@ struct TransactionDayHeader: View {
             Text(date.formatted(.dateTime.day()))
                 .font(.title.bold())
                 .monospacedDigit()
-                // The day's main number. White on a dark card; the label color there is a little gray. A light
-                // appearance keeps the label color, so the number can still be read.
-                .foregroundStyle(colorScheme == .dark ? Color.white : Color.primary)
+                // On the card rather than in a section header, the label color is white in a dark appearance.
+                .foregroundStyle(.primary)
             VStack(alignment: .leading, spacing: 0) {
                 Text(date.formatted(.dateTime.weekday(.wide)))
                     .font(.subheadline.weight(.medium))

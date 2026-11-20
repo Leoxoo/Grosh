@@ -20,7 +20,7 @@ struct DayStepper: View {
                 .accessibilityLabel(Strings.Common.previousDay)
 
                 dateControl
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: spansRow ? .infinity : nil)
 
                 Button {
                     day = day.adding(days: 1)
@@ -30,10 +30,13 @@ struct DayStepper: View {
                 }
                 .accessibilityLabel(Strings.Common.nextDay)
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: spansRow ? .infinity : nil)
             .buttonStyle(.borderless)
         }
     }
+
+    /// The compact row (with an icon) spans the date across it; elsewhere the stepper sits at the trailing edge.
+    private var spansRow: Bool { systemImage != nil }
 
     @ViewBuilder
     private var dateControl: some View {

@@ -15,60 +15,50 @@ struct AmountRow<Label: View>: View {
     /// Shown, dimmed, while nothing is typed, for an amount that may be left open, such as "Any"; `nil` shows 0.
     var placeholder: LocalizedStringResource?
     var font: Font = .title2.weight(.semibold)
-    /// Puts the amount on the leading side of the row, under an icon-only mark, rather than at the trailing edge.
-    var alignsContentLeading = false
-    /// Writes the field name above the amount, as on the Add Transaction form.
-    var showsAmountTitle = false
-    var amountTitle: LocalizedStringResource?
-    var fieldIcon: String?
+    /// The compact row of the Add Transaction form: `label` is its icon-only mark, and this title is written above the
+    /// amount on the leading side, rather than the amount at the trailing edge. `nil` keeps the usual row.
+    var leadingTitle: LocalizedStringResource?
     @ViewBuilder let label: Label
 
     @Environment(KeypadTarget.self) private var keypad: KeypadTarget?
     @FocusState private var hasKeyboardFocus: Bool
 
     var body: some View {
-        let amount = VStack(alignment: alignsContentLeading ? .leading : .trailing, spacing: 2) {
-                if entry.isCalculation {
-                    Text(entry.text())
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-                if let placeholder, entry.isEmpty {
-                    Text(placeholder)
-                        .font(font)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text(entry.amountText(currencyCode: currencyCode))
-                        .font(font)
-                        .foregroundStyle(entry.cents == nil ? .invalid : tint)
-                        .contentTransition(.numericText())
-                }
+        let amount = VStack(alignment: leadingTitle != nil ? .leading : .trailing, spacing: 2) {
+            if entry.isCalculation {
+                Text(entry.text())
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
-            .monospacedDigit()
-            .lineLimit(1)
-            .minimumScaleFactor(0.5)
-            .padding(.horizontal, alignsContentLeading ? 0 : 6)
-            .background(
-                isTypingHere ? AnyShapeStyle(.fill.tertiary) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 8)
-            )
+            if let placeholder, entry.isEmpty {
+                Text(placeholder)
+                    .font(font)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(entry.amountText(currencyCode: currencyCode))
+                    .font(font)
+                    .foregroundStyle(entry.cents == nil ? .invalid : tint)
+                    .contentTransition(.numericText())
+            }
+        }
+        .monospacedDigit()
+        .lineLimit(1)
+        .minimumScaleFactor(0.5)
+        .padding(.horizontal, leadingTitle != nil ? 0 : 6)
+        .background(
+            isTypingHere ? AnyShapeStyle(.fill.tertiary) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 8)
+        )
 
         Group {
-            if alignsContentLeading, showsAmountTitle, let amountTitle, let fieldIcon {
-                FormFieldRow(title: amountTitle, systemImage: fieldIcon) {
+            if let leadingTitle {
+                FormFieldRow(compact: true, leading: label) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(amountTitle)
+                        Text(leadingTitle)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         amount
                     }
                 }
-            } else if alignsContentLeading {
-                HStack(alignment: .center, spacing: CompactFormLayout.markSpacing) {
-                    label.compactFormMarkSlot()
-                    amount
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 LabeledContent {
                     amount
@@ -77,7 +67,6 @@ struct AmountRow<Label: View>: View {
                 }
             }
         }
-        .compactFormRowChrome(alignsContentLeading && !(showsAmountTitle && fieldIcon != nil))
         .contentShape(.rect)
         .onTapGesture(perform: tap)
         .amountKeyboardInput(typing: press)
