@@ -94,6 +94,34 @@ nonisolated struct RewardCategory: Hashable, Identifiable, Sendable {
         return added.sorted { (order[$0] ?? .max, $0) < (order[$1] ?? .max, $1) }
     }
 
+    /// The SF Symbol and color a row draws it with, the way categories are drawn: the fixed list's own, and one tag
+    /// for every Reward category the user added.
+    var symbolName: String { Self.fixedLooks[id]?.symbolName ?? "tag.fill" }
+    var color: PaletteColor { Self.fixedLooks[id]?.color ?? .purple }
+
+    /// The symbol and color of each fixed Reward category, by id.
+    static let fixedLooks: [String: (symbolName: String, color: PaletteColor)] = [
+        "dining": ("fork.knife", .orange),
+        "groceries": ("cart.fill", .green),
+        "gas": ("fuelpump.fill", .red),
+        "ev-charging": ("bolt.car.fill", .mint),
+        "travel": ("suitcase.fill", .blue),
+        "airlines": ("airplane", .cyan),
+        "hotels": ("bed.double.fill", .indigo),
+        "transit": ("tram.fill", .teal),
+        "streaming": ("play.tv.fill", .purple),
+        "entertainment": ("ticket.fill", .pink),
+        "drugstores": ("cross.case.fill", .red),
+        "online-shopping": ("bag.fill", .yellow),
+        "home-improvement": ("hammer.fill", .brown),
+        "fitness": ("figure.run", .green),
+        "phone-internet": ("wifi", .blue),
+        "utilities": ("lightbulb.fill", .yellow),
+        "wholesale-clubs": ("shippingbox.fill", .brown),
+        "department-stores": ("handbag.fill", .pink),
+        "everything-else": ("ellipsis", .gray),
+    ]
+
     /// The fixed list with the user's `own` Reward categories before Everything else, as every list of them reads.
     static func listed(own: [RewardCategory]) -> [RewardCategory] {
         fixed.dropLast() + own + [everythingElse]

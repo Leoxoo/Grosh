@@ -141,6 +141,14 @@ struct RewardCategoryTests {
         #expect(RewardCategory.names(of: ["gone"], in: listed) == "Everything else")
     }
 
+    @Test func everyRewardCategoryHasAnIconAndTheUsersOwnShareOne() {
+        #expect(RewardCategory.fixed.allSatisfy { RewardCategory.fixedLooks[$0.id] != nil })
+        #expect(RewardCategory.fixedLooks.count == RewardCategory.fixed.count)
+        #expect(RewardCategory.fixed.first { $0.id == "airlines" }?.symbolName == "airplane")
+        let pets = RewardCategory(id: "own-key", name: "Pet stores", isOwn: true)
+        #expect(pets.symbolName == "tag.fill")
+    }
+
     // MARK: The Reward categories screen
 
     @Test func theMapListsEveryRewardCategoryWithTheCategoriesThatCountAsIt() throws {

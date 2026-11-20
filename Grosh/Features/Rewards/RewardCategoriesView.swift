@@ -2,8 +2,8 @@ import SwiftData
 import SwiftUI
 
 /// Account → Cards → Reward categories: each Reward category with the user's Expense categories that count as it.
-/// Tapping a category checks what it counts as, which can be several; it is then listed under each (ADR-0015). The
-/// user adds Reward categories of their own here, and renames or deletes them.
+/// Tapping a category opens the list of what it counts as, which can be several; it is then listed under each
+/// (ADR-0015). The user adds Reward categories of their own here, and renames or deletes them.
 struct RewardCategoriesView: View {
     @Environment(\.modelContext) private var context
     @Query private var allCategories: [Category]
@@ -12,6 +12,13 @@ struct RewardCategoriesView: View {
     @State private var naming: Naming?
     @State private var typedName = ""
     @State private var deleting: OwnRewardCategory?
+
+    /// The category whose Rewards as list is open.
+    private struct Editing: Hashable {
+        let category: PersistentIdentifier
+    }
+
+    @State private var editing: Editing?
 
     /// What the name alert is for: a new Reward category, or a new name for one of the user's own.
     private enum Naming: Identifiable {
@@ -43,13 +50,21 @@ struct RewardCategoriesView: View {
                             .foregroundStyle(.secondary)
                     }
                     ForEach(entry.categories) { category in
-                        RewardsAsMenu(own: category.ownRewardsAs, parent: category.parent, rewards: listed) { ids in
-                            Log.store.perform("Changing a category's Rewards as", errorMessage: &errorMessage) {
-                                try rewards.setRewardsAs(of: category, to: ids)
-                            }
+                        Button {
+                            editing = Editing(category: category.persistentModelID)
                         } label: {
-                            CategoryLabel(category: category)
+                            HStack {
+                                RewardsAsSummary(own: category.ownRewardsAs, parent: category.parent, rewards: listed) {
+                                    CategoryLabel(category: category)
+                                }
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                                    .accessibilityHidden(true)
+                            }
+                            .contentShape(.rect)
                         }
+                        .buttonStyle(.plain)
                     }
                 } header: {
                     header(for: entry.reward)
@@ -61,6 +76,20 @@ struct RewardCategoriesView: View {
             }
         }
         .navigationTitle(Strings.Rewards.rewardCategories)
+        // Pushed from state rather than from the row, so the list stays open when a change moves its category to other
+        // sections behind it.
+        .navigationDestination(item: $editing) { editing in
+            if let category = context.model(for: editing.category) as? Category {
+                RewardsAsList(
+                    categoryName: category.name, parent: category.parent, rewards: listed,
+                    own: Binding(get: { category.ownRewardsAs }, set: { ids in
+                        Log.store.perform("Changing a category's Rewards as", errorMessage: &errorMessage) {
+                            try rewards.setRewardsAs(of: category, to: ids)
+                        }
+                    })
+                )
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(Strings.Rewards.addRewardCategory, systemImage: "plus") {

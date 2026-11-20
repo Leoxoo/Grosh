@@ -229,10 +229,15 @@ private struct CategoryForm: View {
     private var rewardsSection: some View {
         let rewards = RewardCategory.listed(own: ownRewardCategories.map(RewardCategory.init))
         return Section {
-            RewardsAsMenu(own: draft.ownRewardsAs, parent: draft.parent, rewards: rewards) { ids in
-                draft.ownRewardsAs = ids
+            NavigationLink {
+                RewardsAsList(
+                    categoryName: draft.trimmedName.isEmpty ? String(localized: Strings.Rewards.rewardsAs) : draft.trimmedName,
+                    parent: draft.parent, rewards: rewards, own: $draft.ownRewardsAs
+                )
             } label: {
-                Text(Strings.Rewards.rewardsAs)
+                RewardsAsSummary(own: draft.ownRewardsAs, parent: draft.parent, rewards: rewards) {
+                    Text(Strings.Rewards.rewardsAs)
+                }
             }
         } footer: {
             Text(Strings.Rewards.rewardsAsFooter)
