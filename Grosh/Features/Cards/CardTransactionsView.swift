@@ -66,6 +66,9 @@ private struct CardPeriodList: View {
     @Query private var paid: [Transaction]
     @Query private var earliest: [Transaction]
     @Query private var latest: [Transaction]
+    /// What the Rewards section has open, presented from the list rather than from inside it.
+    @State private var rewardsAction: CardRewardsAction?
+    @State private var errorMessage: String?
 
     init(
         card: Card, period: CardPeriod, today: CalendarDay, periodsBack: Binding<Int>,
@@ -91,7 +94,7 @@ private struct CardPeriodList: View {
         let added = leadIns.filter { addedLeadIns.contains($0) }
 
         List {
-            CardRewardsSection(card: card, today: today)
+            CardRewardsSection(card: card, today: today, action: $rewardsAction)
 
             Section {
                 CardPeriodStepper(
@@ -155,6 +158,10 @@ private struct CardPeriodList: View {
                 }
             }
         }
+        .sheet(item: $rewardsAction) { action in
+            action.sheet(for: card, errorMessage: $errorMessage)
+        }
+        .errorAlert(Strings.Cards.couldntChange, message: $errorMessage)
     }
 }
 

@@ -7,16 +7,15 @@ import SwiftUI
 /// rotating quarter, its dates and days left first, and the next one. A points or miles Card shows each rate's
 /// Multiplier beside the category. The Effective rate sits in a green Liquid Glass capsule, and an Edited rate says
 /// so. A row opens its details.
-/// A Card that isn't linked offers Add rewards, which links it to the catalog; the pencil opens the rate editor.
+/// A Card that isn't linked offers Add rewards, which links it to the catalog; the pencil opens the rate editor. Use
+/// inside a `List`, with the screen presenting ``CardRewardsAction/sheet(for:errorMessage:)`` for what `action` opens.
 struct CardRewardsSection: View {
     let card: Card
     let today: CalendarDay
+    @Binding var action: CardRewardsAction?
 
     @Environment(\.rewardsCatalog) private var catalog
     @Query(RewardCategories.ownInOrder) private var ownRewardCategories: [OwnRewardCategory]
-    @State private var isLinking = false
-    @State private var isEditingRates = false
-    @State private var errorMessage: String?
 
     var body: some View {
         let rewards = CardRewards(of: card, in: catalog)
@@ -27,7 +26,7 @@ struct CardRewardsSection: View {
             Section {
                 if rewards.entry == nil {
                     Button {
-                        isLinking = true
+                        action = .link
                     } label: {
                         HStack {
                             Text(Strings.Rewards.addRewards)
@@ -76,7 +75,7 @@ struct CardRewardsSection: View {
                     Text(Strings.Rewards.rewards)
                     Spacer()
                     Button {
-                        isEditingRates = true
+                        action = .editRates
                     } label: {
                         Image(systemName: "pencil")
                             .accessibilityLabel(Strings.Rewards.editRates)
@@ -92,17 +91,30 @@ struct CardRewardsSection: View {
                 QuartersSection(quarters: page.quarters, today: today)
             }
         }
-        .sheet(isPresented: $isLinking) {
+    }
+}
+
+/// What the Rewards section of a Card's page opens: the catalog search that links the Card, or the rate editor.
+enum CardRewardsAction: Identifiable {
+    case link, editRates
+
+    var id: Self { self }
+
+    /// The sheet this opens for `card`; a link that fails says so in `errorMessage`. Present it from the screen, outside
+    /// its `List`: a sheet on the section's content is attached to each of its parts, so one tap presented it twice and
+    /// the second presentation closed the first.
+    @ViewBuilder
+    func sheet(for card: Card, errorMessage: Binding<String?>) -> some View {
+        switch self {
+        case .link:
             CatalogCardSearchSheet { entry in
-                Log.store.perform("Linking a Card to the rewards catalog", errorMessage: &errorMessage) {
+                Log.store.perform("Linking a Card to the rewards catalog", errorMessage: &errorMessage.wrappedValue) {
                     try card.link(to: entry)
                 }
             }
-        }
-        .sheet(isPresented: $isEditingRates) {
+        case .editRates:
             CardRatesEditor(card: card)
         }
-        .errorAlert(Strings.Cards.couldntChange, message: $errorMessage)
     }
 }
 
