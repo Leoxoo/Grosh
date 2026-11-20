@@ -2,8 +2,8 @@ import SwiftData
 import SwiftUI
 
 /// Account → Cards → Reward categories: each Reward category with the user's Expense categories that count as it.
-/// Tapping a category checks what it counts as, which can be several; it is then listed under each (ADR-0015). The user adds Reward categories of their own here, and renames or
-/// deletes them.
+/// Tapping a category checks what it counts as, which can be several; it is then listed under each (ADR-0015). The
+/// user adds Reward categories of their own here, and renames or deletes them.
 struct RewardCategoriesView: View {
     @Environment(\.modelContext) private var context
     @Query private var allCategories: [Category]

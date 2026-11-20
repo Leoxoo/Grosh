@@ -24,12 +24,16 @@ enum CardTopSpend {
     }
 
     /// The Expenses among `paid` on `period`'s days, summed per Reward category, in cents. A purchase whose category
-    /// counts as several is counted toward each, since the issuer may see it as any of them (ADR-0015).
+    /// counts as several is split evenly between them, a leftover cent going to the first, so none is counted more
+    /// than its share (ADR-0015).
     static func spending(of paid: [Transaction], in period: CardPeriod) -> [String: Int] {
         var spending: [String: Int] = [:]
         for transaction in paid where period.contains(transaction.day) && transaction.amountCents < 0 {
-            for reward in transaction.category?.rewardsAs ?? [] {
-                spending[reward, default: 0] -= transaction.amountCents
+            guard let rewards = transaction.category?.rewardsAs, !rewards.isEmpty else { continue }
+            let spent = -transaction.amountCents
+            let share = spent / rewards.count, leftover = spent % rewards.count
+            for (index, reward) in rewards.enumerated() {
+                spending[reward, default: 0] += share + (index < leftover ? 1 : 0)
             }
         }
         return spending

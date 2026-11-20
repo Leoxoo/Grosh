@@ -30,7 +30,6 @@ struct RewardsAsMenu<Label: View>: View {
         } label: {
             HStack {
                 label()
-                    .foregroundStyle(.primary)
                     .layoutPriority(1)
                 Spacer()
                 summary(checked)
@@ -44,6 +43,8 @@ struct RewardsAsMenu<Label: View>: View {
             .contentShape(.rect)
         }
         .menuActionDismissBehavior(.disabled)
+        // A menu's label takes the accent color; the category's name stays in the text color, as a picker row's did.
+        .tint(.primary)
     }
 
     /// What the row shows as checked: following the parent, or the checked Reward categories' names.

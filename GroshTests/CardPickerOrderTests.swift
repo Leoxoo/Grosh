@@ -83,7 +83,7 @@ struct CardPickerOrderTests {
         let order = ordered([trips, flights], for: try store.category("Travel"))
         #expect(order.map(\.card.name) == ["Flights", "Trips"])
         #expect(order.map { $0.earning?.effectiveRate } == [5, 3])
-        #expect(order.map(\.detail) == ["5% · Airlines", "3% · Travel"])
+        #expect(order.map(\.detail) == ["Airlines", "Travel"])
     }
 
     @Test func equalRatesInSeveralRewardCategoriesNameTheFirstOfThem() throws {
@@ -91,6 +91,6 @@ struct CardPickerOrderTests {
         let card = try store.context.addCard("Even", paidFrom: store.checking)
         try card.saveRate(in: catalog, EnteredRate(reward: "airlines", rate: 3), replacing: nil)
         try card.saveRate(in: catalog, EnteredRate(reward: "travel", rate: 3), replacing: nil)
-        #expect(ordered([card], for: try store.category("Travel")).first?.detail == "3% · Travel")
+        #expect(ordered([card], for: try store.category("Travel")).first?.detail == "Travel")
     }
 }
