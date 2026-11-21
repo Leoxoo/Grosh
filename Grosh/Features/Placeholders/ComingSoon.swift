@@ -4,6 +4,8 @@ import Foundation
 enum ComingSoon: CaseIterable {
     case budgets
     case topSpending
+    /// Best Card's Location view, beside Category.
+    case location
 
     /// The coming-soon cards on Home, in the order they appear.
     static let homeCards: [ComingSoon] = [.topSpending]
@@ -12,6 +14,7 @@ enum ComingSoon: CaseIterable {
         switch self {
         case .budgets: String(localized: Strings.Screens.budgets)
         case .topSpending: String(localized: Strings.Settings.topSpending)
+        case .location: String(localized: Strings.BestCard.location)
         }
     }
 
@@ -20,6 +23,7 @@ enum ComingSoon: CaseIterable {
         switch self {
         case .budgets: "chart.pie"
         case .topSpending: "list.number"
+        case .location: "location"
         }
     }
 
@@ -30,6 +34,8 @@ enum ComingSoon: CaseIterable {
             String(localized: Strings.Settings.budgetsMessage)
         case .topSpending:
             String(localized: Strings.Settings.topSpendingMessage)
+        case .location:
+            String(localized: Strings.BestCard.locationMessage)
         }
     }
 }

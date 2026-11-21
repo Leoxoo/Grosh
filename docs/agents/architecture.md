@@ -66,6 +66,8 @@ Each step has a budget in `GroshTests/BenchmarkBudgets.swift`, and a step over i
 
 ## House style
 
+- **Customize** (`slider.horizontal.3`) is the one button for choosing what a screen shows and in what order, such as Best Card's tiles. Edit stays for changing the user's own data, such as the order of their categories or wallets.
+
 - **Doc comments** say in the user's words what something is or does, using glossary terms, and cite the ADR that decides it (`(ADR-0004)`). They explain *why* a choice was made when the code can't.
 - **Commit subjects** describe the user-visible change in plain English ("Keep every transaction in memory instead of re-reading the store after each save"), not the code edit.
 - **A rule saves through the store, or refuses.** A rule that changes a model and saves reaches the store with `storeContext()` or `saveToStore()` (`Domain/Store/StoreContext.swift`), never `modelContext?.save()`: a model the store no longer holds throws `StoreError.notInStore` instead of dropping the change without a word.

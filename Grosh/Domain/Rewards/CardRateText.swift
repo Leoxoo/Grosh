@@ -39,6 +39,15 @@ nonisolated enum CardRateText {
         return Strings.Rewards.atMerchants(on, (rate.rule?.merchants ?? []).formatted(.list(type: .or)))
     }
 
+    /// What a rate Needs, as it reads beside the rate: "with Apple Pay", "at Amazon", "Needs activation".
+    static func need(_ need: RateNeed) -> String {
+        switch need {
+        case let .paysWith(way): String(localized: Strings.Rewards.withWay(way))
+        case let .store(stores): String(localized: Strings.Rewards.atStores(stores.formatted(.list(type: .or))))
+        case .activation: String(localized: Strings.Rewards.needsActivation)
+        }
+    }
+
     /// A quarter's days as "Oct 1 – Dec 31".
     static func dayRange(from: CalendarDay, to: CalendarDay) -> String {
         let style = Date.FormatStyle().month(.abbreviated).day()

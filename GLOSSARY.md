@@ -332,6 +332,18 @@ The Reward category the user picked for a rate whose category the cardholder cho
 What a Card earns on a purchase as a share of what was spent: a cash back rate as it is, a points or miles rate times its Point value. Rates are compared and sorted by it everywhere.
 _Avoid_: Value, return
 
+**Best Card**:
+The tab in the middle of the tab bar that shows the Reward categories the user chose, in the order they chose, each with its Go-to card, or else the unarchived Card that earns the most on it, and that Card's Effective rate with what it Needs. A Reward category no Card earns on shows 0%. Location, the view beside Category at its top, is still to come.
+_Avoid_: Rewards tab (Rewards is the section on a Card's page)
+
+**Needs**:
+What a rate asks of a purchase beyond its Reward category, shown beside it wherever Cards are ranked: a way of paying ("with Apple Pay"), a store ("at Amazon"), or a quarter the bank asks the cardholder to activate. A rate competes with every other rate as if what it Needs is done; Grosh never records how a purchase was paid. A cap is not a Need. Rewards are informative only: Grosh never counts what a Card earned (ADR-0016).
+_Avoid_: Condition, requirement (that is the catalog's word for what a Rule asks)
+
+**Go-to card**:
+The Card the user picked for one Reward category on Best Card, shown on its tile in place of the Card that earns the most. The tile is flagged when another Card earns more on it and Needs nothing the Go-to card doesn't. An archived Go-to card, or one with no rate left on the category, gives way to the Card that earns the most.
+_Avoid_: Preferred card (Preferred Rewards is a bank's tier), Your choice (that is a rate's chosen category), default card
+
 **Multiplier**:
 How a points or miles Card states what it earns: points per dollar, written 3×. A cash back Card has none; its rate is already an Effective rate.
 _Avoid_: Points rate

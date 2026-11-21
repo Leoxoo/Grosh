@@ -58,8 +58,8 @@ struct CardPickerOrderTests {
         let savory = try linked("Savory", to: "test-savory-cash")
         let voyager = try linked("Voyager", to: "test-voyager-points")
         let order = ordered([savory, voyager], for: try store.category("Café"))
-        #expect(order.map(\.detail) == ["Dining", "Dining"])
-        #expect(ordered([savory], for: try store.category("Education")).first?.detail == "Everything else")
+        #expect(order.map(\.detail) == ["Dining", "Dining · Needs activation"])
+        #expect(ordered([savory], for: try store.category("Education")).first?.detail == "Everything else · with Apple Pay")
     }
 
     @Test func pickingACategoryNeverPicksACard() throws {

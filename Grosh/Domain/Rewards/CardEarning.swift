@@ -3,19 +3,21 @@ import Foundation
 /// One Card in an Expense's Card picker, with what a purchase in the picked category earns with it.
 nonisolated struct CardEarning: Identifiable {
     let card: Card
-    /// What a purchase in the category earns with the Card: the best of its Reward categories
-    /// (``CardRewards/earning(for:on:own:spending:)``, ADR-0015); `nil` when it has no rate that covers it, or no
-    /// category is picked.
+    /// What a purchase in the category earns with the Card: the best of its Reward categories, a rate limited to a way
+    /// of paying included (``CardRewards/rankedEarning(for:on:own:spending:)``, ADR-0015, ADR-0016); `nil` when it has
+    /// no rate that covers it, or no category is picked.
     let earning: PurchaseEarning?
 
     var id: ObjectIdentifier { ObjectIdentifier(card) }
 
-    /// The line under the Card's name in the picker: the Reward category ("Dining"), and what a capped rate falls back
-    /// to ("Everything else (then 1× after $50,000)"). The Effective rate is shown beside the name, not in this line.
+    /// The line under the Card's name in the picker: the Reward category ("Dining"), what a capped rate falls back to
+    /// ("Everything else (then 1× after $50,000)"), and what the rate Needs ("Everything else · with Apple Pay"). The
+    /// Effective rate is shown beside the name, not in this line.
     var detail: String? {
         guard let earning else { return nil }
         let name = earning.reward.name
-        return CardRateText.afterCap(of: earning).map { "\(name) (\($0))" } ?? name
+        let named = CardRateText.afterCap(of: earning).map { "\(name) (\($0))" } ?? name
+        return ([named] + earning.needs.map(CardRateText.need)).joined(separator: " · ")
     }
 
     /// `cards`, the ones the picker offers in the user's order, best first for what a purchase in `category` earns on
@@ -32,7 +34,7 @@ nonisolated struct CardEarning: Identifiable {
         let earnings = cards.map { card in
             let rewards = CardRewards(of: card, in: catalog)
             let spent = rewards.needsSpending ? spending(card) : [:]
-            return CardEarning(card: card, earning: rewards.earning(for: rewardsAs, on: day, own: own, spending: spent))
+            return CardEarning(card: card, earning: rewards.rankedEarning(for: rewardsAs, on: day, own: own, spending: spent))
         }
         return earnings.enumerated().sorted { lhs, rhs in
             switch (lhs.element.earning?.effectiveRate, rhs.element.earning?.effectiveRate) {

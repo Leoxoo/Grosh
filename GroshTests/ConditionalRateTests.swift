@@ -330,6 +330,6 @@ struct ConditionalRateTests {
         let order = CardEarning.ordered(
             [card], for: try store.category("Products"), in: catalog, own: [], on: TestStore.today, spending: { _ in [:] }
         )
-        #expect(order.first?.detail == "Groceries")
+        #expect(order.first?.detail == "Groceries · Needs activation")
     }
 }

@@ -88,6 +88,9 @@ nonisolated struct PurchaseEarning: Identifiable, Hashable, Sendable {
     /// The rates it is made of and what each adds: the Base rate and each bonus over it when the card's Bonuses add up,
     /// else the one best rate.
     let parts: [EarningPart]
+    /// The way of paying its rate is limited to, such as Apple Pay, where Cards are ranked as if paid that way
+    /// (``CardRewards/rankedEarning(for:on:own:spending:)``, ADR-0016).
+    var paysWith: String?
 
     var id: String { reward.id }
 

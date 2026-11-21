@@ -32,4 +32,8 @@ nonisolated enum AppSettings {
 
     /// How Debts & Loans lists them: by Loan or Debt, as it did before Show by people existed, or by person.
     static let debtsLoansGrouping = AppSetting(key: "debtsLoans.grouping", defaultValue: DebtsLoansGrouping.loanOrDebt)
+
+    /// Which Reward categories Best Card shows and in what order (``BestCardLayout/stored``); empty until the user
+    /// customizes, when the starter tiles show.
+    static let bestCardLayout = AppSetting(key: "bestCard.layout", defaultValue: "")
 }
