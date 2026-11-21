@@ -165,6 +165,9 @@ private struct CategoryChoiceList: View {
             }
         }
         .roundedSectionsListStyle()
+        #if os(iOS)
+        .listSectionSpacing(.compact)
+        #endif
         .overlay {
             if isSearching && groups.isEmpty {
                 ContentUnavailableView.search(text: query.trimmingCharacters(in: .whitespacesAndNewlines))
