@@ -2,7 +2,7 @@ import SwiftData
 import Testing
 @testable import Grosh
 
-/// Search: note text, category name and amount, across all time.
+/// Search: note text, category name, Card name and amount, across all time.
 @MainActor
 @Suite(.namedInTheLog)
 struct TransactionSearchTests {
@@ -44,6 +44,17 @@ struct TransactionSearchTests {
 
         #expect(search("cafe", in: all) == ["flat white"])
         #expect(search("restaurant", in: all) == ["dinner"])
+    }
+
+    @Test func findsEveryTransactionPaidWithACardByItsName() throws {
+        let chase = try context.addCard("Chase Freedom", paidFrom: checking)
+        let paid = [record(-4_50, "flat white"), record(-30_00, "dinner")]
+        for transaction in paid {
+            transaction.card = chase
+        }
+        let all = paid + [record(-2_00, "cash")]
+
+        #expect(search("chase", in: all) == ["flat white", "dinner"])
     }
 
     @Test func aWholeNumberFindsEveryAmountWithThoseDollars() {

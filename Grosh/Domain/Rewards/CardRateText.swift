@@ -1,0 +1,133 @@
+import Foundation
+
+/// How a Card's rates read.
+nonisolated enum CardRateText {
+    /// `rate` (in percent) as "3%" or "1.5%".
+    static func percent(_ rate: Double) -> String {
+        (rate / 100).formatted(.percent.precision(.fractionLength(0...2)))
+    }
+
+    /// `value` as "3" or "1.25".
+    static func number(_ value: Double) -> String {
+        value.formatted(.number.precision(.fractionLength(0...2)))
+    }
+
+    /// The number typed in `text`, in the user's own way of writing one, or `nil` when it isn't one.
+    static func parseNumber(_ text: String) -> Double? {
+        try? Double(text.trimmingCharacters(in: .whitespaces), format: .number)
+    }
+
+    /// A catalog amount in US dollars, as "$2,500".
+    static func dollars(_ amount: Double) -> String {
+        amount.formatted(.currency(code: "USD").precision(.fractionLength(0...2)))
+    }
+
+    /// A quarter's months as "Oct–Dec".
+    static func months(from: CalendarDay, to: CalendarDay) -> String {
+        let month = Date.FormatStyle().month(.abbreviated)
+        return "\(from.date().formatted(month))–\(to.date().formatted(month))"
+    }
+
+    /// A rate earned only paid a certain way or at certain merchants: "2% with Apple Pay", "5% Online shopping at
+    /// Amazon".
+    static func condition(of rate: CardRate) -> LocalizedStringResource {
+        let percent = self.percent(rate.effectiveRate)
+        let on = rate.reward == .everythingElse ? percent : "\(percent) \(rate.reward.name)"
+        if let paysWith = rate.rule?.paysWith {
+            return Strings.Rewards.paidWith(on, paysWith)
+        }
+        return Strings.Rewards.atMerchants(on, (rate.rule?.merchants ?? []).formatted(.list(type: .or)))
+    }
+
+    /// What a rate Needs, as it reads beside the rate: "with Apple Pay", "at Amazon", "Needs activation".
+    static func need(_ need: RateNeed) -> String {
+        switch need {
+        case let .paysWith(way): String(localized: Strings.Rewards.withWay(way))
+        case let .store(stores): String(localized: Strings.Rewards.atStores(stores.formatted(.list(type: .or))))
+        case .activation: String(localized: Strings.Rewards.needsActivation)
+        }
+    }
+
+    /// A quarter's days as "Oct 1 – Dec 31".
+    static func dayRange(from: CalendarDay, to: CalendarDay) -> String {
+        let style = Date.FormatStyle().month(.abbreviated).day()
+        return "\(from.date().formatted(style)) – \(to.date().formatted(style))"
+    }
+
+    /// A note under a purchase's row when one rate needs it: a cap ("Up to $50,000 a year, then 1×"), or which quarter a
+    /// single bonus is ("Oct–Dec quarter"). Several rates that add up are explained on the row's own screen, so this
+    /// is `nil` for those.
+    static func breakdown(of earning: PurchaseEarning) -> String? {
+        guard !earning.isAddedUp else { return nil }
+        if let part = earning.parts.first, let after = part.rate.afterCap, let cap = part.rate.cap,
+           let upTo = self.cap(cap, currencyCode: cap.currencyCode ?? "USD") {
+            return String(localized: Strings.Rewards.thenAfterCap(upTo, rate(effective: after.effectiveRate, multiplier: after.multiplier)))
+        }
+        return earning.parts.first?.quarter.map { String(localized: Strings.Rewards.quarterBonus(months(from: $0.from, to: $0.to))) }
+    }
+
+    /// What a capped rate falls back to, for the picker: "then 1× after $50,000"; `nil` for a rate with no cap to pass.
+    static func afterCap(of earning: PurchaseEarning) -> String? {
+        guard earning.parts.count == 1, let part = earning.parts.first, let after = part.rate.afterCap,
+              let cap = part.rate.cap, let amount = cap.amount
+        else { return nil }
+        return String(localized: Strings.Rewards.thenAfterAmount(
+            rate(effective: after.effectiveRate, multiplier: after.multiplier), money(amount, currencyCode: cap.currencyCode ?? "USD")
+        ))
+    }
+
+    /// A rate as a card states it: "1×" for points or miles, else "1%".
+    static func rate(effective: Double, multiplier: Double?) -> String {
+        multiplier.map { String(localized: Strings.Rewards.multiplier(number($0))) } ?? percent(effective)
+    }
+
+    /// What one rate in a purchase's earning is: the Base rate, a quarter ("Oct–Dec quarter"), or its Reward category.
+    static func partName(_ part: EarningPart, isFirst: Bool, of earning: PurchaseEarning) -> String {
+        if let quarter = part.quarter {
+            return String(localized: Strings.Rewards.quarterBonus(months(from: quarter.from, to: quarter.to)))
+        }
+        if part.rate.reward == .everythingElse && earning.reward != .everythingElse {
+            return String(localized: Strings.Rewards.baseRate)
+        }
+        return part.rate.reward.name
+    }
+
+    /// `day` as the user's calendar writes a date.
+    static func day(_ day: CalendarDay) -> String {
+        day.date().formatted(date: .abbreviated, time: .omitted)
+    }
+
+    /// A rate's dates as "Oct 1, 2026 to Dec 31, 2026", "From …" or "Until …"; `nil` for none.
+    static func dates(from: CalendarDay?, to: CalendarDay?) -> String? {
+        switch (from.map(day), to.map(day)) {
+        case let (from?, to?): String(localized: Strings.Rewards.datesBetween(from, to))
+        case let (from?, nil): String(localized: Strings.Rewards.datesFrom(from))
+        case let (nil, to?): String(localized: Strings.Rewards.datesUntil(to))
+        case (nil, nil): nil
+        }
+    }
+
+    /// A cap's amount alone, as "$1,500".
+    static func cap(amountOf cap: RateCap, currencyCode: String) -> String? {
+        cap.amount.map { money($0, currencyCode: currencyCode) }
+    }
+
+    /// A rate's cap as "Up to $1,500 a quarter", in `currencyCode`.
+    static func cap(_ cap: RateCap, currencyCode: String) -> String? {
+        guard let amount = cap.amount.map({ money($0, currencyCode: currencyCode) }) else {
+            return cap.isUnknown ? String(localized: Strings.Rewards.capUnknown) : nil
+        }
+        return switch cap.period {
+        case .month: String(localized: Strings.Rewards.capPerMonth(amount))
+        case .quarter: String(localized: Strings.Rewards.capPerQuarter(amount))
+        case .year: String(localized: Strings.Rewards.capPerYear(amount))
+        case .statement: String(localized: Strings.Rewards.capPerStatement(amount))
+        case nil: String(localized: Strings.Rewards.capTotal(amount))
+        }
+    }
+
+    /// `amount` in `currencyCode`, as "$2,500".
+    static func money(_ amount: Double, currencyCode: String) -> String {
+        amount.formatted(.currency(code: currencyCode).precision(.fractionLength(0...2)))
+    }
+}

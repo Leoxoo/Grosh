@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// Transactions by day, newest day first, each day under its date and net total: the Transactions tab's list and
-/// search results. `row` draws each transaction. Future's Scheduled rows fall on their days after that day's
-/// transactions, and each opens its Recurring transaction. Use inside a `List`.
+/// Transactions by day, newest day first. Each day is one card: its date and net total lead that day's transactions,
+/// on the card with them. The Transactions tab's list and search results use it. `row` draws each transaction.
+/// Future's Scheduled rows fall on their days after that day's transactions, and each opens its Recurring transaction.
+/// Use inside a `List`.
 struct TransactionDaySections<Row: View>: View {
     let transactions: [Transaction]
     /// Future's Scheduled rows: occurrences not yet made into transactions.
@@ -17,25 +18,25 @@ struct TransactionDaySections<Row: View>: View {
 
     var body: some View {
         ForEach(TransactionDay.days(of: transactions, scheduled: scheduled)) { day in
-            let count = day.transactions.count + day.scheduled.count
+            let count = day.transactions.count + day.scheduled.count + 1
             Section {
-                GroupedForEach(day.transactions, rowsInSection: count, isSelected: isSelected) { row($0) }
-                GroupedForEach(day.scheduled, rowsBefore: day.transactions.count, rowsInSection: count) { occurrence in
+                TransactionDayHeader(day: day, listed: listed)
+                    .groupedRow(GroupPosition(index: 0, count: count))
+                GroupedForEach(day.transactions, rowsBefore: 1, rowsInSection: count, isSelected: isSelected) { row($0) }
+                GroupedForEach(day.scheduled, rowsBefore: day.transactions.count + 1, rowsInSection: count) { occurrence in
                     NavigationLink {
                         RecurringTransactionDetailView(recurring: occurrence.recurring)
                     } label: {
                         ScheduledRow(occurrence: occurrence, showsWalletIcon: showsWalletIcon)
                     }
                 }
-            } header: {
-                TransactionDayHeader(day: day, listed: listed)
             }
         }
     }
 }
 
-/// A day's date with its day number big, the weekday and the month and year stacked small beside it, and the day's
-/// total. At the largest text sizes the total moves under the date so neither is cut short. A day with
+/// A day's date on its card, with its day number big, the weekday and the month and year stacked small beside it,
+/// and the day's total. At the largest text sizes the total moves under the date so neither is cut short. A day with
 /// only Scheduled rows has no total.
 struct TransactionDayHeader: View {
     let day: TransactionDay
@@ -64,6 +65,7 @@ struct TransactionDayHeader: View {
         }
         .textCase(nil)
         .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isHeader)
         .accessibilityLabel(date.formatted(.dateTime.weekday(.wide).day().month(.wide).year()))
         .accessibilityValue(hasTransactions ? day.total(listed).signedFormatted() : "")
     }
@@ -73,6 +75,7 @@ struct TransactionDayHeader: View {
             Text(date.formatted(.dateTime.day()))
                 .font(.title.bold())
                 .monospacedDigit()
+                // On the card rather than in a section header, the label color is white in a dark appearance.
                 .foregroundStyle(.primary)
             VStack(alignment: .leading, spacing: 0) {
                 Text(date.formatted(.dateTime.weekday(.wide)))

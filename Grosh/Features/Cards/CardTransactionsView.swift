@@ -1,12 +1,12 @@
 import SwiftData
 import SwiftUI
 
-/// What tapping a Card opens: the transactions paid with it one period at a time, and their total, to check against
-/// the card's statement. A Credit card with a statement date shows its statement periods, any other Card calendar
-/// months. It opens on the current period; ‹ › step back through the periods with the Card's transactions and forward
-/// again. A statement period also lists its lead-in transactions, muted under "Previous statement": each can be added
-/// to the statement total for as long as this screen shows that statement, and nothing about it is saved. Use inside a
-/// `NavigationStack`.
+/// What tapping a Card opens: what it earns (``CardRewardsSection``), then the transactions paid with it one period at
+/// a time, and their total, to check against the card's statement. A Credit card with a statement date shows its
+/// statement periods, any other Card calendar months. It opens on the current period; ‹ › step back through the periods
+/// with the Card's transactions and forward again. A statement period also lists its lead-in transactions, muted under
+/// "Previous statement": each can be added to the statement total for as long as this screen shows that statement, and
+/// nothing about it is saved. Use inside a `NavigationStack`.
 struct CardTransactionsView: View {
     let card: Card
 
@@ -66,6 +66,9 @@ private struct CardPeriodList: View {
     @Query private var paid: [Transaction]
     @Query private var earliest: [Transaction]
     @Query private var latest: [Transaction]
+    /// What the Rewards section has open, presented from the list rather than from inside it.
+    @State private var rewardsAction: CardRewardsAction?
+    @State private var errorMessage: String?
 
     init(
         card: Card, period: CardPeriod, today: CalendarDay, periodsBack: Binding<Int>,
@@ -91,6 +94,8 @@ private struct CardPeriodList: View {
         let added = leadIns.filter { addedLeadIns.contains($0) }
 
         List {
+            CardRewardsSection(card: card, today: today, action: $rewardsAction)
+
             Section {
                 CardPeriodStepper(
                     period: period, periods: statement.periods, today: today, periodsBack: $periodsBack
@@ -153,6 +158,10 @@ private struct CardPeriodList: View {
                 }
             }
         }
+        .sheet(item: $rewardsAction) { action in
+            action.sheet(for: card, errorMessage: $errorMessage)
+        }
+        .errorAlert(Strings.Cards.couldntChange, message: $errorMessage)
     }
 }
 
@@ -228,5 +237,8 @@ private struct CardPeriodStepper: View {
             .disabled(period >= periods.upperBound)
         }
         .buttonStyle(.borderless)
+        // The list starts a row's separator under its first text, here the centered title; start it at the row's
+        // leading edge, as under the other rows.
+        .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
     }
 }
