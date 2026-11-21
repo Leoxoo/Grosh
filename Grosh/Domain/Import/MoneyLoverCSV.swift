@@ -66,15 +66,30 @@ extension MoneyLoverImportError: LocalizedError {
     }
 }
 
-/// Reads a MoneyLover CSV export, `Id, Date (MM/DD/YYYY), Category, Amount, Currency, Wallet, Note, With, Event,
-/// Exclude from report, Members`, and a Grosh export's own columns, in the file format both share
-/// (``GroshCSVFormat``). Columns are found by their header, so their order doesn't matter.
+/// Reads a MoneyLover CSV export, and a Grosh export's own columns, in the file format both share
+/// (``GroshCSVFormat``). Columns are found by their header, so their order doesn't matter, and any but Date, Category,
+/// Amount and Wallet may be missing. MoneyLover has written two kinds of file:
+/// - comma-separated UTF-8 with `Id, Date (MM/DD/YYYY), Category, Amount, Currency, Wallet, Note, With, Event,
+///   Exclude from report, Members`, as a Grosh export is too;
+/// - tab-separated UTF-16 with only `Id, Date, Category, Amount, Currency, Note, Wallet`.
 nonisolated enum MoneyLoverCSV {
+    /// The export the file's `data` holds, read as UTF-8, or as UTF-16 when it starts with a UTF-16 byte order mark,
+    /// then as its text is read below.
+    static func read(_ data: Data, currencyCode: String) throws -> MoneyLoverExport {
+        let isUTF16 = data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF])
+        guard let text = String(data: data, encoding: isUTF16 ? .utf16 : .utf8) else {
+            throw MoneyLoverImportError.notAMoneyLoverExport
+        }
+        return try read(text, currencyCode: currencyCode)
+    }
+
     /// The export `text` holds, each amount in the currency its row's `Currency` column names, or in `currencyCode`,
-    /// the one Settings → Currency names, for a row that names none. Throws ``MoneyLoverImportError`` for a file that
-    /// isn't a MoneyLover export or has a row that can't be read.
+    /// the one Settings → Currency names, for a row that names none. Its fields are split at tabs when its header has
+    /// one, at commas otherwise. Throws ``MoneyLoverImportError`` for a file that isn't a MoneyLover export or has a
+    /// row that can't be read.
     static func read(_ text: String, currencyCode: String) throws -> MoneyLoverExport {
-        var records = GroshCSVFormat.records(in: text)
+        let separator: Character = text.prefix(while: { !$0.isNewline }).contains("\t") ? "\t" : ","
+        var records = GroshCSVFormat.records(in: text, separator: separator)
         guard !records.isEmpty else { throw MoneyLoverImportError.notAMoneyLoverExport }
         let columns = try Columns(header: records.removeFirst().fields, currencyCode: currencyCode)
         guard !records.isEmpty else { throw MoneyLoverImportError.noTransactions }

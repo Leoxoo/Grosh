@@ -69,9 +69,9 @@ struct ImportFromMoneyLoverView: View {
             defer {
                 if isAccessing { url.stopAccessingSecurityScopedResource() }
             }
-            let text = try String(contentsOf: url, encoding: .utf8)
+            let data = try Data(contentsOf: url)
             picked = PickedExport(
-                fileName: url.lastPathComponent, export: try MoneyLoverCSV.read(text, currencyCode: currencyCode)
+                fileName: url.lastPathComponent, export: try MoneyLoverCSV.read(data, currencyCode: currencyCode)
             )
         }
     }
