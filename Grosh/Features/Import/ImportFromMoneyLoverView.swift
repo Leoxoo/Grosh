@@ -11,7 +11,8 @@ struct ImportFromMoneyLoverView: View {
     @State private var isPickingFile = false
     /// The export read from the picked file, waiting for the user to confirm.
     @State private var picked: PickedExport?
-    @State private var isImporting = false
+    /// The export being imported, from the user's "Replace all data" until the import is done.
+    @State private var importing: PickedExport?
     @State private var summary: MoneyLoverImportSummary?
     @State private var errorMessage: String?
 
@@ -23,6 +24,20 @@ struct ImportFromMoneyLoverView: View {
                 Section {
                     Button(Strings.ImportExport.chooseCSVFile, systemImage: "doc.badge.plus") {
                         isPickingFile = true
+                    }
+                    // On the button, so that where the question shows as a popover, it points at the button.
+                    .confirmationDialog(
+                        Strings.ImportExport.replaceAllDataQuestion,
+                        isPresented: Binding(get: { picked != nil }, set: { if !$0 { picked = nil } }),
+                        titleVisibility: .visible,
+                        presenting: picked
+                    ) { export in
+                        Button(Strings.ImportExport.replaceAllData, role: .destructive) {
+                            importing = export
+                        }
+                        Button(Strings.Common.cancel, role: .cancel) {}
+                    } message: { export in
+                        Text(Strings.ImportExport.replaceConfirmation(export.export.rows.count, export.fileName))
                     }
                 } footer: {
                     Text(Strings.ImportExport.importFooter)
@@ -36,26 +51,11 @@ struct ImportFromMoneyLoverView: View {
         .fileImporter(isPresented: $isPickingFile, allowedContentTypes: [.commaSeparatedText, .plainText]) { result in
             read(result)
         }
-        .confirmationDialog(
-            Strings.ImportExport.replaceAllDataQuestion,
-            isPresented: Binding(get: { picked != nil }, set: { if !$0 { picked = nil } }),
-            titleVisibility: .visible,
-            presenting: picked
-        ) { export in
-            Button(Strings.ImportExport.replaceAllData, role: .destructive) {
-                replaceAllData(with: export)
-            }
-            Button(Strings.Common.cancel, role: .cancel) {}
-        } message: { export in
-            Text(Strings.ImportExport.replaceConfirmation(export.export.rows.count, export.fileName))
-        }
-        .disabled(isImporting)
-        .overlay {
-            if isImporting {
-                ProgressView(Strings.ImportExport.importing)
-                    .padding()
-                    .background(.regularMaterial, in: .rect(cornerRadius: 12))
-                    .transition(.opacity)
+        // Covering the whole app, tabs included, so that nothing else is changed or saved while the import's
+        // changes wait unsaved in the context.
+        .fullScreenCover(isPresented: Binding(get: { importing != nil }, set: { _ in })) {
+            if let importing {
+                ImportProgressScreen(export: importing.export, done: finish)
             }
         }
         .errorAlert(Strings.ImportExport.couldntImport, message: $errorMessage)
@@ -76,19 +76,58 @@ struct ImportFromMoneyLoverView: View {
         }
     }
 
-    /// Shows "Importing…", then imports `export` once it has finished appearing. The import holds the main actor
-    /// until it is done, so nothing new is drawn meanwhile: started any sooner, it would run before the progress is on
-    /// screen.
-    private func replaceAllData(with export: PickedExport) {
-        withAnimation {
-            isImporting = true
-        } completion: {
-            Log.importing.perform("Importing from MoneyLover", errorMessage: &errorMessage) {
-                summary = try MoneyLoverImport.replaceAllData(
-                    with: export.export, cards: .ownersCards, in: context
-                )
+    /// Shows what the import did, or why it couldn't be done, once it is over.
+    private func finish(_ result: Result<MoneyLoverImportSummary, any Error>) {
+        Log.importing.perform("Importing from MoneyLover", errorMessage: &errorMessage) {
+            summary = try result.get()
+        }
+        importing = nil
+    }
+}
+
+/// "Replace all data" under way: a progress bar, moved on between the import's steps (``MoneyLoverImport/Run``). The
+/// import starts once the screen is up and runs on the main actor, handing it back for a moment after each step so the
+/// bar is drawn. Nothing new can be drawn during the save, the last and longest step, so a spinner, which the system
+/// keeps turning meanwhile, shows the app is still at work.
+private struct ImportProgressScreen: View {
+    let export: MoneyLoverExport
+    let done: (Result<MoneyLoverImportSummary, any Error>) -> Void
+    @Environment(\.modelContext) private var context
+    @State private var fractionDone = 0.0
+    @State private var isSaving = false
+
+    var body: some View {
+        VStack(spacing: 24) {
+            ProgressView(value: fractionDone) {
+                Text(isSaving ? Strings.ImportExport.saving : Strings.ImportExport.importing)
+            } currentValueLabel: {
+                Text(fractionDone, format: .percent.precision(.fractionLength(0)))
             }
-            isImporting = false
+            .progressViewStyle(.linear)
+            ProgressView()
+                .opacity(isSaving ? 1 : 0)
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .interactiveDismissDisabled()
+        .task { await run() }
+    }
+
+    private func run() async {
+        do {
+            let run = try MoneyLoverImport.Run(export: export, cards: .ownersCards, in: context)
+            while true {
+                fractionDone = run.fractionDone
+                isSaving = run.isSaving
+                // Not cancellable: a run left halfway would leave its changes unsaved in the context.
+                try? await Task.sleep(for: .milliseconds(15))
+                if let summary = try run.next() {
+                    done(.success(summary))
+                    return
+                }
+            }
+        } catch {
+            done(.failure(error))
         }
     }
 }

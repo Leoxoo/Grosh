@@ -933,6 +933,7 @@ nonisolated enum Strings {
         static let replaceAllDataQuestion: LocalizedStringResource = "Replace all data?"
         static let replaceAllData: LocalizedStringResource = "Replace All Data"
         static let importing: LocalizedStringResource = "Importing…"
+        static let saving: LocalizedStringResource = "Saving…"
         static let couldntImport: LocalizedStringResource = "Couldn't Import"
         static let cardsCreated: LocalizedStringResource = "Cards created"
         static let imported: LocalizedStringResource = "Imported"
