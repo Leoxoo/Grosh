@@ -33,6 +33,7 @@ struct BestCardCustomizeSheet: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityAddTraits(entry.isShown ? .isSelected : [])
+                        .accessibilityIdentifier("BestCard.customize.\(entry.reward.id)")
                     }
                     .onMove { source, destination in
                         stored = layout.moved(from: source, to: destination, in: listed).stored

@@ -40,6 +40,7 @@ struct BestCardView: View {
                 .padding(.horizontal)
                 .padding(.bottom)
             }
+            .navigationTitle(Strings.BestCard.title)
             .tabRootTitle(Strings.BestCard.title)
             .searchable(text: $query, prompt: Text(Strings.BestCard.searchPrompt))
             .toolbar {
@@ -69,6 +70,8 @@ struct BestCardView: View {
                         BestCardTileView(tile: bestCard.tile(for: reward))
                     }
                     .buttonStyle(.plain)
+                    // Its label changes with the Card shown, so the UI tests find it by the Reward category.
+                    .accessibilityIdentifier("BestCard.tile.\(reward.id)")
                 }
             }
         }
