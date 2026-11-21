@@ -432,6 +432,8 @@ nonisolated enum Strings {
         static func onRotatingCategories(_ rate: String) -> LocalizedStringResource { "\(rate) on rotating categories" }
         static func paidWith(_ rate: String, _ way: String) -> LocalizedStringResource { "\(rate) with \(way)" }
         static func atMerchants(_ rate: String, _ merchants: String) -> LocalizedStringResource { "\(rate) at \(merchants)" }
+        static func withWay(_ way: String) -> LocalizedStringResource { "with \(way)" }
+        static func atStores(_ stores: String) -> LocalizedStringResource { "at \(stores)" }
         static let rateOutOfRange: LocalizedStringResource = "Enter a rate above 0."
         static let capOutOfRange: LocalizedStringResource = "Enter a cap above 0, or turn the cap off."
         static let datesOutOfOrder: LocalizedStringResource = "The first day comes before the last."
@@ -498,6 +500,26 @@ nonisolated enum Strings {
         static func datesBetween(_ from: String, _ to: String) -> LocalizedStringResource { "\(from) to \(to)" }
         static func datesFrom(_ from: String) -> LocalizedStringResource { "From \(from)" }
         static func datesUntil(_ to: String) -> LocalizedStringResource { "Until \(to)" }
+    }
+
+    /// The Best Card tab: which Card earns the most on each Reward category.
+    enum BestCard {
+        static let title: LocalizedStringResource = "Best Card"
+        static let category: LocalizedStringResource = "Category"
+        static let location: LocalizedStringResource = "Location"
+        static let locationMessage: LocalizedStringResource = "See which Card earns the most where you are."
+        static let searchPrompt: LocalizedStringResource = "Search Reward categories"
+        static let customize: LocalizedStringResource = "Customize"
+        static let customizeFooter: LocalizedStringResource = "Checked Reward categories show on Best Card, in this order. Drag to reorder."
+        static let goTo: LocalizedStringResource = "Go-to"
+        static let makeGoTo: LocalizedStringResource = "Make Go-to"
+        static let removeGoTo: LocalizedStringResource = "Remove Go-to"
+        static let earnsMore: LocalizedStringResource = "Another Card earns more"
+        static let noCard: LocalizedStringResource = "No Card"
+        static func rowsFooter(_ reward: String) -> LocalizedStringResource { "Swipe a Card to make it your Go-to for \(reward). Rates are compared as if what each one needs is done." }
+        static func noRates(_ reward: String) -> LocalizedStringResource { "No Card earns on \(reward) yet." }
+        static let noRatesMessage: LocalizedStringResource = "Add rewards to a Card in Account → Cards."
+        static let couldntChange: LocalizedStringResource = "Couldn't Change Go-to Card"
     }
 
     /// Categories: adding, editing, hiding, merging and picking them.

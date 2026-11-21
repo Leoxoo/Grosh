@@ -74,6 +74,7 @@ struct PerformanceBenchmarks {
         time("open a Card's transactions") {
             _ = Hosted(NavigationStack { CardTransactionsView(card: card) }, container: container)
         }
+        time("open Best Card") { _ = Hosted(BestCardView(), container: container) }
     }
 
     /// What scrolling costs: each row coming into view is made and drawn, so this draws a few hundred rows at once in a

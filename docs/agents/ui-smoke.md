@@ -38,6 +38,7 @@ Each step is an activity in the test report. Every screen gets 10 seconds to app
 | `Transactions → scroll` | Three swipes down the list. |
 | `Transactions → open a transaction` | Taps a row between the list's header and the tab bar, and waits for the Transaction screen. |
 | `Transactions → back` | Back to the list. |
+| `Best Card → open` | The Best Card tab and its Dining tile. |
 | `Budgets → open` | The Budgets tab. |
 | `Account → open` | The Account tab. |
 | `Wallets → open` | Account → Wallets. |
@@ -49,9 +50,20 @@ Each step is an activity in the test report. Every screen gets 10 seconds to app
 | `Home → see the new Expense` | Scrolls Home to Recent transactions and waits for the row with that note. |
 | `Search → find a payee` | Opens the Transactions tab's search, searches for "Sam" and waits for a "Dinner with Sam". It comes last, so its keyboard stays up and nothing after it taps a tab. |
 
+`testBestCard`, beside the walk, launches on the same store and works the Best Card tab. Its Cards have no rewards, so every tile shows 0%.
+
+| Step | What it does |
+| --- | --- |
+| `Launch` | As the walk's. Whichever of the two runs first makes today's store; the other finds it made. |
+| `Best Card → open` | The tab and the Dining, Groceries and Gas tiles. |
+| `Best Card → customize` | Unchecks Gas in Customize and waits for its tile to go, then checks it again and waits for it to come back, so the tiles stay as they were. A Gas left unchecked by a run that stopped half-way is checked first. |
+| `Best Card → open a tile` | Taps Dining, waits for its screen, and goes back. |
+| `Best Card → Location` | Switches to Location, waits for Coming Soon, and switches back. |
+| `Best Card → search` | Searches for "Hotels" and waits for its tile, which the starter tiles leave out, and for Dining's to go. It comes last, as its keyboard covers the tab bar. |
+
 The walk logs each step with `os.Logger`, subsystem `Leoxo.GroshUITests`, category `Steps`: `begin <step>` when it starts and `end <step>` when it ends, at the default level (`notice`), with the step name logged `privacy: .public`. `tools/check-logs` parses exactly these two messages, so keep the wording. It tags logged errors with the step names, so keep them short and stable. A new step is named `<Screen> → <action>`.
 
-The walk finds screens by their navigation bar titles and tabs by their names. Three rows of the Add Transaction form carry accessibility identifiers for it, because their labels change with what is chosen: `TransactionEditor.category`, `TransactionEditor.card` and `TransactionEditor.note`.
+The walk finds screens by their navigation bar titles and tabs by their names. Three rows of the Add Transaction form carry accessibility identifiers for it, because their labels change with what is chosen: `TransactionEditor.category`, `TransactionEditor.card` and `TransactionEditor.note`. Best Card's tiles are `BestCard.tile.<Reward category id>` (`BestCard.tile.dining`), because their labels name the Card shown, and Customize's rows `BestCard.customize.<id>`.
 
 ## Reading a failure
 

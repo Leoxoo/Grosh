@@ -39,6 +39,8 @@ final class Card {
     var ownRewardKindRaw: String?
     /// Your choice per rate of the linked entry, as JSON (``Card/yourChoices``).
     var yourChoicesData: Data?
+    /// The Reward categories the Card is the Go-to card for on Best Card, by id. Read and set through ``goToRewards``.
+    var goToRewardsList: [String]?
 
     var payingWallet: Wallet?
 
