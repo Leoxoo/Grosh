@@ -93,9 +93,10 @@ nonisolated enum GroshCSVFormat {
         let fields: [String]
     }
 
-    /// Splits CSV text into records, reading back what ``line(_:)`` writes. A field in double quotes may hold commas,
-    /// line breaks and doubled quotes (`""` for one `"`). Blank lines are skipped, and so is a byte order mark.
-    static func records(in text: String) -> [Record] {
+    /// Splits CSV text into records, reading back what ``line(_:)`` writes. Fields are split at `separator`: a comma,
+    /// or a tab for MoneyLover's own export. A field in double quotes may hold separators, line breaks and doubled
+    /// quotes (`""` for one `"`). Blank lines are skipped, and so is a byte order mark.
+    static func records(in text: String, separator: Character = ",") -> [Record] {
         enum State { case fieldStart, unquoted, quoted, quoteInQuoted }
         var records: [Record] = []
         var record: [String] = []
@@ -128,7 +129,7 @@ nonisolated enum GroshCSVFormat {
             case .fieldStart where character == "\"":
                 state = .quoted
             case .fieldStart, .unquoted, .quoteInQuoted:
-                if character == "," {
+                if character == separator {
                     endField()
                 } else if character.isNewline {
                     endRecord()

@@ -85,7 +85,59 @@ struct MoneyLoverCSVTests {
         #expect(!file.isGroshExport)
     }
 
+    // MARK: MoneyLover's tab-separated UTF-16 export
+
+    /// How MoneyLover's newer export writes a file: tab-separated, its notes before its wallets, no With, Event or
+    /// Exclude from report column, quoted notes that may hold commas and line breaks.
+    private let tabSeparatedExport = [
+        "Id\tDate\tCategory\tAmount\tCurrency\tNote\tWallet",
+        "1\t07/13/2026\tTips\t143.00\tUSD\tLost tips\tCash",
+        "2\t07/13/2026\tOutgoing transfer\t-928.00\tUSD\tSend to Checking\tCash",
+        "3\t12/31/2023\tGifts\t160.00\tUSD\t\"Ann, Sam present\nfor December\"\tSaving (Bank)",
+        "4\t06/25/2026\tCafé\t-5.00\tUSD\t\tCash",
+    ].joined(separator: "\r\n") + "\r\n"
+
+    @Test func aTabSeparatedExportIsRead() throws {
+        let rows = try MoneyLoverCSV.read(tabSeparatedExport, currencyCode: "USD").rows
+
+        #expect(rows.map(\.line) == [2, 3, 4, 6])
+        #expect(rows.map(\.day) == [
+            CalendarDay(year: 2026, month: 7, day: 13), CalendarDay(year: 2026, month: 7, day: 13),
+            CalendarDay(year: 2023, month: 12, day: 31), CalendarDay(year: 2026, month: 6, day: 25),
+        ])
+        #expect(rows.map(\.categoryName) == ["Tips", "Outgoing transfer", "Gifts", "Café"])
+        #expect(rows.map(\.amount) == [
+            Money(cents: 143_00), Money(cents: -928_00), Money(cents: 160_00), Money(cents: -5_00),
+        ])
+        #expect(rows.map(\.note) == ["Lost tips", "Send to Checking", "Ann, Sam present\nfor December", ""])
+        #expect(rows.map(\.walletName) == ["Cash", "Cash", "Saving (Bank)", "Cash"])
+        #expect(rows.allSatisfy { $0.withName.isEmpty && $0.eventName.isEmpty && !$0.isExcludedFromReport })
+    }
+
+    @Test(arguments: [String.Encoding.utf16LittleEndian, .utf16BigEndian])
+    func aUTF16FileWithAByteOrderMarkIsRead(encoding: String.Encoding) throws {
+        let bom: [UInt8] = encoding == .utf16LittleEndian ? [0xFF, 0xFE] : [0xFE, 0xFF]
+        let data = Data(bom) + (try #require(tabSeparatedExport.data(using: encoding)))
+
+        let fromData = try MoneyLoverCSV.read(data, currencyCode: "USD")
+
+        #expect(fromData == (try MoneyLoverCSV.read(tabSeparatedExport, currencyCode: "USD")))
+    }
+
+    @Test func aUTF8FileIsRead() throws {
+        let text = moneyLoverExport("1,10/05/2026,Café,-3.00,USD,Cash,,,,,")
+        let data = Data([0xEF, 0xBB, 0xBF]) + Data(text.utf8)
+
+        #expect(try MoneyLoverCSV.read(data, currencyCode: "USD") == (try MoneyLoverCSV.read(text, currencyCode: "USD")))
+    }
+
     // MARK: Files that can't be imported
+
+    @Test func aFileThatIsntTextIsRefused() {
+        #expect(throws: MoneyLoverImportError.notAMoneyLoverExport) {
+            try MoneyLoverCSV.read(Data([0xC3, 0x28, 0xFF]), currencyCode: "USD")
+        }
+    }
 
     @Test func aFileWithoutMoneyLoversColumnsIsRefused() {
         #expect(throws: MoneyLoverImportError.notAMoneyLoverExport) {
