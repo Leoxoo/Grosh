@@ -22,6 +22,42 @@ struct MoneyLoverImportTests {
         try (context.wallet(named: name).transactions ?? []).filter { $0.category?.lockedRole != .startingBalance }.inListOrder()
     }
 
+    // MARK: Steps
+
+    @Test func aRunStepByStepSavesOnlyAtItsLastStepWithProgressRisingToTheEnd() throws {
+        try context.importMoneyLover(moneyLoverExport("1,10/01/2026,Café,-1.00,USD,Old,,,,,"))
+        let autosaves = context.autosaveEnabled
+        let lines = (1...2_500).map { "\($0),10/05/2026,Café,-1.00,USD,Checking,,,,," }
+        let run = try MoneyLoverImport.Run(
+            export: MoneyLoverCSV.read(moneyLoverExport(lines), currencyCode: "USD"), cards: .ownersCards, in: context
+        )
+
+        // What the store holds, as another context reads it.
+        func savedWalletNames() throws -> [String] {
+            try ModelContext(container).fetch(FetchDescriptor<Wallet>()).map(\.name)
+        }
+        var progress = [run.fractionDone]
+        var summary: MoneyLoverImportSummary?
+        while summary == nil {
+            #expect(try savedWalletNames() == ["Old"])
+            #expect(MoneyLoverImport.isRunning)
+            #expect(!context.autosaveEnabled)
+            summary = try run.next()
+            progress.append(run.fractionDone)
+        }
+
+        #expect(progress.first == 0)
+        #expect(progress.last == 1)
+        #expect(progress == progress.sorted())
+        #expect(progress.count > 4)
+        #expect(!MoneyLoverImport.isRunning)
+        #expect(!context.hasChanges)
+        #expect(summary?.transactionCount == 2_500)
+        #expect(try rows(in: "Checking").count == 2_500)
+        #expect(try savedWalletNames() == ["Checking"])
+        #expect(context.autosaveEnabled == autosaves)
+    }
+
     // MARK: Rows
 
     @Test func eachRowBecomesATransactionInTheWalletItNames() throws {
