@@ -82,10 +82,12 @@ enum MoneyLoverImport {
         /// Whether the next step is the save. It is the longest, and a screen can't draw anything new while it runs.
         var isSaving: Bool { step == .save }
 
-        /// How far the import has got, from 0 to 1: the time the steps done so far take, against the time all of them
-        /// take, as measured on the 16k store. Deleting an old transaction takes about as long as recording a row, and
-        /// the save as long as both together, so the save is about half of an import.
+        /// How far the import has got, from 0 to 1. The steps before the save fill the first 90%, each by the time it
+        /// takes as measured on the 16k store (deleting an old transaction takes about as long as recording a row). The
+        /// save is the rest: it can't report how far it has got, and a bar that waits at 90% looks nearly done, where
+        /// one that waits halfway, as the save's real share of the time would put it, looks stuck.
         var fractionDone: Double {
+            let beforeSave = 0.9
             let old = Double(oldCount)
             let rows = Double(importer.rows.count)
             let steps: [(Step, Double)] = [
@@ -93,8 +95,12 @@ enum MoneyLoverImport {
                 (.prepare, rows * 0.6),
                 (.record, rows),
                 (.finish, old * 0.15 + rows * 0.15),
-                (.save, old + rows * 1.3),
             ]
+            switch step {
+            case .save: return beforeSave
+            case .done: return 1
+            default: break
+            }
             var done = 0.0
             for (each, time) in steps {
                 if each == step {
@@ -107,7 +113,7 @@ enum MoneyLoverImport {
                 }
                 done += time
             }
-            return min(done / steps.reduce(0) { $0 + $1.1 }, 1)
+            return beforeSave * done / steps.reduce(0) { $0 + $1.1 }
         }
 
         /// Runs the next step, and once the last one has saved, returns what was imported. When a step throws, the
