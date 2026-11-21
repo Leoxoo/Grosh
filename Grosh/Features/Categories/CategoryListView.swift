@@ -43,6 +43,10 @@ struct CategoryListView: View {
                 categorySections
             }
         }
+        #if os(iOS)
+        // Each parent is a card of its own; a tight gap keeps them reading as one list.
+        .listSectionSpacing(.compact)
+        #endif
         .task(id: CategoryCatalog.tree(of: type, from: allCategories).map(\.persistentModelID)) {
             let tree = CategoryCatalog.tree(of: type, from: allCategories)
             usage = Usage(counted: Set(tree.map(\.persistentModelID)), inUse: catalog.inUse(tree))

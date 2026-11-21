@@ -30,16 +30,24 @@ struct CategoryIcon: View {
     }
 }
 
-/// A category's icon and name, as rows and pickers show it. Subcategories are indented under their parent.
+/// A category's icon and name, as rows and pickers show it. Subcategories are indented under their parent, with a dot
+/// in the indent.
 struct CategoryLabel: View {
     let category: Category
     var indentsSubcategories = true
 
     var body: some View {
         HStack(spacing: 12) {
+            if indentsSubcategories && category.parent != nil {
+                // A dot in the indent marks a subcategory, so it reads as one of its parent's at a glance.
+                Circle()
+                    .fill(.tertiary)
+                    .frame(width: 6, height: 6)
+                    .frame(width: 16)
+                    .accessibilityHidden(true)
+            }
             CategoryIcon(category: category)
             Text(category.name)
         }
-        .padding(.leading, indentsSubcategories && category.parent != nil ? 28 : 0)
     }
 }
