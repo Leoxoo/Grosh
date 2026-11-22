@@ -1,9 +1,9 @@
 import SwiftUI
 
 /// What opens from a Best Card tile: every unarchived Card's rate on the Reward category, and the rates limited to
-/// stores, best first, each with what it Needs. When the tile carries the orange mark, the footer says what it means:
-/// which Card earns more than the Go-to card, and by how much. It is in the footer, under the rows, so that it coming
-/// and going as a swipe changes the Go-to card moves no row mid-swipe. Tapping a Card opens its page; swiping it makes
+/// stores, best first, each with what it Needs. When the tile carries the orange mark, a section of its own says what
+/// it means: which Card earns more than the Go-to card, and by how much. It sits under the rows, so that it coming and
+/// going as a swipe changes the Go-to card moves no row mid-swipe. Tapping a Card opens its page; swiping it makes
 /// it the Go-to card for the Reward category, or stops it being one.
 struct BestCardRewardView: View {
     let reward: RewardCategory
@@ -27,19 +27,20 @@ struct BestCardRewardView: View {
                         .contextMenu { goToButton(row) }
                     }
                 } footer: {
-                    VStack(alignment: .leading, spacing: 12) {
-                        if let goTo = tile.shown, let beatenBy = tile.beatenBy {
-                            Label {
-                                Text(Strings.BestCard.earnsMoreExplanation(
-                                    beatenBy.card.displayName, CardRateText.percent(beatenBy.earning.effectiveRate),
-                                    goTo.card.displayName, CardRateText.percent(goTo.earning.effectiveRate)
-                                ))
-                            } icon: {
-                                Image(systemName: "exclamationmark.circle.fill")
-                                    .foregroundStyle(.orange)
-                            }
-                        }
-                        Text(Strings.BestCard.rowsFooter(reward.name))
+                    Text(Strings.BestCard.rowsFooter(reward.name))
+                }
+            }
+            if let goTo = tile.shown, let beatenBy = tile.beatenBy {
+                Section {
+                    Label {
+                        Text(Strings.BestCard.earnsMoreExplanation(
+                            beatenBy.card.displayName, CardRateText.percent(beatenBy.earning.effectiveRate),
+                            goTo.card.displayName, CardRateText.percent(goTo.earning.effectiveRate)
+                        ))
+                        .font(.subheadline)
+                    } icon: {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .foregroundStyle(.orange)
                     }
                 }
             }
