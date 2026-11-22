@@ -3,7 +3,8 @@ import SwiftUI
 
 /// The Best Card tab: the Reward categories the user chose, in their order, as tiles, each with its Go-to card or else
 /// the unarchived Card that earns the most on it (``BestCardTileView``). Search finds any Reward category, shown or not,
-/// by its name or by the name of one of the user's categories counting as it. Customize chooses and orders the tiles.
+/// by its name or by the name of one of the user's categories counting as it, from a Search button beside Customize, as
+/// on Transactions, so the title stays in the bar (ADR-0009). Customize chooses and orders the tiles.
 /// Location, beside Category at the top, is still to come.
 struct BestCardView: View {
     private enum Showing: Hashable {
@@ -12,6 +13,7 @@ struct BestCardView: View {
 
     @State private var showing = Showing.category
     @State private var query = ""
+    @State private var isSearching = false
     @State private var isCustomizing = false
     @AppStorage(AppSettings.bestCardLayout) private var storedLayout
     @CurrentBestCard private var bestCard
@@ -42,9 +44,10 @@ struct BestCardView: View {
             }
             .navigationTitle(Strings.BestCard.title)
             .tabRootTitle(Strings.BestCard.title)
-            .searchable(text: $query, prompt: Text(Strings.BestCard.searchPrompt))
+            .searchBehindButton(text: $query, isOpen: $isSearching, prompt: Strings.BestCard.searchPrompt)
             .toolbar {
                 if showing == .category {
+                    SearchButton(isOpen: $isSearching)
                     ToolbarItem(placement: .primaryAction) {
                         Button(Strings.BestCard.customize, systemImage: "slider.horizontal.3") { isCustomizing = true }
                     }

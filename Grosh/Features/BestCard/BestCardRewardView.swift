@@ -1,8 +1,10 @@
 import SwiftUI
 
 /// What opens from a Best Card tile: every unarchived Card's rate on the Reward category, and the rates limited to
-/// stores, best first, each with what it Needs. Tapping a Card opens its page; swiping it makes it the Go-to card for
-/// the Reward category, or stops it being one.
+/// stores, best first, each with what it Needs. When the tile carries the orange mark, a section of its own says what
+/// it means: which Card earns more than the Go-to card, and by how much. It sits under the rows, so that it coming and
+/// going as a swipe changes the Go-to card moves no row mid-swipe. Tapping a Card opens its page; swiping it makes
+/// it the Go-to card for the Reward category, or stops it being one.
 struct BestCardRewardView: View {
     let reward: RewardCategory
 
@@ -11,7 +13,7 @@ struct BestCardRewardView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        let rows = bestCard.rows(for: reward)
+        let (tile, rows) = bestCard.detail(for: reward)
         List {
             if !rows.isEmpty {
                 Section {
@@ -26,6 +28,20 @@ struct BestCardRewardView: View {
                     }
                 } footer: {
                     Text(Strings.BestCard.rowsFooter(reward.name))
+                }
+            }
+            if let goTo = tile.shown, let beatenBy = tile.beatenBy {
+                Section {
+                    Label {
+                        Text(Strings.BestCard.earnsMoreExplanation(
+                            beatenBy.card.displayName, CardRateText.percent(beatenBy.earning.effectiveRate),
+                            goTo.card.displayName, CardRateText.percent(goTo.earning.effectiveRate)
+                        ))
+                        .font(.subheadline)
+                    } icon: {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .foregroundStyle(.orange)
+                    }
                 }
             }
         }
@@ -44,7 +60,7 @@ struct BestCardRewardView: View {
 
     private func label(_ row: BestCardRow) -> some View {
         HStack(spacing: 12) {
-            CardMark(card: row.card, height: 28, symbolFont: .title3)
+            CardMark(card: row.card, height: 28)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
                     Text(row.card.displayName)

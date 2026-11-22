@@ -48,14 +48,21 @@ nonisolated struct CardPeriod: Hashable, Sendable {
     /// The days the period covers, both ends included.
     var days: DayRange { DayRange(first: firstDay, last: lastDay) }
 
-    /// How many days before a statement period its lead-in transactions reach back.
-    static let leadInDayCount = 2
+    /// How many days before and after a statement period its nearby transactions reach.
+    static let nearbyDayCount = 2
 
-    /// The days of a statement period's lead-in transactions: the ``leadInDayCount`` days before its first day, which
-    /// are the last days of the previous statement. `nil` for a calendar month, which has none.
-    var leadInDays: DayRange? {
+    /// The days before a statement period whose transactions are nearby: the ``nearbyDayCount`` days before its first
+    /// day, the last days of the previous statement. `nil` for a calendar month, which has none.
+    var nearbyDaysBefore: DayRange? {
         guard isStatement else { return nil }
-        return DayRange(first: firstDay.adding(days: -Self.leadInDayCount), last: firstDay.adding(days: -1))
+        return DayRange(first: firstDay.adding(days: -Self.nearbyDayCount), last: firstDay.adding(days: -1))
+    }
+
+    /// The days after a statement period whose transactions are nearby: the ``nearbyDayCount`` days after its
+    /// statement date, the first days of the next statement. `nil` for a calendar month, which has none.
+    var nearbyDaysAfter: DayRange? {
+        guard isStatement else { return nil }
+        return DayRange(first: lastDay.adding(days: 1), last: lastDay.adding(days: Self.nearbyDayCount))
     }
 
     func contains(_ day: CalendarDay) -> Bool {
@@ -99,7 +106,7 @@ extension Card {
 }
 
 /// What a Card's statement screen shows for one period: the periods ‹ › step through, the transactions paid with the
-/// Card in the period, and its lead-in transactions.
+/// Card in the period, and its nearby transactions.
 nonisolated struct CardStatement {
     /// The periods ‹ › step through, oldest first: from the one holding the Card's first transaction through the one
     /// holding `today`, or its last transaction when that is dated later.
@@ -107,10 +114,10 @@ nonisolated struct CardStatement {
     /// The transactions paid with the Card in the period. Their `net` is the period's total: every one counts,
     /// excluded from report or not, as on the card's statement.
     let transactions: [Transaction]
-    /// The lead-in transactions: those paid with the Card in the two days before a statement period begins, since
-    /// entries aren't always dated exactly as on the statement. They belong to the previous statement and never count
-    /// in this one's total unless the user adds one for the moment. None for a calendar month.
-    let leadIns: [Transaction]
+    /// The nearby transactions: those paid with the Card in the two days before a statement period begins or after it
+    /// ends, since entries aren't always dated exactly as on the statement. They belong to the previous or the next
+    /// statement and never count in this one's total unless the user adds one for the moment. None for a calendar month.
+    let nearby: [Transaction]
 
     /// The statement of `card` for `period` on `today`, from what its ``Reads`` found in the store: `paid`, `earliest`
     /// and `latest`.
@@ -118,22 +125,23 @@ nonisolated struct CardStatement {
         of card: Card, for period: CardPeriod, paid: [Transaction], earliest: [Transaction], latest: [Transaction],
         today: CalendarDay
     ) {
-        let leadInDays = period.leadInDays
+        let before = period.nearbyDaysBefore
+        let after = period.nearbyDaysAfter
         var transactions: [Transaction] = []
-        var leadIns: [Transaction] = []
+        var nearby: [Transaction] = []
         for transaction in paid {
             let day = transaction.day
             if period.contains(day) {
                 transactions.append(transaction)
-            } else if leadInDays?.contains(day) == true {
-                leadIns.append(transaction)
+            } else if before?.contains(day) == true || after?.contains(day) == true {
+                nearby.append(transaction)
             }
         }
         let first = min(earliest.first?.day ?? today, today)
         let last = max(latest.first?.day ?? today, today)
         periods = card.period(containing: first)...card.period(containing: last)
         self.transactions = transactions
-        self.leadIns = leadIns
+        self.nearby = nearby
     }
 }
 
@@ -141,7 +149,7 @@ extension CardStatement {
     /// What the statement screen reads from the store for one period, found by the store rather than by walking every
     /// transaction the Card paid for, which run into thousands for a main Card.
     struct Reads {
-        /// The Card's transactions outside Recently Deleted on the period's days and its lead-in days, if it has any.
+        /// The Card's transactions outside Recently Deleted on the period's days and its nearby days, if it has any.
         let paid: FetchDescriptor<Transaction>
         /// The Card's earliest transaction outside Recently Deleted, by day: where its statements' ‹ stops.
         let earliest: FetchDescriptor<Transaction>
@@ -150,8 +158,8 @@ extension CardStatement {
 
         init(card: Card, for period: CardPeriod) {
             let id = card.persistentModelID
-            let firstRaw = (period.leadInDays?.first ?? period.firstDay).rawValue
-            let lastRaw = period.lastDay.rawValue
+            let firstRaw = (period.nearbyDaysBefore?.first ?? period.firstDay).rawValue
+            let lastRaw = (period.nearbyDaysAfter?.last ?? period.lastDay).rawValue
             paid = FetchDescriptor(predicate: #Predicate { transaction in
                 transaction.card?.persistentModelID == id && transaction.deletedAt == nil
                     && transaction.dayRaw >= firstRaw && transaction.dayRaw <= lastRaw

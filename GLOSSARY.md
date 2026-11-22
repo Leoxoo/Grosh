@@ -207,8 +207,8 @@ The balance at the start and at the end of a period.
 **Future**:
 The period holding every transaction dated after today.
 
-**Lead-in transactions**:
-On a Credit card's statement view, the transactions from the two days before the statement period begins, shown muted because they are not part of it. They never count in the statement total unless the user adds one for the moment they are looking.
+**Nearby transactions**:
+On a Credit card's statement view, the transactions from the two days before the statement period begins and the two days after it ends, listed together under "Around this statement" and shown muted because they are not part of it. They never count in the statement total unless the user adds one for the moment they are looking.
 
 ### Reports
 

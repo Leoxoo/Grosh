@@ -167,16 +167,16 @@ struct ReimbursementBalanceTests {
         #expect(days.map(\.net) == days.map { $0.total(.net) })
     }
 
-    @Test func aStatementPeriodsLeadInTransactionsKeepTheirOriginalAmount() throws {
+    @Test func aStatementPeriodsNearbyTransactionsKeepTheirOriginalAmount() throws {
         let chase = try context.addCard("Chase", paidFrom: checking, statementDay: 15)
         let dinner = try store.record(-60_00, "Restaurants", on: day(2026, 9, 15))
         dinner.card = chase
         try context.payBack(20_00, on: today, to: dinner)
         let current = chase.period(containing: today)
-        let leadIns = try chase.statement(for: current, today: today).leadIns
+        let nearby = try chase.statement(for: current, today: today).nearby
 
-        #expect(leadIns == [dinner])
-        #expect((try chase.statement(for: current, today: today).transactions + leadIns).charged == Money(cents: -60_00))
+        #expect(nearby == [dinner])
+        #expect((try chase.statement(for: current, today: today).transactions + nearby).charged == Money(cents: -60_00))
     }
 
     @Test func theCardFiltersTotalIgnoresReimbursements() throws {

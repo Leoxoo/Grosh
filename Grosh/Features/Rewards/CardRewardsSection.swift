@@ -152,13 +152,15 @@ private struct EarnedRateRow: View {
     }
 }
 
-/// What a purchase in one Reward category earns, how it adds up, and each rate it is made of, which opens its details.
+/// What a purchase in one Reward category earns, on one screen: the Effective rate, then for one rate its details and
+/// the bank's own sentence with its page, or for rates that add up, how they add up, each opening its details.
 private struct EarnedRateDetailView: View {
     let earning: PurchaseEarning
     let rewards: CardRewards
     let currencyCode: String
 
     var body: some View {
+        let single = earning.isAddedUp ? nil : earning.parts.first
         List {
             Section {
                 LabeledContent(Strings.Rewards.effectiveRate) {
@@ -166,23 +168,36 @@ private struct EarnedRateDetailView: View {
                         .monospacedDigit()
                         .fontWeight(.semibold)
                 }
+                if let single {
+                    let name = CardRateText.partName(single, isFirst: true, of: earning)
+                    if name != earning.reward.name {
+                        LabeledContent(Strings.Rewards.rate, value: name)
+                    }
+                    CardRateFacts(rate: single.rate, rewards: rewards, currencyCode: currencyCode)
+                }
             } footer: {
                 if earning.isAddedUp {
                     Text(Strings.Rewards.addsUpFooter)
+                } else if earning.isEdited {
+                    Text(Strings.Rewards.editedFooter)
                 }
             }
-            Section(earning.isAddedUp ? Strings.Rewards.howItAddsUp : Strings.Rewards.rate) {
-                ForEach(Array(earning.parts.enumerated()), id: \.offset) { index, part in
-                    NavigationLink {
-                        CardRateDetailView(rate: part.rate, rewards: rewards, currencyCode: currencyCode)
-                    } label: {
-                        LabeledContent(CardRateText.partName(part, isFirst: index == 0, of: earning)) {
-                            Text(index == 0 || !earning.isAddedUp
-                                ? CardRateText.percent(part.adds) : "+" + CardRateText.percent(part.adds))
-                                .monospacedDigit()
+            if earning.isAddedUp {
+                Section(Strings.Rewards.howItAddsUp) {
+                    ForEach(Array(earning.parts.enumerated()), id: \.offset) { index, part in
+                        NavigationLink {
+                            CardRateDetailView(rate: part.rate, rewards: rewards, currencyCode: currencyCode)
+                        } label: {
+                            LabeledContent(CardRateText.partName(part, isFirst: index == 0, of: earning)) {
+                                Text(index == 0 ? CardRateText.percent(part.adds) : "+" + CardRateText.percent(part.adds))
+                                    .monospacedDigit()
+                            }
                         }
                     }
                 }
+            }
+            if let rule = single?.rate.rule {
+                BankWordsSection(rule: rule)
             }
         }
         .navigationTitle(earning.reward.name)
@@ -433,8 +448,9 @@ struct CardRateRow: View {
     }
 }
 
-/// One rate's details: what it is worth, its cap, its dates and what it needs, and for a catalog rate the bank's
-/// conditions, its own sentence and the page it is on.
+/// One rate's details: what it is worth, its cap, its dates and what it needs, and for a catalog rate the bank's own
+/// sentence and the page it is on. The bank's general conditions aren't listed: they are the card's, not the rate's,
+/// and read as if they were about it.
 struct CardRateDetailView: View {
     let rate: CardRate
     let rewards: CardRewards
@@ -448,57 +464,69 @@ struct CardRateDetailView: View {
                     Text(CardRateText.percent(rate.effectiveRate))
                         .monospacedDigit()
                 }
-                if let multiplier = rate.multiplier {
-                    Text(Strings.Rewards.pointsWorth(CardRateText.number(multiplier), CardRateText.number(rewards.pointValueCents)))
-                        .foregroundStyle(.secondary)
-                }
-                if let cap = rate.cap.flatMap({ CardRateText.cap($0, currencyCode: $0.currencyCode ?? currencyCode) }) {
-                    LabeledContent(Strings.Rewards.cap, value: cap)
-                }
-                if let after = rate.afterCap {
-                    LabeledContent(Strings.Rewards.afterTheCap) {
-                        Text(CardRateText.rate(effective: after.effectiveRate, multiplier: after.multiplier)
-                            + (after.multiplier == nil ? "" : " · " + CardRateText.percent(after.effectiveRate)))
-                            .monospacedDigit()
-                    }
-                }
-                if let dates = CardRateText.dates(from: rate.validFrom, to: rate.validTo) {
-                    LabeledContent(Strings.Rewards.dates, value: dates)
-                }
-                if rate.rule?.requires.contains("activation") == true {
-                    Label(Strings.Rewards.needsActivation, systemImage: "bolt.badge.checkmark")
-                }
-                if rate.rule?.requires.contains("issuer-booking") == true {
-                    Label(Strings.Rewards.bookThroughIssuer, systemImage: "building.columns")
-                }
+                CardRateFacts(rate: rate, rewards: rewards, currencyCode: currencyCode)
             } footer: {
                 if rate.isEdited {
                     Text(Strings.Rewards.editedFooter)
                 }
             }
-
             if let rule = rate.rule {
-                let conditions = rule.conditions + (rewards.entry?.cardConditions ?? [])
-                if !conditions.isEmpty {
-                    Section(Strings.Rewards.conditions) {
-                        ForEach(conditions, id: \.self) { condition in
-                            Text(condition)
-                        }
-                    }
-                }
-
-                Section(Strings.Rewards.fromTheBank) {
-                    Text(verbatim: "“\(rule.evidence.quote)”")
-                        .italic()
-                        .textSelection(.enabled)
-                    if let url = URL(string: rule.evidence.url) {
-                        Link(destination: url) {
-                            Label(Strings.Rewards.source, systemImage: "safari")
-                        }
-                    }
-                }
+                BankWordsSection(rule: rule)
             }
         }
         .navigationTitle(rate.reward.name)
+    }
+}
+
+/// The rows under a rate's Effective rate: what its points are worth, its cap and what it earns after, its dates, and
+/// what it needs.
+private struct CardRateFacts: View {
+    let rate: CardRate
+    let rewards: CardRewards
+    /// The currency of a cap the user entered: the Card's paying wallet's.
+    let currencyCode: String
+
+    var body: some View {
+        if let multiplier = rate.multiplier {
+            Text(Strings.Rewards.pointsWorth(CardRateText.number(multiplier), CardRateText.number(rewards.pointValueCents)))
+                .foregroundStyle(.secondary)
+        }
+        if let cap = rate.cap.flatMap({ CardRateText.cap($0, currencyCode: $0.currencyCode ?? currencyCode) }) {
+            LabeledContent(Strings.Rewards.cap, value: cap)
+        }
+        if let after = rate.afterCap {
+            LabeledContent(Strings.Rewards.afterTheCap) {
+                Text(CardRateText.rate(effective: after.effectiveRate, multiplier: after.multiplier)
+                    + (after.multiplier == nil ? "" : " · " + CardRateText.percent(after.effectiveRate)))
+                    .monospacedDigit()
+            }
+        }
+        if let dates = CardRateText.dates(from: rate.validFrom, to: rate.validTo) {
+            LabeledContent(Strings.Rewards.dates, value: dates)
+        }
+        if rate.rule?.requires.contains("activation") == true {
+            Label(Strings.Rewards.needsActivation, systemImage: "bolt.badge.checkmark")
+        }
+        if rate.rule?.requires.contains("issuer-booking") == true {
+            Label(Strings.Rewards.bookThroughIssuer, systemImage: "building.columns")
+        }
+    }
+}
+
+/// A catalog rate's own sentence from the bank, and the page it is on.
+private struct BankWordsSection: View {
+    let rule: CatalogRule
+
+    var body: some View {
+        Section(Strings.Rewards.fromTheBank) {
+            Text(verbatim: "\u{201C}\(rule.evidence.quote)\u{201D}")
+                .italic()
+                .textSelection(.enabled)
+            if let url = URL(string: rule.evidence.url) {
+                Link(destination: url) {
+                    Label(Strings.Rewards.source, systemImage: "safari")
+                }
+            }
+        }
     }
 }

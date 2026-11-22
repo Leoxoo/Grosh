@@ -352,7 +352,7 @@ nonisolated enum Strings {
         static let statementTotal: LocalizedStringResource = "Statement total"
         static let statementPeriodFooter: LocalizedStringResource = "A statement period runs from the day after one statement date through the next."
         static let nothingPaidInPeriod: LocalizedStringResource = "Nothing was paid with this Card in this period."
-        static let previousStatementSection: LocalizedStringResource = "Previous statement"
+        static let nearbySection: LocalizedStringResource = "Around this statement"
         static let removeFromStatementTotal: LocalizedStringResource = "Remove from Statement Total"
         static let addToStatementTotal: LocalizedStringResource = "Add to Statement Total"
         static let previousStatement: LocalizedStringResource = "Previous Statement"
@@ -362,8 +362,8 @@ nonisolated enum Strings {
         static let nextStatement: LocalizedStringResource = "Next Statement"
         static let nextMonth: LocalizedStringResource = "Next Month"
         static func statementOnThe(_ day: String) -> LocalizedStringResource { "Statement on the \(day)" }
-        static func includesFromPreviousStatement(_ count: Int) -> LocalizedStringResource { "Includes \(count) from the previous statement" }
-        static func previousStatementFooter(_ days: Int) -> LocalizedStringResource { "From the \(days) days before this statement, as entries aren't always dated as on the statement. They're not in its total; tap + to add one for now." }
+        static func includesFromAroundStatement(_ count: Int) -> LocalizedStringResource { "Includes \(count) from around this statement" }
+        static func nearbyFooter(_ days: Int) -> LocalizedStringResource { "From the \(days) days before and after this statement, as entries aren't always dated as on the statement. They're not in its total; tap + to add one for now." }
     }
 
     /// Reward categories, what the user's categories count as, and what each Card earns.
@@ -485,7 +485,6 @@ nonisolated enum Strings {
         static let needsActivation: LocalizedStringResource = "Needs activation"
         static let bookThroughIssuer: LocalizedStringResource = "Only when booked through the bank"
         static let capUnknown: LocalizedStringResource = "Capped; the bank doesn't say how much"
-        static let conditions: LocalizedStringResource = "Conditions"
         static let fromTheBank: LocalizedStringResource = "In the bank's words"
         static let source: LocalizedStringResource = "Source"
         static func multiplier(_ rate: String) -> LocalizedStringResource { "\(rate)×" }
@@ -515,6 +514,7 @@ nonisolated enum Strings {
         static let makeGoTo: LocalizedStringResource = "Make Go-to"
         static let removeGoTo: LocalizedStringResource = "Remove Go-to"
         static let earnsMore: LocalizedStringResource = "Another Card earns more"
+        static func earnsMoreExplanation(_ other: String, _ otherRate: String, _ goTo: String, _ goToRate: String) -> LocalizedStringResource { "\(other) earns \(otherRate) here, more than your Go-to, \(goTo), at \(goToRate), and needs nothing more for it." }
         static let noCard: LocalizedStringResource = "No Card"
         static func rowsFooter(_ reward: String) -> LocalizedStringResource { "Swipe a Card to make it your Go-to for \(reward). Rates are compared as if what each one needs is done." }
         static func noRates(_ reward: String) -> LocalizedStringResource { "No Card earns on \(reward) yet." }
