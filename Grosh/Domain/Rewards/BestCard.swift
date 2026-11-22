@@ -64,9 +64,18 @@ struct BestCard {
     /// What each Card earns on `reward`, best first, equal rates in the user's order; Cards that earn nothing on it are
     /// left out.
     func choices(for reward: String) -> [BestCardChoice] {
-        let choices = cards.compactMap { card, rewards, spending in
-            rewards.rankedEarning(for: [reward], on: today, own: own, spending: spending)
-                .map { BestCardChoice(card: card, earning: $0) }
+        ranked(earnings(for: reward))
+    }
+
+    /// What each Card earns on `reward`, in the user's order: `nil` for a Card that earns nothing on it.
+    private func earnings(for reward: String) -> [PurchaseEarning?] {
+        cards.map { $0.rewards.rankedEarning(for: [reward], on: today, own: own, spending: $0.spending) }
+    }
+
+    /// `earnings`, one per Card in the user's order, best first, equal rates in the user's order.
+    private func ranked(_ earnings: [PurchaseEarning?]) -> [BestCardChoice] {
+        let choices = zip(cards, earnings).compactMap { entry, earning in
+            earning.map { BestCardChoice(card: entry.card, earning: $0) }
         }
         return choices.enumerated().sorted { lhs, rhs in
             if lhs.element.earning.effectiveRate != rhs.element.earning.effectiveRate {
@@ -79,7 +88,17 @@ struct BestCard {
     /// `reward`'s tile: its Go-to card while that is unarchived and earns on it, flagged with the Card that earns the most
     /// of those earning more and Needing nothing it doesn't; otherwise the Card that earns the most.
     func tile(for reward: RewardCategory) -> BestCardTile {
-        let ranked = choices(for: reward.id)
+        tile(for: reward, ranked: choices(for: reward.id))
+    }
+
+    /// What a Reward category's own screen shows: its tile, for what the orange mark means, and its rows, from one
+    /// pass over the Cards rather than one for each.
+    func detail(for reward: RewardCategory) -> (tile: BestCardTile, rows: [BestCardRow]) {
+        let earnings = earnings(for: reward.id)
+        return (tile(for: reward, ranked: ranked(earnings)), rows(for: reward, earnings: earnings))
+    }
+
+    private func tile(for reward: RewardCategory, ranked: [BestCardChoice]) -> BestCardTile {
         guard let goTo = ranked.first(where: { $0.card.goToRewards.contains(reward.id) }) else {
             return BestCardTile(reward: reward, shown: ranked.first, isGoTo: false, beatenBy: nil)
         }
@@ -94,11 +113,16 @@ struct BestCard {
     /// Every Card's rate on `reward`, and the rates limited to stores, best first; on equal rates a Card's own comes
     /// before a store's, then the user's order.
     func rows(for reward: RewardCategory) -> [BestCardRow] {
+        rows(for: reward, earnings: earnings(for: reward.id))
+    }
+
+    /// ``rows(for:)`` from what each Card earns on `reward`, one per Card in the user's order.
+    private func rows(for reward: RewardCategory, earnings: [PurchaseEarning?]) -> [BestCardRow] {
         var rows: [(row: BestCardRow, isStore: Bool, order: Int)] = []
-        for (order, entry) in cards.enumerated() {
+        for (order, (entry, earning)) in zip(cards, earnings).enumerated() {
             let isGoTo = entry.card.goToRewards.contains(reward.id)
             let cardID = "\(ObjectIdentifier(entry.card))"
-            if let earning = entry.rewards.rankedEarning(for: [reward.id], on: today, own: own, spending: entry.spending) {
+            if let earning {
                 let row = BestCardRow(
                     card: entry.card, effectiveRate: earning.effectiveRate, multiplier: earning.multiplier,
                     needs: earning.needs, isGoTo: isGoTo, id: "\(cardID)"

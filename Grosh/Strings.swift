@@ -514,7 +514,7 @@ nonisolated enum Strings {
         static let makeGoTo: LocalizedStringResource = "Make Go-to"
         static let removeGoTo: LocalizedStringResource = "Remove Go-to"
         static let earnsMore: LocalizedStringResource = "Another Card earns more"
-        static func earnsMoreExplanation(_ other: String, _ otherRate: String, _ goTo: String, _ goToRate: String) -> LocalizedStringResource { "\(other) earns \(otherRate) here, more than your Go-to, \(goTo), at \(goToRate), and needs nothing more for it. Swipe a Card to change your Go-to." }
+        static func earnsMoreExplanation(_ other: String, _ otherRate: String, _ goTo: String, _ goToRate: String) -> LocalizedStringResource { "\(other) earns \(otherRate) here, more than your Go-to, \(goTo), at \(goToRate), and needs nothing more for it." }
         static let noCard: LocalizedStringResource = "No Card"
         static func rowsFooter(_ reward: String) -> LocalizedStringResource { "Swipe a Card to make it your Go-to for \(reward). Rates are compared as if what each one needs is done." }
         static func noRates(_ reward: String) -> LocalizedStringResource { "No Card earns on \(reward) yet." }

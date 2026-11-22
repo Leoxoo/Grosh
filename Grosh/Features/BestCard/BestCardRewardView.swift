@@ -1,9 +1,10 @@
 import SwiftUI
 
 /// What opens from a Best Card tile: every unarchived Card's rate on the Reward category, and the rates limited to
-/// stores, best first, each with what it Needs. When the tile carries the orange mark, the list opens with what it
-/// means: which Card earns more than the Go-to card, and by how much. Tapping a Card opens its page; swiping it makes it
-/// the Go-to card for the Reward category, or stops it being one.
+/// stores, best first, each with what it Needs. When the tile carries the orange mark, the footer says what it means:
+/// which Card earns more than the Go-to card, and by how much. It is in the footer, under the rows, so that it coming
+/// and going as a swipe changes the Go-to card moves no row mid-swipe. Tapping a Card opens its page; swiping it makes
+/// it the Go-to card for the Reward category, or stops it being one.
 struct BestCardRewardView: View {
     let reward: RewardCategory
 
@@ -12,23 +13,8 @@ struct BestCardRewardView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        let rows = bestCard.rows(for: reward)
-        let tile = bestCard.tile(for: reward)
+        let (tile, rows) = bestCard.detail(for: reward)
         List {
-            if let goTo = tile.shown, let beatenBy = tile.beatenBy {
-                Section {
-                    Label {
-                        Text(Strings.BestCard.earnsMoreExplanation(
-                            beatenBy.card.displayName, CardRateText.percent(beatenBy.earning.effectiveRate),
-                            goTo.card.displayName, CardRateText.percent(goTo.earning.effectiveRate)
-                        ))
-                        .font(.subheadline)
-                    } icon: {
-                        Image(systemName: "exclamationmark.circle.fill")
-                            .foregroundStyle(.orange)
-                    }
-                }
-            }
             if !rows.isEmpty {
                 Section {
                     ForEach(rows) { row in
@@ -41,7 +27,20 @@ struct BestCardRewardView: View {
                         .contextMenu { goToButton(row) }
                     }
                 } footer: {
-                    Text(Strings.BestCard.rowsFooter(reward.name))
+                    VStack(alignment: .leading, spacing: 12) {
+                        if let goTo = tile.shown, let beatenBy = tile.beatenBy {
+                            Label {
+                                Text(Strings.BestCard.earnsMoreExplanation(
+                                    beatenBy.card.displayName, CardRateText.percent(beatenBy.earning.effectiveRate),
+                                    goTo.card.displayName, CardRateText.percent(goTo.earning.effectiveRate)
+                                ))
+                            } icon: {
+                                Image(systemName: "exclamationmark.circle.fill")
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                        Text(Strings.BestCard.rowsFooter(reward.name))
+                    }
                 }
             }
         }

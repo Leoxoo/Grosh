@@ -131,6 +131,22 @@ struct BestCardTests {
         #expect(rows.first?.card == savory)
     }
 
+    @Test func aRewardCategorysScreenShowsTheSameTileAndRowsFromOnePass() throws {
+        let low = try custom("Low", ["dining": 2])
+        _ = try custom("High", ["dining": 4])
+        _ = try linked("Savory", to: "test-savory-cash")
+        try low.makeGoTo(for: "dining")
+        let best = try bestCard()
+        let dining = try reward("dining")
+
+        let detail = best.detail(for: dining)
+        let tile = best.tile(for: dining)
+        #expect(detail.tile.shown?.card == tile.shown?.card)
+        #expect(detail.tile.beatenBy?.card == tile.beatenBy?.card)
+        #expect(detail.rows.map(\.id) == best.rows(for: dining).map(\.id))
+        #expect(detail.rows.map(\.effectiveRate) == best.rows(for: dining).map(\.effectiveRate))
+    }
+
     // MARK: Go-to card
 
     @Test func theGoToCardTakesTheTileFlaggedWhenAnotherEarnsMoreAndNeedsNothingMore() throws {
