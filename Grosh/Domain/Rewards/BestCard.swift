@@ -17,8 +17,12 @@ struct BestCardTile: Identifiable {
     let shown: BestCardChoice?
     /// Whether ``shown`` is the user's Go-to card.
     let isGoTo: Bool
+    /// The Card that earns the most of those earning more than the Go-to card while Needing nothing it doesn't, which
+    /// flags the tile; `nil` when there is none, or no Go-to card.
+    let beatenBy: BestCardChoice?
+
     /// Whether another Card earns more than the Go-to card and Needs nothing it doesn't, which flags the tile.
-    let isBeaten: Bool
+    var isBeaten: Bool { beatenBy != nil }
 
     var id: String { reward.id }
 }
@@ -72,18 +76,19 @@ struct BestCard {
         }.map(\.element)
     }
 
-    /// `reward`'s tile: its Go-to card while that is unarchived and earns on it, flagged when another Card earns more
-    /// and Needs nothing it doesn't; otherwise the Card that earns the most.
+    /// `reward`'s tile: its Go-to card while that is unarchived and earns on it, flagged with the Card that earns the most
+    /// of those earning more and Needing nothing it doesn't; otherwise the Card that earns the most.
     func tile(for reward: RewardCategory) -> BestCardTile {
         let ranked = choices(for: reward.id)
         guard let goTo = ranked.first(where: { $0.card.goToRewards.contains(reward.id) }) else {
-            return BestCardTile(reward: reward, shown: ranked.first, isGoTo: false, isBeaten: false)
+            return BestCardTile(reward: reward, shown: ranked.first, isGoTo: false, beatenBy: nil)
         }
         let goToNeeds = Set(goTo.earning.needs)
-        let isBeaten = ranked.contains {
+        // Ranked best first, so the first such Card earns the most of them.
+        let beatenBy = ranked.first {
             $0.earning.effectiveRate > goTo.earning.effectiveRate && Set($0.earning.needs).isSubset(of: goToNeeds)
         }
-        return BestCardTile(reward: reward, shown: goTo, isGoTo: true, isBeaten: isBeaten)
+        return BestCardTile(reward: reward, shown: goTo, isGoTo: true, beatenBy: beatenBy)
     }
 
     /// Every Card's rate on `reward`, and the rates limited to stores, best first; on equal rates a Card's own comes

@@ -24,9 +24,7 @@ struct CardRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            CardMark(image: card.image, height: 28) {
-                SymbolCircle(symbolName: Card.symbolName, color: card.color)
-            }
+            CardMark(card: card, height: 28)
             VStack(alignment: .leading, spacing: 2) {
                 Text(card.displayName)
                 Text(summary)

@@ -135,12 +135,13 @@ struct BestCardTests {
 
     @Test func theGoToCardTakesTheTileFlaggedWhenAnotherEarnsMoreAndNeedsNothingMore() throws {
         let low = try custom("Low", ["dining": 2])
+        _ = try custom("Higher", ["dining": 3])
         _ = try custom("High", ["dining": 4])
         try low.makeGoTo(for: "dining")
         let tile = try bestCard().tile(for: try reward("dining"))
         #expect(tile.shown?.card.name == "Low")
         #expect(tile.isGoTo)
-        #expect(tile.isBeaten)
+        #expect(tile.beatenBy?.card.name == "High")
     }
 
     @Test func aCardThatNeedsMoreThanTheGoToCardDoesntFlagIt() throws {

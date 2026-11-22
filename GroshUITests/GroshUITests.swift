@@ -206,11 +206,8 @@ final class GroshUITests: XCTestCase {
         }
         // The search comes last: its keyboard covers the tab bar.
         walk.step("Best Card → search") {
+            app.buttons["Search"].firstMatch.tap()
             let field = app.searchFields.firstMatch
-            // The search field tucks under the bar once the tiles have moved; a pull brings it back.
-            if !field.waitForExistence(timeout: 2) || !field.isHittable {
-                app.scrollViews.firstMatch.swipeDown()
-            }
             walk.expect(field, "the search field")
             field.tap()
             field.typeText("Hotels")

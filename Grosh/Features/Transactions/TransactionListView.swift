@@ -144,7 +144,7 @@ private struct TransactionListContent: View {
             .padding(.vertical, 8)
             .risingWithTabRootTitle(scroll)
         }
-        .modifier(TransactionSearchField(text: $filter.searchText, isOpen: $isSearchPresented))
+        .searchBehindButton(text: $filter.searchText, isOpen: $isSearchPresented, prompt: Strings.Common.searchPrompt)
         .onChange(of: listing.selection) {
             // A wallet with a shorter history may not reach back to the period being shown.
             period.showCurrentPeriod(currentPeriod, unlessOfferedBy: periods)
@@ -161,11 +161,7 @@ private struct TransactionListContent: View {
         }
         .toolbar {
             if !isSelecting {
-                #if os(iOS)
-                ToolbarItem(placement: .primaryAction) {
-                    Button(Strings.Screens.search, systemImage: "magnifyingglass") { isSearchPresented = true }
-                }
-                #endif
+                SearchButton(isOpen: $isSearchPresented)
                 ToolbarItem(placement: .primaryAction) {
                     TransactionsMenu(
                         walletSelection: walletSelection, timeRange: $timeRange, grouping: $grouping,
@@ -228,27 +224,5 @@ private struct TransactionCategoryHeader: View {
             AmountText(amount: group.total, showsPlusSign: true, showsColor: false)
         }
         .textCase(nil)
-    }
-}
-
-/// Adds the system search field. On iPhone and iPad it is there only while the Search button has it open, or search text
-/// is left to clear, so it doesn't take room from the header the rest of the time. It hangs on an empty background
-/// rather than on the list: a modifier that comes and goes on the list itself rebuilds the list, which loses its place
-/// and redraws the period strip mid-animation. Mac keeps its search field in the toolbar, and has no Search button.
-private struct TransactionSearchField: ViewModifier {
-    @Binding var text: String
-    @Binding var isOpen: Bool
-
-    func body(content: Content) -> some View {
-        #if os(macOS)
-        content.searchable(text: $text, prompt: Strings.Common.searchPrompt)
-        #else
-        content.background {
-            if isOpen || !text.isEmpty {
-                Color.clear
-                    .searchable(text: $text, isPresented: $isOpen, prompt: Strings.Common.searchPrompt)
-            }
-        }
-        #endif
     }
 }

@@ -41,9 +41,9 @@ struct BestCardTileView: View {
 
     @ViewBuilder private var mark: some View {
         if let card = tile.shown?.card {
-            CardMark(card: card, height: 36, symbolFont: .title)
+            CardMark(card: card, height: 36)
         } else {
-            CardSymbol(color: .secondary, font: .title)
+            CardMark(image: nil, color: .secondary, height: 36)
         }
     }
 

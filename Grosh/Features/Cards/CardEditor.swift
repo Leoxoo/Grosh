@@ -69,9 +69,10 @@ private struct CardForm: View {
             Form {
                 Section {
                     HStack(spacing: 12) {
-                        CardMark(image: draft.imageData.flatMap(CroppedPhoto.image(from:)), height: 26) {
-                            SymbolCircle(symbolName: Card.symbolName, color: draft.color, size: 40)
-                        }
+                        CardMark(
+                            image: draft.imageData.flatMap(CroppedPhoto.image(from:)), color: draft.color.color,
+                            height: 26
+                        )
                         TextField(Strings.Common.name, text: $draft.name)
                     }
                     Picker(Strings.Common.kind, selection: $draft.kind) {
