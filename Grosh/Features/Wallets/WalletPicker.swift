@@ -6,6 +6,7 @@ import SwiftUI
 /// filter picks from every wallet, archived ones included, or none. The Transfer sheet's pickers also show balances.
 struct WalletPicker: View {
     let title: LocalizedStringResource
+    var systemImage: String?
     @Binding var selection: Wallet?
     /// Which wallets the picker offers, and what it shows beside them.
     private let offered: Offered
@@ -30,9 +31,11 @@ struct WalletPicker: View {
         }
     }
 
-    /// Picks from the unarchived wallets.
-    init(title: LocalizedStringResource, selection: Binding<Wallet?>) {
+    /// Picks from the unarchived wallets. With `systemImage`, the row is a compact one: the chosen wallet's colored
+    /// symbol, or the icon while none is chosen, then its name.
+    init(title: LocalizedStringResource, selection: Binding<Wallet?>, systemImage: String? = nil) {
         self.init(title: title, selection: selection, offered: .unarchived)
+        self.systemImage = systemImage
     }
 
     /// Picks from the unarchived wallets, showing each one's balance from `balances`: the chosen wallet's on a Balance
@@ -56,25 +59,21 @@ struct WalletPicker: View {
     }
 
     var body: some View {
-        if case .unarchivedWithBalances(let balances) = offered {
+        switch offered {
+        case .unarchivedWithBalances(let balances):
             LabeledContent(title) {
-                Menu {
-                    Picker(title, selection: $selection) {
-                        options(balances: balances)
-                    }
-                    .pickerStyle(.inline)
-                } label: {
-                    selectionLabel
-                }
-                .menuStyle(.button)
-                .buttonStyle(.borderless)
+                walletMenu(balances: balances)
             }
             if let selection {
                 LabeledContent(Strings.Common.balance) {
                     AmountText(amount: balances.balance(of: selection), showsColor: false)
                 }
             }
-        } else {
+        case .unarchived where systemImage != nil:
+            FormFieldRow(compact: true, leading: walletRowMark) {
+                walletMenu(balances: nil)
+            }
+        default:
             Picker(title, selection: $selection) {
                 if case .everyWalletOr(let noneTitle) = offered {
                     Text(noneTitle).tag(Wallet?.none)
@@ -84,12 +83,46 @@ struct WalletPicker: View {
         }
     }
 
-    /// The chosen wallet as the row shows it: its symbol on its colored circle and its name, on one line however long
-    /// the name is. A picker's own row can't show the color, so this draws the menu's button itself.
+    /// A menu of the wallets drawn as ``selectionLabel``.
+    @ViewBuilder
+    private func walletMenu(balances: WalletBalances?) -> some View {
+        let menu = Menu {
+            Picker(title, selection: $selection) {
+                options(balances: balances)
+            }
+            .pickerStyle(.inline)
+        } label: {
+            selectionLabel
+        }
+        .menuStyle(.button)
+        if systemImage != nil {
+            menu.buttonStyle(.plain)
+        } else {
+            menu.buttonStyle(.borderless)
+        }
+    }
+
+    /// The compact row's mark: the chosen wallet's symbol on its colored circle, or the field's icon while none is
+    /// chosen.
+    @ViewBuilder
+    private var walletRowMark: some View {
+        if let selection {
+            SymbolCircle(symbolName: selection.symbolName, color: selection.color, size: 28)
+                .accessibilityLabel(Text(title))
+        } else {
+            FieldLabel(title: title, systemImage: systemImage)
+        }
+    }
+
+    /// The chosen wallet as the row shows it: its symbol on its colored circle (the compact row's mark instead) and its
+    /// name, on one line however long the name is. A picker's own row can't show the color, so this draws the menu's
+    /// button itself.
     private var selectionLabel: some View {
         HStack(spacing: 8) {
             if let selection {
-                SymbolCircle(symbolName: selection.symbolName, color: selection.color)
+                if systemImage == nil {
+                    SymbolCircle(symbolName: selection.symbolName, color: selection.color)
+                }
                 Text(Self.name(of: selection))
                     .lineLimit(1)
                     .foregroundStyle(.primary)
@@ -97,11 +130,15 @@ struct WalletPicker: View {
                 Text(Strings.Common.choose)
                     .foregroundStyle(.secondary)
             }
+            if systemImage != nil {
+                Spacer(minLength: 0)
+            }
             Image(systemName: "chevron.up.chevron.down")
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
         }
+        .frame(maxWidth: systemImage != nil ? .infinity : nil, alignment: .leading)
     }
 
     /// An option for each of the choices: the wallet's symbol and name, with its balance under the name when there are

@@ -3,16 +3,15 @@ import SwiftUI
 
 /// What the Reimbursement section of the transaction detail opens.
 enum ReimbursementAction: Hashable, Identifiable {
-    case paidBack, moveIn
+    case paidBack
     case edit(Reimbursement)
 
     var id: Self { self }
 }
 
 /// The transaction detail's section for an Expense: each Reimbursement with its day and note, opening its sheet to edit
-/// and deleted by swipe or from its menu, then Someone paid me back and Move an existing transaction in. Shows nothing
-/// for any other transaction. Use inside a `List`, with the screen presenting ``ReimbursementAction/sheet(for:)`` for
-/// what `action` opens.
+/// and deleted by swipe or from its menu, then Someone paid me back. Shows nothing for any other transaction. Use
+/// inside a `List`, with the screen presenting ``ReimbursementAction/sheet(for:)`` for what `action` opens.
 struct ReimbursementSection: View {
     let transaction: Transaction
     @Binding var action: ReimbursementAction?
@@ -38,7 +37,6 @@ struct ReimbursementSection: View {
                     }
                 }
                 Button(Strings.Reimbursements.someonePaidMeBack, systemImage: "plus.circle") { action = .paidBack }
-                Button(Strings.Reimbursements.moveExistingIn, systemImage: "arrow.down.circle") { action = .moveIn }
             } header: {
                 Text(Strings.Common.reimbursements)
             } footer: {
@@ -77,13 +75,12 @@ private struct ReimbursementRow: View {
 }
 
 extension ReimbursementAction {
-    /// The sheet this opens for `transaction`: Someone paid me back, Move an existing transaction in or an entry's edit
-    /// sheet. Present it from the screen, outside its `List`, so presenting doesn't depend on the list's rows.
+    /// The sheet this opens for `transaction`: Someone paid me back, or an entry's edit sheet. Present it from the
+    /// screen, outside its `List`, so presenting doesn't depend on the list's rows.
     @ViewBuilder
     func sheet(for transaction: Transaction) -> some View {
         switch self {
         case .paidBack: ReimbursementEditor(expense: transaction)
-        case .moveIn: ReimbursementMoveInPicker(expense: transaction)
         case .edit(let entry): ReimbursementEditor(expense: transaction, editing: entry)
         }
     }

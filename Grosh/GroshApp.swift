@@ -44,7 +44,8 @@ struct GroshApp: App {
                     // Items in Recently Deleted that have waited 30 days are removed for good, and Recurring transactions
                     // make the days that came due while the app was closed, whenever the app opens or comes back to the
                     // foreground; nothing runs in the background. The day moves on first, in case it changed meanwhile.
-                    if phase == .active {
+                    // Not while an import waits unsaved in the context, which these would save half of.
+                    if phase == .active, !MoneyLoverImport.isRunning {
                         let today = refreshToday()
                         Signpost.interval("Launch") {
                             Log.store.attempt("Removing what Recently Deleted kept for good") {

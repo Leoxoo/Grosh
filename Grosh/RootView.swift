@@ -11,6 +11,9 @@ struct RootView: View {
             Tab(Strings.Common.transactions, systemImage: "wallet.bifold") {
                 TransactionsView()
             }
+            Tab(Strings.BestCard.title, systemImage: "star.circle") {
+                BestCardView()
+            }
             Tab(Strings.Screens.budgets, systemImage: "chart.pie") {
                 BudgetsView()
             }

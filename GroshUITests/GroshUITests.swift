@@ -23,19 +23,7 @@ final class GroshUITests: XCTestCase {
         }
 
         walk.step("Launch") {
-            // The app makes the 16k store in its launch, before it has a screen, and no screen can be queried until
-            // then. So it is launched to make the store, which quits once the store is made, and launched again to
-            // open it.
-            app.launchArguments = ["-GroshUITestStore", "make"]
-            app.launch()
-            XCTAssertTrue(
-                app.wait(for: .notRunning, timeout: 900),
-                "\(walk.current): the 16k store was still being made after 900 seconds."
-            )
-            app.launchArguments = ["-GroshUITestStore", "benchmark"]
-            app.launch()
-            walk.expect(app.navigationBars["Home"], "Home", timeout: 300)
-            walk.declineNotificationsIfAsked()
+            walk.launchOnTheStore()
         }
         walk.step("Launch → measure") {
             measure(metrics: [XCTApplicationLaunchMetric()]) {
@@ -67,6 +55,10 @@ final class GroshUITests: XCTestCase {
         }
         walk.step("Transactions → back") {
             walk.back(from: "Transaction", to: "Transactions")
+        }
+        walk.step("Best Card → open") {
+            walk.openTab("Best Card")
+            walk.expect(walk.tile("dining"), "the Dining tile")
         }
         walk.step("Budgets → open") {
             walk.openTab("Budgets")
@@ -133,6 +125,8 @@ final class GroshUITests: XCTestCase {
                 let debit = app.buttons["Debit"]
                 walk.expect(debit, "the Card Debit")
                 debit.tap()
+                // Picking a Card goes back from its list to the sheet.
+                walk.expect(sheet, "the Add Transaction sheet")
             }
 
             let noteField = app.descendants(matching: .any).matching(identifier: "TransactionEditor.note").firstMatch
@@ -161,6 +155,64 @@ final class GroshUITests: XCTestCase {
             field.tap()
             field.typeText("Sam")
             walk.expect(walk.element(containing: "Dinner with Sam"), "a dinner with Sam")
+        }
+    }
+
+    /// The Best Card tab on the 16k store, whose Cards have no rewards, so every tile shows 0%: Customize hides a tile
+    /// and brings it back, a tile opens its Reward category, Location says it is coming, and search finds a Reward
+    /// category whose tile isn't shown. It leaves the tiles as it found them.
+    @MainActor
+    func testBestCard() {
+        let app = XCUIApplication()
+        let walk = Walk(app)
+        _ = addUIInterruptionMonitor(withDescription: "Notifications prompt") { alert in
+            MainActor.assumeIsolated { Walk.decline(alert) }
+        }
+
+        walk.step("Launch") {
+            walk.launchOnTheStore()
+        }
+        walk.step("Best Card → open") {
+            walk.openTab("Best Card")
+            for reward in ["dining", "groceries", "gas"] {
+                walk.expect(walk.tile(reward), "the \(reward) tile")
+            }
+        }
+        walk.step("Best Card → customize") {
+            // Gas is a starter tile. An earlier run that stopped half-way may have left it hidden, so it is shown first.
+            walk.customize { gas in
+                if !gas.isSelected { gas.tap() }
+                gas.tap()
+                XCTAssertFalse(gas.isSelected, "\(walk.current): Gas is still checked after tapping it.")
+            }
+            walk.expectGone(walk.tile("gas"), "The Gas tile")
+            walk.customize { gas in
+                gas.tap()
+                XCTAssertTrue(gas.isSelected, "\(walk.current): Gas isn't checked after tapping it again.")
+            }
+            walk.expect(walk.tile("gas"), "the Gas tile, shown again")
+        }
+        walk.step("Best Card → open a tile") {
+            walk.tile("dining").tap()
+            walk.expect(app.navigationBars["Dining"], "Dining's Cards")
+            walk.back(from: "Dining", to: "Best Card")
+        }
+        walk.step("Best Card → Location") {
+            app.segmentedControls.buttons["Location"].tap()
+            walk.expect(app.staticTexts["Coming Soon"], "Location's coming soon")
+            walk.expectGone(walk.tile("dining"), "The Dining tile")
+            app.segmentedControls.buttons["Category"].tap()
+            walk.expect(walk.tile("dining"), "the Dining tile")
+        }
+        // The search comes last: its keyboard covers the tab bar.
+        walk.step("Best Card → search") {
+            app.buttons["Search"].firstMatch.tap()
+            let field = app.searchFields.firstMatch
+            walk.expect(field, "the search field")
+            field.tap()
+            field.typeText("Hotels")
+            walk.expect(walk.tile("hotels"), "the Hotels tile, which the starter tiles leave out")
+            walk.expectGone(walk.tile("dining"), "The Dining tile")
         }
     }
 }
@@ -220,6 +272,39 @@ private final class Walk {
     func expectGone(_ element: XCUIElement, _ what: String) {
         if element.waitForNonExistence(timeout: 10) { return }
         XCTFail("\(current): \(what) was still there after 10 seconds.")
+    }
+
+    /// Launches Grosh on the 16k store and waits for Home. The app makes the store in its launch, before it has a
+    /// screen, and no screen can be queried until then. So it is launched to make the store, which quits once the store
+    /// is made (at once when today's is already there), and launched again to open it.
+    func launchOnTheStore() {
+        app.launchArguments = ["-GroshUITestStore", "make"]
+        app.launch()
+        XCTAssertTrue(
+            app.wait(for: .notRunning, timeout: 900),
+            "\(current): the 16k store was still being made after 900 seconds."
+        )
+        app.launchArguments = ["-GroshUITestStore", "benchmark"]
+        app.launch()
+        expect(app.navigationBars["Home"], "Home", timeout: 300)
+        declineNotificationsIfAsked()
+    }
+
+    /// Best Card's tile for the Reward category `id` (`dining`), found by its identifier, since its label names the Card.
+    func tile(_ id: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: "BestCard.tile.\(id)").firstMatch
+    }
+
+    /// Opens Best Card's Customize, hands `change` the Gas row, and closes it with Done.
+    func customize(_ change: (XCUIElement) -> Void) {
+        app.buttons["Customize"].tap()
+        let sheet = app.navigationBars["Customize"]
+        expect(sheet, "Customize")
+        let gas = app.descendants(matching: .any).matching(identifier: "BestCard.customize.gas").firstMatch
+        expect(gas, "the Gas row")
+        change(gas)
+        sheet.buttons["Done"].tap()
+        expectGone(sheet, "Customize")
     }
 
     /// Opens the tab called `name` and waits for its screen, which has the same title.

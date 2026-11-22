@@ -95,26 +95,29 @@ struct CardTransactionsTests {
         #expect(shown.charged == Money(cents: -42_76))
     }
 
-    // MARK: Lead-in transactions
+    // MARK: Nearby transactions
 
-    @Test func aStatementPeriodLeadsInWithTheTwoDaysBeforeItBegins() throws {
+    @Test func aStatementPeriodsNearbyDaysAreTheTwoBeforeItBeginsAndTheTwoAfterItEnds() throws {
         let chase = try context.addCard("Chase", paidFrom: checking, statementDay: 15)
+        let current = chase.period(containing: today)
 
-        #expect(chase.period(containing: today).leadInDays == DayRange(first: day(2026, 9, 14), last: day(2026, 9, 15)))
+        #expect(current.nearbyDaysBefore == DayRange(first: day(2026, 9, 14), last: day(2026, 9, 15)))
+        #expect(current.nearbyDaysAfter == DayRange(first: day(2026, 10, 16), last: day(2026, 10, 17)))
     }
 
-    @Test func aCalendarMonthHasNoLeadIn() throws {
+    @Test func aCalendarMonthHasNoNearbyTransactions() throws {
         let debit = try context.addCard("Navy Federal Debit", kind: .debit, paidFrom: checking)
         let petal = try context.addCard("Petal", paidFrom: checking)
         try record(-20_00, on: day(2026, 9, 30), paidWith: debit)
         try record(-20_00, on: day(2026, 9, 30), paidWith: petal)
 
-        #expect(debit.period(containing: today).leadInDays == nil)
-        #expect(try debit.statement(for: debit.period(containing: today), today: today).leadIns.isEmpty)
-        #expect(try petal.statement(for: petal.period(containing: today), today: today).leadIns.isEmpty)
+        #expect(debit.period(containing: today).nearbyDaysBefore == nil)
+        #expect(debit.period(containing: today).nearbyDaysAfter == nil)
+        #expect(try debit.statement(for: debit.period(containing: today), today: today).nearby.isEmpty)
+        #expect(try petal.statement(for: petal.period(containing: today), today: today).nearby.isEmpty)
     }
 
-    @Test func leadInTransactionsAreThisCardsFromTheTwoDaysBeforeAndStayOnThePreviousStatement() throws {
+    @Test func nearbyTransactionsAreThisCardsFromTheTwoDaysBeforeAndStayOnThePreviousStatement() throws {
         let chase = try context.addCard("Chase", paidFrom: checking, statementDay: 15)
         let amex = try context.addCard("Amex", paidFrom: checking, statementDay: 15)
         try record(-1_00, on: day(2026, 9, 13), paidWith: chase)
@@ -124,22 +127,35 @@ struct CardTransactionsTests {
         try record(-50_00, on: day(2026, 9, 15), paidWith: amex)
         let current = chase.period(containing: today)
 
-        #expect(Set(try chase.statement(for: current, today: today).leadIns) == [fourteenth, fifteenth])
+        #expect(Set(try chase.statement(for: current, today: today).nearby) == [fourteenth, fifteenth])
         let previous = try chase.statement(for: current.adding(-1), today: today).transactions
         #expect(Set(previous).isSuperset(of: [fourteenth, fifteenth]))
         #expect(try chase.statement(for: current, today: today).transactions == [first])
     }
 
-    @Test func leadInTransactionsNeverCountInTheStatementTotalUnlessAdded() throws {
+    @Test func nearbyTransactionsAreThisCardsFromTheTwoDaysAfterAndStayOnTheNextStatement() throws {
         let chase = try context.addCard("Chase", paidFrom: checking, statementDay: 15)
-        let leadIn = try record(-20_00, on: day(2026, 9, 15), paidWith: chase)
+        let previous = chase.period(containing: today).adding(-1)
+        let last = try record(-9_00, on: day(2026, 9, 15), paidWith: chase)
+        let sixteenth = try record(-20_00, on: day(2026, 9, 16), paidWith: chase)
+        let seventeenth = try record(-30_00, on: day(2026, 9, 17), paidWith: chase)
+        try record(-1_00, on: day(2026, 9, 18), paidWith: chase)
+
+        let statement = try chase.statement(for: previous, today: today)
+        #expect(Set(statement.nearby) == [sixteenth, seventeenth])
+        #expect(statement.transactions == [last])
+    }
+
+    @Test func nearbyTransactionsNeverCountInTheStatementTotalUnlessAdded() throws {
+        let chase = try context.addCard("Chase", paidFrom: checking, statementDay: 15)
+        let fifteenth = try record(-20_00, on: day(2026, 9, 15), paidWith: chase)
         try record(-30_00, on: day(2026, 9, 14), paidWith: chase)
         try record(-12_76, on: day(2026, 9, 16), paidWith: chase)
         let current = chase.period(containing: today)
         let shown = try chase.statement(for: current, today: today).transactions
 
         #expect(shown.charged == Money(cents: -12_76))
-        let added = try chase.statement(for: current, today: today).leadIns.filter { $0 == leadIn }
+        let added = try chase.statement(for: current, today: today).nearby.filter { $0 == fifteenth }
         #expect((shown + added).charged == Money(cents: -32_76))
     }
 

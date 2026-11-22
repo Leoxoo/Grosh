@@ -33,6 +33,13 @@ final class Category {
     var sortOrder: Int = 0
     /// The ``RecurringKind`` the user set, or `nil` while the category has none of its own. See ``defaultKind``.
     var ownKindRaw: String?
+    /// The Reward categories the user set (``RewardCategory/id``s, an ``OwnRewardCategory``'s key), or `nil` while
+    /// the category has none of its own. Read and set through ``ownRewardsAs``; see ``rewardsAs`` (ADR-0015).
+    var ownRewardsAsList: [String]?
+    /// The one Reward category a store kept before a category could count as several, under its old name. Opening
+    /// the store moves it into ``ownRewardsAsList`` and clears it (``RewardCategories/keepSingleRewardsAs(in:)``), so
+    /// nothing else reads or writes it.
+    @Attribute(originalName: "ownRewardsAs") var singleRewardsAs: String?
 
     var parent: Category?
 
@@ -89,6 +96,12 @@ final class Category {
     var ownKind: RecurringKind? {
         get { ownKindRaw.flatMap(RecurringKind.init(rawValue:)) }
         set { ownKindRaw = newValue?.rawValue }
+    }
+
+    /// The Reward categories the user set, in list order, or none while the category has none of its own.
+    var ownRewardsAs: [String] {
+        get { ownRewardsAsList ?? [] }
+        set { ownRewardsAsList = newValue.isEmpty ? nil : newValue }
     }
 
     /// The Kind a Recurring transaction in this category starts as: its own, else its parent's, else Regular. So a

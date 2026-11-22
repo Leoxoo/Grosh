@@ -66,7 +66,7 @@ struct CardManagementTests {
             CardDraft(name: "Navy Federal", kind: .credit, payingWallet: checking, statementDay: 12),
             in: context
         )
-        var details = CardDraft(card)
+        var details = CardDraft(card, catalog: .empty)
         details.kind = .debit
         details.name = "Navy Federal Debit"
         details.lastFourDigits = "4821"
@@ -212,7 +212,7 @@ struct CardManagementTests {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
         let nfcu = try context.addCard("NFCU", paidFrom: checking)
         _ = try addExpense(12_76, paidWith: nfcu)
-        var details = CardDraft(nfcu)
+        var details = CardDraft(nfcu, catalog: .empty)
         details.payingWallet = savings
         details.name = "Navy Federal"
 
@@ -224,7 +224,7 @@ struct CardManagementTests {
     @Test func aCardWithoutTransactionsCanMoveToAnotherPayingWallet() throws {
         let savings = try Wallet.create(name: "Savings", startingBalance: Money(cents: 0), on: today, in: context)
         let unused = try context.addCard("PayPal", paidFrom: checking)
-        var details = CardDraft(unused)
+        var details = CardDraft(unused, catalog: .empty)
         details.payingWallet = savings
 
         try unused.update(with: details)

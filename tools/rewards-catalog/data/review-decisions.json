@@ -1,0 +1,995 @@
+{
+  "american-express-blue-business-cash": {
+    "0343f81063c8648b": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members earn 2% cash back on all eligible purchases on up to $50,000 per calendar year, then 1% on eligible purchases thereafter.",
+      "rule": "2% on everything else, up to $50,000 per year"
+    },
+    "8325077dcb780394": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members earn 2% cash back on all eligible purchases on up to $50,000 per calendar year, then 1% on eligible purchases thereafter.",
+      "rule": "1% on everything else"
+    }
+  },
+  "american-express-blue-business-plus": {
+    "a8fdb03d3b281e78": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Earn 2X points on the first $50,000 in eligible purchases per calendar year and 1X points thereafter, with no category restrictions and no annual fee.",
+      "rule": "2x on everything else, up to $50,000 per year"
+    },
+    "b4d594b263ccf49f": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Earn 2X points on the first $50,000 in eligible purchases per calendar year and 1X points thereafter, with no category restrictions and no annual fee.",
+      "rule": "1x on everything else"
+    }
+  },
+  "american-express-blue-cash-everyday": {
+    "3b3323aae1e0506f": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members can earn 3% cash back on eligible U.S. online retail purchases, on up to $6,000 per year in purchases (then 1%).‡",
+      "rule": "3% on online shopping, up to $6,000 per year"
+    },
+    "4dd80624a3eaab89": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members can earn 1% cash back on other eligible purchases.‡",
+      "rule": "1% on everything else"
+    },
+    "64ff78b51523ef7f": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members can earn 3% cash back on eligible purchases at U.S. supermarkets, on up to $6,000 per year in purchases (then 1%).‡",
+      "rule": "3% on groceries, up to $6,000 per year"
+    },
+    "aaba560d26dd3392": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "3% cash back on gas at U.S. gas stations on up to $6,000 per year in purchases (then 1%)‡",
+      "rule": "3% on gas, up to $6,000 per year"
+    }
+  },
+  "american-express-blue-cash-preferred": {
+    "078c07b9844bf44f": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members can earn 1% cash back on other eligible purchases.‡",
+      "rule": "1% on everything else"
+    },
+    "3af5901f6c107fda": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members can earn 6% cash back on eligible purchases at U.S. supermarkets, on up to $6,000 per year in purchases (then 1%).‡",
+      "rule": "6% on groceries, up to $6,000 per year"
+    },
+    "5028ef538882d0a5": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members can earn 3% cash back on eligible purchases at U.S. gas stations.‡",
+      "rule": "3% on gas"
+    },
+    "6ad50b55a63f3f1b": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members can earn 3% cash back on transit (e.g., taxis/rideshare, parking, tolls, trains, buses and more).‡",
+      "rule": "3% on transit"
+    },
+    "822847fb1d80e129": {
+      "decidedAt": "2026-11-14",
+      "decision": "reject",
+      "quote": "Card Members can earn 6% cash back on eligible purchases at U.S. supermarkets, on up to $6,000 per year in purchases (then 1%).‡",
+      "rule": "1% on groceries"
+    },
+    "8c058b30f9c9b9f6": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Card Members can earn 6% cash back on select U.S. streaming subscriptions to stream your favorite shows, movies, and more.‡",
+      "rule": "6% on streaming"
+    }
+  },
+  "american-express-business-gold": {
+    "81cc991a8770d78e": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "1X\nPOINTS\nOn All Other Eligible Purchases\nMade using the Business Gold Card.‡",
+      "rule": "1x on everything else"
+    },
+    "c97b45edd09b91df": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "While your top 2 categories may change each billing cycle based on where your business spent the most, you will earn 4X points on the first $150,000 in combined purchases from these categories each calendar year (then 1X thereafter).",
+      "rule": "4x on the top-spend category each billing cycle, from: dining, gas, transit, phone & internet (and others), up to $150,000 per year"
+    },
+    "f8d8444e5dd3c4b7": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "3X\nPOINTS\nOn Flights & Pre-Paid Hotels‡\nBooked on AmexTravel.com.‡",
+      "rule": "3x on travel"
+    }
+  },
+  "american-express-business-green": {
+    "a9cbfaf99b2e5fd4": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "With the Business Green Rewards Card, you can earn 2X Membership Rewards® points on prepaid hotels and other eligible travel, such as prepaid car rentals, cruises and flights, when you book through AmexTravel.com or on the Amex Travel App™.",
+      "rule": "2x on travel"
+    },
+    "afc837516856f549": {
+      "added": {
+        "capAmount": null,
+        "capPeriod": null,
+        "capUnknown": false,
+        "categories": [
+          "everything-else"
+        ],
+        "conditions": [
+          "On Other Eligible Purchases"
+        ],
+        "evidence": {
+          "pageHash": "bd2a149ca6fc3ed8cd094bc242aa55174ed5c6dc879828c937dc522947627586",
+          "quote": "On Other Eligible Purchases\nmade using your Business Green Rewards Card.",
+          "url": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-business-green-card-amex/"
+        },
+        "firstMonths": null,
+        "hasOtherChoices": false,
+        "merchants": [],
+        "needs": [],
+        "paysWith": null,
+        "picks": null,
+        "rate": 1,
+        "requires": [],
+        "selection": "fixed",
+        "tier": null,
+        "unit": "per-dollar",
+        "validFrom": null,
+        "validTo": null,
+        "verified": "override"
+      },
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "overrides": "rate 1 is not in the quote",
+      "quote": "On Other Eligible Purchases\nmade using your Business Green Rewards Card.",
+      "rule": "1x on everything else"
+    }
+  },
+  "american-express-business-platinum": {
+    "5f1a6bd6660b8364": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "Earn 5X Membership Rewards® points on flights and prepaid hotels booked on AmexTravel.com.‡",
+      "rule": "5x on hotels and at Hilton"
+    },
+    "9698183207a78a07": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "Earn 2X points on eligible purchases in key business categories, or on purchases of $5K or more.",
+      "rule": "2x on everything else"
+    },
+    "ac971d1c68e47c7b": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "edited": {
+        "capAmount": null,
+        "capPeriod": null,
+        "capUnknown": false,
+        "categories": [
+          "airlines"
+        ],
+        "conditions": [],
+        "evidence": {
+          "pageHash": "9f06ca6bd548b355280a5aa1703ae41ce3d2d2c3e4a1ddbe4ec151a274a5d00d",
+          "quote": "You can also get 5X Membership Rewards® points on all flights booked on AmexTravel.com.‡",
+          "url": "https://www.americanexpress.com/us/credit-cards/business/business-credit-cards/american-express-business-platinum-credit-card-amex/"
+        },
+        "firstMonths": null,
+        "hasOtherChoices": false,
+        "merchants": [],
+        "needs": [],
+        "paysWith": null,
+        "picks": null,
+        "rate": 5,
+        "requires": [
+          "issuer-booking"
+        ],
+        "selection": "fixed",
+        "tier": null,
+        "unit": "per-dollar",
+        "validFrom": null,
+        "validTo": null,
+        "verified": "page"
+      },
+      "quote": "You can also get 5X Membership Rewards® points on all flights booked on AmexTravel.com.‡",
+      "rule": "5x on airlines"
+    },
+    "e46c0fcc1e900f2e": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "1X POINTS On Other Eligible Purchases",
+      "rule": "1x on everything else"
+    }
+  },
+  "american-express-delta-skymiles-blue": {
+    "297d5a50d4255e98": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Earn 1 mile per dollar for purchases you make with your Card",
+      "rule": "1x on everything else"
+    },
+    "77e66044596a73cf": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Earn 2 miles for every dollar spent on eligible purchases made directly with Delta.",
+      "rule": "2x at Delta"
+    },
+    "b6bd6e9a349f6959": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Earn 2X Miles at Restaurants",
+      "rule": "2x on dining"
+    }
+  },
+  "american-express-delta-skymiles-gold": {
+    "2d33f8f1cc1fc621": {
+      "added": {
+        "capAmount": null,
+        "capPeriod": null,
+        "capUnknown": false,
+        "categories": [
+          "airlines"
+        ],
+        "conditions": [],
+        "evidence": {
+          "pageHash": "3a999ee95fcff9711fc1a5d33091d7cd5de4779db81c8b14a583c8586b16911f",
+          "quote": "2X\nMILES\nOn Delta Purchases\nMade directly with Delta.‡",
+          "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-gold-american-express-card/"
+        },
+        "firstMonths": null,
+        "hasOtherChoices": false,
+        "merchants": [
+          "Delta"
+        ],
+        "needs": [],
+        "paysWith": null,
+        "picks": null,
+        "rate": 2,
+        "requires": [],
+        "selection": "fixed",
+        "tier": null,
+        "unit": "per-dollar",
+        "validFrom": null,
+        "validTo": null,
+        "verified": "override"
+      },
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "edited": {
+        "capAmount": null,
+        "capPeriod": null,
+        "capUnknown": false,
+        "categories": [],
+        "conditions": [],
+        "evidence": {
+          "pageHash": "3a999ee95fcff9711fc1a5d33091d7cd5de4779db81c8b14a583c8586b16911f",
+          "quote": "2X\nMILES\nOn Delta Purchases\nMade directly with Delta.‡",
+          "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-gold-american-express-card/"
+        },
+        "firstMonths": null,
+        "hasOtherChoices": false,
+        "merchants": [
+          "Delta"
+        ],
+        "needs": [],
+        "paysWith": null,
+        "picks": null,
+        "rate": 2,
+        "requires": [],
+        "selection": "fixed",
+        "tier": null,
+        "unit": "per-dollar",
+        "validFrom": null,
+        "validTo": null,
+        "verified": "override"
+      },
+      "overrides": "quote doesn't mention airlines",
+      "quote": "2X\nMILES\nOn Delta Purchases\nMade directly with Delta.‡",
+      "rule": "2x at Delta"
+    },
+    "8b3964805f03cf58": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "2X\nMILES\nOn Dining\nAt restaurants, including takeout and delivery in the U.S.‡",
+      "rule": "2x on dining"
+    },
+    "9a35ff7288f48077": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "1X MILES Per Dollar On Other Purchases.‡",
+      "rule": "1x on everything else"
+    },
+    "ad2986f2bd55464a": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "2X\nMILES\nOn Groceries\nAt U.S. supermarkets.‡",
+      "rule": "2x on groceries"
+    }
+  },
+  "american-express-delta-skymiles-gold-business": {
+    "3cfd32d8c43b19b2": {
+      "added": {
+        "capAmount": null,
+        "capPeriod": null,
+        "capUnknown": false,
+        "categories": [
+          "dining"
+        ],
+        "conditions": [],
+        "evidence": {
+          "pageHash": "978bc7dd599973869ee519d16a4d19804d7692afddd35ac084412af8523adc94",
+          "quote": "2X MILES At Restaurants\nWhen you use your Delta SkyMiles® Gold Business Card.‡",
+          "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-gold/"
+        },
+        "firstMonths": null,
+        "hasOtherChoices": false,
+        "merchants": [],
+        "needs": [],
+        "paysWith": null,
+        "picks": null,
+        "rate": 2,
+        "requires": [],
+        "selection": "fixed",
+        "tier": null,
+        "unit": "per-dollar",
+        "validFrom": null,
+        "validTo": null,
+        "verified": "page"
+      },
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "2X MILES At Restaurants\nWhen you use your Delta SkyMiles® Gold Business Card.‡",
+      "rule": "2x on dining"
+    },
+    "749e03da0e5fb38f": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "1X\nMILES\nOn Other Purchases\nMade using the Delta SkyMiles® Gold Business Card.‡",
+      "rule": "1x on everything else"
+    },
+    "b29b547c7c18599b": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "2X\nMILES\nOn Eligible U.S. Purchases\nat U.S. shipping providers & at U.S. providers for advertising in select media. Miles caps apply.‡",
+      "rule": "2x at U.S. shipping providers, U.S. providers for advertising in select media"
+    },
+    "c174a9ce5501bbee": {
+      "added": {
+        "capAmount": null,
+        "capPeriod": null,
+        "capUnknown": false,
+        "categories": [],
+        "conditions": [],
+        "evidence": {
+          "pageHash": "978bc7dd599973869ee519d16a4d19804d7692afddd35ac084412af8523adc94",
+          "quote": "2X\nMILES\nAt Delta\nPer every eligible dollar spent on purchases made directly with Delta.‡",
+          "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-gold/"
+        },
+        "firstMonths": null,
+        "hasOtherChoices": false,
+        "merchants": [
+          "Delta"
+        ],
+        "needs": [],
+        "paysWith": null,
+        "picks": null,
+        "rate": 2,
+        "requires": [],
+        "selection": "fixed",
+        "tier": null,
+        "unit": "per-dollar",
+        "validFrom": null,
+        "validTo": null,
+        "verified": "page"
+      },
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "2X\nMILES\nAt Delta\nPer every eligible dollar spent on purchases made directly with Delta.‡",
+      "rule": "2x at Delta"
+    }
+  },
+  "american-express-delta-skymiles-platinum": {
+    "1c2e3fdc2a55c7e1": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "1X MILES Per Dollar On Other Purchases.‡",
+      "rule": "1x on everything else"
+    },
+    "3d9d7552718e96b7": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "2X\nMILES\nOn Groceries\nAt U.S. supermarkets.‡",
+      "rule": "2x on groceries"
+    },
+    "813dc68f84cce3cf": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "2X MILES At restaurants, including takeout and delivery in the U.S.‡",
+      "rule": "2x on dining"
+    },
+    "9718304ec40d0122": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "edited": {
+        "capAmount": null,
+        "capPeriod": null,
+        "capUnknown": false,
+        "categories": [
+          "hotels"
+        ],
+        "conditions": [],
+        "evidence": {
+          "pageHash": "12dafba780cbaff6d9f46fabcf8c52c9b64715f5ada3c13b65fc219e9d8ee6ff",
+          "quote": "3X\nMILES\nAt Hotels\nPurchases made directly with hotels.‡",
+          "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-platinum-american-express-card/"
+        },
+        "firstMonths": null,
+        "hasOtherChoices": false,
+        "merchants": [],
+        "needs": [],
+        "paysWith": null,
+        "picks": null,
+        "rate": 3,
+        "requires": [],
+        "selection": "fixed",
+        "tier": null,
+        "unit": "per-dollar",
+        "validFrom": null,
+        "validTo": null,
+        "verified": "page"
+      },
+      "quote": "3X\nMILES\nAt Hotels\nPurchases made directly with hotels.‡",
+      "rule": "3x on hotels"
+    },
+    "a196dc11953b02f7": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "edited": {
+        "capAmount": null,
+        "capPeriod": null,
+        "capUnknown": false,
+        "categories": [],
+        "conditions": [],
+        "evidence": {
+          "pageHash": "12dafba780cbaff6d9f46fabcf8c52c9b64715f5ada3c13b65fc219e9d8ee6ff",
+          "quote": "When you earn 3X Miles on Delta flights and Delta Vacations®, one trip can lead you to the next.‡",
+          "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-platinum-american-express-card/"
+        },
+        "firstMonths": null,
+        "hasOtherChoices": false,
+        "merchants": [
+          "Delta"
+        ],
+        "needs": [],
+        "paysWith": null,
+        "picks": null,
+        "rate": 3,
+        "requires": [],
+        "selection": "fixed",
+        "tier": null,
+        "unit": "per-dollar",
+        "validFrom": null,
+        "validTo": null,
+        "verified": "page"
+      },
+      "quote": "When you earn 3X Miles on Delta flights and Delta Vacations®, one trip can lead you to the next.‡",
+      "rule": "3x at Delta"
+    }
+  },
+  "american-express-delta-skymiles-platinum-business": {
+    "3d80091d6da2dc44": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "3X\nMILES\nAt Delta & Hotels\nPer every eligible dollar spent on purchases made directly with Delta and hotels.‡",
+      "rule": "3x on hotels and at Delta"
+    },
+    "5939a5be0b557e81": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "1X\nMILES\nOn Other Purchases\nMade using the Delta SkyMiles® Platinum Business Card.‡",
+      "rule": "1x on everything else"
+    },
+    "baf268d9e9e08376": {
+      "added": {
+        "capAmount": null,
+        "capPeriod": null,
+        "capUnknown": false,
+        "categories": [
+          "transit"
+        ],
+        "conditions": [],
+        "evidence": {
+          "pageHash": "92b286e537253c890696326f584f4dc0f192462451d91428b3f418397ed2bdfa",
+          "quote": "On Eligible Transit, U.S. Shipping, & or Large Purchases\nEarn on transit including taxicabs, rideshares, and more, at U.S. shipping providers, and or on single eligible purchases of $5K or more, up to $100K of combined eligible purchases per year.\n\n1If your purchase qualifies for a category that has a higher mileage accelerator, only the higher accelerator will apply.‡",
+          "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-platinum/"
+        },
+        "firstMonths": null,
+        "hasOtherChoices": false,
+        "merchants": [],
+        "needs": [],
+        "paysWith": null,
+        "picks": null,
+        "rate": 1.5,
+        "requires": [],
+        "selection": "fixed",
+        "tier": null,
+        "unit": "per-dollar",
+        "validFrom": null,
+        "validTo": null,
+        "verified": "override"
+      },
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "overrides": "rate 1.5 is not in the quote",
+      "quote": "On Eligible Transit, U.S. Shipping, & or Large Purchases\nEarn on transit including taxicabs, rideshares, and more, at U.S. shipping providers, and or on single eligible purchases of $5K or more, up to $100K of combined eligible purchases per year.\n\n1If your purchase qualifies for a category that has a higher mileage accelerator, only the higher accelerator will apply.‡",
+      "rule": "1.5x on transit"
+    }
+  },
+  "american-express-delta-skymiles-reserve": {
+    "394d03902e80d76c": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "edited": {
+        "capAmount": null,
+        "capPeriod": null,
+        "capUnknown": false,
+        "categories": [],
+        "conditions": [],
+        "evidence": {
+          "pageHash": "58b86250c4bb13b2880ac43caa98ca1d2a2309df3e1df1bb6f72fed550b56a4d",
+          "quote": "Earn 3X Miles on Delta flights and Delta Vacations®",
+          "url": "https://www.americanexpress.com/us/credit-cards/card/delta-skymiles-reserve-american-express-card/"
+        },
+        "firstMonths": null,
+        "hasOtherChoices": false,
+        "merchants": [
+          "Delta"
+        ],
+        "needs": [],
+        "paysWith": null,
+        "picks": null,
+        "rate": 3,
+        "requires": [],
+        "selection": "fixed",
+        "tier": null,
+        "unit": "per-dollar",
+        "validFrom": null,
+        "validTo": null,
+        "verified": "page"
+      },
+      "quote": "Earn 3X Miles on Delta flights and Delta Vacations®",
+      "rule": "3x at Delta"
+    },
+    "de27d67abe83d349": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "Earn 1 mile per dollar for all other eligible purchases you make with your Card",
+      "rule": "1x on everything else"
+    }
+  },
+  "american-express-delta-skymiles-reserve-business": {
+    "030abdf87286558d": {
+      "added": {
+        "capAmount": null,
+        "capPeriod": null,
+        "capUnknown": false,
+        "categories": [],
+        "conditions": [],
+        "evidence": {
+          "pageHash": "bcb0d707cb6563c8aa515b3b807f130ad85eddf5c4acbe2f0b043c5296ed9c36",
+          "quote": "3X\nMILES\nAt Delta\nPer every eligible dollar spent on purchases made directly with Delta.‡",
+          "url": "https://www.americanexpress.com/en-us/business/credit-cards/delta-skymiles-reserve/"
+        },
+        "firstMonths": null,
+        "hasOtherChoices": false,
+        "merchants": [
+          "Delta"
+        ],
+        "needs": [],
+        "paysWith": null,
+        "picks": null,
+        "rate": 3,
+        "requires": [],
+        "selection": "fixed",
+        "tier": null,
+        "unit": "per-dollar",
+        "validFrom": null,
+        "validTo": null,
+        "verified": "page"
+      },
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "3X\nMILES\nAt Delta\nPer every eligible dollar spent on purchases made directly with Delta.‡",
+      "rule": "3x at Delta"
+    },
+    "574db448d3b4391f": {
+      "decidedAt": "2026-11-15",
+      "decision": "reject",
+      "quote": "After you spend $150,000 in purchases on your Card in a year, earn 1.5 miles on all eligible purchases for the rest of the year.1",
+      "rule": "1.5x on everything else"
+    },
+    "8eaa31db97e955c0": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "1.5X MILES Per Dollar On eligible transit, U.S. shipping & U.S. office supply store purchases.‡",
+      "rule": "1.5x on transit"
+    },
+    "9c835ceb4ddf4456": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "1X\nMILES\nOn Other Purchases\nMade using the Delta SkyMiles® Reserve Business Card.‡",
+      "rule": "1x on everything else"
+    }
+  },
+  "american-express-gold": {
+    "2d2878441ff35b4d": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "1X Membership Rewards® point per dollar spent on all other eligible purchases.‡",
+      "rule": "1x on everything else"
+    },
+    "38c5ddc2277bf628": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "edited": {
+        "capAmount": null,
+        "capPeriod": null,
+        "capUnknown": false,
+        "categories": [
+          "car-rentals"
+        ],
+        "conditions": [],
+        "evidence": {
+          "pageHash": "68826df5d9a9443ce2ebac4e220abbce1119b8c87a8e2a4c3f0b6b3a39304ee6",
+          "quote": "2X Membership Rewards® points per dollar spent on prepaid car rentals booked through AmexTravel.com or the Amex Travel App™ and cruises booked and paid through AmexTravel.com.‡",
+          "url": "https://www.americanexpress.com/us/credit-cards/card/gold-card/"
+        },
+        "firstMonths": null,
+        "hasOtherChoices": false,
+        "merchants": [],
+        "needs": [],
+        "paysWith": null,
+        "picks": null,
+        "rate": 2,
+        "requires": [
+          "issuer-booking"
+        ],
+        "selection": "fixed",
+        "tier": null,
+        "unit": "per-dollar",
+        "validFrom": null,
+        "validTo": null,
+        "verified": "page"
+      },
+      "quote": "2X Membership Rewards® points per dollar spent on prepaid car rentals booked through AmexTravel.com or the Amex Travel App™ and cruises booked and paid through AmexTravel.com.‡",
+      "rule": "2x on car rentals"
+    },
+    "64e49221f110ccee": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "5X Membership Rewards® points per dollar spent on prepaid hotels booked through AmexTravel.com or the Amex Travel App™. ‡",
+      "rule": "5x on hotels"
+    },
+    "a7d739018f8220c9": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "4X Membership Rewards® points per dollar spent on purchases at restaurants worldwide, on up to $50,000 in purchases per calendar year, then 1X points for the rest of the year.‡",
+      "rule": "4x on dining, up to $50,000 per year"
+    },
+    "d142175095f2f4bf": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "3X Membership Rewards® points per dollar spent on flights booked through AmexTravel.com or the Amex Travel App™ or purchased directly from airlines.‡",
+      "rule": "3x on airlines"
+    },
+    "ec399bd72bcfdd2e": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "4X Membership Rewards® points per dollar spent at US supermarkets, on up to $25,000 in purchases per calendar year, then 1X points for the rest of the year.‡",
+      "rule": "4x on groceries, up to $25,000 per year"
+    }
+  },
+  "bank-of-america-customized-cash-rewards": {
+    "0569d530cb013697": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Earn 3% and 2% cash back on up to $2,500 in combined purchases each quarter in the choice category, and at grocery stores and wholesale clubs, then earn unlimited 1% thereafter.",
+      "rule": "3% in the category the cardholder chooses: gas, online shopping, dining, travel, drugstores (and others), up to $2,500 per quarter"
+    },
+    "06d8d1223f493c2c": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "1% unlimited cash back on all other purchases",
+      "rule": "1% on everything else"
+    },
+    "49afd6cd1f803e29": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "1% unlimited cash back on all other purchases",
+      "rule": "1% on everything else"
+    },
+    "754f6bb8c96a7ef6": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "Earn 3% and 2% cash back on up to $2,500 in combined purchases each quarter in the choice category, and at grocery stores and wholesale clubs, then earn unlimited 1% thereafter.",
+      "rule": "2% on groceries, up to $2,500 per quarter"
+    },
+    "834efd0bf28fdf56": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "Earn 3% and 2% cash back on up to $2,500 in combined purchases each quarter in the choice category, and at grocery stores and wholesale clubs, then earn unlimited 1% thereafter.",
+      "rule": "3% in the category the cardholder chooses: gas, online shopping, dining, travel, drugstores (and others), up to $2,500 per quarter"
+    },
+    "f19cfcec5a2cfa2b": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Earn 3% and 2% cash back on up to $2,500 in combined purchases each quarter in the choice category, and at grocery stores and wholesale clubs, then earn unlimited 1% thereafter.",
+      "rule": "2% on groceries, up to $2,500 per quarter"
+    }
+  },
+  "chase-freedom-flex": {
+    "0c5c80d281a308c5": {
+      "decidedAt": "2026-11-13",
+      "decision": "accept",
+      "quote": "Earn 3% on drugstore purchases.",
+      "rule": "3% on drugstores"
+    },
+    "0ccf44614d87586f": {
+      "decidedAt": "2026-11-13",
+      "decision": "accept",
+      "quote": "OCT-DEC\n2026\nCURRENT Quarter\nGrocery Stores\n(excluding Walmart® and Target®)*Opens offer details overlay\nDining\nAmerican Red Cross®*Opens offer details overlay",
+      "rule": "5% in rotating bonus categories from 2026-10-01 to 2026-12-31: groceries, dining (also at American Red Cross®), up to $1,500 per quarter"
+    },
+    "0f13fb92505511da": {
+      "decidedAt": "2026-11-13",
+      "decision": "reject",
+      "quote": "Earn 5% cash back on up to $1,500 in rotating categories each quarter you activate.",
+      "rule": "5% in rotating bonus categories, up to $1,500 per quarter"
+    },
+    "2d80d051bd940a74": {
+      "decidedAt": "2026-11-13",
+      "decision": "accept",
+      "quote": "Earn 3% on dining at restaurants, including takeout and eligible delivery services.",
+      "rule": "3% on dining"
+    },
+    "36fea253ef333d5b": {
+      "decidedAt": "2026-11-13",
+      "decision": "accept",
+      "quote": "Earn 1% on all other purchases.",
+      "rule": "1% on everything else"
+    },
+    "4aa3e0ff3d81b14a": {
+      "decidedAt": "2026-11-13",
+      "decision": "accept",
+      "quote": "Earn 5% on travel purchased through Chase Travel℠.",
+      "rule": "5% on travel"
+    },
+    "a581ff4862fc7def": {
+      "decidedAt": "2026-11-13",
+      "decision": "accept",
+      "quote": "JAN-MAR\n2027\nNEXT Quarter\nGrocery Stores\n(excluding Walmart® and Target®)*Opens offer details overlay\nTop Streaming Services",
+      "rule": "5% in rotating bonus categories from 2027-01-01 to 2027-03-31: groceries, streaming, up to $1,500 per quarter"
+    }
+  },
+  "citi-custom-cash": {
+    "3e04061fcd93c917": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "Customers will earn 5% cash back on purchases in the top eligible spend category each billing cycle, up to the first $500 spent.",
+      "rule": "5% on the top-spend category each billing cycle, from: dining, gas, groceries, travel, transit, streaming, drugstores (and others), up to $500 per billing cycle"
+    },
+    "4cc4cfba84e0bcd6": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "Cardmembers will also earn unlimited 1% cash back on all other purchases.",
+      "rule": "1% on everything else"
+    },
+    "7a78090e4832c980": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Customers will earn 5% cash back on purchases in the top eligible spend category each billing cycle, up to the first $500 spent.",
+      "rule": "5% on the top-spend category each billing cycle, from: dining, gas, groceries, travel, transit, streaming, drugstores (and others), up to $500 per billing cycle"
+    },
+    "90f3d64a0116fdee": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Cardmembers will also earn unlimited 1% cash back on all other purchases.",
+      "rule": "1% on everything else"
+    }
+  },
+  "discover-discover-it": {
+    "272a6b7ec46982f7": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Plus, earn 1% cash back on all other purchases.",
+      "rule": "1% on everything else"
+    },
+    "50f85abcc8723827": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Earn 5% Cashback Bonus at Restaurants, Entertainment and Utilities, now to December 31, 2026, on up to $1,500 in purchases when you activate.",
+      "rule": "5% in rotating bonus categories from 2026-10-01 to 2026-12-31: dining, entertainment, utilities, up to $1,500 per quarter"
+    },
+    "8a3e912d563793fc": {
+      "decidedAt": "2026-11-14",
+      "decision": "reject",
+      "quote": "Earn 5% cash back on everyday purchases at different places you shop each quarter, up to the quarterly maximum when you activate.",
+      "rule": "5% in rotating bonus categories"
+    }
+  },
+  "goldman-sachs-apple-card": {
+    "111dc25b43058d0f": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "When you use the card, you’ll get 1% Daily Cash back on every purchase.",
+      "rule": "1% on everything else"
+    },
+    "53c891790b44efd4": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "edited": {
+        "capAmount": null,
+        "capPeriod": null,
+        "capUnknown": false,
+        "categories": [
+          "everything-else"
+        ],
+        "conditions": [],
+        "evidence": {
+          "pageHash": "edcc8c1be3f0be17d9c1fa91441d290eb47a7eef01767d456421063bce60af2e",
+          "quote": "Get 2% Daily Cash back when you use Apple Card with Apple Pay.",
+          "url": "https://www.apple.com/apple-card/"
+        },
+        "firstMonths": null,
+        "hasOtherChoices": false,
+        "merchants": [],
+        "needs": [],
+        "paysWith": "Apple Pay",
+        "picks": null,
+        "rate": 2,
+        "requires": [],
+        "selection": "fixed",
+        "tier": null,
+        "unit": "percent",
+        "validFrom": null,
+        "validTo": null,
+        "verified": "page"
+      },
+      "quote": "Get 2% Daily Cash back when you use Apple Card with Apple Pay.",
+      "rule": "2% on everything else when paying with Apple Pay"
+    },
+    "69969b5b586d226b": {
+      "decidedAt": "2026-11-14",
+      "decision": "accept",
+      "quote": "Get 2% Daily Cash back when you use Apple Card with Apple Pay.",
+      "rule": "2% when paying with Apple Pay"
+    },
+    "9b123d7933f6a5e4": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "When you use the card, you’ll get 1% Daily Cash back on every purchase.",
+      "rule": "1% on everything else"
+    }
+  },
+  "navy-federal-more-rewards": {
+    "1fcfb17a893da47e": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "3X points on gas and transit",
+      "rule": "3x on gas"
+    },
+    "4823637a3779851a": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "3X points at supermarkets",
+      "rule": "3x on groceries"
+    },
+    "641a5099089d9bdd": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "1X points on everything else",
+      "rule": "1x on everything else"
+    },
+    "832dd8bbe59c4db6": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "3X points on gas and transit",
+      "rule": "3x on transit"
+    },
+    "d8851e7ed938569a": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "3X points at restaurants and on food delivery",
+      "rule": "3x on dining"
+    }
+  },
+  "synchrony-paypal-cashback": {
+    "65c655677b151862": {
+      "added": {
+        "capAmount": null,
+        "capPeriod": null,
+        "capUnknown": false,
+        "categories": [
+          "everything-else"
+        ],
+        "conditions": [],
+        "evidence": {
+          "pageHash": null,
+          "quote": "1.5%\ncash back on all other purchases everywhere Mastercard is accepted.",
+          "url": "https://www.paypal.com/us/digital-wallet/manage-money/paypal-cashback-mastercard"
+        },
+        "firstMonths": null,
+        "hasOtherChoices": false,
+        "merchants": [],
+        "needs": [],
+        "paysWith": null,
+        "picks": null,
+        "rate": 1.5,
+        "requires": [],
+        "selection": "fixed",
+        "tier": null,
+        "unit": "percent",
+        "validFrom": null,
+        "validTo": null,
+        "verified": "manual"
+      },
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "1.5%\ncash back on all other purchases everywhere Mastercard is accepted.",
+      "rule": "1.5% on everything else"
+    },
+    "7545bb341f54a199": {
+      "added": {
+        "capAmount": null,
+        "capPeriod": null,
+        "capUnknown": false,
+        "categories": [
+          "everything-else"
+        ],
+        "conditions": [],
+        "evidence": {
+          "pageHash": null,
+          "quote": "3%\ncash back when you check out with PayPal.",
+          "url": "https://www.paypal.com/us/digital-wallet/manage-money/paypal-cashback-mastercard"
+        },
+        "firstMonths": null,
+        "hasOtherChoices": false,
+        "merchants": [],
+        "needs": [],
+        "paysWith": "PayPal",
+        "picks": null,
+        "rate": 3,
+        "requires": [],
+        "selection": "fixed",
+        "tier": null,
+        "unit": "percent",
+        "validFrom": null,
+        "validTo": null,
+        "verified": "manual"
+      },
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "3%\ncash back when you check out with PayPal.",
+      "rule": "3% on everything else when paying with PayPal"
+    }
+  },
+  "wells-fargo-active-cash": {
+    "a9984c2a7a90fa47": {
+      "decidedAt": "2026-11-15",
+      "decision": "accept",
+      "quote": "Plus, enjoy unlimited 2% cash rewards on purchases.",
+      "rule": "2% on everything else"
+    }
+  }
+}

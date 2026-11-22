@@ -9,11 +9,13 @@ struct PluralStringsTests {
         #expect(String(localized: Strings.RecentlyDeleted.transactionCount(1)) == "1 transaction")
         #expect(String(localized: Strings.RecentlyDeleted.daysLeft(1)) == "1 day left")
         #expect(String(localized: Strings.Recurring.remindDaysLater(1)) == "Remind me 1 day later")
+        #expect(String(localized: Strings.Rewards.changeRemovesEditedRates(1)).hasPrefix("Its 1 Edited rate is removed."))
     }
 
     @Test func moreThanOneTakesThePlural() {
         #expect(String(localized: Strings.RecentlyDeleted.transactionCount(3)) == "3 transactions")
         #expect(String(localized: Strings.RecentlyDeleted.daysLeft(30)) == "30 days left")
         #expect(String(localized: Strings.Recurring.remindDaysLater(2)) == "Remind me 2 days later")
+        #expect(String(localized: Strings.Rewards.changeRemovesEditedRates(2)).hasPrefix("Its 2 Edited rates are removed."))
     }
 }

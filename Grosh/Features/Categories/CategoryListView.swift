@@ -2,7 +2,8 @@ import SwiftData
 import SwiftUI
 
 /// Account → Categories: the Expense, Income and Debt/Loan trees. Tap to edit; swipe or right-click to hide,
-/// merge or delete. Edit reorders the Expense or Income categories, and each parent's subcategories within it.
+/// merge or delete. Each parent and its subcategories sit in their own group, with a gap before the next parent.
+/// Edit reorders the Expense or Income categories, and each parent's subcategories within it.
 struct CategoryListView: View {
     @Environment(\.modelContext) private var context
     @Query private var allCategories: [Category]
@@ -42,6 +43,10 @@ struct CategoryListView: View {
                 categorySections
             }
         }
+        #if os(iOS)
+        // Each parent is a card of its own; a tight gap keeps them reading as one list.
+        .listSectionSpacing(.compact)
+        #endif
         .task(id: CategoryCatalog.tree(of: type, from: allCategories).map(\.persistentModelID)) {
             let tree = CategoryCatalog.tree(of: type, from: allCategories)
             usage = Usage(counted: Set(tree.map(\.persistentModelID)), inUse: catalog.inUse(tree))
@@ -91,25 +96,14 @@ struct CategoryListView: View {
     /// The type's tree to tap and swipe, the switch for hidden categories, and the app's own categories.
     @ViewBuilder
     private var categorySections: some View {
-        Section {
-            ForEach(rows) { category in
-                let canDelete = usage.canDelete(category)
-                Button {
-                    editorMode = .edit(category)
-                } label: {
-                    row(for: category)
-                }
-                .buttonStyle(.plain)
-                .swipeActions { actions(for: category, canDelete: canDelete) }
-                .contextMenu {
-                    Button(Strings.Common.edit, systemImage: "pencil") { editorMode = .edit(category) }
-                    actions(for: category, canDelete: canDelete)
-                }
+        if type.isUserManaged {
+            Section {
+                Button(Strings.Categories.newCategory, systemImage: "plus.circle") { editorMode = .add(type) }
             }
-        } footer: {
-            if type == .debtLoan {
-                Text(Strings.Categories.debtLoanFooter)
-            }
+        }
+
+        ForEach(shownGroups) { group in
+            categoryGroup(group)
         }
 
         Section {
@@ -160,6 +154,55 @@ struct CategoryListView: View {
                     .onMove { source, destination in
                         Log.store.perform("Changing a category", errorMessage: &errorMessage) { try catalog.move(subcategories, fromOffsets: source, toOffset: destination) }
                     }
+            }
+        }
+    }
+
+    /// One parent and its subcategories, as the list shows them. The Debt/Loan note follows the last of those groups.
+    private struct ShownGroup: Identifiable {
+        let categories: [Category]
+        let showsDebtLoanFooter: Bool
+        var id: PersistentIdentifier { categories[0].persistentModelID }
+    }
+
+    private var shownGroups: [ShownGroup] {
+        let groups = CategoryCatalog.parentGroups(in: rows)
+        return groups.enumerated().map { index, categories in
+            ShownGroup(
+                categories: categories,
+                showsDebtLoanFooter: type == .debtLoan && index == groups.count - 1
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func categoryGroup(_ group: ShownGroup) -> some View {
+        if group.showsDebtLoanFooter {
+            Section {
+                categoryRows(group.categories)
+            } footer: {
+                Text(Strings.Categories.debtLoanFooter)
+            }
+        } else {
+            Section {
+                categoryRows(group.categories)
+            }
+        }
+    }
+
+    private func categoryRows(_ categories: [Category]) -> some View {
+        ForEach(categories) { category in
+            let canDelete = usage.canDelete(category)
+            Button {
+                editorMode = .edit(category)
+            } label: {
+                row(for: category)
+            }
+            .buttonStyle(.plain)
+            .swipeActions { actions(for: category, canDelete: canDelete) }
+            .contextMenu {
+                Button(Strings.Common.edit, systemImage: "pencil") { editorMode = .edit(category) }
+                actions(for: category, canDelete: canDelete)
             }
         }
     }

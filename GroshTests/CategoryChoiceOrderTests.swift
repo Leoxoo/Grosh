@@ -98,4 +98,25 @@ struct CategoryChoiceOrderTests {
 
         #expect(CategoryCatalog.matching("  ", in: tree).map(\.name) == tree.map(\.name))
     }
+
+    @Test func eachParentAndItsSubcategoriesFormOneGroup() throws {
+        let names = CategoryCatalog.parentGroups(in: try expenseTree).map { $0.map(\.name) }
+
+        #expect(names[0] == ["Food & Beverage", "Café", "Restaurants"])
+        #expect(names[1] == ["Products"])
+        #expect(names[2].first == "Bills & Utilities")
+        #expect(names[2].dropFirst().first == "Phone Bill")
+    }
+
+    @Test func aSubcategoryJoinsItsParentAndStandsAloneWhenTheParentIsMissing() throws {
+        let bills = try fixture.category("Bills & Utilities")
+        let phone = try fixture.category("Phone Bill")
+        let cafe = try fixture.category("Café")
+
+        let withParent = CategoryCatalog.parentGroups(in: [bills, phone, cafe]).map { $0.map(\.name) }
+        let withoutParent = CategoryCatalog.parentGroups(in: [cafe, phone]).map { $0.map(\.name) }
+
+        #expect(withParent == [["Bills & Utilities", "Phone Bill"], ["Café"]])
+        #expect(withoutParent == [["Café"], ["Phone Bill"]])
+    }
 }

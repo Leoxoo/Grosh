@@ -1,12 +1,12 @@
 import SwiftData
 import SwiftUI
 
-/// What tapping a Card opens: the transactions paid with it one period at a time, and their total, to check against
-/// the card's statement. A Credit card with a statement date shows its statement periods, any other Card calendar
-/// months. It opens on the current period; ‹ › step back through the periods with the Card's transactions and forward
-/// again. A statement period also lists its lead-in transactions, muted under "Previous statement": each can be added
-/// to the statement total for as long as this screen shows that statement, and nothing about it is saved. Use inside a
-/// `NavigationStack`.
+/// What tapping a Card opens: what it earns (``CardRewardsSection``), then the transactions paid with it one period at
+/// a time, and their total, to check against the card's statement. A Credit card with a statement date shows its
+/// statement periods, any other Card calendar months. It opens on the current period; ‹ › step back through the periods
+/// with the Card's transactions and forward again. A statement period also lists its nearby transactions, from the days
+/// just before and after it, muted under "Around this statement": each can be added to the statement total for as long
+/// as this screen shows that statement, and nothing about it is saved. Use inside a `NavigationStack`.
 struct CardTransactionsView: View {
     let card: Card
 
@@ -15,8 +15,8 @@ struct CardTransactionsView: View {
     /// a transaction dated after today.
     @State private var periodsBack = 0
     @State private var isEditing = false
-    /// The lead-in transactions the user added to the statement total for now. Cleared on stepping to another period.
-    @State private var addedLeadIns = Set<Transaction>()
+    /// The nearby transactions the user added to the statement total for now. Cleared on stepping to another period.
+    @State private var addedNearby = Set<Transaction>()
 
     var body: some View {
         // The Card can be merged into another or deleted, from its editor, while this screen is open.
@@ -30,7 +30,7 @@ struct CardTransactionsView: View {
             } else {
                 let period = card.period(containing: today).adding(-periodsBack)
                 CardPeriodList(
-                    card: card, period: period, today: today, periodsBack: $periodsBack, addedLeadIns: $addedLeadIns
+                    card: card, period: period, today: today, periodsBack: $periodsBack, addedNearby: $addedNearby
                 )
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
@@ -47,12 +47,12 @@ struct CardTransactionsView: View {
             CardEditor(mode: .edit(card))
         }
         .onChange(of: periodsBack) {
-            addedLeadIns = []
+            addedNearby = []
         }
     }
 }
 
-/// The period being shown, its count and total, then its transactions by day and its lead-in transactions. The Card's
+/// The period being shown, its count and total, then its transactions by day and its nearby transactions. The Card's
 /// transactions on the period's days, and its first and last, are read by the store for the period shown, rather than by
 /// walking every transaction the Card paid for on each draw.
 private struct CardPeriodList: View {
@@ -60,22 +60,25 @@ private struct CardPeriodList: View {
     let period: CardPeriod
     let today: CalendarDay
     @Binding var periodsBack: Int
-    /// The lead-in transactions the user added to the statement total for now.
-    @Binding var addedLeadIns: Set<Transaction>
+    /// The nearby transactions the user added to the statement total for now.
+    @Binding var addedNearby: Set<Transaction>
 
     @Query private var paid: [Transaction]
     @Query private var earliest: [Transaction]
     @Query private var latest: [Transaction]
+    /// What the Rewards section has open, presented from the list rather than from inside it.
+    @State private var rewardsAction: CardRewardsAction?
+    @State private var errorMessage: String?
 
     init(
         card: Card, period: CardPeriod, today: CalendarDay, periodsBack: Binding<Int>,
-        addedLeadIns: Binding<Set<Transaction>>
+        addedNearby: Binding<Set<Transaction>>
     ) {
         self.card = card
         self.period = period
         self.today = today
         _periodsBack = periodsBack
-        _addedLeadIns = addedLeadIns
+        _addedNearby = addedNearby
         let reads = CardStatement.Reads(card: card, for: period)
         _paid = Query(reads.paid)
         _earliest = Query(reads.earliest)
@@ -87,10 +90,12 @@ private struct CardPeriodList: View {
             of: card, for: period, paid: paid, earliest: earliest, latest: latest, today: today
         )
         let shown = statement.transactions
-        let leadIns = statement.leadIns
-        let added = leadIns.filter { addedLeadIns.contains($0) }
+        let nearby = statement.nearby
+        let added = nearby.filter { addedNearby.contains($0) }
 
         List {
+            CardRewardsSection(card: card, today: today, action: $rewardsAction)
+
             Section {
                 CardPeriodStepper(
                     period: period, periods: statement.periods, today: today, periodsBack: $periodsBack
@@ -105,7 +110,7 @@ private struct CardPeriodList: View {
                 } label: {
                     Text(period.isStatement ? Strings.Cards.statementTotal : Strings.Common.total)
                     if !added.isEmpty {
-                        Text(Strings.Cards.includesFromPreviousStatement(added.count))
+                        Text(Strings.Cards.includesFromAroundStatement(added.count))
                     }
                 }
             } footer: {
@@ -135,30 +140,34 @@ private struct CardPeriodList: View {
                 }
             }
 
-            if !leadIns.isEmpty {
+            if !nearby.isEmpty {
                 Section {
-                    ForEach(leadIns.inListOrder()) { transaction in
-                        LeadInTransactionRow(
-                            transaction: transaction, isAdded: addedLeadIns.contains(transaction)
+                    ForEach(nearby.inListOrder()) { transaction in
+                        NearbyTransactionRow(
+                            transaction: transaction, isAdded: addedNearby.contains(transaction)
                         ) {
-                            if addedLeadIns.remove(transaction) == nil {
-                                addedLeadIns.insert(transaction)
+                            if addedNearby.remove(transaction) == nil {
+                                addedNearby.insert(transaction)
                             }
                         }
                     }
                 } header: {
-                    Text(Strings.Cards.previousStatementSection)
+                    Text(Strings.Cards.nearbySection)
                 } footer: {
-                    Text(Strings.Cards.previousStatementFooter(CardPeriod.leadInDayCount))
+                    Text(Strings.Cards.nearbyFooter(CardPeriod.nearbyDayCount))
                 }
             }
         }
+        .sheet(item: $rewardsAction) { action in
+            action.sheet(for: card, errorMessage: $errorMessage)
+        }
+        .errorAlert(Strings.Cards.couldntChange, message: $errorMessage)
     }
 }
 
-/// A lead-in transaction: muted, since it belongs to the previous statement, but opening its detail like any other,
-/// with a + that adds it to the statement total for now, or takes it back out once added.
-private struct LeadInTransactionRow: View {
+/// A nearby transaction: muted, since it belongs to the previous or the next statement, but opening its detail like any
+/// other, with a + that adds it to the statement total for now, or takes it back out once added.
+private struct NearbyTransactionRow: View {
     let transaction: Transaction
     let isAdded: Bool
     let toggle: () -> Void
@@ -228,5 +237,8 @@ private struct CardPeriodStepper: View {
             .disabled(period >= periods.upperBound)
         }
         .buttonStyle(.borderless)
+        // The list starts a row's separator under its first text, here the centered title; start it at the row's
+        // leading edge, as under the other rows.
+        .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
     }
 }

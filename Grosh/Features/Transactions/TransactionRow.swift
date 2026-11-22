@@ -97,7 +97,7 @@ struct CardIndicator: View {
     let card: Card
 
     var body: some View {
-        CardMark(card: card, height: 15, symbolFont: .caption)
+        CardMark(card: card, height: 15)
         .frame(width: 24, height: 16)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(card.name)
